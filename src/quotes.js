@@ -15,10 +15,12 @@ export function parseTencentQuotes(text, symbols) {
   return out;
 }
 
-// smartbox 有时把名称按 %uXXXX 转义返回（如 %u8FC8 → 迈）；解码回真实字符。
+// smartbox 把名称按 \uXXXX 或 %uXXXX 转义返回（如 万科 → 万科）；两种都解码回真实字符。
 function decodeHintName(s) {
-  if (s.indexOf("%u") < 0) return s;
-  return s.replace(/%u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+  if (s.indexOf("u") < 0) return s;
+  return s
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/%u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 }
 
 // 腾讯 smartbox: v_hint="mkt~code~name~~^mkt~code~name~~^...";
