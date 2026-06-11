@@ -67,9 +67,14 @@ const items = []; // {id, cfg, gauge, chartEl, cfgEl, verdictEl, live, gotQuote,
 const gate = document.getElementById("gate");
 const appEl = document.getElementById("app");
 async function tryLoad() {
-  const res = await fetch("/api/admin/items");
-  if (res.status === 401) return false;
-  const { items: rows } = await res.json();
+  let rows;
+  try {
+    const res = await fetch("/api/admin/items");
+    if (res.status === 401) return false;
+    rows = (await res.json()).items || [];
+  } catch {
+    return false;
+  }
   gate.classList.add("hidden");
   appEl.classList.remove("hidden");
   rows.forEach((r) => addItem({ ...r, price: 0 }));
@@ -100,6 +105,8 @@ function setSave(item, state, text) {
 }
 async function saveItem(item) {
   if (!item.cfg.symbol || !structValid(item.cfg)) return;
+  if (item._saving) { item._pendingSave = true; return; } // a POST/PUT is in flight — coalesce, replay after it resolves
+  item._saving = true;
   setSave(item, "", "保存中…");
   const payload = {
     ticker: item.cfg.ticker, name: item.cfg.name, symbol: item.cfg.symbol,
@@ -108,13 +115,20 @@ async function saveItem(item) {
   };
   const url = item.id ? `/api/admin/items/${item.id}` : "/api/admin/items";
   const method = item.id ? "PUT" : "POST";
-  const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-  if (res.ok) {
-    const body = await res.json();
-    if (!item.id && body.id) item.id = body.id;
-    setSave(item, "ok", "已保存");
-  } else {
+  try {
+    const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    if (res.ok) {
+      const body = await res.json();
+      if (!item.id && body.id) item.id = body.id;
+      setSave(item, "ok", "已保存");
+    } else {
+      setSave(item, "err", "保存失败");
+    }
+  } catch {
     setSave(item, "err", "保存失败");
+  } finally {
+    item._saving = false;
+    if (item._pendingSave) { item._pendingSave = false; saveItem(item); } // replay latest edit (now a PUT, id is known)
   }
 }
 function debounceSave(item) {
