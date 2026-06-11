@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的看板 · 配置</title>
+<link rel="stylesheet" href="/shared/styles.css">
+<style>
+  .hidden{display:none}
+  .save-state{font-size:11px;color:var(--ink-mute);font-family:var(--mono);margin-left:8px}
+  .save-state.ok{color:var(--green)} .save-state.err{color:var(--red)}
+  .field textarea{font-family:var(--font);font-size:13px;color:var(--ink);border:1px solid #dfe3ea;
+    border-radius:8px;padding:7px 9px;width:100%;background:#fbfcfd;outline:none;min-height:62px;
+    resize:vertical;line-height:1.5}
+  .field textarea:focus{border-color:#3a73ee;box-shadow:0 0 0 3px rgba(58,115,238,.12);background:#fff}
+  .cfg-block.site .field input{font-family:var(--font)}
+  .color-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #eef0f3}
+  .color-row:first-child{border-top:none}
+  .color-row .c-lab{flex:1;font-size:13px;color:var(--ink-soft)}
+  .color-row input[type=color]{width:36px;height:28px;padding:0;border:1px solid #dfe3ea;
+    border-radius:6px;background:#fff;cursor:pointer}
+  .color-row input[type=text]{width:94px;font-family:var(--mono);font-size:12.5px;
+    border:1px solid #dfe3ea;border-radius:6px;padding:5px 7px;background:#fbfcfd;outline:none}
+  .color-row input[type=text].bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(226,60,60,.10)}
+  .cfg-block.site .field input[type=text].bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(226,60,60,.10)}
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- 配置主体 -->
+  <div id="app" class="hidden">
+    <div class="page-head">
+      <p class="eyebrow">我的看板 · 配置</p>
+      <h1>估值钟摆 · 我的配置</h1>
+      <p class="sub">在此增删改标的与估值参数，保存后公开页即时生效。</p>
+    </div>
+    <div class="layout">
+      <div class="charts" id="charts"></div>
+      <div class="config">
+        <div class="config-head">
+          <span class="config-title">配置</span>
+          <button class="btn primary" id="btnAdd">＋ 添加图表</button>
+        </div>
+        <div class="quote-bar">
+          <button class="btn" id="btnRefresh">↻ 立即刷新</button>
+          <span class="quote-status" id="quoteStatus"></span>
+          <button class="btn" id="btnLogout" style="margin-left:auto">退出</button>
+        </div>
+        <p class="quote-note">现价由腾讯公开行情接口经服务端代理获取（延时）。代码框支持 <code>代码 / 名称 / 拼音</code> 联想，<b>必须从下拉中选择</b>以锁定精确标的。改动会自动保存。</p>
+
+        <!-- 看板设置 -->
+        <div class="cfg-block site" id="boardBlock">
+          <div class="cfg-top">
+            <span class="cfg-name">看板设置</span>
+            <span class="save-state" id="boardSave"></span>
+          </div>
+          <div class="cfg-grid">
+            <label class="field full"><span class="f-lab">看板名称</span>
+              <input id="boardName" type="text" autocomplete="off" placeholder="我的估值看板"></label>
+            <label class="field full"><span class="f-lab">公开地址 Slug</span>
+              <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
+          </div>
+          <p class="quote-note">公开地址：<a id="boardLink" href="#" target="_blank">/b/…</a> — 改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位。</p>
+        </div>
+
+        <!-- 页面文案 -->
+        <div class="cfg-block site">
+          <div class="cfg-top">
+            <span class="cfg-name">页面文案</span>
+            <span class="save-state" id="setSave"></span>
+          </div>
+          <div class="cfg-grid">
+            <label class="field full"><span class="f-lab">小标题</span>
+              <input id="setEyebrow" type="text" autocomplete="off" placeholder="市场情绪 · Valuation Pendulum"></label>
+            <label class="field full"><span class="f-lab">大标题</span>
+              <input id="setTitle" type="text" autocomplete="off" placeholder="估值钟摆看板"></label>
+            <label class="field full"><span class="f-lab">说明</span>
+              <textarea id="setSubtitle" placeholder="每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。"></textarea></label>
+          </div>
+          <p class="quote-note">留空即使用默认文案。改动自动保存，公开页即时生效。</p>
+        </div>
+
+        <!-- 色块配色 -->
+        <div class="cfg-block site">
+          <div class="cfg-top">
+            <span class="cfg-name">色块配色</span>
+            <span class="save-state" id="colSave"></span>
+          </div>
+          <div id="colorRows"></div>
+          <p class="quote-note">各估值区间的高亮色。用取色器或直接填 <code>#rrggbb</code>，改动自动保存、实时预览；清空恢复默认。</p>
+        </div>
+
+        <div id="cfgList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { Gauge } from "/shared/gauge.js";
+import { verdictOf, structValid, applyZoneColors, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
+import { MKT_LABEL } from "/shared/market.js";
+
+const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+const chartsEl = document.getElementById("charts");
+const cfgList = document.getElementById("cfgList");
+const items = []; // {id, cfg, gauge, chartEl, cfgEl, verdictEl, live, gotQuote, saveEl}
+let quoteTimer = null;
+
+/* ---------- 启动：/api/me 鉴权 ---------- */
+async function init() {
+  let me;
+  try {
+    const res = await fetch("/api/me");
+    if (res.status === 401) { location.href = "/login"; return; }
+    me = await res.json();
+  } catch {
+    location.href = "/login";
+    return;
+  }
+  document.getElementById("app").classList.remove("hidden");
+  // 初始化看板设置输入框
+  const board = me.board || {};
+  document.getElementById("boardName").value = board.name || "";
+  document.getElementById("boardSlug").value = board.slug || "";
+  updateBoardLink(board.slug || "");
+
+  // 加载列表 + 设置
+  let rows;
+  try {
+    const res = await fetch("/api/my/items");
+    if (!res.ok) { location.href = "/login"; return; }
+    rows = (await res.json()).items || [];
+  } catch {
+    location.href = "/login";
+    return;
+  }
+  rows.forEach((r) => addItem({ ...r, price: 0 }));
+  loadSettings();
+  fetchQuotes();
+  if (!quoteTimer) quoteTimer = setInterval(fetchQuotes, 60000);
+}
+
+/* ---------- 看板设置（自动保存） ---------- */
+const boardNameEl = document.getElementById("boardName");
+const boardSlugEl = document.getElementById("boardSlug");
+const boardSaveEl = document.getElementById("boardSave");
+const boardLinkEl = document.getElementById("boardLink");
+const SLUG_RE = /^[a-z0-9-]{3,32}$/;
+let boardTimer = null;
+
+function updateBoardLink(slug) {
+  if (slug && SLUG_RE.test(slug)) {
+    boardLinkEl.href = "/b/" + slug;
+    boardLinkEl.textContent = "/b/" + slug;
+  } else {
+    boardLinkEl.href = "#";
+    boardLinkEl.textContent = "/b/…";
+  }
+}
+
+async function saveBoard() {
+  const name = boardNameEl.value.trim();
+  const slug = boardSlugEl.value.trim();
+  if (!SLUG_RE.test(slug)) return; // client-side guard; bad input stays marked
+  boardSaveEl.className = "save-state"; boardSaveEl.textContent = "保存中…";
+  try {
+    const res = await fetch("/api/my/board", {
+      method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, slug }),
+    });
+    if (res.ok) {
+      boardSaveEl.className = "save-state ok"; boardSaveEl.textContent = "已保存";
+      updateBoardLink(slug);
+    } else {
+      let errMsg = "保存失败";
+      try { const b = await res.json(); if (b.error) errMsg = b.error; } catch { /* ignore */ }
+      boardSaveEl.className = "save-state err"; boardSaveEl.textContent = errMsg;
+    }
+  } catch { boardSaveEl.className = "save-state err"; boardSaveEl.textContent = "保存失败"; }
+}
+
+boardSlugEl.addEventListener("input", () => {
+  const v = boardSlugEl.value.trim();
+  if (v === "" || SLUG_RE.test(v)) {
+    boardSlugEl.classList.remove("bad");
+  } else {
+    boardSlugEl.classList.add("bad");
+  }
+  updateBoardLink(v);
+  if (SLUG_RE.test(v)) {
+    clearTimeout(boardTimer);
+    boardTimer = setTimeout(saveBoard, 600);
+  }
+});
+boardNameEl.addEventListener("input", () => {
+  clearTimeout(boardTimer);
+  boardTimer = setTimeout(saveBoard, 600);
+});
+
+/* ---------- 页面文案（自动保存） ---------- */
+const setEyebrow = document.getElementById("setEyebrow");
+const setTitle = document.getElementById("setTitle");
+const setSubtitle = document.getElementById("setSubtitle");
+const setSaveEl = document.getElementById("setSave");
+let setTimer = null;
+async function loadSettings() {
+  let s = {};
+  try {
+    const res = await fetch("/api/my/settings");
+    if (res.ok) s = (await res.json()).settings || {};
+  } catch { /* 保持空，占位符显示默认 */ }
+  setEyebrow.value = s.eyebrow || "";
+  setTitle.value = s.title || "";
+  setSubtitle.value = s.subtitle || "";
+  colorState = {};
+  for (const k of ZONE_KEYS) if (s["color_" + k]) colorState[k] = s["color_" + k];
+  applyZoneColors(currentColorMap());
+  buildColorRows();
+  items.forEach((i) => i.gauge.repaint());
+}
+async function saveSettings() {
+  setSaveEl.className = "save-state"; setSaveEl.textContent = "保存中…";
+  try {
+    const res = await fetch("/api/my/settings", {
+      method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ eyebrow: setEyebrow.value, title: setTitle.value, subtitle: setSubtitle.value }),
+    });
+    if (res.ok) { setSaveEl.className = "save-state ok"; setSaveEl.textContent = "已保存"; }
+    else { setSaveEl.className = "save-state err"; setSaveEl.textContent = "保存失败"; }
+  } catch { setSaveEl.className = "save-state err"; setSaveEl.textContent = "保存失败"; }
+}
+[setEyebrow, setTitle, setSubtitle].forEach((el) =>
+  el.addEventListener("input", () => { clearTimeout(setTimer); setTimer = setTimeout(saveSettings, 600); }));
+
+/* ---------- 色块配色（自动保存 + 实时预览） ---------- */
+const ZONE_KEYS = ZONES.map((z) => z.key);
+const ZONE_LABELS = { deep: "深度低估", under: "低估", fair: "合理", over: "高估", xover: "极度高估" };
+const colSaveEl = document.getElementById("colSave");
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+let colorState = {}; // 仅存自定义的区间色；缺省即用默认
+let colTimer = null;
+
+function currentColorMap() {
+  const m = {};
+  for (const k of ZONE_KEYS) if (colorState[k]) m[k] = colorState[k];
+  return m;
+}
+function buildColorRows() {
+  const wrap = document.getElementById("colorRows");
+  wrap.innerHTML = "";
+  ZONES.forEach((z) => {
+    const cur = colorState[z.key] || DEFAULT_ZONE_COLORS[z.key];
+    const row = document.createElement("div");
+    row.className = "color-row";
+    const lab = document.createElement("span");
+    lab.className = "c-lab";
+    lab.textContent = `${ZONE_LABELS[z.key] || z.key} · ${z.en}`;
+    const picker = document.createElement("input");
+    picker.type = "color"; picker.value = cur;
+    const hex = document.createElement("input");
+    hex.type = "text"; hex.maxLength = 7; hex.spellcheck = false; hex.autocomplete = "off";
+    hex.value = cur; hex.placeholder = DEFAULT_ZONE_COLORS[z.key];
+    picker.addEventListener("input", () => { hex.value = picker.value; hex.classList.remove("bad"); onColorChange(z.key, picker.value); });
+    hex.addEventListener("input", () => {
+      const v = hex.value.trim();
+      if (HEX_RE.test(v)) { hex.classList.remove("bad"); picker.value = v; onColorChange(z.key, v); }
+      else if (v === "") { hex.classList.remove("bad"); onColorChange(z.key, ""); } // 清空→默认
+      else hex.classList.add("bad");
+    });
+    row.append(lab, picker, hex);
+    wrap.appendChild(row);
+  });
+}
+function onColorChange(key, value) {
+  if (value) colorState[key] = value; else delete colorState[key];
+  applyZoneColors(currentColorMap());
+  items.forEach((i) => i.gauge.repaint());
+  clearTimeout(colTimer);
+  colTimer = setTimeout(saveColors, 600);
+}
+async function saveColors() {
+  colSaveEl.className = "save-state"; colSaveEl.textContent = "保存中…";
+  const payload = {};
+  for (const k of ZONE_KEYS) payload["color_" + k] = colorState[k] || ""; // 空串→后端删除→默认
+  try {
+    const res = await fetch("/api/my/settings", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+    });
+    colSaveEl.className = res.ok ? "save-state ok" : "save-state err";
+    colSaveEl.textContent = res.ok ? "已保存" : "保存失败";
+  } catch { colSaveEl.className = "save-state err"; colSaveEl.textContent = "保存失败"; }
+}
+
+document.getElementById("btnLogout").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  location.href = "/login";
+});
+
+/* ---------- 保存（防抖） ---------- */
+function setSave(item, state, text) {
+  if (!item.saveEl) return;
+  item.saveEl.className = "save-state " + (state || "");
+  item.saveEl.textContent = text || "";
+}
+async function saveItem(item) {
+  if (!item.cfg.symbol || !structValid(item.cfg)) return;
+  if (item._saving) { item._pendingSave = true; return; } // a POST/PUT is in flight — coalesce, replay after it resolves
+  item._saving = true;
+  setSave(item, "", "保存中…");
+  const payload = {
+    ticker: item.cfg.ticker, name: item.cfg.name, symbol: item.cfg.symbol,
+    fairLow: item.cfg.fairLow, fairHigh: item.cfg.fairHigh, mos: item.cfg.mos, ext: item.cfg.ext,
+    sortOrder: item.cfg.sortOrder || 0,
+  };
+  const url = item.id ? `/api/my/items/${item.id}` : "/api/my/items";
+  const method = item.id ? "PUT" : "POST";
+  try {
+    const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    if (res.ok) {
+      const body = await res.json();
+      if (!item.id && body.id) item.id = body.id;
+      setSave(item, "ok", "已保存");
+    } else {
+      setSave(item, "err", "保存失败");
+    }
+  } catch {
+    setSave(item, "err", "保存失败");
+  } finally {
+    item._saving = false;
+    if (item._pendingSave) { item._pendingSave = false; saveItem(item); } // replay latest edit (now a PUT, id is known)
+  }
+}
+function debounceSave(item) {
+  clearTimeout(item._saveT);
+  item._saveT = setTimeout(() => saveItem(item), 600);
+}
+
+/* ---------- 图表侧 ---------- */
+function renderVerdict(item) {
+  const v = verdictOf(item.cfg);
+  const el = item.verdictEl;
+  el.className = "verdict " + v.cls;
+  el.innerHTML = "";
+  const px = document.createElement("span");
+  px.className = "px" + (item.live ? " px-live" : "");
+  px.textContent = v.px;
+  el.appendChild(px);
+  el.appendChild(document.createTextNode(v.text));
+}
+function addChartDom(item) {
+  const wrap = document.createElement("div");
+  wrap.className = "chart-item";
+  const gauge = new Gauge(wrap);
+  const verdict = document.createElement("p");
+  verdict.className = "verdict v-fair";
+  wrap.appendChild(verdict);
+  chartsEl.appendChild(wrap);
+  item.gauge = gauge; item.chartEl = wrap; item.verdictEl = verdict;
+  gauge.set(item.cfg, false);
+  renderVerdict(item);
+}
+
+/* ---------- 代码联想（走 /api/hints） ---------- */
+let hintSeq = 0;
+async function loadHints(q) {
+  const seq = ++hintSeq;
+  try {
+    const res = await fetch("/api/hints?q=" + encodeURIComponent(q));
+    const { hints } = await res.json();
+    return seq === hintSeq ? hints : null;
+  } catch { return []; }
+}
+
+/* ---------- 配置侧 ---------- */
+const FIELDS = [
+  { k: "ticker", lab: "标的代码", type: "text" },
+  { k: "fairLow", lab: "合理 · 低点", type: "number" },
+  { k: "fairHigh", lab: "合理 · 高点", type: "number" },
+  { k: "mos", lab: "安全边际 %", type: "number", presets: [10, 20, 30, 40, 50] },
+  { k: "ext", lab: "极度高估 %", type: "number", presets: [10, 20, 30, 40, 50] },
+];
+
+function addCfgDom(item) {
+  const block = document.createElement("div");
+  block.className = "cfg-block";
+  const top = document.createElement("div");
+  top.className = "cfg-top";
+  const name = document.createElement("span");
+  name.className = "cfg-name";
+  name.textContent = item.cfg.name ? `${(item.cfg.ticker || "—").toUpperCase()} · ${item.cfg.name}` : (item.cfg.ticker || "—").toUpperCase();
+  const saveEl = document.createElement("span");
+  saveEl.className = "save-state";
+  item.saveEl = saveEl;
+  const del = document.createElement("button");
+  del.className = "btn-del"; del.textContent = "移除";
+  del.addEventListener("click", () => removeItem(item));
+  const topRight = document.createElement("span");
+  topRight.append(saveEl, del);
+  top.append(name, topRight);
+
+  const grid = document.createElement("div");
+  grid.className = "cfg-grid";
+  FIELDS.forEach((f) => {
+    const lab = document.createElement("label");
+    lab.className = "field" + (f.k === "ticker" ? " full" : "");
+    const span = document.createElement("span");
+    span.className = "f-lab"; span.textContent = f.lab;
+    const input = document.createElement("input");
+    input.type = f.type;
+    if (f.type === "number") { input.min = "0"; input.step = "any"; }
+    else { input.maxLength = 24; input.spellcheck = false; input.placeholder = "代码 / 名称 / 拼音"; input.autocomplete = "off"; }
+    input.value = item.cfg[f.k] ?? "";
+
+    input.addEventListener("input", () => {
+      const v = f.type === "number" ? parseFloat(input.value) : input.value.trim();
+      const next = { ...item.cfg, [f.k]: v };
+      let bad = false;
+      if (f.k === "fairLow") bad = !(v > 0);
+      if (f.k === "fairHigh") bad = !(v > next.fairLow);
+      if (f.k === "mos") bad = !(v > 0 && v < 100);
+      if (f.k === "ext") bad = !(v > 0);
+      input.classList.toggle("bad", bad && input.value !== "");
+      item.cfg = next;
+      if (f.k === "ticker") {
+        name.textContent = (v || "—").toUpperCase();
+        item.live = false; item.gotQuote = false;
+        item.cfg = { ...item.cfg, price: 0, symbol: null, name: "" };
+        input.classList.remove("ok", "bad");
+        renderVerdict(item);
+        item.gauge.set(item.cfg);
+      }
+      if (structValid(item.cfg)) {
+        item.gauge.set(item.cfg);
+        renderVerdict(item);
+        debounceSave(item);
+      }
+    });
+
+    if (f.k === "ticker") {
+      const combo = document.createElement("div");
+      combo.className = "combo";
+      const list = document.createElement("div");
+      list.className = "combo-list"; list.style.display = "none";
+      const err = document.createElement("div");
+      err.className = "f-err"; err.textContent = "请从下拉中选择标的";
+      let opts = [], act = -1, searchTimer = null;
+      const close = () => { list.style.display = "none"; act = -1; };
+      const markState = () => {
+        const txt = input.value.trim();
+        if (item.cfg.symbol) { input.classList.add("ok"); input.classList.remove("bad"); err.style.display = "none"; }
+        else if (txt) { input.classList.add("bad"); input.classList.remove("ok"); err.style.display = ""; }
+        else { input.classList.remove("ok", "bad"); err.style.display = "none"; }
+      };
+      const pick = (o) => {
+        input.value = o.code;
+        item.cfg = { ...item.cfg, ticker: o.code, name: o.name, symbol: o.symbol, price: 0 };
+        item.live = false; item.gotQuote = false;
+        name.textContent = `${o.code} · ${o.name}`;
+        if (structValid(item.cfg)) { item.gauge.set(item.cfg); renderVerdict(item); saveItem(item); }
+        close(); markState(); fetchQuotes();
+      };
+      const renderList = (arr) => {
+        opts = arr; act = -1; list.innerHTML = "";
+        if (!arr.length) { close(); return; }
+        arr.forEach((o) => {
+          const d = document.createElement("div");
+          d.className = "combo-opt";
+          d.innerHTML = `<span class="c-code"></span><span class="c-name"></span><span class="c-mkt"></span>`;
+          d.children[0].textContent = o.code;
+          d.children[1].textContent = o.name;
+          d.children[2].textContent = MKT_LABEL[o.mkt];
+          d.addEventListener("mousedown", (e) => { e.preventDefault(); pick(o); });
+          list.appendChild(d);
+        });
+        list.style.display = "";
+      };
+      const highlight = () => {
+        [...list.children].forEach((d, i) => d.classList.toggle("act", i === act));
+        if (act >= 0) list.children[act].scrollIntoView({ block: "nearest" });
+      };
+      input.addEventListener("input", () => {
+        const q = input.value.trim();
+        clearTimeout(searchTimer);
+        if (q.length < 1) { close(); return; }
+        searchTimer = setTimeout(async () => {
+          const arr = await loadHints(q);
+          if (arr !== null) renderList(arr);
+        }, 250);
+      });
+      input.addEventListener("keydown", (e) => {
+        if (list.style.display === "none") return;
+        if (e.key === "ArrowDown") { e.preventDefault(); act = Math.min(opts.length - 1, act + 1); highlight(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); act = Math.max(0, act - 1); highlight(); }
+        else if (e.key === "Enter") { e.preventDefault(); if (act >= 0) pick(opts[act]); else if (opts.length) pick(opts[0]); }
+        else if (e.key === "Escape") { close(); }
+      });
+      input.addEventListener("blur", () => { setTimeout(() => { close(); markState(); }, 150); });
+      combo.append(input, list);
+      lab.append(span, combo, err);
+      grid.appendChild(lab);
+      if (item.cfg.symbol) input.classList.add("ok");
+      return;
+    }
+
+    lab.append(span, input);
+    if (f.presets) {
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      const chipEls = f.presets.map((p) => {
+        const c = document.createElement("button");
+        c.type = "button"; c.className = "chip"; c.textContent = p + "%";
+        c.addEventListener("click", () => { input.value = p; input.dispatchEvent(new Event("input", { bubbles: true })); });
+        chips.appendChild(c);
+        return { el: c, val: p };
+      });
+      const syncChips = () => { const v = parseFloat(input.value); chipEls.forEach(({ el, val }) => el.classList.toggle("on", v === val)); };
+      input.addEventListener("input", syncChips);
+      syncChips();
+      lab.appendChild(chips);
+    }
+    grid.appendChild(lab);
+  });
+
+  block.addEventListener("click", (e) => {
+    if (e.target.closest("input,button")) return;
+    item.chartEl.scrollIntoView({ behavior: REDUCE ? "auto" : "smooth", block: "center" });
+  });
+  block.append(top, grid);
+  cfgList.appendChild(block);
+  item.cfgEl = block;
+}
+
+/* ---------- 增/删 ---------- */
+function addItem(cfg) {
+  const item = { id: cfg.id || null, cfg: { ...cfg }, live: false, gotQuote: false };
+  items.push(item);
+  addChartDom(item);
+  addCfgDom(item);
+  return item;
+}
+async function removeItem(item) {
+  if (item.id) await fetch(`/api/my/items/${item.id}`, { method: "DELETE" });
+  const idx = items.indexOf(item);
+  if (idx >= 0) { item.gauge.destroy(); item.chartEl.remove(); item.cfgEl.remove(); items.splice(idx, 1); }
+}
+document.getElementById("btnAdd").addEventListener("click", () => {
+  const it = addItem({ ticker: "", name: "", symbol: null, price: 0, fairLow: 215, fairHigh: 265, mos: 20, ext: 25, sortOrder: items.length });
+  it.cfgEl.scrollIntoView({ behavior: REDUCE ? "auto" : "smooth", block: "nearest" });
+  const first = it.cfgEl.querySelector("input");
+  first && first.focus();
+});
+
+/* ---------- 行情 ---------- */
+const statusEl = document.getElementById("quoteStatus");
+async function fetchQuotes() {
+  const map = items.filter((i) => i.cfg.symbol);
+  if (!map.length) { statusEl.textContent = "请先从下拉选择标的"; return; }
+  statusEl.classList.remove("err"); statusEl.textContent = "获取中…";
+  const symbols = [...new Set(map.map((i) => i.cfg.symbol))];
+  let data;
+  try {
+    const res = await fetch("/api/quotes?symbols=" + encodeURIComponent(symbols.join(",")));
+    data = await res.json();
+  } catch { statusEl.textContent = "接口不可达"; statusEl.classList.add("err"); return; }
+  const quotes = data.quotes || {};
+  let ok = 0;
+  map.forEach((item) => {
+    const p = quotes[item.cfg.symbol];
+    if (!(p > 0)) return;
+    ok++;
+    item.cfg = { ...item.cfg, price: p }; item.live = true;
+    if (structValid(item.cfg)) {
+      const first = !item.gotQuote; item.gotQuote = true;
+      item.gauge.set(item.cfg, !first);
+      if (first) item.gauge.swingIn();
+      renderVerdict(item);
+    }
+  });
+  const t = new Date();
+  const hh = String(t.getHours()).padStart(2, "0"), mm = String(t.getMinutes()).padStart(2, "0"), ss = String(t.getSeconds()).padStart(2, "0");
+  statusEl.textContent = ok > 0 ? `已更新 ${ok}/${map.length} · ${hh}:${mm}:${ss}` : "未取到报价";
+  statusEl.classList.toggle("err", ok === 0);
+}
+document.getElementById("btnRefresh").addEventListener("click", fetchQuotes);
+
+/* ---------- 启动 ---------- */
+init();
+</script>
+</body>
+</html>
