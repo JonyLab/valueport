@@ -8,6 +8,8 @@
 
 **Tech Stack:** Cloudflare Workers + D1 (SQLite)、Hono、Web Crypto API、Vitest（`@cloudflare/vitest-pool-workers` 跑 Worker 集成测试 + node 环境跑纯逻辑单测）、Wrangler。
 
+> **测试约定（实现中确认）：** vitest 2.1 用 `vitest.workspace.js` 定义多 project（不是 `vitest.config.js` 里的 `test.projects`，那是 3.x 特性会被忽略）。`wrangler.toml` 必须含 `compatibility_flags = ["nodejs_compat"]`，否则 pool-workers 拒绝启动。pool-workers 会加载 `main = src/index.js`，故 worker 项目要在 `src/index.js` 存在后（Task 6）才能完整启动。跑单个测试文件用 `npx vitest run <文件路径>`（`--project <name>` 过滤在本组合下不可靠）。
+
 ---
 
 ## File Structure
@@ -365,7 +367,7 @@ describe("auth token", () => {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `npx vitest run --project worker test/auth.test.js`
+Run: `npx vitest run test/auth.test.js`
 Expected: FAIL，`signToken` 未定义。
 
 - [ ] **Step 3: 实现 auth.js**
@@ -428,7 +430,7 @@ function timingSafeEqual(a, b) {
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `npx vitest run --project worker test/auth.test.js`
+Run: `npx vitest run test/auth.test.js`
 Expected: PASS。
 
 - [ ] **Step 5: Commit**
@@ -483,7 +485,7 @@ describe("rowToItem", () => {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `npx vitest run --project worker test/items.test.js`
+Run: `npx vitest run test/items.test.js`
 Expected: FAIL，`validateItem` 未定义。
 
 - [ ] **Step 3: 实现 items.js**
@@ -517,7 +519,7 @@ export function rowToItem(r) {
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `npx vitest run --project worker test/items.test.js`
+Run: `npx vitest run test/items.test.js`
 Expected: PASS。
 
 - [ ] **Step 5: Commit**
@@ -570,7 +572,7 @@ describe("parseTencentHints", () => {
 
 - [ ] **Step 2: 运行测试确认失败**
 
-Run: `npx vitest run --project worker test/quotes.test.js`
+Run: `npx vitest run test/quotes.test.js`
 Expected: FAIL，函数未定义。
 
 - [ ] **Step 3: 实现 quotes.js**
@@ -614,7 +616,7 @@ export function parseTencentHints(text) {
 
 - [ ] **Step 4: 运行测试确认通过**
 
-Run: `npx vitest run --project worker test/quotes.test.js`
+Run: `npx vitest run test/quotes.test.js`
 Expected: PASS。
 
 - [ ] **Step 5: Commit**
@@ -851,7 +853,7 @@ describe("crud + public read", () => {
 
 - [ ] **Step 2: 运行测试**
 
-Run: `npx vitest run --project worker test/routes.test.js`
+Run: `npx vitest run test/routes.test.js`
 Expected: PASS（401 拦截、登录后 CRUD、公开读取、400 校验均通过）。
 
 > 若 `cloudflare:test` 的 `SELF` 报未找到 worker，确认 `vitest.config.js` 中 worker project 的 `wrangler.configPath` 正确指向 `./wrangler.toml`。
