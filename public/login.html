@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>登录 · 估值钟摆</title>
+<link rel="stylesheet" href="/shared/styles.css">
+<style>.auth{max-width:360px;margin:80px auto;background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:28px 24px}
+.auth h2{font-size:18px;margin:0 0 16px}.auth input{width:100%;font-size:14px;padding:10px;border:1px solid #dfe3ea;border-radius:8px;margin-bottom:12px}
+.auth .err{color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px}.auth .alt{font-size:12.5px;color:var(--ink-soft);margin-top:14px;text-align:center}</style>
+</head><body><div class="page"><div class="auth">
+<h2>登录</h2><div class="err" id="err"></div>
+<input id="u" placeholder="用户名" autocomplete="username">
+<input id="p" type="password" placeholder="密码" autocomplete="current-password">
+<button class="btn primary" id="go" style="width:100%">登录</button>
+<div class="alt">没有账号？<a href="/register">用激活码注册</a></div>
+</div></div>
+<script type="module">
+const err=document.getElementById("err");
+async function login(){ err.textContent="";
+  const go=document.getElementById("go"); go.disabled=true;
+  try{
+    const r=await fetch("/api/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value,password:document.getElementById("p").value})});
+    if(r.ok){ location.href="/app"; return; }
+    err.textContent=(await r.json().catch(()=>({}))).error||"登录失败";
+  }catch{ err.textContent="网络错误，请重试"; }
+  finally{ go.disabled=false; }
+}
+document.getElementById("go").addEventListener("click",login);
+document.getElementById("p").addEventListener("keydown",(e)=>{if(e.key==="Enter")login();});
+</script></body></html>
