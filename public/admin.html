@@ -62,6 +62,7 @@ const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 const chartsEl = document.getElementById("charts");
 const cfgList = document.getElementById("cfgList");
 const items = []; // {id, cfg, gauge, chartEl, cfgEl, verdictEl, live, gotQuote, saveEl}
+let quoteTimer = null;
 
 /* ---------- 登录 ---------- */
 const gate = document.getElementById("gate");
@@ -79,6 +80,7 @@ async function tryLoad() {
   appEl.classList.remove("hidden");
   rows.forEach((r) => addItem({ ...r, price: 0 }));
   fetchQuotes();
+  if (!quoteTimer) quoteTimer = setInterval(fetchQuotes, 60000);
   return true;
 }
 document.getElementById("btnLogin").addEventListener("click", login);
@@ -385,8 +387,7 @@ async function fetchQuotes() {
 document.getElementById("btnRefresh").addEventListener("click", fetchQuotes);
 
 /* ---------- 启动 ---------- */
-tryLoad();
-setInterval(fetchQuotes, 60000);
+tryLoad(); // 登录成功后才启动 60s 行情轮询（见 tryLoad）
 </script>
 </body>
 </html>

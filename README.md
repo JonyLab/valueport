@@ -24,7 +24,7 @@ Cloudflare Worker (src/index.js)  — Hono router
 └── public/shared/
     ├── core.js        Pure business logic ESM module (pendulum math, no DOM)
     ├── gauge.js       Canvas/SVG gauge renderer
-    ├── market.js      Market-hours helper
+    ├── market.js      Exports `MKT_LABEL` — map of market code → Chinese label (e.g. `us`→美股, `sh`→沪A), used by the admin combobox to label search suggestions
     └── styles.css     Shared stylesheet
 
 D1 database (binding: DB)

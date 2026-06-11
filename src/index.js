@@ -25,7 +25,8 @@ app.get("/api/config", async (c) => {
 });
 
 app.get("/api/quotes", async (c) => {
-  const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim())
+    .filter((s) => s && s.length <= 16).slice(0, 50);
   if (!symbols.length) return c.json({ quotes: {}, ts: new Date().toISOString() });
   try {
     const text = await fetchGbk("https://qt.gtimg.cn/q=" + symbols.join(","));
