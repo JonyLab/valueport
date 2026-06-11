@@ -1,6 +1,7 @@
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+import { defineConfig } from "vitest/config";
+import { defineWorkersProject } from "@cloudflare/vitest-pool-workers/config";
 
-export default defineWorkersConfig({
+export default defineConfig({
   test: {
     projects: [
       {
@@ -10,7 +11,7 @@ export default defineWorkersConfig({
           include: ["test-core/**/*.test.js"],
         },
       },
-      {
+      defineWorkersProject({
         test: {
           name: "worker",
           include: ["test/**/*.test.js"],
@@ -24,7 +25,7 @@ export default defineWorkersConfig({
             },
           },
         },
-      },
+      }),
     ],
   },
 });
