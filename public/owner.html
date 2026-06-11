@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>站长后台 · 估值钟摆</title>
+<link rel="stylesheet" href="/shared/styles.css">
+<style>.wrap{max-width:760px;margin:40px auto}.gate{max-width:360px;margin:80px auto;background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:28px 24px}
+.gate input{width:100%;font-size:14px;padding:10px;border:1px solid #dfe3ea;border-radius:8px;margin-bottom:12px}
+.card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px 20px;margin-bottom:20px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.hidden{display:none}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{text-align:left;padding:6px 8px;border-bottom:1px solid #eef0f3}
+.mono{font-family:var(--mono)}.err{color:var(--red);font-size:12px;min-height:16px}</style>
+</head><body>
+<div class="gate" id="gate"><h2>站长登录</h2><div class="err" id="gerr"></div>
+<input id="pw" type="password" placeholder="站长密码"><button class="btn primary" id="gin" style="width:100%">进入</button></div>
+<div class="wrap hidden" id="app">
+  <div class="row" style="justify-content:space-between"><h1>站长后台</h1><button class="btn" id="out">退出</button></div>
+  <div class="card"><div class="row"><b>激活码</b><input id="cnt" type="number" min="1" max="50" value="5" style="width:70px">
+    <button class="btn primary" id="gen">生成</button></div><div id="codes"></div></div>
+  <div class="card"><b>用户</b><div id="users"></div></div>
+</div>
+<script type="module">
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>String(s).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function tryLoad(){ let r; try{ r=await fetch("/api/owner/codes"); }catch{ return false; } if(r.status===401) return false;
+  $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); await refreshCodes(); await refreshUsers(); return true; }
+async function login(){ $("gerr").textContent="";
+  let r; try{ r=await fetch("/api/owner/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:$("pw").value})}); }catch{ $("gerr").textContent="网络错误，请重试"; return; }
+  if(r.ok) tryLoad(); else $("gerr").textContent="密码错误"; }
+$("gin").addEventListener("click",login); $("pw").addEventListener("keydown",(e)=>{if(e.key==="Enter")login();});
+$("out").addEventListener("click",async()=>{await fetch("/api/owner/logout",{method:"POST"});location.reload();});
+$("gen").addEventListener("click",async()=>{ await fetch("/api/owner/codes",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({count:Number($("cnt").value)||1})}); refreshCodes(); });
+async function refreshCodes(){ const {codes}=await (await fetch("/api/owner/codes")).json();
+  const t=document.createElement("div");
+  t.innerHTML="<table><tr><th>激活码</th><th>状态</th><th></th></tr>"+codes.map(c=>`<tr><td class="mono">${esc(c.code)}</td><td>${c.used?"已用":"未用"}</td><td>${c.used?"":`<button class="btn" data-code="${esc(c.code)}">复制</button>`}</td></tr>`).join("")+"</table>";
+  t.querySelectorAll("button[data-code]").forEach(b=>b.addEventListener("click",()=>{ navigator.clipboard.writeText(b.dataset.code); const orig=b.textContent; b.textContent="已复制"; setTimeout(()=>{ b.textContent=orig; },1500); }));
+  $("codes").innerHTML=""; $("codes").appendChild(t); }
+async function refreshUsers(){ const {users}=await (await fetch("/api/owner/users")).json();
+  const t=document.createElement("div");
+  t.innerHTML="<table><tr><th>用户名</th><th>网址</th><th>注册时间</th><th></th></tr>"+users.map(u=>`<tr><td>${esc(u.username)}</td><td class="mono">/b/${esc(u.boardSlug)}</td><td>${esc((u.createdAt||"").slice(0,10))}</td><td><button class="btn" data-id="${esc(u.id)}">重置密码</button></td></tr>`).join("")+"</table>";
+  t.querySelectorAll("button[data-id]").forEach(b=>b.addEventListener("click",async()=>{ const r=await fetch(`/api/owner/users/${b.dataset.id}/reset`,{method:"POST"}); const j=await r.json(); if(j.ok) alert("临时密码（转告该用户，登录后请改）：\n"+j.password); }));
+  $("users").innerHTML=""; $("users").appendChild(t); }
+tryLoad();
+</script></body></html>
