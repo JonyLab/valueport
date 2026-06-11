@@ -14,6 +14,10 @@ describe("parseTencentQuotes", () => {
     const text = 'v_usAAPL="1~苹果~AAPL~0~...";';
     expect(parseTencentQuotes(text, ["usAAPL"])).toEqual({});
   });
+  it("ignores symbols with illegal (regex-injection) characters", () => {
+    const text = 'v_usAAPL="1~苹果~AAPL~232.10~...";';
+    expect(parseTencentQuotes(text, ["usAAPL", "us(.*"])).toEqual({ usAAPL: 232.1 });
+  });
 });
 
 describe("parseTencentHints", () => {
@@ -22,5 +26,10 @@ describe("parseTencentHints", () => {
     const out = parseTencentHints(text);
     expect(out[0]).toMatchObject({ mkt: "us", code: "AAPL", name: "Apple Inc", symbol: "usAAPL" });
     expect(out[1]).toMatchObject({ mkt: "sh", code: "600519", symbol: "sh600519" });
+  });
+  it("returns at most 8 suggestions", () => {
+    const entry = "us~AAPL.OQ~Apple Inc~~";
+    const text = `v_hint="${Array(12).fill(entry).join("^")}";`;
+    expect(parseTencentHints(text).length).toBe(8);
   });
 });

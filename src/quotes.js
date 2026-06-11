@@ -1,9 +1,11 @@
 export const MKT_LABEL = { sh: "沪A", sz: "深A", hk: "港股", us: "美股", bj: "北交所" };
 
+const SYMBOL_RE = /^[a-zA-Z0-9.]+$/; // tencent symbols are alphanumeric+dot; reject anything else (regex-injection guard)
 // 腾讯行情返回多行: v_<sym>="f0~f1~f2~price~...";  价格在索引 3。
 export function parseTencentQuotes(text, symbols) {
   const out = {};
   for (const sym of symbols) {
+    if (!SYMBOL_RE.test(sym)) continue;
     const m = text.match(new RegExp(`v_${sym}="([^"]*)"`));
     if (!m) continue;
     const f = m[1].split("~");
