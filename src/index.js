@@ -3,161 +3,204 @@ import { getCookie, setCookie } from "hono/cookie";
 import { signToken, verifyToken } from "./auth.js";
 import { validateItem, rowToItem } from "./items.js";
 import { parseTencentQuotes, parseTencentHints } from "./quotes.js";
+import { hashPassword, verifyPassword } from "./password.js";
+import { generateCode } from "./codes.js";
+import { validateUsername, validateSlug, rowToUser } from "./users.js";
 
 const app = new Hono();
-const SESSION_COOKIE = "pendulum_session";
-const SESSION_TTL = 7 * 24 * 3600;
-
-// 可配置项；前端持有默认值，这里只存/返回已自定义的键。
-const TEXT_KEYS = ["eyebrow", "title", "subtitle"];                          // 页面文案
-const COLOR_KEYS = ["color_deep", "color_under", "color_fair", "color_over", "color_xover"]; // 区间色块
+const USER_COOKIE = "pendulum_user", OWNER_COOKIE = "pendulum_owner";
+const TTL = 7 * 24 * 3600;
+const TEXT_KEYS = ["eyebrow", "title", "subtitle"];
+const COLOR_KEYS = ["color_deep", "color_under", "color_fair", "color_over", "color_xover"];
 const SETTING_KEYS = [...TEXT_KEYS, ...COLOR_KEYS];
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
-async function readSettings(db) {
+const COOKIE_OPTS = { httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: TTL };
+
+async function readSettings(db, userId) {
   const out = {};
   try {
-    const { results } = await db.prepare("SELECT key, value FROM settings").all();
+    const { results } = await db.prepare("SELECT key, value FROM settings WHERE user_id=?").bind(userId).all();
     for (const r of results || []) if (SETTING_KEYS.includes(r.key)) out[r.key] = r.value;
-  } catch { /* settings 表尚未迁移时退回默认文案，不影响看板 */ }
+  } catch {}
   return out;
 }
-
-// 服务端抓腾讯并按 GBK 解码为文本
 async function fetchGbk(url) {
   const res = await fetch(url, { cf: { cacheTtl: 30, cacheEverything: true } });
   if (!res.ok) throw new Error(`upstream ${res.status}`);
-  const buf = await res.arrayBuffer();
-  return new TextDecoder("gbk").decode(buf);
+  return new TextDecoder("gbk").decode(await res.arrayBuffer());
 }
 
 /* ---------- 公开接口 ---------- */
 app.get("/api/config", async (c) => {
-  const { results } = await c.env.DB.prepare(
-    "SELECT * FROM items ORDER BY sort_order ASC, id ASC"
-  ).all();
-  return c.json({ items: (results || []).map(rowToItem), settings: await readSettings(c.env.DB) });
+  const slug = c.req.query("slug") || "";
+  const user = await c.env.DB.prepare("SELECT * FROM users WHERE board_slug=?").bind(slug).first();
+  if (!user) return c.json({ error: "board not found" }, 404);
+  const { results } = await c.env.DB.prepare("SELECT * FROM items WHERE user_id=? ORDER BY sort_order ASC, id ASC").bind(user.id).all();
+  return c.json({ board: { slug: user.board_slug, name: user.board_name }, items: (results || []).map(rowToItem), settings: await readSettings(c.env.DB, user.id) });
 });
-
 app.get("/api/quotes", async (c) => {
-  const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim())
-    .filter((s) => s && s.length <= 16).slice(0, 50);
+  const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim()).filter((s) => s && s.length <= 16).slice(0, 50);
   if (!symbols.length) return c.json({ quotes: {}, ts: new Date().toISOString() });
-  try {
-    const text = await fetchGbk("https://qt.gtimg.cn/q=" + symbols.join(","));
-    return c.json({ quotes: parseTencentQuotes(text, symbols), ts: new Date().toISOString() });
-  } catch {
-    return c.json({ quotes: {}, error: "upstream unreachable", ts: new Date().toISOString() }, 502);
-  }
+  try { const text = await fetchGbk("https://qt.gtimg.cn/q=" + symbols.join(",")); return c.json({ quotes: parseTencentQuotes(text, symbols), ts: new Date().toISOString() }); }
+  catch { return c.json({ quotes: {}, error: "upstream unreachable", ts: new Date().toISOString() }, 502); }
 });
-
 app.get("/api/hints", async (c) => {
   const q = c.req.query("q") || "";
   if (!q) return c.json({ hints: [] });
-  try {
-    const text = await fetchGbk(
-      "https://smartbox.gtimg.cn/s3/?v=2&t=all&q=" + encodeURIComponent(q)
-    );
-    return c.json({ hints: parseTencentHints(text) });
-  } catch {
-    return c.json({ hints: [] });
-  }
+  try { const text = await fetchGbk("https://smartbox.gtimg.cn/s3/?v=2&t=all&q=" + encodeURIComponent(q)); return c.json({ hints: parseTencentHints(text) }); }
+  catch { return c.json({ hints: [] }); }
 });
 
-/* ---------- 登录 ---------- */
+/* ---------- 注册 / 登录 ---------- */
+app.post("/api/register", async (c) => {
+  const { username, password, code } = await c.req.json().catch(() => ({}));
+  if (!validateUsername(username)) return c.json({ ok: false, error: "用户名需 3-20 位字母/数字/_/-" }, 400);
+  if (typeof password !== "string" || password.length < 6) return c.json({ ok: false, error: "密码至少 6 位" }, 400);
+  const codeRow = await c.env.DB.prepare("SELECT code FROM activation_codes WHERE code=? AND used_by IS NULL").bind(code || "").first();
+  if (!codeRow) return c.json({ ok: false, error: "激活码无效或已被使用" }, 400);
+  const exists = await c.env.DB.prepare("SELECT id FROM users WHERE username=?").bind(username).first();
+  if (exists) return c.json({ ok: false, error: "用户名已被占用" }, 409);
+  let slug = username.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  if (!validateSlug(slug)) slug = "b-" + slug;
+  if (await c.env.DB.prepare("SELECT id FROM users WHERE board_slug=?").bind(slug).first()) slug = slug + "-" + (Date.now() % 10000);
+  const { hash, salt } = await hashPassword(password);
+  const now = new Date().toISOString();
+  const { meta } = await c.env.DB.prepare(
+    "INSERT INTO users (username,pass_hash,pass_salt,board_slug,board_name,created_at) VALUES (?,?,?,?,?,?)"
+  ).bind(username, hash, salt, slug, username, now).run();
+  await c.env.DB.prepare("UPDATE activation_codes SET used_by=?, used_at=? WHERE code=?").bind(meta.last_row_id, now, code).run();
+  const token = await signToken(c.env.SESSION_SECRET, { role: "user", uid: meta.last_row_id }, TTL);
+  setCookie(c, USER_COOKIE, token, COOKIE_OPTS);
+  return c.json({ ok: true, board: { slug, name: username } });
+});
 app.post("/api/login", async (c) => {
-  const { password } = await c.req.json().catch(() => ({}));
-  if (!password || password !== c.env.ADMIN_PASSWORD) {
-    return c.json({ ok: false, error: "invalid password" }, 401);
-  }
-  const token = await signToken(c.env.SESSION_SECRET, SESSION_TTL);
-  // Strict: admin panel is same-origin only; no cross-site navigation needs to carry the session.
-  setCookie(c, SESSION_COOKIE, token, {
-    httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: SESSION_TTL,
-  });
+  const { username, password } = await c.req.json().catch(() => ({}));
+  const user = await c.env.DB.prepare("SELECT * FROM users WHERE username=?").bind(username || "").first();
+  if (!user || !(await verifyPassword(password || "", user.pass_salt, user.pass_hash))) return c.json({ ok: false, error: "用户名或密码错误" }, 401);
+  const token = await signToken(c.env.SESSION_SECRET, { role: "user", uid: user.id }, TTL);
+  setCookie(c, USER_COOKIE, token, COOKIE_OPTS);
   return c.json({ ok: true });
 });
+app.post("/api/logout", (c) => { setCookie(c, USER_COOKIE, "", { ...COOKIE_OPTS, maxAge: 0 }); return c.json({ ok: true }); });
 
-app.post("/api/logout", (c) => {
-  setCookie(c, SESSION_COOKIE, "", { httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: 0 });
-  return c.json({ ok: true });
+/* ---------- 用户会话中间件 ---------- */
+async function currentUserId(c) {
+  const token = getCookie(c, USER_COOKIE);
+  if (!token) return null;
+  const claims = await verifyToken(c.env.SESSION_SECRET, token);
+  return claims && claims.role === "user" ? claims.uid : null;
+}
+app.get("/api/me", async (c) => {
+  const uid = await currentUserId(c);
+  if (!uid) return c.json({ ok: false, error: "unauthorized" }, 401);
+  const user = await c.env.DB.prepare("SELECT * FROM users WHERE id=?").bind(uid).first();
+  if (!user) return c.json({ ok: false }, 401);
+  return c.json({ username: user.username, board: { slug: user.board_slug, name: user.board_name } });
 });
-
-/* ---------- 后台鉴权中间件 ---------- */
-app.use("/api/admin/*", async (c, next) => {
-  const token = getCookie(c, SESSION_COOKIE);
-  if (!token || !(await verifyToken(c.env.SESSION_SECRET, token))) {
-    return c.json({ ok: false, error: "unauthorized" }, 401);
-  }
+app.use("/api/my/*", async (c, next) => {
+  const uid = await currentUserId(c);
+  if (!uid) return c.json({ ok: false, error: "unauthorized" }, 401);
+  c.set("uid", uid);
   await next();
 });
 
-/* ---------- 后台 CRUD ---------- */
-app.get("/api/admin/items", async (c) => {
-  const { results } = await c.env.DB.prepare(
-    "SELECT * FROM items ORDER BY sort_order ASC, id ASC"
-  ).all();
+/* ---------- 用户数据 CRUD（按 uid 隔离） ---------- */
+app.get("/api/my/items", async (c) => {
+  const { results } = await c.env.DB.prepare("SELECT * FROM items WHERE user_id=? ORDER BY sort_order ASC, id ASC").bind(c.get("uid")).all();
   return c.json({ items: (results || []).map(rowToItem) });
 });
-
-app.post("/api/admin/items", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const v = validateItem(body);
+app.post("/api/my/items", async (c) => {
+  const v = validateItem(await c.req.json().catch(() => ({})));
   if (!v.ok) return c.json({ ok: false, errors: v.errors }, 400);
   const it = v.value;
   const { meta } = await c.env.DB.prepare(
-    `INSERT INTO items (ticker,name,symbol,fair_low,fair_high,mos,ext,sort_order,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?)`
-  ).bind(it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder,
-    new Date().toISOString()).run();
+    "INSERT INTO items (user_id,ticker,name,symbol,fair_low,fair_high,mos,ext,sort_order,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)"
+  ).bind(c.get("uid"), it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder, new Date().toISOString()).run();
   return c.json({ ok: true, id: meta.last_row_id }, 201);
 });
-
-app.put("/api/admin/items/:id", async (c) => {
-  const id = Number(c.req.param("id"));
-  const body = await c.req.json().catch(() => ({}));
-  const v = validateItem(body);
+app.put("/api/my/items/:id", async (c) => {
+  const v = validateItem(await c.req.json().catch(() => ({})));
   if (!v.ok) return c.json({ ok: false, errors: v.errors }, 400);
   const it = v.value;
   const { meta } = await c.env.DB.prepare(
-    `UPDATE items SET ticker=?,name=?,symbol=?,fair_low=?,fair_high=?,mos=?,ext=?,sort_order=?,updated_at=?
-     WHERE id=?`
-  ).bind(it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder,
-    new Date().toISOString(), id).run();
+    "UPDATE items SET ticker=?,name=?,symbol=?,fair_low=?,fair_high=?,mos=?,ext=?,sort_order=?,updated_at=? WHERE id=? AND user_id=?"
+  ).bind(it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder, new Date().toISOString(), Number(c.req.param("id")), c.get("uid")).run();
   if (!meta.changes) return c.json({ ok: false, error: "not found" }, 404);
   return c.json({ ok: true });
 });
-
-app.delete("/api/admin/items/:id", async (c) => {
-  const id = Number(c.req.param("id"));
-  const { meta } = await c.env.DB.prepare("DELETE FROM items WHERE id=?").bind(id).run();
+app.delete("/api/my/items/:id", async (c) => {
+  const { meta } = await c.env.DB.prepare("DELETE FROM items WHERE id=? AND user_id=?").bind(Number(c.req.param("id")), c.get("uid")).run();
   if (!meta.changes) return c.json({ ok: false, error: "not found" }, 404);
   return c.json({ ok: true });
 });
-
-/* ---------- 页面文案设置 ---------- */
-app.get("/api/admin/settings", async (c) => {
-  return c.json({ settings: await readSettings(c.env.DB) });
-});
-
-app.put("/api/admin/settings", async (c) => {
+app.get("/api/my/settings", async (c) => c.json({ settings: await readSettings(c.env.DB, c.get("uid")) }));
+app.put("/api/my/settings", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const stmts = [];
+  const uid = c.get("uid"), stmts = [];
   for (const k of SETTING_KEYS) {
     if (!(k in body)) continue;
-    const v = typeof body[k] === "string" ? body[k].trim() : "";
-    if (COLOR_KEYS.includes(k) && v && !HEX_RE.test(v)) continue; // 非法 hex：忽略，不改动
-    stmts.push(v
-      ? c.env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(k, v)
-      : c.env.DB.prepare("DELETE FROM settings WHERE key=?").bind(k)); // 清空即恢复默认
+    const val = typeof body[k] === "string" ? body[k].trim() : "";
+    if (COLOR_KEYS.includes(k) && val && !HEX_RE.test(val)) continue;
+    stmts.push(val
+      ? c.env.DB.prepare("INSERT INTO settings (user_id,key,value) VALUES (?,?,?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value").bind(uid, k, val)
+      : c.env.DB.prepare("DELETE FROM settings WHERE user_id=? AND key=?").bind(uid, k));
   }
   if (stmts.length) await c.env.DB.batch(stmts);
-  return c.json({ ok: true, settings: await readSettings(c.env.DB) });
+  return c.json({ ok: true, settings: await readSettings(c.env.DB, uid) });
+});
+app.put("/api/my/board", async (c) => {
+  const { slug, name } = await c.req.json().catch(() => ({}));
+  if (!validateSlug(slug)) return c.json({ ok: false, error: "网址 slug 需 3-32 位小写字母/数字/-" }, 400);
+  const clash = await c.env.DB.prepare("SELECT id FROM users WHERE board_slug=? AND id<>?").bind(slug, c.get("uid")).first();
+  if (clash) return c.json({ ok: false, error: "该网址已被占用" }, 409);
+  await c.env.DB.prepare("UPDATE users SET board_slug=?, board_name=? WHERE id=?").bind(slug, typeof name === "string" ? name : "", c.get("uid")).run();
+  return c.json({ ok: true, board: { slug, name: name || "" } });
 });
 
-// 未匹配的 /api/* 返回 JSON 404；其余交给静态资源（public/）
+/* ---------- 站长 ---------- */
+app.post("/api/owner/login", async (c) => {
+  const { password } = await c.req.json().catch(() => ({}));
+  if (!password || password !== c.env.ADMIN_PASSWORD) return c.json({ ok: false, error: "密码错误" }, 401);
+  const token = await signToken(c.env.SESSION_SECRET, { role: "owner" }, TTL);
+  setCookie(c, OWNER_COOKIE, token, COOKIE_OPTS);
+  return c.json({ ok: true });
+});
+app.post("/api/owner/logout", (c) => { setCookie(c, OWNER_COOKIE, "", { ...COOKIE_OPTS, maxAge: 0 }); return c.json({ ok: true }); });
+app.use("/api/owner/*", async (c, next) => {
+  if (c.req.path === "/api/owner/login") return next();
+  const token = getCookie(c, OWNER_COOKIE);
+  const claims = token ? await verifyToken(c.env.SESSION_SECRET, token) : null;
+  if (!claims || claims.role !== "owner") return c.json({ ok: false, error: "unauthorized" }, 401);
+  await next();
+});
+app.get("/api/owner/codes", async (c) => {
+  const { results } = await c.env.DB.prepare("SELECT code, used_by, used_at, created_at FROM activation_codes ORDER BY created_at DESC").all();
+  return c.json({ codes: (results || []).map((r) => ({ code: r.code, used: r.used_by != null, usedBy: r.used_by, usedAt: r.used_at })) });
+});
+app.post("/api/owner/codes", async (c) => {
+  const { count } = await c.req.json().catch(() => ({}));
+  const n = Math.max(1, Math.min(50, Number(count) || 1));
+  const now = new Date().toISOString(), created = [], stmts = [];
+  for (let i = 0; i < n; i++) { const code = generateCode(); created.push(code); stmts.push(c.env.DB.prepare("INSERT INTO activation_codes (code,used_by,created_at,used_at) VALUES (?,?,?,?)").bind(code, null, now, null)); }
+  await c.env.DB.batch(stmts);
+  return c.json({ ok: true, created });
+});
+app.get("/api/owner/users", async (c) => {
+  const { results } = await c.env.DB.prepare("SELECT * FROM users ORDER BY created_at DESC").all();
+  return c.json({ users: (results || []).map(rowToUser) });
+});
+app.post("/api/owner/users/:id/reset", async (c) => {
+  const tmp = generateCode();
+  const { hash, salt } = await hashPassword(tmp);
+  const { meta } = await c.env.DB.prepare("UPDATE users SET pass_hash=?, pass_salt=? WHERE id=?").bind(hash, salt, Number(c.req.param("id"))).run();
+  if (!meta.changes) return c.json({ ok: false, error: "not found" }, 404);
+  return c.json({ ok: true, password: tmp });
+});
+
+/* ---------- 公开页路由 + 静态 ---------- */
+app.get("/b/:slug", (c) => { const url = new URL(c.req.url); url.pathname = "/index.html"; return c.env.ASSETS.fetch(new Request(url, c.req.raw)); });
 app.all("*", (c) => {
   if (c.req.path.startsWith("/api/")) return c.json({ ok: false, error: "not found" }, 404);
   return c.env.ASSETS.fetch(c.req.raw);
 });
-
 export default app;
