@@ -8,9 +8,18 @@
 <style>
   /* 公开页：单列/自适应多列钟摆流，无配置栏 */
   .layout{display:block}
-  .charts{max-width:1080px;margin:0 auto}
+  /* 去掉卡片样式（透明背景、无阴影圆角），每只钟摆用分割线分隔 */
+  .charts{max-width:1080px;margin:0 auto;background:none;box-shadow:none;border-radius:0;padding:0}
+  .chart-item{border-top:1px solid var(--track-edge);padding:26px 0 10px}
+  .chart-item:first-child{border-top:none}
   @media (min-width:1100px){
-    .charts{display:grid;grid-template-columns:1fr 1fr;gap:8px 40px}
+    .charts{display:grid;grid-template-columns:1fr 1fr;gap:0 48px}
+    .chart-item:nth-child(2){border-top:none}  /* 双列时第一行（前两项）不画上分割线 */
+  }
+  /* 移动端：收窄页面留白，让钟摆更大 */
+  @media (max-width:560px){
+    body{padding:20px 10px 56px}
+    .chart-item{padding:20px 0 8px}
   }
 </style>
 </head>
