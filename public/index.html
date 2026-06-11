@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>估值钟摆 · 看板</title>
+<link rel="stylesheet" href="/shared/styles.css">
+<style>
+  /* 公开页：单列/自适应多列钟摆流，无配置栏 */
+  .layout{display:block}
+  .charts{max-width:1080px;margin:0 auto}
+  @media (min-width:1100px){
+    .charts{display:grid;grid-template-columns:1fr 1fr;gap:8px 40px}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+    <p class="eyebrow">市场情绪 · Valuation Pendulum</p>
+    <h1>估值钟摆看板</h1>
+    <p class="sub">每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。</p>
+  </div>
+  <div class="layout">
+    <div class="charts" id="charts"></div>
+  </div>
+</div>
+
+<script type="module">
+import { Gauge } from "/shared/gauge.js";
+import { verdictOf, structValid } from "/shared/core.js";
+
+const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+const chartsEl = document.getElementById("charts");
+const items = []; // {cfg, gauge, verdictEl, gotQuote}
+
+function renderVerdict(item) {
+  const v = verdictOf(item.cfg);
+  const el = item.verdictEl;
+  el.className = "verdict " + v.cls;
+  el.innerHTML = "";
+  const px = document.createElement("span");
+  px.className = "px" + (item.live ? " px-live" : "");
+  px.textContent = v.px;
+  el.appendChild(px);
+  el.appendChild(document.createTextNode(v.text));
+}
+
+function addChart(cfg) {
+  const wrap = document.createElement("div");
+  wrap.className = "chart-item";
+  const gauge = new Gauge(wrap);
+  const verdict = document.createElement("p");
+  verdict.className = "verdict v-fair";
+  wrap.appendChild(verdict);
+  chartsEl.appendChild(wrap);
+  const item = { cfg, gauge, verdictEl: verdict, live: false, gotQuote: false };
+  items.push(item);
+  gauge.set(cfg, false);
+  renderVerdict(item);
+}
+
+async function loadConfig() {
+  const res = await fetch("/api/config");
+  const { items: rows } = await res.json();
+  chartsEl.innerHTML = "";
+  items.length = 0;
+  if (!rows.length) {
+    chartsEl.innerHTML = '<div class="charts-empty">看板暂未配置内容。</div>';
+    return;
+  }
+  rows.forEach((r) => addChart({ ...r, price: 0 }));
+  await fetchQuotes();
+}
+
+async function fetchQuotes() {
+  const symbols = [...new Set(items.map((i) => i.cfg.symbol).filter(Boolean))];
+  if (!symbols.length) return;
+  let data;
+  try {
+    const res = await fetch("/api/quotes?symbols=" + encodeURIComponent(symbols.join(",")));
+    data = await res.json();
+  } catch { return; }
+  const quotes = data.quotes || {};
+  items.forEach((item) => {
+    const p = quotes[item.cfg.symbol];
+    if (!(p > 0)) return;
+    item.cfg = { ...item.cfg, price: p };
+    item.live = true;
+    if (structValid(item.cfg)) {
+      const first = !item.gotQuote;
+      item.gotQuote = true;
+      item.gauge.set(item.cfg, !first);
+      if (first) item.gauge.swingIn();
+      renderVerdict(item);
+    }
+  });
+}
+
+loadConfig();
+setInterval(fetchQuotes, 60000);
+</script>
+</body>
+</html>
