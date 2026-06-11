@@ -93,9 +93,13 @@ function applySettings(s) {
 }
 
 async function loadConfig() {
+  const m = location.pathname.match(/^\/b\/([^/]+)/);
+  const slug = m ? decodeURIComponent(m[1]) : "";
+  if (!slug) { chartsEl.innerHTML = '<div class="charts-empty">缺少看板地址（/b/&lt;slug&gt;）。</div>'; return; }
   let rows;
   try {
-    const res = await fetch("/api/config");
+    const res = await fetch("/api/config?slug=" + encodeURIComponent(slug));
+    if (res.status === 404) { chartsEl.innerHTML = '<div class="charts-empty">看板不存在。</div>'; return; }
     const data = await res.json();
     applySettings(data.settings || {});
     applyColors(data.settings || {});
