@@ -8,20 +8,25 @@
 <style>
   /* 公开页：单列/自适应多列钟摆流，无配置栏 */
   .layout{display:block}
-  /* 标题区与图表区用分割线分隔；图表区为白色扁平面板（无圆角/阴影） */
+  body{overflow-x:hidden}
+  /* 顶部更新时间 */
+  .updated{font-family:var(--mono);font-size:12px;color:var(--ink-mute);margin:12px 0 0}
+  /* 标题区与图表区用分割线分隔；图表区为白色扁平面板，左右铺满整个屏幕 */
   .page-head{margin-bottom:0;padding-bottom:20px}
-  .charts{max-width:1080px;margin:0 auto;background:var(--card);box-shadow:none;border-radius:0;
-    border-top:1px solid var(--divider);padding:6px 24px 14px}
+  .charts{background:var(--card);box-shadow:none;border-radius:0;border-top:1px solid var(--divider);
+    max-width:none;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);padding:6px 24px 16px}
   .chart-item{border-top:1px solid var(--track-edge);padding:26px 0 10px}
   .chart-item:first-child{border-top:none}
   @media (min-width:1100px){
-    .charts{display:grid;grid-template-columns:1fr 1fr;gap:0 48px}
+    /* 白底铺满全屏，但钟摆内容仍居中约 1080，避免在宽屏上过大 */
+    .charts{display:grid;grid-template-columns:1fr 1fr;gap:0 48px;
+      padding-left:calc((100vw - 1080px) / 2);padding-right:calc((100vw - 1080px) / 2)}
     .chart-item:nth-child(2){border-top:none}  /* 双列时第一行（前两项）不画上分割线 */
   }
   /* 移动端：收窄页面留白，让钟摆更大 */
   @media (max-width:560px){
     body{padding:20px 10px 56px}
-    .charts{padding:2px 12px 10px}
+    .charts{padding:2px 12px 12px}
     .chart-item{padding:20px 0 8px}
   }
 </style>
@@ -32,6 +37,7 @@
     <p class="eyebrow" id="eyebrow">市场情绪 · Valuation Pendulum</p>
     <h1 id="title">估值钟摆看板</h1>
     <p class="sub" id="sub">每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。</p>
+    <p class="updated" id="updated" aria-live="polite"></p>
   </div>
   <div class="layout">
     <div class="charts" id="charts"></div>
@@ -43,6 +49,7 @@ import { Gauge } from "/shared/gauge.js";
 import { verdictOf, structValid } from "/shared/core.js";
 
 const chartsEl = document.getElementById("charts");
+const updatedEl = document.getElementById("updated");
 const items = []; // {cfg, gauge, verdictEl, gotQuote}
 
 function renderVerdict(item) {
@@ -108,9 +115,11 @@ async function fetchQuotes() {
     data = await res.json();
   } catch { return; }
   const quotes = data.quotes || {};
+  let ok = 0;
   items.forEach((item) => {
     const p = quotes[item.cfg.symbol];
     if (!(p > 0)) return;
+    ok++;
     item.cfg = { ...item.cfg, price: p };
     item.live = true;
     if (structValid(item.cfg)) {
@@ -121,6 +130,11 @@ async function fetchQuotes() {
       renderVerdict(item);
     }
   });
+  if (ok > 0) {
+    const t = new Date();
+    const p2 = (n) => String(n).padStart(2, "0");
+    updatedEl.textContent = `行情更新于 ${p2(t.getHours())}:${p2(t.getMinutes())}:${p2(t.getSeconds())} · 腾讯延时行情`;
+  }
 }
 
 loadConfig();
