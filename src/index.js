@@ -8,6 +8,17 @@ const app = new Hono();
 const SESSION_COOKIE = "pendulum_session";
 const SESSION_TTL = 7 * 24 * 3600;
 
+// 可配置的页面文案键；前端持有默认值，这里只存/返回已自定义的键。
+const SETTING_KEYS = ["eyebrow", "title", "subtitle"];
+async function readSettings(db) {
+  const out = {};
+  try {
+    const { results } = await db.prepare("SELECT key, value FROM settings").all();
+    for (const r of results || []) if (SETTING_KEYS.includes(r.key)) out[r.key] = r.value;
+  } catch { /* settings 表尚未迁移时退回默认文案，不影响看板 */ }
+  return out;
+}
+
 // 服务端抓腾讯并按 GBK 解码为文本
 async function fetchGbk(url) {
   const res = await fetch(url, { cf: { cacheTtl: 30, cacheEverything: true } });
@@ -21,7 +32,7 @@ app.get("/api/config", async (c) => {
   const { results } = await c.env.DB.prepare(
     "SELECT * FROM items ORDER BY sort_order ASC, id ASC"
   ).all();
-  return c.json({ items: (results || []).map(rowToItem) });
+  return c.json({ items: (results || []).map(rowToItem), settings: await readSettings(c.env.DB) });
 });
 
 app.get("/api/quotes", async (c) => {
@@ -118,6 +129,25 @@ app.delete("/api/admin/items/:id", async (c) => {
   const { meta } = await c.env.DB.prepare("DELETE FROM items WHERE id=?").bind(id).run();
   if (!meta.changes) return c.json({ ok: false, error: "not found" }, 404);
   return c.json({ ok: true });
+});
+
+/* ---------- 页面文案设置 ---------- */
+app.get("/api/admin/settings", async (c) => {
+  return c.json({ settings: await readSettings(c.env.DB) });
+});
+
+app.put("/api/admin/settings", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const stmts = [];
+  for (const k of SETTING_KEYS) {
+    if (!(k in body)) continue;
+    const v = typeof body[k] === "string" ? body[k].trim() : "";
+    stmts.push(v
+      ? c.env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(k, v)
+      : c.env.DB.prepare("DELETE FROM settings WHERE key=?").bind(k)); // 清空即恢复默认
+  }
+  if (stmts.length) await c.env.DB.batch(stmts);
+  return c.json({ ok: true, settings: await readSettings(c.env.DB) });
 });
 
 // 未匹配的 /api/* 返回 JSON 404；其余交给静态资源（public/）

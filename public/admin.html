@@ -15,6 +15,11 @@
   .hidden{display:none}
   .save-state{font-size:11px;color:var(--ink-mute);font-family:var(--mono);margin-left:8px}
   .save-state.ok{color:var(--green)} .save-state.err{color:var(--red)}
+  .field textarea{font-family:var(--font);font-size:13px;color:var(--ink);border:1px solid #dfe3ea;
+    border-radius:8px;padding:7px 9px;width:100%;background:#fbfcfd;outline:none;min-height:62px;
+    resize:vertical;line-height:1.5}
+  .field textarea:focus{border-color:#3a73ee;box-shadow:0 0 0 3px rgba(58,115,238,.12);background:#fff}
+  .cfg-block.site .field input{font-family:var(--font)}
 </style>
 </head>
 <body>
@@ -47,6 +52,24 @@
           <button class="btn" id="btnLogout" style="margin-left:auto">退出</button>
         </div>
         <p class="quote-note">现价由腾讯公开行情接口经服务端代理获取（延时）。代码框支持 <code>代码 / 名称 / 拼音</code> 联想，<b>必须从下拉中选择</b>以锁定精确标的。改动会自动保存。</p>
+
+        <!-- 页面文案 -->
+        <div class="cfg-block site">
+          <div class="cfg-top">
+            <span class="cfg-name">页面文案</span>
+            <span class="save-state" id="setSave"></span>
+          </div>
+          <div class="cfg-grid">
+            <label class="field full"><span class="f-lab">小标题</span>
+              <input id="setEyebrow" type="text" autocomplete="off" placeholder="市场情绪 · Valuation Pendulum"></label>
+            <label class="field full"><span class="f-lab">大标题</span>
+              <input id="setTitle" type="text" autocomplete="off" placeholder="估值钟摆看板"></label>
+            <label class="field full"><span class="f-lab">说明</span>
+              <textarea id="setSubtitle" placeholder="每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。"></textarea></label>
+          </div>
+          <p class="quote-note">留空即使用默认文案。改动自动保存，公开页 / 即时生效。</p>
+        </div>
+
         <div id="cfgList"></div>
       </div>
     </div>
@@ -79,10 +102,41 @@ async function tryLoad() {
   gate.classList.add("hidden");
   appEl.classList.remove("hidden");
   rows.forEach((r) => addItem({ ...r, price: 0 }));
+  loadSettings();
   fetchQuotes();
   if (!quoteTimer) quoteTimer = setInterval(fetchQuotes, 60000);
   return true;
 }
+
+/* ---------- 页面文案（自动保存） ---------- */
+const setEyebrow = document.getElementById("setEyebrow");
+const setTitle = document.getElementById("setTitle");
+const setSubtitle = document.getElementById("setSubtitle");
+const setSaveEl = document.getElementById("setSave");
+let setTimer = null;
+async function loadSettings() {
+  try {
+    const res = await fetch("/api/admin/settings");
+    if (!res.ok) return;
+    const s = (await res.json()).settings || {};
+    setEyebrow.value = s.eyebrow || "";
+    setTitle.value = s.title || "";
+    setSubtitle.value = s.subtitle || "";
+  } catch { /* 保持空，占位符显示默认 */ }
+}
+async function saveSettings() {
+  setSaveEl.className = "save-state"; setSaveEl.textContent = "保存中…";
+  try {
+    const res = await fetch("/api/admin/settings", {
+      method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ eyebrow: setEyebrow.value, title: setTitle.value, subtitle: setSubtitle.value }),
+    });
+    if (res.ok) { setSaveEl.className = "save-state ok"; setSaveEl.textContent = "已保存"; }
+    else { setSaveEl.className = "save-state err"; setSaveEl.textContent = "保存失败"; }
+  } catch { setSaveEl.className = "save-state err"; setSaveEl.textContent = "保存失败"; }
+}
+[setEyebrow, setTitle, setSubtitle].forEach((el) =>
+  el.addEventListener("input", () => { clearTimeout(setTimer); setTimer = setTimeout(saveSettings, 600); }));
 document.getElementById("btnLogin").addEventListener("click", login);
 document.getElementById("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
 async function login() {

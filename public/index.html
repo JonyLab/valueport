@@ -17,9 +17,9 @@
 <body>
 <div class="page">
   <div class="page-head">
-    <p class="eyebrow">市场情绪 · Valuation Pendulum</p>
-    <h1>估值钟摆看板</h1>
-    <p class="sub">每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。</p>
+    <p class="eyebrow" id="eyebrow">市场情绪 · Valuation Pendulum</p>
+    <h1 id="title">估值钟摆看板</h1>
+    <p class="sub" id="sub">每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。</p>
   </div>
   <div class="layout">
     <div class="charts" id="charts"></div>
@@ -59,11 +59,20 @@ function addChart(cfg) {
   renderVerdict(item);
 }
 
+function applySettings(s) {
+  // HTML 里保留默认文案；有自定义值就覆盖（空字符串则保留默认）。
+  if (s.eyebrow) document.getElementById("eyebrow").textContent = s.eyebrow;
+  if (s.title) { document.getElementById("title").textContent = s.title; document.title = s.title; }
+  if (s.subtitle) document.getElementById("sub").textContent = s.subtitle;
+}
+
 async function loadConfig() {
   let rows;
   try {
     const res = await fetch("/api/config");
-    rows = (await res.json()).items || [];
+    const data = await res.json();
+    applySettings(data.settings || {});
+    rows = data.items || [];
   } catch {
     chartsEl.innerHTML = '<div class="charts-empty">加载失败，请稍后重试。</div>';
     return;

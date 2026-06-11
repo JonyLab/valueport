@@ -8,6 +8,9 @@ beforeAll(async () => {
        symbol TEXT NOT NULL, fair_low REAL NOT NULL, fair_high REAL NOT NULL,
        mos REAL NOT NULL, ext REAL NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)`
   ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
+  ).run();
 });
 
 const item = { ticker: "AAPL", name: "苹果", symbol: "usAAPL", fairLow: 215, fairHigh: 265, mos: 20, ext: 25 };
@@ -118,5 +121,50 @@ describe("update / delete / misc routes", () => {
   it("returns JSON 404 for an unknown /api path", async () => {
     const res = await SELF.fetch("https://x/api/does-not-exist");
     expect(res.status).toBe(404);
+  });
+});
+
+describe("page text settings", () => {
+  it("blocks settings writes without a session", async () => {
+    const res = await SELF.fetch("https://x/api/admin/settings", {
+      method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "x" }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("saves settings and exposes them on /api/config", async () => {
+    const cookie = await login();
+    const put = await SELF.fetch("https://x/api/admin/settings", {
+      method: "PUT", headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ eyebrow: "我的小标题", title: "我的看板", subtitle: "我的说明" }),
+    });
+    expect(put.status).toBe(200);
+    const cfg = await (await SELF.fetch("https://x/api/config")).json();
+    expect(cfg.settings).toMatchObject({ eyebrow: "我的小标题", title: "我的看板", subtitle: "我的说明" });
+  });
+
+  it("clearing a value resets it to default (key removed)", async () => {
+    const cookie = await login();
+    await SELF.fetch("https://x/api/admin/settings", {
+      method: "PUT", headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ title: "临时标题" }),
+    });
+    await SELF.fetch("https://x/api/admin/settings", {
+      method: "PUT", headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ title: "   " }), // 清空（trim 后为空）→ 删除该键
+    });
+    const cfg = await (await SELF.fetch("https://x/api/config")).json();
+    expect("title" in cfg.settings).toBe(false);
+  });
+
+  it("ignores keys outside the allowed set", async () => {
+    const cookie = await login();
+    await SELF.fetch("https://x/api/admin/settings", {
+      method: "PUT", headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ evil: "nope" }),
+    });
+    const cfg = await (await SELF.fetch("https://x/api/config")).json();
+    expect("evil" in cfg.settings).toBe(false);
   });
 });
