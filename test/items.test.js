@@ -15,6 +15,12 @@ describe("validateItem", () => {
   it("rejects mos >= 100", () => {
     expect(validateItem({ ...good, mos: 100 }).ok).toBe(false);
   });
+  it("rejects missing ticker", () => {
+    expect(validateItem({ ...good, ticker: "" }).ok).toBe(false);
+  });
+  it("rejects mos = 0 (open interval)", () => {
+    expect(validateItem({ ...good, mos: 0 }).ok).toBe(false);
+  });
 });
 
 describe("rowToItem", () => {
