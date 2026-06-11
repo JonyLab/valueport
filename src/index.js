@@ -8,8 +8,11 @@ const app = new Hono();
 const SESSION_COOKIE = "pendulum_session";
 const SESSION_TTL = 7 * 24 * 3600;
 
-// 可配置的页面文案键；前端持有默认值，这里只存/返回已自定义的键。
-const SETTING_KEYS = ["eyebrow", "title", "subtitle"];
+// 可配置项；前端持有默认值，这里只存/返回已自定义的键。
+const TEXT_KEYS = ["eyebrow", "title", "subtitle"];                          // 页面文案
+const COLOR_KEYS = ["color_deep", "color_under", "color_fair", "color_over", "color_xover"]; // 区间色块
+const SETTING_KEYS = [...TEXT_KEYS, ...COLOR_KEYS];
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 async function readSettings(db) {
   const out = {};
   try {
@@ -142,6 +145,7 @@ app.put("/api/admin/settings", async (c) => {
   for (const k of SETTING_KEYS) {
     if (!(k in body)) continue;
     const v = typeof body[k] === "string" ? body[k].trim() : "";
+    if (COLOR_KEYS.includes(k) && v && !HEX_RE.test(v)) continue; // 非法 hex：忽略，不改动
     stmts.push(v
       ? c.env.DB.prepare("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(k, v)
       : c.env.DB.prepare("DELETE FROM settings WHERE key=?").bind(k)); // 清空即恢复默认

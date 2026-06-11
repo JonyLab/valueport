@@ -10,6 +10,14 @@ export const N = ZONES.length;
 export const SEG = 180 / N;
 export const PHI_MAX = 179;
 
+// 区间默认配色（用于「恢复默认」与色块配置 UI 的初始值）。
+export const DEFAULT_ZONE_COLORS = Object.fromEntries(ZONES.map((z) => [z.key, z.hex]));
+
+// 用 {zoneKey: "#rrggbb"} 覆盖区间高亮色；未提供的键回退到默认色。
+export function applyZoneColors(map) {
+  for (const z of ZONES) z.hex = (map && map[z.key]) || DEFAULT_ZONE_COLORS[z.key];
+}
+
 // cfg: { fairLow, fairHigh, mos, ext } -> [0, t1, t2, t3, t4, Infinity]
 export function computeAnchors(cfg) {
   const t2 = cfg.fairLow, t3 = cfg.fairHigh;

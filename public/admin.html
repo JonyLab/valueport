@@ -20,6 +20,14 @@
     resize:vertical;line-height:1.5}
   .field textarea:focus{border-color:#3a73ee;box-shadow:0 0 0 3px rgba(58,115,238,.12);background:#fff}
   .cfg-block.site .field input{font-family:var(--font)}
+  .color-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #eef0f3}
+  .color-row:first-child{border-top:none}
+  .color-row .c-lab{flex:1;font-size:13px;color:var(--ink-soft)}
+  .color-row input[type=color]{width:36px;height:28px;padding:0;border:1px solid #dfe3ea;
+    border-radius:6px;background:#fff;cursor:pointer}
+  .color-row input[type=text]{width:94px;font-family:var(--mono);font-size:12.5px;
+    border:1px solid #dfe3ea;border-radius:6px;padding:5px 7px;background:#fbfcfd;outline:none}
+  .color-row input[type=text].bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(226,60,60,.10)}
 </style>
 </head>
 <body>
@@ -70,6 +78,16 @@
           <p class="quote-note">留空即使用默认文案。改动自动保存，公开页 / 即时生效。</p>
         </div>
 
+        <!-- 色块配色 -->
+        <div class="cfg-block site">
+          <div class="cfg-top">
+            <span class="cfg-name">色块配色</span>
+            <span class="save-state" id="colSave"></span>
+          </div>
+          <div id="colorRows"></div>
+          <p class="quote-note">各估值区间的高亮色。用取色器或直接填 <code>#rrggbb</code>，改动自动保存、实时预览；清空恢复默认。</p>
+        </div>
+
         <div id="cfgList"></div>
       </div>
     </div>
@@ -78,7 +96,7 @@
 
 <script type="module">
 import { Gauge } from "/shared/gauge.js";
-import { verdictOf, structValid } from "/shared/core.js";
+import { verdictOf, structValid, applyZoneColors, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
 import { MKT_LABEL } from "/shared/market.js";
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -115,14 +133,19 @@ const setSubtitle = document.getElementById("setSubtitle");
 const setSaveEl = document.getElementById("setSave");
 let setTimer = null;
 async function loadSettings() {
+  let s = {};
   try {
     const res = await fetch("/api/admin/settings");
-    if (!res.ok) return;
-    const s = (await res.json()).settings || {};
-    setEyebrow.value = s.eyebrow || "";
-    setTitle.value = s.title || "";
-    setSubtitle.value = s.subtitle || "";
+    if (res.ok) s = (await res.json()).settings || {};
   } catch { /* 保持空，占位符显示默认 */ }
+  setEyebrow.value = s.eyebrow || "";
+  setTitle.value = s.title || "";
+  setSubtitle.value = s.subtitle || "";
+  colorState = {};
+  for (const k of ZONE_KEYS) if (s["color_" + k]) colorState[k] = s["color_" + k];
+  applyZoneColors(currentColorMap());
+  buildColorRows();
+  items.forEach((i) => i.gauge.repaint());
 }
 async function saveSettings() {
   setSaveEl.className = "save-state"; setSaveEl.textContent = "保存中…";
@@ -137,6 +160,65 @@ async function saveSettings() {
 }
 [setEyebrow, setTitle, setSubtitle].forEach((el) =>
   el.addEventListener("input", () => { clearTimeout(setTimer); setTimer = setTimeout(saveSettings, 600); }));
+
+/* ---------- 色块配色（自动保存 + 实时预览） ---------- */
+const ZONE_KEYS = ZONES.map((z) => z.key);
+const ZONE_LABELS = { deep: "深度低估", under: "低估", fair: "合理", over: "高估", xover: "极度高估" };
+const colSaveEl = document.getElementById("colSave");
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+let colorState = {}; // 仅存自定义的区间色；缺省即用默认
+let colTimer = null;
+
+function currentColorMap() {
+  const m = {};
+  for (const k of ZONE_KEYS) if (colorState[k]) m[k] = colorState[k];
+  return m;
+}
+function buildColorRows() {
+  const wrap = document.getElementById("colorRows");
+  wrap.innerHTML = "";
+  ZONES.forEach((z) => {
+    const cur = colorState[z.key] || DEFAULT_ZONE_COLORS[z.key];
+    const row = document.createElement("div");
+    row.className = "color-row";
+    const lab = document.createElement("span");
+    lab.className = "c-lab";
+    lab.textContent = `${ZONE_LABELS[z.key] || z.key} · ${z.en}`;
+    const picker = document.createElement("input");
+    picker.type = "color"; picker.value = cur;
+    const hex = document.createElement("input");
+    hex.type = "text"; hex.maxLength = 7; hex.spellcheck = false; hex.autocomplete = "off";
+    hex.value = cur; hex.placeholder = DEFAULT_ZONE_COLORS[z.key];
+    picker.addEventListener("input", () => { hex.value = picker.value; hex.classList.remove("bad"); onColorChange(z.key, picker.value); });
+    hex.addEventListener("input", () => {
+      const v = hex.value.trim();
+      if (HEX_RE.test(v)) { hex.classList.remove("bad"); picker.value = v; onColorChange(z.key, v); }
+      else if (v === "") { hex.classList.remove("bad"); onColorChange(z.key, ""); } // 清空→默认
+      else hex.classList.add("bad");
+    });
+    row.append(lab, picker, hex);
+    wrap.appendChild(row);
+  });
+}
+function onColorChange(key, value) {
+  if (value) colorState[key] = value; else delete colorState[key];
+  applyZoneColors(currentColorMap());
+  items.forEach((i) => i.gauge.repaint());
+  clearTimeout(colTimer);
+  colTimer = setTimeout(saveColors, 600);
+}
+async function saveColors() {
+  colSaveEl.className = "save-state"; colSaveEl.textContent = "保存中…";
+  const payload = {};
+  for (const k of ZONE_KEYS) payload["color_" + k] = colorState[k] || ""; // 空串→后端删除→默认
+  try {
+    const res = await fetch("/api/admin/settings", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+    });
+    colSaveEl.className = res.ok ? "save-state ok" : "save-state err";
+    colSaveEl.textContent = res.ok ? "已保存" : "保存失败";
+  } catch { colSaveEl.className = "save-state err"; colSaveEl.textContent = "保存失败"; }
+}
 document.getElementById("btnLogin").addEventListener("click", login);
 document.getElementById("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
 async function login() {

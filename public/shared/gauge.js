@@ -126,5 +126,6 @@ export class Gauge {
     };
     this.raf = requestAnimationFrame(step);
   }
+  repaint() { this.paint(this.current); } // 用配色变更后按当前角度重绘
   destroy() { if (this.raf) cancelAnimationFrame(this.raf); this.svg.remove(); }
 }

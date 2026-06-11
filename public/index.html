@@ -46,7 +46,14 @@
 
 <script type="module">
 import { Gauge } from "/shared/gauge.js";
-import { verdictOf, structValid } from "/shared/core.js";
+import { verdictOf, structValid, applyZoneColors } from "/shared/core.js";
+
+const ZONE_KEYS = ["deep", "under", "fair", "over", "xover"];
+function applyColors(s) {
+  const m = {};
+  for (const k of ZONE_KEYS) if (s["color_" + k]) m[k] = s["color_" + k];
+  applyZoneColors(m);
+}
 
 const chartsEl = document.getElementById("charts");
 const updatedEl = document.getElementById("updated");
@@ -91,6 +98,7 @@ async function loadConfig() {
     const res = await fetch("/api/config");
     const data = await res.json();
     applySettings(data.settings || {});
+    applyColors(data.settings || {});
     rows = data.items || [];
   } catch {
     chartsEl.innerHTML = '<div class="charts-empty">加载失败，请稍后重试。</div>';

@@ -167,4 +167,25 @@ describe("page text settings", () => {
     const cfg = await (await SELF.fetch("https://x/api/config")).json();
     expect("evil" in cfg.settings).toBe(false);
   });
+
+  it("stores valid hex zone colors and exposes them", async () => {
+    const cookie = await login();
+    await SELF.fetch("https://x/api/admin/settings", {
+      method: "PUT", headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ color_over: "#FF0000", color_deep: "#00aa55" }),
+    });
+    const cfg = await (await SELF.fetch("https://x/api/config")).json();
+    expect(cfg.settings.color_over).toBe("#FF0000");
+    expect(cfg.settings.color_deep).toBe("#00aa55");
+  });
+
+  it("ignores an invalid hex color (leaves it unset)", async () => {
+    const cookie = await login();
+    await SELF.fetch("https://x/api/admin/settings", {
+      method: "PUT", headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ color_fair: "red" }),
+    });
+    const cfg = await (await SELF.fetch("https://x/api/config")).json();
+    expect("color_fair" in cfg.settings).toBe(false);
+  });
 });

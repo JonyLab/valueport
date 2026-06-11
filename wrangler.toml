@@ -8,7 +8,7 @@ assets = { directory = "./public", binding = "ASSETS" }
 [[d1_databases]]
 binding = "DB"
 database_name = "pendulum-db"
-database_id = "PLACEHOLDER_RUN_d1_create_TO_FILL"
+database_id = "0be2e6bd-01f6-4b58-8112-516b9a1034db"
 
 # secrets（不写明文，用 `wrangler secret put` 设置）:
 #   ADMIN_PASSWORD   后台登录密码

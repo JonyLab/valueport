@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeAnchors, priceToPhi, verdictOf, structValid, SEG, N } from "../public/shared/core.js";
+import { computeAnchors, priceToPhi, verdictOf, structValid, SEG, N, ZONES, applyZoneColors, DEFAULT_ZONE_COLORS } from "../public/shared/core.js";
 
 describe("computeAnchors", () => {
   it("derives t1..t4 from fair range, mos, ext", () => {
@@ -65,5 +65,16 @@ describe("zone constants", () => {
   it("keeps SEG, N, and zone count in sync", () => {
     expect(N).toBe(5);
     expect(N * SEG).toBe(180);
+  });
+});
+
+describe("applyZoneColors", () => {
+  it("overrides provided zone colors and falls back to defaults for the rest", () => {
+    applyZoneColors({ over: "#ff0000", under: "#00ff00" });
+    expect(ZONES.find((z) => z.key === "over").hex).toBe("#ff0000");
+    expect(ZONES.find((z) => z.key === "under").hex).toBe("#00ff00");
+    expect(ZONES.find((z) => z.key === "deep").hex).toBe(DEFAULT_ZONE_COLORS.deep);
+    applyZoneColors({}); // 清空后全部回到默认
+    expect(ZONES.find((z) => z.key === "over").hex).toBe(DEFAULT_ZONE_COLORS.over);
   });
 });
