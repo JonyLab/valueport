@@ -55,14 +55,15 @@ app.post("/api/login", async (c) => {
     return c.json({ ok: false, error: "invalid password" }, 401);
   }
   const token = await signToken(c.env.SESSION_SECRET, SESSION_TTL);
+  // Strict: admin panel is same-origin only; no cross-site navigation needs to carry the session.
   setCookie(c, SESSION_COOKIE, token, {
-    httpOnly: true, secure: true, sameSite: "Lax", path: "/", maxAge: SESSION_TTL,
+    httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: SESSION_TTL,
   });
   return c.json({ ok: true });
 });
 
 app.post("/api/logout", (c) => {
-  setCookie(c, SESSION_COOKIE, "", { httpOnly: true, secure: true, sameSite: "Lax", path: "/", maxAge: 0 });
+  setCookie(c, SESSION_COOKIE, "", { httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: 0 });
   return c.json({ ok: true });
 });
 
@@ -93,7 +94,7 @@ app.post("/api/admin/items", async (c) => {
      VALUES (?,?,?,?,?,?,?,?,?)`
   ).bind(it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder,
     new Date().toISOString()).run();
-  return c.json({ ok: true, id: meta.last_row_id });
+  return c.json({ ok: true, id: meta.last_row_id }, 201);
 });
 
 app.put("/api/admin/items/:id", async (c) => {
@@ -118,7 +119,10 @@ app.delete("/api/admin/items/:id", async (c) => {
   return c.json({ ok: true });
 });
 
-// 其余交给静态资源（public/）
-app.all("*", (c) => c.env.ASSETS.fetch(c.req.raw));
+// 未匹配的 /api/* 返回 JSON 404；其余交给静态资源（public/）
+app.all("*", (c) => {
+  if (c.req.path.startsWith("/api/")) return c.json({ ok: false, error: "not found" }, 404);
+  return c.env.ASSETS.fetch(c.req.raw);
+});
 
 export default app;

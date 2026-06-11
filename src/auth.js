@@ -46,7 +46,8 @@ export async function verifyToken(secret, token) {
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
 }
-// ASCII-only constant-time compare (safe for base64url MAC strings; do not reuse for arbitrary unicode).
+// Constant-time compare for equal-length ASCII strings (base64url MAC). Precondition: lengths come from
+// our own HMAC output, never attacker-controlled — the early length check is not a timing concern here.
 function timingSafeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
   let diff = 0;
