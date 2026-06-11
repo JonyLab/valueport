@@ -20,4 +20,13 @@ describe("auth token", () => {
     const token = await signToken(SECRET, -1);
     expect(await verifyToken(SECRET, token)).toBe(false);
   });
+  it("rejects a token with a modified payload but original signature", async () => {
+    const token = await signToken(SECRET, 3600);
+    const [payload, sig] = token.split(".");
+    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    json.exp += 99999;
+    const forged = btoa(JSON.stringify(json))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    expect(await verifyToken(SECRET, `${forged}.${sig}`)).toBe(false);
+  });
 });

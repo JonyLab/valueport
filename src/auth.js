@@ -20,7 +20,7 @@ async function hmac(secret, message) {
   return b64urlEncode(new Uint8Array(sig));
 }
 
-// ttlSeconds 用 0 表示当前时刻（配合负值可造已过期 token 供测试）。
+// exp = now + ttlSeconds。verifyToken 用 exp > now 严格判定，故 ttlSeconds<=0 即为已过期 token（供测试）。
 export async function signToken(secret, ttlSeconds) {
   const exp = nowSeconds() + ttlSeconds;
   const payload = b64urlEncode(new TextEncoder().encode(JSON.stringify({ exp })));
@@ -29,8 +29,10 @@ export async function signToken(secret, ttlSeconds) {
 }
 
 export async function verifyToken(secret, token) {
-  if (typeof token !== "string" || !token.includes(".")) return false;
-  const [payload, sig] = token.split(".");
+  if (typeof token !== "string") return false;
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+  const [payload, sig] = parts;
   const expected = await hmac(secret, payload);
   if (!timingSafeEqual(sig, expected)) return false;
   try {
@@ -44,6 +46,7 @@ export async function verifyToken(secret, token) {
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
 }
+// ASCII-only constant-time compare (safe for base64url MAC strings; do not reuse for arbitrary unicode).
 function timingSafeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
   let diff = 0;
