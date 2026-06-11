@@ -1,32 +1,32 @@
 import { describe, it, expect } from "vitest";
 import { signToken, verifyToken } from "../src/auth.js";
-
 const SECRET = "unit-secret";
 
-describe("auth token", () => {
-  it("verifies a freshly signed token", async () => {
-    const token = await signToken(SECRET, 3600);
-    expect(await verifyToken(SECRET, token)).toBe(true);
+describe("auth token with claims", () => {
+  it("round-trips role and uid", async () => {
+    const t = await signToken(SECRET, { role: "user", uid: 7 }, 3600);
+    const c = await verifyToken(SECRET, t);
+    expect(c).toMatchObject({ role: "user", uid: 7 });
+    expect(typeof c.exp).toBe("number");
   });
-  it("rejects a tampered token", async () => {
-    const token = await signToken(SECRET, 3600);
-    expect(await verifyToken(SECRET, token + "x")).toBe(false);
+  it("returns null for tampered token", async () => {
+    const t = await signToken(SECRET, { role: "owner" }, 3600);
+    expect(await verifyToken(SECRET, t + "x")).toBe(null);
   });
-  it("rejects a token signed with a different secret", async () => {
-    const token = await signToken(SECRET, 3600);
-    expect(await verifyToken("other-secret", token)).toBe(false);
+  it("returns null for wrong secret", async () => {
+    const t = await signToken(SECRET, { role: "owner" }, 3600);
+    expect(await verifyToken("other", t)).toBe(null);
   });
-  it("rejects an expired token", async () => {
-    const token = await signToken(SECRET, -1);
-    expect(await verifyToken(SECRET, token)).toBe(false);
+  it("returns null for expired token", async () => {
+    const t = await signToken(SECRET, { role: "user", uid: 1 }, -1);
+    expect(await verifyToken(SECRET, t)).toBe(null);
   });
-  it("rejects a token with a modified payload but original signature", async () => {
-    const token = await signToken(SECRET, 3600);
-    const [payload, sig] = token.split(".");
-    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
-    json.exp += 99999;
-    const forged = btoa(JSON.stringify(json))
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-    expect(await verifyToken(SECRET, `${forged}.${sig}`)).toBe(false);
+  it("returns null for malformed token", async () => {
+    expect(await verifyToken(SECRET, "a.b.c")).toBe(null);
+    expect(await verifyToken(SECRET, "garbage")).toBe(null);
+  });
+  it("returns null when ttl was undefined (NaN exp must not verify)", async () => {
+    const t = await signToken(SECRET, { role: "user", uid: 1 }, undefined);
+    expect(await verifyToken(SECRET, t)).toBe(null);
   });
 });
