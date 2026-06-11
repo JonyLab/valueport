@@ -15,6 +15,12 @@ export function parseTencentQuotes(text, symbols) {
   return out;
 }
 
+// smartbox 有时把名称按 %uXXXX 转义返回（如 %u8FC8 → 迈）；解码回真实字符。
+function decodeHintName(s) {
+  if (s.indexOf("%u") < 0) return s;
+  return s.replace(/%u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
 // 腾讯 smartbox: v_hint="mkt~code~name~~^mkt~code~name~~^...";
 export function parseTencentHints(text) {
   const m = text.match(/v_hint="([^"]*)"/);
@@ -26,7 +32,7 @@ export function parseTencentHints(text) {
     const mkt = (f[0] || "").toLowerCase();
     if (!MKT_LABEL[mkt]) continue;
     let code = (f[1] || "").toUpperCase();
-    const name = f[2] || "";
+    const name = decodeHintName(f[2] || "");
     if (mkt === "us") code = code.split(".")[0];
     const symbol = mkt + (mkt === "us" ? code : (f[1] || "").toLowerCase());
     out.push({ mkt, code, name, symbol });
