@@ -26,6 +26,9 @@ describe("priceToPhi", () => {
   it("caps extreme overvalue below 180", () => {
     expect(priceToPhi(anchors, 100000)).toBeLessThanOrEqual(179);
   });
+  it("maps deep-value price into the first band", () => {
+    expect(priceToPhi(anchors, 80)).toBeCloseTo(18);
+  });
 });
 
 describe("verdictOf", () => {
@@ -52,5 +55,15 @@ describe("structValid", () => {
   });
   it("rejects mos out of range", () => {
     expect(structValid({ fairLow: 200, fairHigh: 300, mos: 0, ext: 25 })).toBe(false);
+  });
+  it("rejects ext <= 0", () => {
+    expect(structValid({ fairLow: 200, fairHigh: 300, mos: 20, ext: 0 })).toBe(false);
+  });
+});
+
+describe("zone constants", () => {
+  it("keeps SEG, N, and zone count in sync", () => {
+    expect(N).toBe(5);
+    expect(N * SEG).toBe(180);
   });
 });
