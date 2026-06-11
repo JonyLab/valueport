@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>估值钟摆 · 配置后台</title>
+<link rel="stylesheet" href="/shared/styles.css">
+<style>
+  .login-gate{max-width:360px;margin:80px auto;background:var(--card);border-radius:18px;
+    box-shadow:var(--shadow);padding:28px 24px}
+  .login-gate h2{font-size:18px;margin:0 0 16px}
+  .login-gate input{width:100%;font-family:var(--mono);font-size:14px;padding:10px;
+    border:1px solid #dfe3ea;border-radius:8px;margin-bottom:12px}
+  .login-err{color:var(--red);font-size:12px;margin-bottom:10px;display:none}
+  .hidden{display:none}
+  .save-state{font-size:11px;color:var(--ink-mute);font-family:var(--mono);margin-left:8px}
+  .save-state.ok{color:var(--green)} .save-state.err{color:var(--red)}
+</style>
+</head>
+<body>
+<div class="page">
+  <!-- 登录门 -->
+  <div class="login-gate" id="gate">
+    <h2>配置后台登录</h2>
+    <div class="login-err" id="loginErr">密码错误</div>
+    <input type="password" id="pw" placeholder="管理密码" autocomplete="current-password">
+    <button class="btn primary" id="btnLogin" style="width:100%">进入</button>
+  </div>
+
+  <!-- 配置主体 -->
+  <div id="app" class="hidden">
+    <div class="page-head">
+      <p class="eyebrow">配置后台 · Admin</p>
+      <h1>估值钟摆 · 配置</h1>
+      <p class="sub">在此增删改标的与估值参数，保存后公开页 <a href="/" target="_blank">/</a> 即时生效。</p>
+    </div>
+    <div class="layout">
+      <div class="charts" id="charts"></div>
+      <div class="config">
+        <div class="config-head">
+          <span class="config-title">配置</span>
+          <button class="btn primary" id="btnAdd">＋ 添加图表</button>
+        </div>
+        <div class="quote-bar">
+          <button class="btn" id="btnRefresh">↻ 立即刷新</button>
+          <span class="quote-status" id="quoteStatus"></span>
+          <button class="btn" id="btnLogout" style="margin-left:auto">退出</button>
+        </div>
+        <p class="quote-note">现价由腾讯公开行情接口经服务端代理获取（延时）。代码框支持 <code>代码 / 名称 / 拼音</code> 联想，<b>必须从下拉中选择</b>以锁定精确标的。改动会自动保存。</p>
+        <div id="cfgList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { Gauge } from "/shared/gauge.js";
+import { verdictOf, structValid } from "/shared/core.js";
+import { MKT_LABEL } from "/shared/market.js";
+
+const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+const chartsEl = document.getElementById("charts");
+const cfgList = document.getElementById("cfgList");
+const items = []; // {id, cfg, gauge, chartEl, cfgEl, verdictEl, live, gotQuote, saveEl}
+
+/* ---------- 登录 ---------- */
+const gate = document.getElementById("gate");
+const appEl = document.getElementById("app");
+async function tryLoad() {
+  const res = await fetch("/api/admin/items");
+  if (res.status === 401) return false;
+  const { items: rows } = await res.json();
+  gate.classList.add("hidden");
+  appEl.classList.remove("hidden");
+  rows.forEach((r) => addItem({ ...r, price: 0 }));
+  fetchQuotes();
+  return true;
+}
+document.getElementById("btnLogin").addEventListener("click", login);
+document.getElementById("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+async function login() {
+  const password = document.getElementById("pw").value;
+  const res = await fetch("/api/login", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  if (res.ok) { tryLoad(); }
+  else { document.getElementById("loginErr").style.display = ""; }
+}
+document.getElementById("btnLogout").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  location.reload();
+});
+
+/* ---------- 保存（防抖） ---------- */
+function setSave(item, state, text) {
+  if (!item.saveEl) return;
+  item.saveEl.className = "save-state " + (state || "");
+  item.saveEl.textContent = text || "";
+}
+async function saveItem(item) {
+  if (!item.cfg.symbol || !structValid(item.cfg)) return;
+  setSave(item, "", "保存中…");
+  const payload = {
+    ticker: item.cfg.ticker, name: item.cfg.name, symbol: item.cfg.symbol,
+    fairLow: item.cfg.fairLow, fairHigh: item.cfg.fairHigh, mos: item.cfg.mos, ext: item.cfg.ext,
+    sortOrder: item.cfg.sortOrder || 0,
+  };
+  const url = item.id ? `/api/admin/items/${item.id}` : "/api/admin/items";
+  const method = item.id ? "PUT" : "POST";
+  const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+  if (res.ok) {
+    const body = await res.json();
+    if (!item.id && body.id) item.id = body.id;
+    setSave(item, "ok", "已保存");
+  } else {
+    setSave(item, "err", "保存失败");
+  }
+}
+function debounceSave(item) {
+  clearTimeout(item._saveT);
+  item._saveT = setTimeout(() => saveItem(item), 600);
+}
+
+/* ---------- 图表侧 ---------- */
+function renderVerdict(item) {
+  const v = verdictOf(item.cfg);
+  const el = item.verdictEl;
+  el.className = "verdict " + v.cls;
+  el.innerHTML = "";
+  const px = document.createElement("span");
+  px.className = "px" + (item.live ? " px-live" : "");
+  px.textContent = v.px;
+  el.appendChild(px);
+  el.appendChild(document.createTextNode(v.text));
+}
+function addChartDom(item) {
+  const wrap = document.createElement("div");
+  wrap.className = "chart-item";
+  const gauge = new Gauge(wrap);
+  const verdict = document.createElement("p");
+  verdict.className = "verdict v-fair";
+  wrap.appendChild(verdict);
+  chartsEl.appendChild(wrap);
+  item.gauge = gauge; item.chartEl = wrap; item.verdictEl = verdict;
+  gauge.set(item.cfg, false);
+  renderVerdict(item);
+}
+
+/* ---------- 代码联想（走 /api/hints） ---------- */
+let hintSeq = 0;
+async function loadHints(q) {
+  const seq = ++hintSeq;
+  try {
+    const res = await fetch("/api/hints?q=" + encodeURIComponent(q));
+    const { hints } = await res.json();
+    return seq === hintSeq ? hints : null;
+  } catch { return []; }
+}
+
+/* ---------- 配置侧 ---------- */
+const FIELDS = [
+  { k: "ticker", lab: "标的代码", type: "text" },
+  { k: "fairLow", lab: "合理 · 低点", type: "number" },
+  { k: "fairHigh", lab: "合理 · 高点", type: "number" },
+  { k: "mos", lab: "安全边际 %", type: "number", presets: [10, 20, 30, 40, 50] },
+  { k: "ext", lab: "极度高估 %", type: "number", presets: [10, 20, 30, 40, 50] },
+];
+
+function addCfgDom(item) {
+  const block = document.createElement("div");
+  block.className = "cfg-block";
+  const top = document.createElement("div");
+  top.className = "cfg-top";
+  const name = document.createElement("span");
+  name.className = "cfg-name";
+  name.textContent = item.cfg.name ? `${(item.cfg.ticker || "—").toUpperCase()} · ${item.cfg.name}` : (item.cfg.ticker || "—").toUpperCase();
+  const saveEl = document.createElement("span");
+  saveEl.className = "save-state";
+  item.saveEl = saveEl;
+  const del = document.createElement("button");
+  del.className = "btn-del"; del.textContent = "移除";
+  del.addEventListener("click", () => removeItem(item));
+  const topRight = document.createElement("span");
+  topRight.append(saveEl, del);
+  top.append(name, topRight);
+
+  const grid = document.createElement("div");
+  grid.className = "cfg-grid";
+  FIELDS.forEach((f) => {
+    const lab = document.createElement("label");
+    lab.className = "field" + (f.k === "ticker" ? " full" : "");
+    const span = document.createElement("span");
+    span.className = "f-lab"; span.textContent = f.lab;
+    const input = document.createElement("input");
+    input.type = f.type;
+    if (f.type === "number") { input.min = "0"; input.step = "any"; }
+    else { input.maxLength = 24; input.spellcheck = false; input.placeholder = "代码 / 名称 / 拼音"; input.autocomplete = "off"; }
+    input.value = item.cfg[f.k] ?? "";
+
+    input.addEventListener("input", () => {
+      const v = f.type === "number" ? parseFloat(input.value) : input.value.trim();
+      const next = { ...item.cfg, [f.k]: v };
+      let bad = false;
+      if (f.k === "fairLow") bad = !(v > 0);
+      if (f.k === "fairHigh") bad = !(v > next.fairLow);
+      if (f.k === "mos") bad = !(v > 0 && v < 100);
+      if (f.k === "ext") bad = !(v > 0);
+      input.classList.toggle("bad", bad && input.value !== "");
+      item.cfg = next;
+      if (f.k === "ticker") {
+        name.textContent = (v || "—").toUpperCase();
+        item.live = false; item.gotQuote = false;
+        item.cfg = { ...item.cfg, price: 0, symbol: null, name: "" };
+        input.classList.remove("ok", "bad");
+        renderVerdict(item);
+        item.gauge.set(item.cfg);
+      }
+      if (structValid(item.cfg)) {
+        item.gauge.set(item.cfg);
+        renderVerdict(item);
+        debounceSave(item);
+      }
+    });
+
+    if (f.k === "ticker") {
+      const combo = document.createElement("div");
+      combo.className = "combo";
+      const list = document.createElement("div");
+      list.className = "combo-list"; list.style.display = "none";
+      const err = document.createElement("div");
+      err.className = "f-err"; err.textContent = "请从下拉中选择标的";
+      let opts = [], act = -1, searchTimer = null;
+      const close = () => { list.style.display = "none"; act = -1; };
+      const markState = () => {
+        const txt = input.value.trim();
+        if (item.cfg.symbol) { input.classList.add("ok"); input.classList.remove("bad"); err.style.display = "none"; }
+        else if (txt) { input.classList.add("bad"); input.classList.remove("ok"); err.style.display = ""; }
+        else { input.classList.remove("ok", "bad"); err.style.display = "none"; }
+      };
+      const pick = (o) => {
+        input.value = o.code;
+        item.cfg = { ...item.cfg, ticker: o.code, name: o.name, symbol: o.symbol, price: 0 };
+        item.live = false; item.gotQuote = false;
+        name.textContent = `${o.code} · ${o.name}`;
+        if (structValid(item.cfg)) { item.gauge.set(item.cfg); renderVerdict(item); saveItem(item); }
+        close(); markState(); fetchQuotes();
+      };
+      const renderList = (arr) => {
+        opts = arr; act = -1; list.innerHTML = "";
+        if (!arr.length) { close(); return; }
+        arr.forEach((o) => {
+          const d = document.createElement("div");
+          d.className = "combo-opt";
+          d.innerHTML = `<span class="c-code"></span><span class="c-name"></span><span class="c-mkt"></span>`;
+          d.children[0].textContent = o.code;
+          d.children[1].textContent = o.name;
+          d.children[2].textContent = MKT_LABEL[o.mkt];
+          d.addEventListener("mousedown", (e) => { e.preventDefault(); pick(o); });
+          list.appendChild(d);
+        });
+        list.style.display = "";
+      };
+      const highlight = () => {
+        [...list.children].forEach((d, i) => d.classList.toggle("act", i === act));
+        if (act >= 0) list.children[act].scrollIntoView({ block: "nearest" });
+      };
+      input.addEventListener("input", () => {
+        const q = input.value.trim();
+        clearTimeout(searchTimer);
+        if (q.length < 1) { close(); return; }
+        searchTimer = setTimeout(async () => {
+          const arr = await loadHints(q);
+          if (arr !== null) renderList(arr);
+        }, 250);
+      });
+      input.addEventListener("keydown", (e) => {
+        if (list.style.display === "none") return;
+        if (e.key === "ArrowDown") { e.preventDefault(); act = Math.min(opts.length - 1, act + 1); highlight(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); act = Math.max(0, act - 1); highlight(); }
+        else if (e.key === "Enter") { e.preventDefault(); if (act >= 0) pick(opts[act]); else if (opts.length) pick(opts[0]); }
+        else if (e.key === "Escape") { close(); }
+      });
+      input.addEventListener("blur", () => { setTimeout(() => { close(); markState(); }, 150); });
+      combo.append(input, list);
+      lab.append(span, combo, err);
+      grid.appendChild(lab);
+      if (item.cfg.symbol) input.classList.add("ok");
+      return;
+    }
+
+    lab.append(span, input);
+    if (f.presets) {
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      const chipEls = f.presets.map((p) => {
+        const c = document.createElement("button");
+        c.type = "button"; c.className = "chip"; c.textContent = p + "%";
+        c.addEventListener("click", () => { input.value = p; input.dispatchEvent(new Event("input", { bubbles: true })); });
+        chips.appendChild(c);
+        return { el: c, val: p };
+      });
+      const syncChips = () => { const v = parseFloat(input.value); chipEls.forEach(({ el, val }) => el.classList.toggle("on", v === val)); };
+      input.addEventListener("input", syncChips);
+      syncChips();
+      lab.appendChild(chips);
+    }
+    grid.appendChild(lab);
+  });
+
+  block.addEventListener("click", (e) => {
+    if (e.target.closest("input,button")) return;
+    item.chartEl.scrollIntoView({ behavior: REDUCE ? "auto" : "smooth", block: "center" });
+  });
+  block.append(top, grid);
+  cfgList.appendChild(block);
+  item.cfgEl = block;
+}
+
+/* ---------- 增/删 ---------- */
+function addItem(cfg) {
+  const item = { id: cfg.id || null, cfg: { ...cfg }, live: false, gotQuote: false };
+  items.push(item);
+  addChartDom(item);
+  addCfgDom(item);
+  return item;
+}
+async function removeItem(item) {
+  if (item.id) await fetch(`/api/admin/items/${item.id}`, { method: "DELETE" });
+  const idx = items.indexOf(item);
+  if (idx >= 0) { item.gauge.destroy(); item.chartEl.remove(); item.cfgEl.remove(); items.splice(idx, 1); }
+}
+document.getElementById("btnAdd").addEventListener("click", () => {
+  const it = addItem({ ticker: "", name: "", symbol: null, price: 0, fairLow: 215, fairHigh: 265, mos: 20, ext: 25, sortOrder: items.length });
+  it.cfgEl.scrollIntoView({ behavior: REDUCE ? "auto" : "smooth", block: "nearest" });
+  const first = it.cfgEl.querySelector("input");
+  first && first.focus();
+});
+
+/* ---------- 行情 ---------- */
+const statusEl = document.getElementById("quoteStatus");
+async function fetchQuotes() {
+  const map = items.filter((i) => i.cfg.symbol);
+  if (!map.length) { statusEl.textContent = "请先从下拉选择标的"; return; }
+  statusEl.classList.remove("err"); statusEl.textContent = "获取中…";
+  const symbols = [...new Set(map.map((i) => i.cfg.symbol))];
+  let data;
+  try {
+    const res = await fetch("/api/quotes?symbols=" + encodeURIComponent(symbols.join(",")));
+    data = await res.json();
+  } catch { statusEl.textContent = "接口不可达"; statusEl.classList.add("err"); return; }
+  const quotes = data.quotes || {};
+  let ok = 0;
+  map.forEach((item) => {
+    const p = quotes[item.cfg.symbol];
+    if (!(p > 0)) return;
+    ok++;
+    item.cfg = { ...item.cfg, price: p }; item.live = true;
+    if (structValid(item.cfg)) {
+      const first = !item.gotQuote; item.gotQuote = true;
+      item.gauge.set(item.cfg, !first);
+      if (first) item.gauge.swingIn();
+      renderVerdict(item);
+    }
+  });
+  const t = new Date();
+  const hh = String(t.getHours()).padStart(2, "0"), mm = String(t.getMinutes()).padStart(2, "0"), ss = String(t.getSeconds()).padStart(2, "0");
+  statusEl.textContent = ok > 0 ? `已更新 ${ok}/${map.length} · ${hh}:${mm}:${ss}` : "未取到报价";
+  statusEl.classList.toggle("err", ok === 0);
+}
+document.getElementById("btnRefresh").addEventListener("click", fetchQuotes);
+
+/* ---------- 启动 ---------- */
+tryLoad();
+setInterval(fetchQuotes, 60000);
+</script>
+</body>
+</html>
