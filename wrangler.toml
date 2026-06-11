@@ -1,0 +1,14 @@
+name = "valuation-pendulum"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+assets = { directory = "./public", binding = "ASSETS" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pendulum-db"
+database_id = "PLACEHOLDER_RUN_d1_create_TO_FILL"
+
+# secrets（不写明文，用 `wrangler secret put` 设置）:
+#   ADMIN_PASSWORD   后台登录密码
+#   SESSION_SECRET   cookie HMAC 签名密钥
