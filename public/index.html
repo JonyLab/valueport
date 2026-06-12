@@ -641,6 +641,11 @@ function buildItemForm(item) {
     grid.appendChild(lab);
   });
   modalForm.appendChild(grid);
+  // 合理价值注释：链接到估值方法介绍页
+  const note = document.createElement("p");
+  note.className = "quote-note";
+  note.innerHTML = '合理价值 = 你对这家公司内在价值的估计区间。<a href="/valuation" target="_blank" rel="noopener">什么是合理价值？常见估值方法 →</a>';
+  modalForm.appendChild(note);
 }
 
 const modalErrEl = document.getElementById("modalErr");

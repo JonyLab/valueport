@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>什么是合理价值 · 常见估值方法</title>
+<link rel="stylesheet" href="/shared/styles.css">
+<style>
+  :root{
+    --bg:#fafafa; --card:#ffffff;
+    --ink:#09090b; --ink-soft:#52525b; --ink-mute:#71717a;
+    --border:#e4e4e7; --accent:#f4f4f5;
+    --divider:#e4e4e7; --shadow:0 1px 2px rgba(0,0,0,.05);
+  }
+  .article{max-width:720px;margin:0 auto}
+  .article h2{font-size:18px;margin:36px 0 10px;letter-spacing:-.01em}
+  .article h3{font-size:15px;margin:22px 0 6px}
+  .article p{font-size:14.5px;line-height:1.85;color:var(--ink-soft);margin:8px 0}
+  .article p b{color:var(--ink)}
+  .article .formula{font-family:var(--mono);font-size:13px;background:var(--accent);
+    border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:10px 0;color:var(--ink)}
+  .article table{width:100%;border-collapse:collapse;font-size:13.5px;margin:14px 0}
+  .article th,.article td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  .article th{font-size:12.5px;color:var(--ink-mute);font-weight:600}
+  .article td:first-child{font-weight:600;white-space:nowrap}
+  .back{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink-soft);
+    text-decoration:none;margin-bottom:18px}
+  .back:hover{color:var(--ink)}
+  .tip{background:var(--accent);border:1px solid var(--border);border-radius:10px;
+    padding:12px 16px;font-size:13.5px;line-height:1.8;color:var(--ink-soft);margin:16px 0}
+  .disclaim{font-size:12px;color:var(--ink-mute);margin-top:32px;padding-top:16px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="article">
+    <a class="back" href="javascript:history.back()">← 返回</a>
+    <p class="eyebrow">Valuation · 估值方法</p>
+    <h1>什么是合理价值？</h1>
+    <p><b>合理价值（内在价值）</b>是一家公司值多少钱的估计——理论上等于它未来能产生的所有现金流，折算到今天的价值。价格每天在波动，但它围绕的中心是价值。本看板的钟摆，就是把「现价」放到「你估计的价值区间」里去看：现在是便宜、合理，还是贵。</p>
+    <p>两个要点：第一，价值是<b>区间，不是精确数字</b>——任何估值都建立在对未来的假设上，所以用「低点 ~ 高点」表达比单点更诚实；第二，<b>安全边际</b>（Margin of Safety，格雷厄姆提出）——只在价格明显低于价值低点时才算真正便宜，为估错留出缓冲。</p>
+
+    <h2>常见估值方法</h2>
+    <table>
+      <tr><th>方法</th><th>思路</th><th>适用</th></tr>
+      <tr><td>市盈率 PE</td><td>合理价 = 每股收益 EPS × 合理市盈率。参照公司历史 PE 区间、同行业水平。</td><td>盈利稳定的成熟公司</td></tr>
+      <tr><td>市净率 PB</td><td>合理价 = 每股净资产 × 合理市净率。</td><td>银行、保险、重资产行业</td></tr>
+      <tr><td>市销率 PS</td><td>用收入代替利润估值。</td><td>尚未盈利的成长公司</td></tr>
+      <tr><td>PEG</td><td>PE ÷ 盈利增速。PEG ≈ 1 视为合理，越低越便宜。</td><td>高成长公司</td></tr>
+      <tr><td>股息贴现 DDM</td><td>把未来股息折现加总。</td><td>高分红、分红稳定的公司</td></tr>
+      <tr><td>现金流折现 DCF</td><td>预测未来自由现金流并折现，理论上最严谨，但对增长率与折现率假设极其敏感。</td><td>现金流可预测的公司</td></tr>
+      <tr><td>历史分位法</td><td>看当前估值（PE/PB）处在自身历史的什么分位：低于 20% 分位偏便宜，高于 80% 偏贵。</td><td>周期相对稳定的公司/指数</td></tr>
+    </table>
+
+    <h3>一个简单的例子（PE 法）</h3>
+    <div class="formula">某公司 EPS ≈ 10 元；历史合理 PE 区间 20–26 倍<br>→ 合理价值区间 ≈ 200 ~ 260 元</div>
+    <p>悲观一点的假设给出低点，乐观一点的假设给出高点。用两种以上方法交叉验证，区间更可靠。</p>
+
+    <h2>怎么用在本看板</h2>
+    <p>在添加/编辑标的时填三样东西，钟摆的五个区间就由它们决定：</p>
+    <table>
+      <tr><th>设置</th><th>含义</th></tr>
+      <tr><td>合理 · 低点 / 高点</td><td>你估计的合理价值区间。现价落在区间内 = <b>合理（Fair value）</b>。</td></tr>
+      <tr><td>安全边际 %</td><td>低于「低点 ×（1 − 安全边际）」= <b>深度低估</b>；介于其间 = <b>低估</b>。例：低点 200、安全边际 50% → 100 以下才算深度低估。</td></tr>
+      <tr><td>极度高估 %</td><td>高于「高点 ×（1 + 极度高估）」= <b>极度高估</b>；介于其间 = <b>高估</b>。</td></tr>
+    </table>
+    <div class="tip">建议：估值是「毛估估」，把功夫花在理解生意上，而不是把数字算到小数点后两位。定期（如每季度财报后）回顾并更新区间。</div>
+
+    <p class="disclaim">本页内容仅为估值方法的一般性介绍，不构成任何投资建议。市场有风险，决策需独立判断。</p>
+  </div>
+</div>
+</body>
+</html>
