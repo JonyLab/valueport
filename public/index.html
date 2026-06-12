@@ -174,7 +174,10 @@
     <div id="modalForm"></div>
     <div class="modal-foot">
       <button class="btn danger" id="btnModalRemove">移除</button>
-      <button class="btn primary" id="btnModalDone">完成</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn" id="btnModalCancel">取消</button>
+        <button class="btn primary" id="btnModalDone">完成</button>
+      </div>
     </div>
   </div>
 </div>
@@ -472,7 +475,7 @@ const modalOverlay = document.getElementById("modalOverlay");
 const modalForm = document.getElementById("modalForm");
 const modalTitle = document.getElementById("modalTitle");
 const btnModalRemove = document.getElementById("btnModalRemove");
-let modalItem = null, modalIsNew = false;
+let modalItem = null, modalIsNew = false, modalSnapshot = null;
 
 function modalTitleFor(item) {
   return item.cfg.symbol
@@ -609,6 +612,7 @@ function buildItemForm(item) {
 
 function openItemModal(item, isNew) {
   modalItem = item; modalIsNew = isNew;
+  modalSnapshot = { ...item.cfg }; // 取消时回滚到打开前的状态
   modalTitle.textContent = modalTitleFor(item);
   setSaveState("", "");
   btnModalRemove.classList.toggle("hidden", isNew && !item.id);
@@ -626,6 +630,24 @@ function closeItemModal() {
 }
 document.getElementById("btnModalDone").addEventListener("click", closeItemModal);
 modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) closeItemModal(); });
+document.getElementById("btnModalCancel").addEventListener("click", async () => {
+  if (!modalItem) return;
+  const item = modalItem;
+  clearTimeout(item._saveT); // 丢弃尚未发出的防抖保存
+  if (modalIsNew) {
+    // 新建取消：整个丢弃（期间已自动创建的也删掉）
+    if (item.id) await fetch(`/api/my/items/${item.id}`, { method: "DELETE" });
+    removeChart(item);
+  } else {
+    // 编辑取消：回滚到打开前的值；期间的自动保存用快照覆盖回去
+    item.cfg = { ...modalSnapshot };
+    item.live = false; item.gotQuote = false;
+    if (structValid(item.cfg)) { item.gauge.set(item.cfg, false); renderVerdict(item); saveItem(item); }
+    fetchQuotes();
+  }
+  modalItem = null;
+  modalOverlay.classList.add("hidden");
+});
 btnModalRemove.addEventListener("click", async () => {
   if (!modalItem) return;
   if (!confirm("确定移除该标的？")) return;
