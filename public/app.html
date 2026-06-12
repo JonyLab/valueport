@@ -31,8 +31,26 @@
 
   /* 卡片：边框替代重阴影 */
   .charts,.config{border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
-  .config{padding:20px 20px 16px}
+  .config{padding:0 18px 18px}
   .config-title{letter-spacing:.08em}
+
+  /* Figma 式右侧固定检查器面板（桌面端） */
+  @media (min-width:881px){
+    body{padding-right:412px}
+    .layout{display:block}
+    .charts{max-width:920px;margin:0 auto}
+    .config{position:fixed;top:0;right:0;bottom:0;width:388px;max-height:none;
+      border:0;border-left:1px solid var(--border);border-radius:0;box-shadow:none;z-index:40}
+  }
+  @media (max-width:880px){
+    .config{overflow:visible}   /* 移动端不做内滚，吸顶相对窗口生效 */
+    .config-sticky{border-radius:14px 14px 0 0}
+  }
+  /* 吸顶：面板头 + tabs（负边距铺满面板内宽，盖住滚动内容） */
+  .config-sticky{position:sticky;top:0;z-index:10;background:var(--card);
+    margin:0 -18px 6px;padding:14px 18px 10px;border-bottom:1px solid var(--border)}
+  .config-sticky .config-head{margin-bottom:0}
+  .config-sticky .tabs{margin:10px 0 0}
 
   /* 按钮（h-9 / rounded-md / outline & primary） */
   .btn{height:36px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;
@@ -43,6 +61,9 @@
   .btn:focus-visible{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
   .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
   .btn.primary:hover{background:#27272a}
+  /* 列表末尾的「添加图表」：整行虚线按钮 */
+  .btn.add{width:100%;justify-content:center;margin-top:14px;border-style:dashed;color:var(--ink-soft)}
+  .btn.add:hover{background:var(--accent);border-style:dashed;color:var(--ink)}
   .btn-del{font-size:12.5px;border-radius:6px;padding:4px 8px}
   .btn-del:hover{color:#dc2626;background:#fef2f2}
 
@@ -118,27 +139,28 @@
     <div class="layout">
       <div class="charts" id="charts"></div>
       <div class="config">
-        <div class="config-head">
-          <span class="config-title">配置</span>
-          <button class="btn" id="btnLogout">退出</button>
-        </div>
-
-        <!-- 分类 tabs -->
-        <div class="tabs" role="tablist" aria-label="配置分类">
-          <button class="tab on" role="tab" aria-selected="true" data-pane="paneItems">标的</button>
-          <button class="tab" role="tab" aria-selected="false" data-pane="panePage">页面</button>
-          <button class="tab" role="tab" aria-selected="false" data-pane="paneBoard">看板</button>
+        <!-- 吸顶：面板头 + 分类 tabs -->
+        <div class="config-sticky">
+          <div class="config-head">
+            <span class="config-title">配置</span>
+            <button class="btn" id="btnLogout">退出</button>
+          </div>
+          <div class="tabs" role="tablist" aria-label="配置分类">
+            <button class="tab on" role="tab" aria-selected="true" data-pane="paneItems">标的</button>
+            <button class="tab" role="tab" aria-selected="false" data-pane="panePage">页面</button>
+            <button class="tab" role="tab" aria-selected="false" data-pane="paneBoard">看板</button>
+          </div>
         </div>
 
         <!-- 标的 -->
         <div id="paneItems" class="tab-pane" role="tabpanel">
           <div class="quote-bar">
-            <button class="btn primary" id="btnAdd">＋ 添加图表</button>
             <button class="btn" id="btnRefresh">↻ 立即刷新</button>
             <span class="quote-status" id="quoteStatus"></span>
           </div>
           <p class="quote-note">现价由腾讯公开行情接口经服务端代理获取（延时）。代码框支持 <code>代码 / 名称 / 拼音</code> 联想，<b>必须从下拉中选择</b>以锁定精确标的。改动会自动保存。</p>
           <div id="cfgList"></div>
+          <button class="btn add" id="btnAdd">＋ 添加图表</button>
         </div>
 
         <!-- 页面：文案 + 配色 -->
