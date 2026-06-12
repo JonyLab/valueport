@@ -6,23 +6,94 @@
 <title>我的看板 · 配置</title>
 <link rel="stylesheet" href="/shared/styles.css">
 <style>
+  /* ===== shadcn(zinc)-flavored theme — 仅作用于本页（加载在 shared/styles.css 之后） ===== */
+  :root{
+    --bg:#fafafa;            /* zinc-50 页面底 */
+    --card:#ffffff;
+    --ink:#09090b;           /* zinc-950 前景 */
+    --ink-soft:#52525b;      /* zinc-600 次级 */
+    --ink-mute:#71717a;      /* zinc-500 muted-foreground */
+    --border:#e4e4e7;        /* zinc-200 边框 */
+    --accent:#f4f4f5;        /* zinc-100 hover/底纹 */
+    --ring:rgba(161,161,170,.4);  /* zinc-400/40 focus ring */
+    --ring-border:#a1a1aa;
+    --divider:#e4e4e7;
+    --track:#f0f0f1;--track-edge:#e4e4e7;
+    --shadow:0 1px 2px rgba(0,0,0,.05);   /* shadow-sm */
+  }
+  body{padding:32px 24px 64px}
   .hidden{display:none}
-  .save-state{font-size:11px;color:var(--ink-mute);font-family:var(--mono);margin-left:8px}
-  .save-state.ok{color:var(--green)} .save-state.err{color:var(--red)}
-  .field textarea{font-family:var(--font);font-size:13px;color:var(--ink);border:1px solid #dfe3ea;
-    border-radius:8px;padding:7px 9px;width:100%;background:#fbfcfd;outline:none;min-height:62px;
-    resize:vertical;line-height:1.5}
-  .field textarea:focus{border-color:#3a73ee;box-shadow:0 0 0 3px rgba(58,115,238,.12);background:#fff}
+
+  /* 头部 */
+  h1{font-size:24px;letter-spacing:-.02em}
+  .eyebrow{letter-spacing:.08em}
+  .sub{font-size:14px;color:var(--ink-mute)}
+
+  /* 卡片：边框替代重阴影 */
+  .charts,.config{border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+  .config{padding:20px 20px 16px}
+  .config-title{letter-spacing:.08em}
+
+  /* 按钮（h-9 / rounded-md / outline & primary） */
+  .btn{height:36px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;
+    border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--ink);
+    font-size:13.5px;font-weight:500;transition:background .15s,border-color .15s,box-shadow .15s}
+  .btn:hover{background:var(--accent);border-color:var(--border)}
+  .btn:active{transform:none}
+  .btn:focus-visible{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
+  .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+  .btn.primary:hover{background:#27272a}
+  .btn-del{font-size:12.5px;border-radius:6px;padding:4px 8px}
+  .btn-del:hover{color:#dc2626;background:#fef2f2}
+
+  /* 表单（统一 36px 高、灰 ring 焦点态） */
+  .field{gap:6px}
+  .cfg-grid{gap:12px}
+  .f-lab{font-size:12.5px;font-weight:500;color:#3f3f46}
+  .field input,.field textarea{
+    height:36px;font-size:14px;font-weight:500;color:var(--ink);
+    border:1px solid var(--border);border-radius:8px;padding:0 12px;width:100%;
+    background:#fff;outline:none;box-shadow:0 1px 2px rgba(0,0,0,.03);
+    transition:border-color .15s,box-shadow .15s}
+  .field textarea{height:auto;min-height:76px;padding:8px 12px;resize:vertical;line-height:1.55;font-family:var(--font);font-size:13.5px}
+  .field input:focus,.field textarea:focus{border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring);background:#fff}
+  .field input.bad,.field textarea.bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(226,60,60,.12)}
+  .field input.ok{border-color:#86c8a0;box-shadow:none;background:#fff}
   .cfg-block.site .field input{font-family:var(--font)}
-  .color-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #eef0f3}
+
+  /* 区块分隔与标题 */
+  .cfg-block{padding:18px 0 16px;border-bottom:1px solid var(--border)}
+  .cfg-name{font-family:var(--font);font-size:14px;font-weight:600;letter-spacing:0}
+  .save-state{font-size:12px;color:var(--ink-mute);font-family:var(--font);margin-left:8px}
+  .save-state.ok{color:var(--green)} .save-state.err{color:var(--red)}
+  .quote-note{font-size:12px;color:var(--ink-mute)}
+  .quote-note code{background:var(--accent);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
+
+  /* 预设 chips → 徽章式开关 */
+  .chip{font-family:var(--font);font-size:12px;font-weight:500;padding:4px 10px;border-radius:8px;
+    border:1px solid var(--border);background:#fff;color:var(--ink-soft)}
+  .chip:hover{background:var(--accent);border-color:var(--border)}
+  .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .chip:focus-visible{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
+
+  /* 联想下拉 → popover */
+  .combo-list{border:1px solid var(--border);border-radius:10px;padding:4px;
+    box-shadow:0 4px 16px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05)}
+  .combo-opt{border-radius:6px;padding:8px 10px;font-size:13px}
+  .combo-opt:hover,.combo-opt.act{background:var(--accent)}
+  .combo-opt .c-mkt{background:var(--accent);border:1px solid var(--border);color:var(--ink-mute)}
+
+  /* 色块配色行 */
+  .color-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--accent)}
   .color-row:first-child{border-top:none}
   .color-row .c-lab{flex:1;font-size:13px;color:var(--ink-soft)}
-  .color-row input[type=color]{width:36px;height:28px;padding:0;border:1px solid #dfe3ea;
-    border-radius:6px;background:#fff;cursor:pointer}
-  .color-row input[type=text]{width:94px;font-family:var(--mono);font-size:12.5px;
-    border:1px solid #dfe3ea;border-radius:6px;padding:5px 7px;background:#fbfcfd;outline:none}
-  .color-row input[type=text].bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(226,60,60,.10)}
-  .cfg-block.site .field input[type=text].bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(226,60,60,.10)}
+  .color-row input[type=color]{width:36px;height:32px;padding:2px;border:1px solid var(--border);
+    border-radius:8px;background:#fff;cursor:pointer}
+  .color-row input[type=text]{width:96px;height:32px;font-family:var(--mono);font-size:12.5px;font-weight:500;
+    border:1px solid var(--border);border-radius:8px;padding:0 9px;background:#fff;outline:none;
+    transition:border-color .15s,box-shadow .15s}
+  .color-row input[type=text]:focus{border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
+  .color-row input[type=text].bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(226,60,60,.12)}
 </style>
 </head>
 <body>
