@@ -75,6 +75,8 @@
   .save-state.ok{color:var(--green)} .save-state.err{color:var(--red)}
   .quote-note{font-size:12px;color:var(--ink-mute);line-height:1.6;margin:6px 0 4px}
   .quote-note code{font-family:var(--mono);background:var(--accent);border:1px solid var(--border);padding:1px 5px;border-radius:5px}
+  .quote-note a{color:var(--ink-soft);text-decoration:underline;text-underline-offset:2px}
+  .quote-note a:hover{color:var(--ink)}
 
   .chips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
   .chip{appearance:none;font-family:var(--font);font-size:12px;font-weight:500;padding:4px 10px;
@@ -639,13 +641,16 @@ function buildItemForm(item) {
       lab.appendChild(chips);
     }
     grid.appendChild(lab);
+    if (f.k === "fairHigh") {
+      // 合理价值注释：紧贴低点/高点输入下方，链接到估值方法介绍页
+      const note = document.createElement("p");
+      note.className = "quote-note";
+      note.style.cssText = "grid-column:1 / -1;margin:0";
+      note.innerHTML = '合理价值 = 你对这家公司内在价值的估计区间。<a href="/valuation" target="_blank" rel="noopener">什么是合理价值？常见估值方法 →</a>';
+      grid.appendChild(note);
+    }
   });
   modalForm.appendChild(grid);
-  // 合理价值注释：链接到估值方法介绍页
-  const note = document.createElement("p");
-  note.className = "quote-note";
-  note.innerHTML = '合理价值 = 你对这家公司内在价值的估计区间。<a href="/valuation" target="_blank" rel="noopener">什么是合理价值？常见估值方法 →</a>';
-  modalForm.appendChild(note);
 }
 
 const modalErrEl = document.getElementById("modalErr");
