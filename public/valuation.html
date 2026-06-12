@@ -39,7 +39,7 @@
 <body>
 <div class="page">
   <div class="article">
-    <div class="topbar"><a class="back" href="javascript:history.back()" id="backLink">← 返回</a><button class="lang-sw" id="langSw"></button></div>
+    <div class="topbar"><a class="back" href="#" id="backLink">← 返回</a><button class="lang-sw" id="langSw"></button></div>
     <div id="art-zh">
     <p class="eyebrow">Valuation · 估值方法</p>
     <h1>什么是合理价值？</h1>
@@ -114,7 +114,16 @@
     import { LANG, toggleLang, langButtonLabel } from "/shared/i18n.js";
     document.documentElement.lang = LANG === "zh" ? "zh-CN" : "en";
     document.title = LANG === "zh" ? "什么是合理价值 · 常见估值方法" : "What is Fair Value · Valuation Methods";
-    document.getElementById("backLink").textContent = LANG === "zh" ? "← 返回" : "← Back";
+    const backLink = document.getElementById("backLink");
+    backLink.textContent = LANG === "zh" ? "← 返回" : "← Back";
+    backLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      // 同标签有历史 → 直接后退；新标签（history 仅 1 条）→ 跳回来源页，否则首页
+      if (history.length > 1) { history.back(); return; }
+      let target = "/";
+      try { if (document.referrer && new URL(document.referrer).origin === location.origin) target = document.referrer; } catch { /* ignore */ }
+      location.href = target;
+    });
     document.getElementById(LANG === "zh" ? "art-en" : "art-zh").classList.add("hidden");
     document.getElementById(LANG === "zh" ? "art-zh" : "art-en").classList.remove("hidden");
     const sw = document.getElementById("langSw");

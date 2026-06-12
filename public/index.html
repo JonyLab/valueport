@@ -141,6 +141,12 @@
 
   /* ===== 设置视图 ===== */
   .view-settings{max-width:640px;margin:0 auto;padding-top:4px}
+  .lang-seg{display:inline-flex;gap:2px;background:var(--accent);border-radius:10px;padding:3px}
+  .lang-opt{height:32px;padding:0 16px;border:0;background:transparent;border-radius:7px;cursor:pointer;
+    font-family:var(--font);font-size:13px;font-weight:500;color:var(--ink-mute);transition:background .15s,color .15s,box-shadow .15s}
+  .lang-opt:hover{color:var(--ink)}
+  .lang-opt.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.03)}
+  .lang-opt:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
   .cfg-block{padding:16px 0 14px;border-bottom:1px solid var(--border)}
   .cfg-block:last-of-type{border-bottom:0}
   .cfg-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -174,7 +180,6 @@
     <p class="sub" id="sub" data-i18n="def_sub">每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。</p>
     <div class="board-bar">
       <p class="updated" id="updated" aria-live="polite"></p>
-      <button class="btn sm" id="btnLang" aria-label="Language"></button>
       <button class="btn icon hidden" id="btnShare" aria-label="分享 / 看板设置" data-i18n-title="s_share" title="分享 / 看板设置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
       </button>
@@ -204,6 +209,13 @@
 
   <!-- 设置视图（主人模式，由导航切换） -->
   <div class="view-settings hidden" id="viewSettings">
+    <div class="cfg-block">
+      <div class="cfg-top"><span class="cfg-name" data-i18n="set_language">语言 Language</span></div>
+      <div class="lang-seg" id="langSeg" role="tablist" aria-label="Language">
+        <button class="lang-opt" data-lang="zh">中文</button>
+        <button class="lang-opt" data-lang="en">English</button>
+      </div>
+    </div>
     <div class="cfg-block">
       <div class="cfg-top"><span class="cfg-name" data-i18n="set_text">页面文案</span><span class="save-state" id="setSave"></span></div>
       <div class="cfg-grid">
@@ -277,16 +289,18 @@
 import { Gauge } from "/shared/gauge.js";
 import { verdictOf, structValid, applyZoneColors, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
 import { MKT_LABEL } from "/shared/market.js";
-import { t, applyI18n, toggleLang, langButtonLabel } from "/shared/i18n.js";
+import { t, applyI18n, setLang, LANG } from "/shared/i18n.js";
 
 applyI18n(); // 静态文案先按当前语言渲染
 const VMSGS = {
   px: (p) => t("v_px", p), pxNone: t("v_px_none"), noSymbol: t("v_no_symbol"),
   waiting: t("v_waiting"), under: (pct) => t("v_under", pct), over: (pct) => t("v_over", pct), fair: t("v_fair"),
 };
-const langBtn = document.getElementById("btnLang");
-langBtn.textContent = langButtonLabel();
-langBtn.addEventListener("click", toggleLang);
+// 语言切换（设置页内的分段控件）
+document.querySelectorAll(".lang-opt").forEach((b) => {
+  b.classList.toggle("on", b.dataset.lang === LANG);
+  b.addEventListener("click", () => { if (b.dataset.lang !== LANG) setLang(b.dataset.lang); });
+});
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 const ZONE_KEYS = ZONES.map((z) => z.key);
@@ -693,8 +707,9 @@ function trySubmitModal() {
   const item = modalItem;
   if (!item) return;
   const c = item.cfg;
-  const untouched = modalIsNew && !item.id && !c.symbol && !(c.fairLow > 0) && !(c.fairHigh > 0);
-  if (untouched) { closeItemModal(); return; }   // 完全空白的新表单视为放弃
+  // 仅当全新表单「什么都没动」（没选标的、代码框也空、没填区间）才视为放弃；否则一律校验报错
+  const untouched = modalIsNew && !item.id && !c.symbol && !c.ticker && !(c.fairLow > 0) && !(c.fairHigh > 0);
+  if (untouched) { closeItemModal(); return; }
   if (!c.symbol) { showModalErr(t("m_err_symbol")); return; }
   if (!(c.fairLow > 0) || !(c.fairHigh > c.fairLow)) {
     showModalErr(t("m_err_range"));

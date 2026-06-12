@@ -75,6 +75,7 @@ const DICT = {
     s_note: "改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。",
     s_slug_invalid: "请先设置有效的 Slug",
     /* 设置视图 */
+    set_language: "语言 Language",
     set_text: "页面文案",
     set_eyebrow: "小标题",
     set_title: "大标题",
@@ -159,6 +160,7 @@ const DICT = {
     s_copied: "Copied",
     s_note: "Changes auto-save (600 ms debounce). Slug: 3–32 lowercase letters, digits or hyphens; the page URL updates after saving.",
     s_slug_invalid: "Set a valid slug first",
+    set_language: "语言 Language",
     set_text: "Page text",
     set_eyebrow: "Eyebrow",
     set_title: "Title",
