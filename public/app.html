@@ -61,6 +61,16 @@
   .field input.ok{border-color:#86c8a0;box-shadow:none;background:#fff}
   .cfg-block.site .field input{font-family:var(--font)}
 
+  /* 分类 tabs（shadcn Tabs：muted 底槽 + 选中白底浮起） */
+  .tabs{display:flex;gap:2px;background:var(--accent);border-radius:10px;padding:3px;margin:12px 0 6px}
+  .tab{flex:1;height:32px;border:0;background:transparent;border-radius:7px;cursor:pointer;
+    font-family:var(--font);font-size:13px;font-weight:500;color:var(--ink-mute);
+    transition:background .15s,color .15s,box-shadow .15s}
+  .tab:hover{color:var(--ink)}
+  .tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.03)}
+  .tab:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+  .tab-pane>.cfg-block:first-child{padding-top:12px}
+
   /* 区块分隔与标题 */
   .cfg-block{padding:18px 0 16px;border-bottom:1px solid var(--border)}
   .cfg-name{font-family:var(--font);font-size:14px;font-weight:600;letter-spacing:0}
@@ -110,58 +120,70 @@
       <div class="config">
         <div class="config-head">
           <span class="config-title">配置</span>
-          <button class="btn primary" id="btnAdd">＋ 添加图表</button>
-        </div>
-        <div class="quote-bar">
-          <button class="btn" id="btnRefresh">↻ 立即刷新</button>
-          <span class="quote-status" id="quoteStatus"></span>
-          <button class="btn" id="btnLogout" style="margin-left:auto">退出</button>
-        </div>
-        <p class="quote-note">现价由腾讯公开行情接口经服务端代理获取（延时）。代码框支持 <code>代码 / 名称 / 拼音</code> 联想，<b>必须从下拉中选择</b>以锁定精确标的。改动会自动保存。</p>
-
-        <!-- 看板设置 -->
-        <div class="cfg-block site" id="boardBlock">
-          <div class="cfg-top">
-            <span class="cfg-name">看板设置</span>
-            <span class="save-state" id="boardSave"></span>
-          </div>
-          <div class="cfg-grid">
-            <label class="field full"><span class="f-lab">看板名称</span>
-              <input id="boardName" type="text" autocomplete="off" placeholder="我的估值看板"></label>
-            <label class="field full"><span class="f-lab">公开地址 Slug</span>
-              <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
-          </div>
-          <p class="quote-note">公开地址：<a id="boardLink" href="#" target="_blank">/b/…</a> — 改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位。</p>
+          <button class="btn" id="btnLogout">退出</button>
         </div>
 
-        <!-- 页面文案 -->
-        <div class="cfg-block site">
-          <div class="cfg-top">
-            <span class="cfg-name">页面文案</span>
-            <span class="save-state" id="setSave"></span>
-          </div>
-          <div class="cfg-grid">
-            <label class="field full"><span class="f-lab">小标题</span>
-              <input id="setEyebrow" type="text" autocomplete="off" placeholder="市场情绪 · Valuation Pendulum"></label>
-            <label class="field full"><span class="f-lab">大标题</span>
-              <input id="setTitle" type="text" autocomplete="off" placeholder="估值钟摆看板"></label>
-            <label class="field full"><span class="f-lab">说明</span>
-              <textarea id="setSubtitle" placeholder="每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。"></textarea></label>
-          </div>
-          <p class="quote-note">留空即使用默认文案。改动自动保存，公开页即时生效。</p>
+        <!-- 分类 tabs -->
+        <div class="tabs" role="tablist" aria-label="配置分类">
+          <button class="tab on" role="tab" aria-selected="true" data-pane="paneItems">标的</button>
+          <button class="tab" role="tab" aria-selected="false" data-pane="panePage">页面</button>
+          <button class="tab" role="tab" aria-selected="false" data-pane="paneBoard">看板</button>
         </div>
 
-        <!-- 色块配色 -->
-        <div class="cfg-block site">
-          <div class="cfg-top">
-            <span class="cfg-name">色块配色</span>
-            <span class="save-state" id="colSave"></span>
+        <!-- 标的 -->
+        <div id="paneItems" class="tab-pane" role="tabpanel">
+          <div class="quote-bar">
+            <button class="btn primary" id="btnAdd">＋ 添加图表</button>
+            <button class="btn" id="btnRefresh">↻ 立即刷新</button>
+            <span class="quote-status" id="quoteStatus"></span>
           </div>
-          <div id="colorRows"></div>
-          <p class="quote-note">各估值区间的高亮色。用取色器或直接填 <code>#rrggbb</code>，改动自动保存、实时预览；清空恢复默认。</p>
+          <p class="quote-note">现价由腾讯公开行情接口经服务端代理获取（延时）。代码框支持 <code>代码 / 名称 / 拼音</code> 联想，<b>必须从下拉中选择</b>以锁定精确标的。改动会自动保存。</p>
+          <div id="cfgList"></div>
         </div>
 
-        <div id="cfgList"></div>
+        <!-- 页面：文案 + 配色 -->
+        <div id="panePage" class="tab-pane hidden" role="tabpanel">
+          <div class="cfg-block site">
+            <div class="cfg-top">
+              <span class="cfg-name">页面文案</span>
+              <span class="save-state" id="setSave"></span>
+            </div>
+            <div class="cfg-grid">
+              <label class="field full"><span class="f-lab">小标题</span>
+                <input id="setEyebrow" type="text" autocomplete="off" placeholder="市场情绪 · Valuation Pendulum"></label>
+              <label class="field full"><span class="f-lab">大标题</span>
+                <input id="setTitle" type="text" autocomplete="off" placeholder="估值钟摆看板"></label>
+              <label class="field full"><span class="f-lab">说明</span>
+                <textarea id="setSubtitle" placeholder="每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。"></textarea></label>
+            </div>
+            <p class="quote-note">留空即使用默认文案。改动自动保存，公开页即时生效。</p>
+          </div>
+          <div class="cfg-block site">
+            <div class="cfg-top">
+              <span class="cfg-name">色块配色</span>
+              <span class="save-state" id="colSave"></span>
+            </div>
+            <div id="colorRows"></div>
+            <p class="quote-note">各估值区间的高亮色。用取色器或直接填 <code>#rrggbb</code>，改动自动保存、实时预览；清空恢复默认。</p>
+          </div>
+        </div>
+
+        <!-- 看板 -->
+        <div id="paneBoard" class="tab-pane hidden" role="tabpanel">
+          <div class="cfg-block site" id="boardBlock">
+            <div class="cfg-top">
+              <span class="cfg-name">看板设置</span>
+              <span class="save-state" id="boardSave"></span>
+            </div>
+            <div class="cfg-grid">
+              <label class="field full"><span class="f-lab">看板名称</span>
+                <input id="boardName" type="text" autocomplete="off" placeholder="我的估值看板"></label>
+              <label class="field full"><span class="f-lab">公开地址 Slug</span>
+                <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
+            </div>
+            <p class="quote-note">公开地址：<a id="boardLink" href="#" target="_blank">/b/…</a> — 改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位。</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -367,6 +389,17 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" });
   location.href = "/login";
 });
+
+/* ---------- 分类 tabs 切换 ---------- */
+document.querySelectorAll(".tab").forEach((t) =>
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((x) => {
+      x.classList.toggle("on", x === t);
+      x.setAttribute("aria-selected", x === t ? "true" : "false");
+    });
+    document.querySelectorAll(".tab-pane").forEach((p) => p.classList.toggle("hidden", p.id !== t.dataset.pane));
+    document.querySelector(".config").scrollTop = 0;
+  }));
 
 /* ---------- 保存（防抖） ---------- */
 function setSave(item, state, text) {
