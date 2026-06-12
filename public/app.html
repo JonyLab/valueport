@@ -64,6 +64,14 @@
   /* 列表末尾的「添加图表」：整行虚线按钮 */
   .btn.add{width:100%;justify-content:center;margin-top:14px;border-style:dashed;color:var(--ink-soft)}
   .btn.add:hover{background:var(--accent);border-style:dashed;color:var(--ink)}
+  /* 纯查看网址：只读链接框 + 复制 */
+  .share-url{display:flex;gap:8px;align-items:center;margin:6px 0 2px}
+  .share-url a{flex:1;min-width:0;height:36px;display:flex;align-items:center;padding:0 12px;
+    font-family:var(--mono);font-size:12.5px;color:var(--ink);text-decoration:none;
+    background:var(--accent);border:1px solid var(--border);border-radius:8px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .share-url a:hover{border-color:#d4d4d8;text-decoration:underline}
+  .share-url .btn{flex:none}
   .btn-del{font-size:12.5px;border-radius:6px;padding:4px 8px}
   .btn-del:hover{color:#dc2626;background:#fef2f2}
 
@@ -203,7 +211,12 @@
               <label class="field full"><span class="f-lab">公开地址 Slug</span>
                 <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
             </div>
-            <p class="quote-note">公开地址：<a id="boardLink" href="#" target="_blank">/b/…</a> — 改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位。</p>
+            <div class="f-lab" style="margin-top:4px">纯查看网址（分享给任何人，只能看不能改）</div>
+            <div class="share-url">
+              <a id="boardLink" href="#" target="_blank">…</a>
+              <button class="btn" id="btnCopyUrl" type="button">复制</button>
+            </div>
+            <p class="quote-note">改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位。</p>
           </div>
         </div>
       </div>
@@ -266,13 +279,24 @@ let boardTimer = null;
 
 function updateBoardLink(slug) {
   if (slug && SLUG_RE.test(slug)) {
-    boardLinkEl.href = "/b/" + slug;
-    boardLinkEl.textContent = "/b/" + slug;
+    const url = location.origin + "/b/" + slug;
+    boardLinkEl.href = url;
+    boardLinkEl.textContent = url;
   } else {
     boardLinkEl.href = "#";
-    boardLinkEl.textContent = "/b/…";
+    boardLinkEl.textContent = "请先设置有效的 Slug";
   }
 }
+document.getElementById("btnCopyUrl").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  if (!boardLinkEl.href || boardLinkEl.href.endsWith("#")) return;
+  try {
+    await navigator.clipboard.writeText(boardLinkEl.href);
+    const old = btn.textContent;
+    btn.textContent = "已复制";
+    setTimeout(() => { btn.textContent = old; }, 1500);
+  } catch { /* 剪贴板不可用时点链接也能打开 */ }
+});
 
 async function saveBoard() {
   const name = boardNameEl.value.trim();
