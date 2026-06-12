@@ -94,7 +94,8 @@ export class Gauge {
   }
   set(cfg, animate = true) {
     this.anchors = computeAnchors(cfg);
-    this.nums.forEach((t, k) => t.textContent = Math.round(this.anchors[k + 1]));
+    // 区间未填完时锚点为 NaN：刻度留空而不是显示 "NaN"
+    this.nums.forEach((t, k) => { const v = this.anchors[k + 1]; t.textContent = isFinite(v) ? Math.round(v) : ""; });
     this.hubText.textContent = (cfg.ticker || "—").toUpperCase();
     this.hubText.style.fontSize = (cfg.ticker || "").length > 6 ? "15px" : "20px";
     this.hasPrice = cfg.price > 0;

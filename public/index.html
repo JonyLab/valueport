@@ -395,7 +395,8 @@ async function init() {
     addCardEl.className = "add-card";
     addCardEl.textContent = "＋ 添加标的";
     addCardEl.addEventListener("click", () => {
-      const item = addChart({ ticker: "", name: "", symbol: null, price: 0, fairLow: 215, fairHigh: 265, mos: 20, ext: 25, sortOrder: items.length });
+      // 低/高点不预填（必须自己想清楚估值）；安全边际默认 50%、极度高估默认 40%
+      const item = addChart({ ticker: "", name: "", symbol: null, price: 0, fairLow: "", fairHigh: "", mos: 50, ext: 40, sortOrder: items.length });
       openItemModal(item, true);
       item.chartEl.scrollIntoView({ behavior: REDUCE ? "auto" : "smooth", block: "center" });
     });
