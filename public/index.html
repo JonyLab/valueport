@@ -19,8 +19,11 @@
   .layout{display:block}
   .page{position:relative}
 
-  /* 顶部 */
+  /* 顶部：更新时间 + 分享入口 */
+  .board-bar{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;min-height:24px}
   .updated{font-family:var(--mono);font-size:12px;color:var(--ink-mute);margin:12px 0 0}
+  .btn.icon{width:36px;padding:0;justify-content:center;flex:none}
+  .btn.icon svg{width:16px;height:16px}
   .page-head{margin-bottom:0;padding-bottom:20px}
   .head-actions{position:absolute;top:0;right:0;display:flex;gap:8px}
 
@@ -166,7 +169,12 @@
     <p class="eyebrow" id="eyebrow">市场情绪 · Valuation Pendulum</p>
     <h1 id="title">估值钟摆看板</h1>
     <p class="sub" id="sub">每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。</p>
-    <p class="updated" id="updated" aria-live="polite"></p>
+    <div class="board-bar">
+      <p class="updated" id="updated" aria-live="polite"></p>
+      <button class="btn icon hidden" id="btnShare" aria-label="分享 / 看板设置" title="分享 / 看板设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
+      </button>
+    </div>
     <div class="head-actions" id="headActions"></div>
   </div>
 
@@ -209,23 +217,34 @@
       <div id="colorRows"></div>
       <p class="quote-note">各估值区间的高亮色。用取色器或直接填 <code>#rrggbb</code>，改动自动保存、实时预览；清空恢复默认。</p>
     </div>
-    <div class="cfg-block">
-      <div class="cfg-top"><span class="cfg-name">看板设置</span><span class="save-state" id="boardSave"></span></div>
-      <div class="cfg-grid">
-        <label class="field full"><span class="f-lab">看板名称</span>
-          <input id="boardName" class="plain" type="text" autocomplete="off" placeholder="我的估值看板"></label>
-        <label class="field full"><span class="f-lab">公开地址 Slug</span>
-          <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
-      </div>
-      <div class="f-lab" style="margin-top:4px">纯查看网址（分享给任何人，只能看不能改）</div>
-      <div class="share-url">
-        <a id="boardLink" href="#" target="_blank">…</a>
-        <button class="btn" id="btnCopyUrl" type="button">复制</button>
-      </div>
-      <p class="quote-note">改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。</p>
-    </div>
     <div style="padding:18px 0">
       <button class="btn" id="btnLogout" style="width:100%;justify-content:center">退出登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- 分享 / 看板设置弹窗（主人模式，Watchlist 右上角分享图标打开） -->
+<div class="overlay hidden" id="shareOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="分享与看板设置">
+    <div class="modal-head">
+      <span class="modal-title" style="font-family:var(--font)">分享 · 看板设置</span>
+      <span class="save-state" id="boardSave"></span>
+    </div>
+    <div class="cfg-grid">
+      <label class="field full"><span class="f-lab">看板名称</span>
+        <input id="boardName" class="plain" type="text" autocomplete="off" placeholder="我的估值看板"></label>
+      <label class="field full"><span class="f-lab">公开地址 Slug</span>
+        <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
+    </div>
+    <div class="f-lab" style="margin-top:12px">纯查看网址（分享给任何人，只能看不能改）</div>
+    <div class="share-url">
+      <a id="boardLink" href="#" target="_blank">…</a>
+      <button class="btn" id="btnCopyUrl" type="button">复制</button>
+    </div>
+    <p class="quote-note">改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。</p>
+    <div class="modal-foot">
+      <span></span>
+      <button class="btn primary" id="btnShareDone">完成</button>
     </div>
   </div>
 </div>
@@ -389,6 +408,7 @@ async function init() {
   const actions = document.getElementById("headActions");
   if (owner) {
     document.getElementById("appNav").classList.remove("hidden");
+    document.getElementById("btnShare").classList.remove("hidden");
     document.body.classList.add("has-nav");
   } else if (me && me.board && me.board.slug) {
     const mine = document.createElement("a");
@@ -674,10 +694,20 @@ document.querySelectorAll(".nav-tab").forEach((t) =>
     const v = t.dataset.view;
     layoutEl.classList.toggle("hidden", v !== "board");
     updatedEl.classList.toggle("hidden", v !== "board");
+    document.getElementById("btnShare").classList.toggle("hidden", v !== "board");
     viewSettings.classList.toggle("hidden", v !== "settings");
   }));
+
+/* ---------- 分享 / 看板设置弹窗 ---------- */
+const shareOverlay = document.getElementById("shareOverlay");
+document.getElementById("btnShare").addEventListener("click", () => shareOverlay.classList.remove("hidden"));
+document.getElementById("btnShareDone").addEventListener("click", () => shareOverlay.classList.add("hidden"));
+shareOverlay.addEventListener("click", (e) => { if (e.target === shareOverlay) shareOverlay.classList.add("hidden"); });
+
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !modalOverlay.classList.contains("hidden")) closeItemModal();
+  if (e.key !== "Escape") return;
+  if (!modalOverlay.classList.contains("hidden")) closeItemModal();
+  else if (!shareOverlay.classList.contains("hidden")) shareOverlay.classList.add("hidden");
 });
 
 /* ---------- 页面文案（自动保存 + 本页实时生效） ---------- */
