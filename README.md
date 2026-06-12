@@ -2,41 +2,72 @@
 
 ## Overview
 
-A Cloudflare Worker that serves a public read-only valuation-pendulum board at `/` and a
-password-protected configuration backend at `/admin`. Watchlist items (tickers, fair-value
-bands, margin-of-safety thresholds) are persisted in a Cloudflare D1 SQLite database. Live
-stock quotes and search hints are proxied server-side from Tencent Finance
+A Cloudflare Worker serving a **multi-user valuation-pendulum watchlist** platform. Each user
+gets a private dashboard to manage their own watchlist and a public read-only board at
+`/b/<slug>`. Users register with a one-time activation code issued by the station-master
+(owner). Live stock quotes and search hints are proxied server-side from Tencent Finance
 (`qt.gtimg.cn` / `smartbox.gtimg.cn`), so the browser never makes cross-origin requests.
-A single `ADMIN_PASSWORD` secret gates the admin panel; sessions are stateless HMAC-signed
-cookies (`SESSION_SECRET`).
+Sessions are stateless HMAC-signed cookies (`SESSION_SECRET`). The owner backend is gated by
+`ADMIN_PASSWORD`.
+
+## Entry Points
+
+| URL | Description |
+|-----|-------------|
+| `/login` | User login page |
+| `/register` | New-user registration (requires an activation code) |
+| `/app` | User dashboard — manage your board, items, and settings |
+| `/owner` | Station-master backend — issue activation codes, manage users, reset passwords |
+| `/b/<slug>` | Public read-only pendulum board for a given user slug |
 
 ## Architecture
 
 ```
 Cloudflare Worker (src/index.js)  — Hono router
 │
-├── src/auth.js        HMAC-SHA-256 stateless session tokens (sign / verify)
+├── src/auth.js        HMAC-SHA-256 stateless session tokens; signToken/verifyToken
+│                      carry {role, uid} claims (role: "user" | "owner")
+├── src/password.js    PBKDF2-SHA256 password hashing (hashPassword / verifyPassword)
+├── src/codes.js       Unambiguous base32 activation-code generator (generateCode)
+├── src/users.js       Username/slug validation and DB-row ↔ camelCase mapping
 ├── src/items.js       Watchlist item validation and DB-row ↔ camelCase mapping
 ├── src/quotes.js      Tencent Finance GBK response parsers (quotes + hints)
 │
-├── public/index.html  Public read-only pendulum board
-├── public/admin.html  Password-protected config UI (CRUD)
+├── public/index.html  Public read-only pendulum board (reads /b/<slug>)
+├── public/login.html  Login page
+├── public/register.html  Registration page (activation code required)
+├── public/app.html    User dashboard (per-user board config, items, settings)
+├── public/owner.html  Station-master backend (codes, users, password reset)
 └── public/shared/
     ├── core.js        Pure business logic ESM module (pendulum math, no DOM)
     ├── gauge.js       Canvas/SVG gauge renderer
-    ├── market.js      Exports `MKT_LABEL` — map of market code → Chinese label (e.g. `us`→美股, `sh`→沪A), used by the admin combobox to label search suggestions
+    ├── market.js      Map of market code → Chinese label (e.g. us→美股, sh→沪A)
     └── styles.css     Shared stylesheet
 
 D1 database (binding: DB)
-└── items table — ticker, name, symbol, fair_low, fair_high, mos, ext, sort_order, updated_at
+├── users             — id, username, pass_hash, pass_salt, board_slug, board_name, created_at
+├── items             — id, user_id, ticker, name, symbol, fair_low, fair_high, mos, ext,
+│                       sort_order, updated_at
+├── settings          — (user_id, key) composite PK; keys: eyebrow, title, subtitle,
+│                       color_deep, color_under, color_fair, color_over, color_xover
+└── activation_codes  — code (PK), used_by (user id), created_at, used_at
 ```
+
+### Cookie names
+
+| Cookie | Scope |
+|--------|-------|
+| `pendulum_user` | Authenticated user session (`{role:"user", uid:<id>}`) |
+| `pendulum_owner` | Station-master session (`{role:"owner"}`) |
+
+Both are `HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800`.
 
 ### Test workspace (`vitest.workspace.js`)
 
-| Project   | Runner                          | Covers                          |
-|-----------|---------------------------------|---------------------------------|
-| `core`    | Node (vitest default)           | `test-core/core.test.js` — pure logic |
-| `worker`  | `@cloudflare/vitest-pool-workers` | `src/*.test.js` — auth, items, quotes, routes |
+| Project | Runner | Covers |
+|---------|--------|--------|
+| `core` | Node (vitest default) | `test-core/core.test.js` — pure pendulum logic |
+| `worker` | `@cloudflare/vitest-pool-workers` | `test/*.test.js` — auth, password, codes, users, items, quotes, routes |
 
 ## Local Development
 
@@ -51,7 +82,7 @@ D1 database (binding: DB)
 npm install
 ```
 
-Create `.dev.vars` in the project root (this file is gitignored):
+Create `.dev.vars` in the project root (gitignored):
 
 ```ini
 ADMIN_PASSWORD = "dev-pass"
@@ -71,19 +102,22 @@ npm run dev
 ```
 
 Then open:
-- http://localhost:8787/ — public pendulum board
-- http://localhost:8787/admin — config backend (login with `dev-pass`)
+
+- http://localhost:8787/login — user login
+- http://localhost:8787/register — new-user registration
+- http://localhost:8787/app — user dashboard (redirects to `/login` if not authenticated)
+- http://localhost:8787/owner — station-master backend (enter `dev-pass`)
+- http://localhost:8787/b/\<slug\> — public board for a registered user
 
 ### Tests
 
 ```bash
-npm test          # runs all 40 vitest tests (no network, no Cloudflare account)
+npm test          # runs all vitest tests across core + worker projects
 ```
 
-## Deployment
+## Deployment (fresh)
 
-The steps below require a Cloudflare account and `wrangler login` (run once in your terminal).
-You only need to do this — do not run these commands locally in this repo without an account.
+The steps below require a Cloudflare account and `wrangler login` (run once).
 
 ```bash
 # 1. Create the D1 database and note the database_id in the output
@@ -91,7 +125,6 @@ npx wrangler d1 create pendulum-db
 
 # 2. Copy the database_id printed above into wrangler.toml:
 #    database_id = "<the-id-from-step-1>"
-#    (replace the PLACEHOLDER_RUN_d1_create_TO_FILL value)
 
 # 3. Apply the schema to the remote database
 npx wrangler d1 execute pendulum-db --remote --file=./schema.sql
@@ -104,22 +137,87 @@ npx wrangler secret put SESSION_SECRET
 npm run deploy
 ```
 
+After deploying:
+1. Open `/owner` and log in with your `ADMIN_PASSWORD`.
+2. Generate activation codes and share them with new users.
+3. New users visit `/register`, enter their username, password, and activation code.
+
 > **Note:** `wrangler.toml` ships with `database_id = "PLACEHOLDER_RUN_d1_create_TO_FILL"`.
-> You must replace this with the real ID returned by `d1 create` before deploying.
+> Replace this with the real ID returned by `d1 create` before deploying.
+
+## Migration (existing single-board DB to multi-user)
+
+If you have an existing single-board deployment (pre-multi-user schema), run the migration
+script **once** against your remote D1 database:
+
+```bash
+npx wrangler d1 execute pendulum-db --remote --file=./migrate-to-multiuser.sql
+```
+
+What the migration does:
+
+- Creates `users` and `activation_codes` tables if they do not exist.
+- Seeds a placeholder user (id=1, username `owner`, board slug `main`) with an **empty
+  password** — this user cannot log in until their password is reset.
+- Adds a `user_id` column to `items` (defaults to 1, attributing all existing items to the
+  placeholder owner user).
+- Rebuilds `settings` with the composite `(user_id, key)` primary key, migrating all existing
+  settings rows to user 1.
+
+After running the migration:
+
+1. Make sure `ADMIN_PASSWORD` and `SESSION_SECRET` secrets are set (via `wrangler secret put`).
+2. Deploy the new worker (`npm run deploy`).
+3. Open `/owner`, log in with your `ADMIN_PASSWORD`.
+4. Find the `owner` user in the Users table and click **Reset Password** to get a temporary
+   password — the placeholder user has an empty password hash and cannot log in until reset.
+5. Log in at `/login` as `owner` with the temporary password, then update items/settings from
+   `/app`.
+6. Generate activation codes for additional users via `/owner`.
+
+New deployments should use `schema.sql` directly and skip this migration entirely.
 
 ## API Reference
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/config` | Public | Returns all watchlist items as JSON |
-| GET | `/api/quotes?symbols=usAAPL,usGOOGL` | Public | Live prices proxied from Tencent |
-| GET | `/api/hints?q=apple` | Public | Search hints proxied from Tencent |
-| POST | `/api/login` | — | `{"password":"…"}` → sets session cookie |
-| POST | `/api/logout` | Cookie | Clears session cookie |
-| GET | `/api/admin/items` | Cookie | List all items (admin) |
-| POST | `/api/admin/items` | Cookie | Create item |
-| PUT | `/api/admin/items/:id` | Cookie | Update item |
-| DELETE | `/api/admin/items/:id` | Cookie | Delete item |
+### Public
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/config?slug=<slug>` | Board data: `{board, items, settings}` for the given slug; 404 if unknown |
+| GET | `/api/quotes?symbols=usAAPL,usGOOGL` | Live prices proxied from Tencent Finance |
+| GET | `/api/hints?q=apple` | Search hints proxied from Tencent Finance |
+
+### Auth
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/register` | `{username, password, code}` → sets user cookie; 400/409 on error |
+| POST | `/api/login` | `{username, password}` → sets user cookie; 401 on failure |
+| POST | `/api/logout` | Clears user cookie |
+| GET | `/api/me` | `{username, board}` for current session; 401 if unauthenticated |
+
+### User (requires `pendulum_user` cookie)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/my/items` | List current user's items |
+| POST | `/api/my/items` | Create item → 201 `{ok, id}` |
+| PUT | `/api/my/items/:id` | Update item; 404 if not owned |
+| DELETE | `/api/my/items/:id` | Delete item; 404 if not owned |
+| GET | `/api/my/settings` | Get current user's settings |
+| PUT | `/api/my/settings` | Update settings (partial) |
+| PUT | `/api/my/board` | `{slug, name}` → update board metadata; 409 on slug conflict |
+
+### Station-master (requires `pendulum_owner` cookie)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/owner/login` | `{password}` → sets owner cookie; 401 on failure |
+| POST | `/api/owner/logout` | Clears owner cookie |
+| GET | `/api/owner/codes` | List all activation codes with usage status |
+| POST | `/api/owner/codes` | `{count}` → mint 1-50 codes; returns `{ok, created:[...]}` |
+| GET | `/api/owner/users` | List all registered users |
+| POST | `/api/owner/users/:id/reset` | Reset a user's password → `{ok, password:"<temp>"}` |
 
 Any unmatched `/api/*` path returns a JSON 404. All other paths are served from the `public/`
 static-asset directory via the `ASSETS` binding.
@@ -128,7 +226,8 @@ static-asset directory via the `ASSETS` binding.
 
 - `compatibility_flags = ["nodejs_compat"]` is required (already set in `wrangler.toml`) for
   the `TextDecoder("gbk")` used in GBK-encoded Tencent Finance responses.
-- Quote and hint endpoints are proxied server-side to avoid browser CORS restrictions and
-  JSONP dependencies — the browser only calls same-origin `/api/*` routes.
+- Quote and hint endpoints are proxied server-side to avoid browser CORS restrictions.
 - Sessions are stateless: the worker holds no state beyond D1. Rotating `SESSION_SECRET`
   invalidates all existing sessions immediately.
+- All user data operations are strictly isolated by `uid` extracted from the verified session
+  token — a user cannot read or modify another user's items or settings.
