@@ -6,29 +6,148 @@
 <title>估值钟摆 · 看板</title>
 <link rel="stylesheet" href="/shared/styles.css">
 <style>
-  /* 公开页：单列/自适应多列钟摆流，无配置栏 */
-  .layout{display:block}
+  /* ===== shadcn(zinc) 主题层 ===== */
+  :root{
+    --bg:#fafafa; --card:#ffffff;
+    --ink:#09090b; --ink-soft:#52525b; --ink-mute:#71717a;
+    --border:#e4e4e7; --accent:#f4f4f5;
+    --ring:rgba(161,161,170,.4); --ring-border:#a1a1aa;
+    --divider:#e4e4e7; --track:#f0f0f1; --track-edge:#e4e4e7;
+    --shadow:0 1px 2px rgba(0,0,0,.05);
+  }
   body{overflow-x:hidden}
-  /* 顶部更新时间 */
+  .layout{display:block}
+  .page{position:relative}
+
+  /* 顶部 */
   .updated{font-family:var(--mono);font-size:12px;color:var(--ink-mute);margin:12px 0 0}
-  /* 标题区与图表区用分割线分隔；图表区为白色扁平面板，左右铺满整个屏幕 */
   .page-head{margin-bottom:0;padding-bottom:20px}
+  .head-actions{position:absolute;top:0;right:0;display:flex;gap:8px}
+
+  /* 图表区：白色扁平面板，左右铺满 */
   .charts{background:var(--card);box-shadow:none;border-radius:0;border-top:1px solid var(--divider);
     max-width:none;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);padding:6px 24px 16px}
-  .chart-item{border-top:1px solid var(--track-edge);padding:26px 0 10px}
+  .chart-item{border-top:1px solid var(--track-edge);padding:26px 0 10px;position:relative}
   .chart-item:first-child{border-top:none}
   @media (min-width:1100px){
-    /* 白底铺满全屏，但钟摆内容仍居中约 1080，避免在宽屏上过大 */
     .charts{display:grid;grid-template-columns:1fr 1fr;gap:0 48px;
       padding-left:calc((100vw - 1080px) / 2);padding-right:calc((100vw - 1080px) / 2)}
-    .chart-item:nth-child(2){border-top:none}  /* 双列时第一行（前两项）不画上分割线 */
+    .chart-item:nth-child(2){border-top:none}
   }
-  /* 移动端：收窄页面留白，让钟摆更大 */
   @media (max-width:560px){
     body{padding:20px 10px 56px}
     .charts{padding:2px 12px 12px}
     .chart-item{padding:20px 0 8px}
   }
+
+  /* ===== 按钮 / 表单（shadcn 形态）===== */
+  .btn{height:36px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;
+    border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--ink);
+    font-size:13.5px;font-weight:500;transition:background .15s,border-color .15s,box-shadow .15s}
+  .btn:hover{background:var(--accent)}
+  .btn:active{transform:none}
+  .btn:focus-visible{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
+  .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+  .btn.primary:hover{background:#27272a}
+  .btn.danger{color:#dc2626}
+  .btn.danger:hover{background:#fef2f2;border-color:#fecaca}
+  .btn.sm{height:30px;padding:0 10px;font-size:12.5px;border-radius:7px}
+
+  .field{display:flex;flex-direction:column;gap:6px}
+  .f-lab{font-size:12.5px;font-weight:500;color:#3f3f46}
+  .field input,.field textarea{
+    height:36px;font-size:14px;font-weight:500;color:var(--ink);font-family:var(--mono);
+    border:1px solid var(--border);border-radius:8px;padding:0 12px;width:100%;
+    background:#fff;outline:none;box-shadow:0 1px 2px rgba(0,0,0,.03);
+    transition:border-color .15s,box-shadow .15s}
+  .field textarea{height:auto;min-height:76px;padding:8px 12px;resize:vertical;line-height:1.55;font-family:var(--font);font-size:13.5px}
+  .field input:focus,.field textarea:focus{border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
+  .field input.bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(226,60,60,.12)}
+  .field input.ok{border-color:#86c8a0}
+  .field input.plain{font-family:var(--font)}
+  .f-err{font-size:11px;color:var(--red);margin-top:3px;display:none}
+  .cfg-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .cfg-grid .field.full{grid-column:1 / -1}
+  .save-state{font-size:12px;color:var(--ink-mute);margin-left:8px}
+  .save-state.ok{color:var(--green)} .save-state.err{color:var(--red)}
+  .quote-note{font-size:12px;color:var(--ink-mute);line-height:1.6;margin:6px 0 4px}
+  .quote-note code{font-family:var(--mono);background:var(--accent);border:1px solid var(--border);padding:1px 5px;border-radius:5px}
+
+  .chips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+  .chip{appearance:none;font-family:var(--font);font-size:12px;font-weight:500;padding:4px 10px;
+    border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--ink-soft);cursor:pointer;
+    transition:background .12s,color .12s,border-color .12s}
+  .chip:hover{background:var(--accent)}
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .chip:focus-visible{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
+
+  /* 联想下拉 */
+  .combo{position:relative}
+  .combo-list{position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:230px;
+    background:#fff;border:1px solid var(--border);border-radius:10px;
+    box-shadow:0 4px 16px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);z-index:30;
+    max-height:236px;overflow:auto;padding:4px}
+  .combo-opt{display:flex;gap:8px;align-items:baseline;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px}
+  .combo-opt:hover,.combo-opt.act{background:var(--accent)}
+  .combo-opt .c-code{font-family:var(--mono);font-weight:700}
+  .combo-opt .c-name{color:var(--ink-soft);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .combo-opt .c-mkt{font-size:10.5px;color:var(--ink-mute);background:var(--accent);border:1px solid var(--border);padding:1px 6px;border-radius:999px;white-space:nowrap}
+
+  /* 卡片上的编辑按钮 + 末尾添加卡片（仅主人模式注入） */
+  .card-edit{position:absolute;top:18px;right:0;z-index:5}
+  .add-card{border:1.5px dashed var(--border);border-radius:12px;margin:18px 0 8px;padding:24px 0;
+    width:100%;background:none;color:var(--ink-mute);font-size:14px;font-weight:500;cursor:pointer;font-family:var(--font);
+    transition:background .15s,color .15s}
+  .add-card:hover{background:var(--accent);color:var(--ink)}
+  @media (min-width:1100px){ .add-card{grid-column:1 / -1} }
+
+  /* ===== 弹窗（shadcn Dialog）===== */
+  .overlay{position:fixed;inset:0;background:rgba(9,9,11,.45);z-index:90;display:flex}
+  .overlay.hidden{display:none}
+  .modal{margin:auto;width:min(440px,calc(100vw - 32px));background:#fff;border:1px solid var(--border);
+    border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.18);padding:18px 18px 14px;max-height:88vh;overflow:auto}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .modal-title{font-size:15px;font-weight:600;font-family:var(--mono)}
+  .modal-foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+
+  /* ===== 设置抽屉（shadcn Sheet）===== */
+  .overlay.right{justify-content:flex-end}
+  .drawer{width:min(400px,92vw);height:100dvh;background:#fff;border-left:1px solid var(--border);
+    box-shadow:-8px 0 30px rgba(0,0,0,.12);padding:0 18px 18px;overflow:auto;display:flex;flex-direction:column}
+  .drawer-sticky{position:sticky;top:0;z-index:5;background:#fff;margin:0 -18px 6px;padding:14px 18px 10px;border-bottom:1px solid var(--border)}
+  .drawer-head{display:flex;align-items:center;justify-content:space-between}
+  .drawer-title{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);font-weight:600}
+  .drawer-foot{margin-top:auto;padding-top:16px}
+  .tabs{display:flex;gap:2px;background:var(--accent);border-radius:10px;padding:3px;margin:10px 0 0}
+  .tab{flex:1;height:32px;border:0;background:transparent;border-radius:7px;cursor:pointer;
+    font-family:var(--font);font-size:13px;font-weight:500;color:var(--ink-mute);
+    transition:background .15s,color .15s,box-shadow .15s}
+  .tab:hover{color:var(--ink)}
+  .tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.03)}
+  .tab:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+  .cfg-block{padding:16px 0 14px;border-bottom:1px solid var(--border)}
+  .cfg-block:last-of-type{border-bottom:0}
+  .cfg-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .cfg-name{font-size:14px;font-weight:600}
+
+  .color-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--accent)}
+  .color-row:first-child{border-top:none}
+  .color-row .c-lab{flex:1;font-size:13px;color:var(--ink-soft)}
+  .color-row input[type=color]{width:36px;height:32px;padding:2px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer}
+  .color-row input[type=text]{width:96px;height:32px;font-family:var(--mono);font-size:12.5px;font-weight:500;
+    border:1px solid var(--border);border-radius:8px;padding:0 9px;background:#fff;outline:none;
+    transition:border-color .15s,box-shadow .15s}
+  .color-row input[type=text]:focus{border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
+  .color-row input[type=text].bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(226,60,60,.12)}
+
+  .share-url{display:flex;gap:8px;align-items:center;margin:6px 0 2px}
+  .share-url a{flex:1;min-width:0;height:36px;display:flex;align-items:center;padding:0 12px;
+    font-family:var(--mono);font-size:12.5px;color:var(--ink);text-decoration:none;
+    background:var(--accent);border:1px solid var(--border);border-radius:8px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .share-url a:hover{border-color:#d4d4d8;text-decoration:underline}
+  .share-url .btn{flex:none}
+  .hidden{display:none}
 </style>
 </head>
 <body>
@@ -38,27 +157,125 @@
     <h1 id="title">估值钟摆看板</h1>
     <p class="sub" id="sub">每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。</p>
     <p class="updated" id="updated" aria-live="polite"></p>
+    <div class="head-actions" id="headActions"></div>
   </div>
   <div class="layout">
     <div class="charts" id="charts"></div>
   </div>
 </div>
 
+<!-- 标的编辑弹窗（主人模式） -->
+<div class="overlay hidden" id="modalOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <span class="modal-title" id="modalTitle">添加标的</span>
+      <span class="save-state" id="modalSave"></span>
+    </div>
+    <div id="modalForm"></div>
+    <div class="modal-foot">
+      <button class="btn danger" id="btnModalRemove">移除</button>
+      <button class="btn primary" id="btnModalDone">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 设置抽屉（主人模式） -->
+<div class="overlay right hidden" id="drawerOverlay">
+  <div class="drawer" role="dialog" aria-modal="true" aria-label="设置">
+    <div class="drawer-sticky">
+      <div class="drawer-head">
+        <span class="drawer-title">设置</span>
+        <button class="btn sm" id="btnDrawerClose">关闭</button>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab on" role="tab" aria-selected="true" data-pane="panePage">页面</button>
+        <button class="tab" role="tab" aria-selected="false" data-pane="paneBoard">看板</button>
+      </div>
+    </div>
+
+    <div id="panePage" class="tab-pane">
+      <div class="cfg-block">
+        <div class="cfg-top"><span class="cfg-name">页面文案</span><span class="save-state" id="setSave"></span></div>
+        <div class="cfg-grid">
+          <label class="field full"><span class="f-lab">小标题</span>
+            <input id="setEyebrow" class="plain" type="text" autocomplete="off" placeholder="市场情绪 · Valuation Pendulum"></label>
+          <label class="field full"><span class="f-lab">大标题</span>
+            <input id="setTitle" class="plain" type="text" autocomplete="off" placeholder="估值钟摆看板"></label>
+          <label class="field full"><span class="f-lab">说明</span>
+            <textarea id="setSubtitle" placeholder="每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。"></textarea></label>
+        </div>
+        <p class="quote-note">留空即使用默认文案。改动自动保存，本页即时生效。</p>
+      </div>
+      <div class="cfg-block">
+        <div class="cfg-top"><span class="cfg-name">色块配色</span><span class="save-state" id="colSave"></span></div>
+        <div id="colorRows"></div>
+        <p class="quote-note">各估值区间的高亮色。用取色器或直接填 <code>#rrggbb</code>，改动自动保存、实时预览；清空恢复默认。</p>
+      </div>
+    </div>
+
+    <div id="paneBoard" class="tab-pane hidden">
+      <div class="cfg-block">
+        <div class="cfg-top"><span class="cfg-name">看板设置</span><span class="save-state" id="boardSave"></span></div>
+        <div class="cfg-grid">
+          <label class="field full"><span class="f-lab">看板名称</span>
+            <input id="boardName" class="plain" type="text" autocomplete="off" placeholder="我的估值看板"></label>
+          <label class="field full"><span class="f-lab">公开地址 Slug</span>
+            <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
+        </div>
+        <div class="f-lab" style="margin-top:4px">纯查看网址（分享给任何人，只能看不能改）</div>
+        <div class="share-url">
+          <a id="boardLink" href="#" target="_blank">…</a>
+          <button class="btn" id="btnCopyUrl" type="button">复制</button>
+        </div>
+        <p class="quote-note">改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。</p>
+      </div>
+    </div>
+
+    <div class="drawer-foot">
+      <button class="btn" id="btnLogout" style="width:100%;justify-content:center">退出登录</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { Gauge } from "/shared/gauge.js";
-import { verdictOf, structValid, applyZoneColors } from "/shared/core.js";
+import { verdictOf, structValid, applyZoneColors, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
+import { MKT_LABEL } from "/shared/market.js";
 
-const ZONE_KEYS = ["deep", "under", "fair", "over", "xover"];
+const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+const ZONE_KEYS = ZONES.map((z) => z.key);
+const ZONE_LABELS = { deep: "深度低估", under: "低估", fair: "合理", over: "高估", xover: "极度高估" };
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const SLUG_RE = /^[a-z0-9-]{3,32}$/;
+
+const chartsEl = document.getElementById("charts");
+const updatedEl = document.getElementById("updated");
+const items = []; // {id, cfg, gauge, chartEl, verdictEl, live, gotQuote}
+let boardSlug = "";
+let owner = false;
+let addCardEl = null;
+
+// 默认文案（自定义清空时恢复）
+const DEFAULT_TEXT = {
+  eyebrow: document.getElementById("eyebrow").textContent,
+  title: document.getElementById("title").textContent,
+  subtitle: document.getElementById("sub").textContent,
+};
+
 function applyColors(s) {
   const m = {};
   for (const k of ZONE_KEYS) if (s["color_" + k]) m[k] = s["color_" + k];
   applyZoneColors(m);
 }
+function applySettings(s) {
+  document.getElementById("eyebrow").textContent = s.eyebrow || DEFAULT_TEXT.eyebrow;
+  const t = s.title || DEFAULT_TEXT.title;
+  document.getElementById("title").textContent = t;
+  document.title = t;
+  document.getElementById("sub").textContent = s.subtitle || DEFAULT_TEXT.subtitle;
+}
 
-const chartsEl = document.getElementById("charts");
-const updatedEl = document.getElementById("updated");
-const items = []; // {cfg, gauge, verdictEl, gotQuote}
-
+/* ---------- 图表渲染 ---------- */
 function renderVerdict(item) {
   const v = verdictOf(item.cfg);
   const el = item.verdictEl;
@@ -70,7 +287,6 @@ function renderVerdict(item) {
   el.appendChild(px);
   el.appendChild(document.createTextNode(v.text));
 }
-
 function addChart(cfg) {
   const wrap = document.createElement("div");
   wrap.className = "chart-item";
@@ -78,46 +294,26 @@ function addChart(cfg) {
   const verdict = document.createElement("p");
   verdict.className = "verdict v-fair";
   wrap.appendChild(verdict);
-  chartsEl.appendChild(wrap);
-  const item = { cfg, gauge, verdictEl: verdict, live: false, gotQuote: false };
+  const item = { id: cfg.id || null, cfg: { ...cfg }, gauge, chartEl: wrap, verdictEl: verdict, live: false, gotQuote: false };
+  if (owner) {
+    const edit = document.createElement("button");
+    edit.className = "btn sm card-edit";
+    edit.textContent = "编辑";
+    edit.addEventListener("click", () => openItemModal(item, false));
+    wrap.appendChild(edit);
+  }
+  if (addCardEl) chartsEl.insertBefore(wrap, addCardEl); else chartsEl.appendChild(wrap);
   items.push(item);
-  gauge.set(cfg, false);
+  gauge.set(item.cfg, false);
   renderVerdict(item);
+  return item;
+}
+function removeChart(item) {
+  const idx = items.indexOf(item);
+  if (idx >= 0) { item.gauge.destroy(); item.chartEl.remove(); items.splice(idx, 1); }
 }
 
-function applySettings(s) {
-  // HTML 里保留默认文案；有自定义值就覆盖（空字符串则保留默认）。
-  if (s.eyebrow) document.getElementById("eyebrow").textContent = s.eyebrow;
-  if (s.title) { document.getElementById("title").textContent = s.title; document.title = s.title; }
-  if (s.subtitle) document.getElementById("sub").textContent = s.subtitle;
-}
-
-async function loadConfig() {
-  const m = location.pathname.match(/^\/b\/([^/]+)/);
-  const slug = m ? decodeURIComponent(m[1]) : "";
-  if (!slug) { location.replace("/login"); return; }  // 根路径无看板 → 去登录（公开看板走 /b/<slug>）
-  let rows;
-  try {
-    const res = await fetch("/api/config?slug=" + encodeURIComponent(slug));
-    if (res.status === 404) { chartsEl.innerHTML = '<div class="charts-empty">看板不存在。</div>'; return; }
-    const data = await res.json();
-    applySettings(data.settings || {});
-    applyColors(data.settings || {});
-    rows = data.items || [];
-  } catch {
-    chartsEl.innerHTML = '<div class="charts-empty">加载失败，请稍后重试。</div>';
-    return;
-  }
-  chartsEl.innerHTML = "";
-  items.length = 0;
-  if (!rows.length) {
-    chartsEl.innerHTML = '<div class="charts-empty">看板暂未配置内容。</div>';
-    return;
-  }
-  rows.forEach((r) => addChart({ ...r, price: 0 }));
-  await fetchQuotes();
-}
-
+/* ---------- 行情 ---------- */
 async function fetchQuotes() {
   const symbols = [...new Set(items.map((i) => i.cfg.symbol).filter(Boolean))];
   if (!symbols.length) return;
@@ -149,7 +345,480 @@ async function fetchQuotes() {
   }
 }
 
-loadConfig();
+/* ---------- 启动 ---------- */
+async function init() {
+  const m = location.pathname.match(/^\/b\/([^/]+)/);
+  boardSlug = m ? decodeURIComponent(m[1]) : "";
+  if (!boardSlug) { location.replace("/login"); return; }
+
+  const [cfgRes, meRes] = await Promise.allSettled([
+    fetch("/api/config?slug=" + encodeURIComponent(boardSlug)),
+    fetch("/api/me"),
+  ]);
+
+  // 身份
+  let me = null;
+  if (meRes.status === "fulfilled" && meRes.value.ok) {
+    try { me = await meRes.value.json(); } catch { me = null; }
+  }
+  owner = !!(me && me.board && me.board.slug === boardSlug);
+
+  // 看板数据
+  if (cfgRes.status !== "fulfilled") { chartsEl.innerHTML = '<div class="charts-empty">加载失败，请稍后重试。</div>'; return; }
+  const res = cfgRes.value;
+  if (res.status === 404) { chartsEl.innerHTML = '<div class="charts-empty">看板不存在。</div>'; return; }
+  let data;
+  try { data = await res.json(); } catch { chartsEl.innerHTML = '<div class="charts-empty">加载失败，请稍后重试。</div>'; return; }
+  applySettings(data.settings || {});
+  applyColors(data.settings || {});
+  const rows = data.items || [];
+
+  // 头部入口
+  const actions = document.getElementById("headActions");
+  if (owner) {
+    const set = document.createElement("button");
+    set.className = "btn"; set.textContent = "设置";
+    set.addEventListener("click", openDrawer);
+    actions.appendChild(set);
+  } else if (me && me.board && me.board.slug) {
+    const mine = document.createElement("a");
+    mine.className = "btn"; mine.style.textDecoration = "none";
+    mine.href = "/b/" + me.board.slug; mine.textContent = "我的看板";
+    actions.appendChild(mine);
+  }
+
+  // 渲染
+  chartsEl.innerHTML = "";
+  items.length = 0;
+  if (owner) {
+    addCardEl = document.createElement("button");
+    addCardEl.className = "add-card";
+    addCardEl.textContent = "＋ 添加标的";
+    addCardEl.addEventListener("click", () => {
+      const item = addChart({ ticker: "", name: "", symbol: null, price: 0, fairLow: 215, fairHigh: 265, mos: 20, ext: 25, sortOrder: items.length });
+      openItemModal(item, true);
+      item.chartEl.scrollIntoView({ behavior: REDUCE ? "auto" : "smooth", block: "center" });
+    });
+    chartsEl.appendChild(addCardEl);
+  }
+  if (!rows.length && !owner) {
+    chartsEl.innerHTML = '<div class="charts-empty">看板暂未配置内容。</div>';
+    return;
+  }
+  rows.forEach((r) => addChart({ ...r, price: 0 }));
+  if (owner) initOwner(data.settings || {});
+  await fetchQuotes();
+}
+
+/* ================= 以下仅主人模式 ================= */
+
+/* ---------- 保存（防抖 + 串行） ---------- */
+const modalSaveEl = document.getElementById("modalSave");
+function setSaveState(state, text) {
+  modalSaveEl.className = "save-state " + (state || "");
+  modalSaveEl.textContent = text || "";
+}
+async function saveItem(item) {
+  if (!item.cfg.symbol || !structValid(item.cfg)) return;
+  if (item._saving) { item._pendingSave = true; return; }
+  item._saving = true;
+  setSaveState("", "保存中…");
+  const payload = {
+    ticker: item.cfg.ticker, name: item.cfg.name, symbol: item.cfg.symbol,
+    fairLow: item.cfg.fairLow, fairHigh: item.cfg.fairHigh, mos: item.cfg.mos, ext: item.cfg.ext,
+    sortOrder: item.cfg.sortOrder || 0,
+  };
+  const url = item.id ? `/api/my/items/${item.id}` : "/api/my/items";
+  const method = item.id ? "PUT" : "POST";
+  try {
+    const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    if (res.ok) {
+      const body = await res.json();
+      if (!item.id && body.id) item.id = body.id;
+      setSaveState("ok", "已保存");
+    } else setSaveState("err", "保存失败");
+  } catch { setSaveState("err", "保存失败"); }
+  finally {
+    item._saving = false;
+    if (item._pendingSave) { item._pendingSave = false; saveItem(item); }
+  }
+}
+function debounceSave(item) {
+  clearTimeout(item._saveT);
+  item._saveT = setTimeout(() => saveItem(item), 600);
+}
+
+/* ---------- 代码联想 ---------- */
+let hintSeq = 0;
+async function loadHints(q) {
+  const seq = ++hintSeq;
+  try {
+    const res = await fetch("/api/hints?q=" + encodeURIComponent(q));
+    const { hints } = await res.json();
+    return seq === hintSeq ? hints : null;
+  } catch { return []; }
+}
+
+/* ---------- 标的编辑弹窗 ---------- */
+const FIELDS = [
+  { k: "ticker", lab: "标的代码", type: "text" },
+  { k: "fairLow", lab: "合理 · 低点", type: "number" },
+  { k: "fairHigh", lab: "合理 · 高点", type: "number" },
+  { k: "mos", lab: "安全边际 %", type: "number", presets: [10, 20, 30, 40, 50] },
+  { k: "ext", lab: "极度高估 %", type: "number", presets: [10, 20, 30, 40, 50] },
+];
+const modalOverlay = document.getElementById("modalOverlay");
+const modalForm = document.getElementById("modalForm");
+const modalTitle = document.getElementById("modalTitle");
+const btnModalRemove = document.getElementById("btnModalRemove");
+let modalItem = null, modalIsNew = false;
+
+function modalTitleFor(item) {
+  return item.cfg.symbol
+    ? `${(item.cfg.ticker || "").toUpperCase()}${item.cfg.name ? " · " + item.cfg.name : ""}`
+    : (modalIsNew ? "添加标的" : (item.cfg.ticker || "—").toUpperCase());
+}
+
+function buildItemForm(item) {
+  modalForm.innerHTML = "";
+  const grid = document.createElement("div");
+  grid.className = "cfg-grid";
+  FIELDS.forEach((f) => {
+    const lab = document.createElement("label");
+    lab.className = "field" + (f.k === "ticker" ? " full" : "");
+    const span = document.createElement("span");
+    span.className = "f-lab"; span.textContent = f.lab;
+    const input = document.createElement("input");
+    input.type = f.type;
+    if (f.type === "number") { input.min = "0"; input.step = "any"; }
+    else { input.maxLength = 24; input.spellcheck = false; input.placeholder = "代码 / 名称 / 拼音"; input.autocomplete = "off"; }
+    input.value = item.cfg[f.k] ?? "";
+
+    input.addEventListener("input", () => {
+      const v = f.type === "number" ? parseFloat(input.value) : input.value.trim();
+      const next = { ...item.cfg, [f.k]: v };
+      let bad = false;
+      if (f.k === "fairLow") bad = !(v > 0);
+      if (f.k === "fairHigh") bad = !(v > next.fairLow);
+      if (f.k === "mos") bad = !(v > 0 && v < 100);
+      if (f.k === "ext") bad = !(v > 0);
+      input.classList.toggle("bad", bad && input.value !== "");
+      item.cfg = next;
+      if (f.k === "ticker") {
+        item.live = false; item.gotQuote = false;
+        item.cfg = { ...item.cfg, price: 0, symbol: null, name: "" };
+        input.classList.remove("ok", "bad");
+        modalTitle.textContent = modalTitleFor(item);
+        renderVerdict(item);
+        item.gauge.set(item.cfg);
+      }
+      if (structValid(item.cfg)) {
+        item.gauge.set(item.cfg);
+        renderVerdict(item);
+        debounceSave(item);
+      }
+    });
+
+    if (f.k === "ticker") {
+      const combo = document.createElement("div");
+      combo.className = "combo";
+      const list = document.createElement("div");
+      list.className = "combo-list"; list.style.display = "none";
+      const err = document.createElement("div");
+      err.className = "f-err"; err.textContent = "请从下拉中选择标的";
+      let opts = [], act = -1, searchTimer = null;
+      const close = () => { list.style.display = "none"; act = -1; };
+      const markState = () => {
+        const txt = input.value.trim();
+        if (item.cfg.symbol) { input.classList.add("ok"); input.classList.remove("bad"); err.style.display = "none"; }
+        else if (txt) { input.classList.add("bad"); input.classList.remove("ok"); err.style.display = ""; }
+        else { input.classList.remove("ok", "bad"); err.style.display = "none"; }
+      };
+      const pick = (o) => {
+        input.value = o.code;
+        item.cfg = { ...item.cfg, ticker: o.code, name: o.name, symbol: o.symbol, price: 0 };
+        item.live = false; item.gotQuote = false;
+        modalTitle.textContent = modalTitleFor(item);
+        if (structValid(item.cfg)) { item.gauge.set(item.cfg); renderVerdict(item); saveItem(item); }
+        close(); markState(); fetchQuotes();
+      };
+      const renderList = (arr) => {
+        opts = arr; act = -1; list.innerHTML = "";
+        if (!arr.length) { close(); return; }
+        arr.forEach((o) => {
+          const d = document.createElement("div");
+          d.className = "combo-opt";
+          d.innerHTML = `<span class="c-code"></span><span class="c-name"></span><span class="c-mkt"></span>`;
+          d.children[0].textContent = o.code;
+          d.children[1].textContent = o.name;
+          d.children[2].textContent = MKT_LABEL[o.mkt];
+          d.addEventListener("mousedown", (e) => { e.preventDefault(); pick(o); });
+          list.appendChild(d);
+        });
+        list.style.display = "";
+      };
+      const highlight = () => {
+        [...list.children].forEach((d, i) => d.classList.toggle("act", i === act));
+        if (act >= 0) list.children[act].scrollIntoView({ block: "nearest" });
+      };
+      input.addEventListener("input", () => {
+        const q = input.value.trim();
+        clearTimeout(searchTimer);
+        if (q.length < 1) { close(); return; }
+        searchTimer = setTimeout(async () => {
+          const arr = await loadHints(q);
+          if (arr !== null) renderList(arr);
+        }, 250);
+      });
+      input.addEventListener("keydown", (e) => {
+        if (list.style.display === "none") return;
+        if (e.key === "ArrowDown") { e.preventDefault(); act = Math.min(opts.length - 1, act + 1); highlight(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); act = Math.max(0, act - 1); highlight(); }
+        else if (e.key === "Enter") { e.preventDefault(); if (act >= 0) pick(opts[act]); else if (opts.length) pick(opts[0]); }
+        else if (e.key === "Escape") { e.stopPropagation(); close(); }
+      });
+      input.addEventListener("blur", () => { setTimeout(() => { close(); markState(); }, 150); });
+      combo.append(input, list);
+      lab.append(span, combo, err);
+      grid.appendChild(lab);
+      if (item.cfg.symbol) input.classList.add("ok");
+      return;
+    }
+
+    lab.append(span, input);
+    if (f.presets) {
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      const chipEls = f.presets.map((p) => {
+        const c = document.createElement("button");
+        c.type = "button"; c.className = "chip"; c.textContent = p + "%";
+        c.addEventListener("click", () => { input.value = p; input.dispatchEvent(new Event("input", { bubbles: true })); });
+        chips.appendChild(c);
+        return { el: c, val: p };
+      });
+      const syncChips = () => { const v = parseFloat(input.value); chipEls.forEach(({ el, val }) => el.classList.toggle("on", v === val)); };
+      input.addEventListener("input", syncChips);
+      syncChips();
+      lab.appendChild(chips);
+    }
+    grid.appendChild(lab);
+  });
+  modalForm.appendChild(grid);
+}
+
+function openItemModal(item, isNew) {
+  modalItem = item; modalIsNew = isNew;
+  modalTitle.textContent = modalTitleFor(item);
+  setSaveState("", "");
+  btnModalRemove.classList.toggle("hidden", isNew && !item.id);
+  buildItemForm(item);
+  modalOverlay.classList.remove("hidden");
+  const first = modalForm.querySelector("input");
+  if (isNew && first) first.focus();
+}
+function closeItemModal() {
+  if (!modalItem) return;
+  // 新增但从未成功保存（无 id 且没选代码）→ 丢弃卡片
+  if (modalIsNew && !modalItem.id && !modalItem.cfg.symbol) removeChart(modalItem);
+  modalItem = null;
+  modalOverlay.classList.add("hidden");
+}
+document.getElementById("btnModalDone").addEventListener("click", closeItemModal);
+modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) closeItemModal(); });
+btnModalRemove.addEventListener("click", async () => {
+  if (!modalItem) return;
+  if (!confirm("确定移除该标的？")) return;
+  if (modalItem.id) await fetch(`/api/my/items/${modalItem.id}`, { method: "DELETE" });
+  removeChart(modalItem);
+  modalItem = null;
+  modalOverlay.classList.add("hidden");
+});
+
+/* ---------- 设置抽屉 ---------- */
+const drawerOverlay = document.getElementById("drawerOverlay");
+function openDrawer() { drawerOverlay.classList.remove("hidden"); }
+function closeDrawer() { drawerOverlay.classList.add("hidden"); }
+document.getElementById("btnDrawerClose").addEventListener("click", closeDrawer);
+drawerOverlay.addEventListener("click", (e) => { if (e.target === drawerOverlay) closeDrawer(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!modalOverlay.classList.contains("hidden")) closeItemModal();
+  else if (!drawerOverlay.classList.contains("hidden")) closeDrawer();
+});
+document.querySelectorAll(".tab").forEach((t) =>
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((x) => {
+      x.classList.toggle("on", x === t);
+      x.setAttribute("aria-selected", x === t ? "true" : "false");
+    });
+    document.querySelectorAll(".tab-pane").forEach((p) => p.classList.toggle("hidden", p.id !== t.dataset.pane));
+  }));
+
+/* ---------- 页面文案（自动保存 + 本页实时生效） ---------- */
+const setEyebrow = document.getElementById("setEyebrow");
+const setTitle = document.getElementById("setTitle");
+const setSubtitle = document.getElementById("setSubtitle");
+const setSaveEl = document.getElementById("setSave");
+let setTimer = null;
+async function saveSettings() {
+  setSaveEl.className = "save-state"; setSaveEl.textContent = "保存中…";
+  try {
+    const res = await fetch("/api/my/settings", {
+      method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ eyebrow: setEyebrow.value, title: setTitle.value, subtitle: setSubtitle.value }),
+    });
+    if (res.ok) {
+      setSaveEl.className = "save-state ok"; setSaveEl.textContent = "已保存";
+      applySettings({ eyebrow: setEyebrow.value.trim(), title: setTitle.value.trim(), subtitle: setSubtitle.value.trim() });
+    } else { setSaveEl.className = "save-state err"; setSaveEl.textContent = "保存失败"; }
+  } catch { setSaveEl.className = "save-state err"; setSaveEl.textContent = "保存失败"; }
+}
+[setEyebrow, setTitle, setSubtitle].forEach((el) =>
+  el.addEventListener("input", () => { clearTimeout(setTimer); setTimer = setTimeout(saveSettings, 600); }));
+
+/* ---------- 色块配色 ---------- */
+const colSaveEl = document.getElementById("colSave");
+let colorState = {};
+let colTimer = null;
+function currentColorMap() {
+  const m = {};
+  for (const k of ZONE_KEYS) if (colorState[k]) m[k] = colorState[k];
+  return m;
+}
+function buildColorRows() {
+  const wrap = document.getElementById("colorRows");
+  wrap.innerHTML = "";
+  ZONES.forEach((z) => {
+    const cur = colorState[z.key] || DEFAULT_ZONE_COLORS[z.key];
+    const row = document.createElement("div");
+    row.className = "color-row";
+    const lab = document.createElement("span");
+    lab.className = "c-lab";
+    lab.textContent = `${ZONE_LABELS[z.key] || z.key} · ${z.en}`;
+    const picker = document.createElement("input");
+    picker.type = "color"; picker.value = cur;
+    const hex = document.createElement("input");
+    hex.type = "text"; hex.maxLength = 7; hex.spellcheck = false; hex.autocomplete = "off";
+    hex.value = cur; hex.placeholder = DEFAULT_ZONE_COLORS[z.key];
+    picker.addEventListener("input", () => { hex.value = picker.value; hex.classList.remove("bad"); onColorChange(z.key, picker.value); });
+    hex.addEventListener("input", () => {
+      const v = hex.value.trim();
+      if (HEX_RE.test(v)) { hex.classList.remove("bad"); picker.value = v; onColorChange(z.key, v); }
+      else if (v === "") { hex.classList.remove("bad"); onColorChange(z.key, ""); }
+      else hex.classList.add("bad");
+    });
+    row.append(lab, picker, hex);
+    wrap.appendChild(row);
+  });
+}
+function onColorChange(key, value) {
+  if (value) colorState[key] = value; else delete colorState[key];
+  applyZoneColors(currentColorMap());
+  items.forEach((i) => i.gauge.repaint());
+  clearTimeout(colTimer);
+  colTimer = setTimeout(saveColors, 600);
+}
+async function saveColors() {
+  colSaveEl.className = "save-state"; colSaveEl.textContent = "保存中…";
+  const payload = {};
+  for (const k of ZONE_KEYS) payload["color_" + k] = colorState[k] || "";
+  try {
+    const res = await fetch("/api/my/settings", {
+      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+    });
+    colSaveEl.className = res.ok ? "save-state ok" : "save-state err";
+    colSaveEl.textContent = res.ok ? "已保存" : "保存失败";
+  } catch { colSaveEl.className = "save-state err"; colSaveEl.textContent = "保存失败"; }
+}
+
+/* ---------- 看板设置 ---------- */
+const boardNameEl = document.getElementById("boardName");
+const boardSlugEl = document.getElementById("boardSlug");
+const boardSaveEl = document.getElementById("boardSave");
+const boardLinkEl = document.getElementById("boardLink");
+let boardTimer = null;
+function updateBoardLink(slug) {
+  if (slug && SLUG_RE.test(slug)) {
+    const url = location.origin + "/b/" + slug;
+    boardLinkEl.href = url;
+    boardLinkEl.textContent = url;
+  } else {
+    boardLinkEl.href = "#";
+    boardLinkEl.textContent = "请先设置有效的 Slug";
+  }
+}
+document.getElementById("btnCopyUrl").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  if (!boardLinkEl.href || boardLinkEl.href.endsWith("#")) return;
+  try {
+    await navigator.clipboard.writeText(boardLinkEl.href);
+    const old = btn.textContent;
+    btn.textContent = "已复制";
+    setTimeout(() => { btn.textContent = old; }, 1500);
+  } catch { /* 剪贴板不可用时点链接也能打开 */ }
+});
+async function saveBoard() {
+  const name = boardNameEl.value.trim();
+  const slug = boardSlugEl.value.trim();
+  if (!SLUG_RE.test(slug)) return;
+  boardSaveEl.className = "save-state"; boardSaveEl.textContent = "保存中…";
+  try {
+    const res = await fetch("/api/my/board", {
+      method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, slug }),
+    });
+    if (res.ok) {
+      boardSaveEl.className = "save-state ok"; boardSaveEl.textContent = "已保存";
+      updateBoardLink(slug);
+      if (slug !== boardSlug) {
+        boardSlug = slug;
+        history.replaceState(null, "", "/b/" + slug); // 地址栏跟随新 slug
+      }
+    } else {
+      let errMsg = "保存失败";
+      try { const b = await res.json(); if (b.error) errMsg = b.error; } catch { /* ignore */ }
+      boardSaveEl.className = "save-state err"; boardSaveEl.textContent = errMsg;
+    }
+  } catch { boardSaveEl.className = "save-state err"; boardSaveEl.textContent = "保存失败"; }
+}
+boardSlugEl.addEventListener("input", () => {
+  const v = boardSlugEl.value.trim();
+  boardSlugEl.classList.toggle("bad", !(v === "" || SLUG_RE.test(v)));
+  updateBoardLink(v);
+  if (SLUG_RE.test(v)) {
+    clearTimeout(boardTimer);
+    boardTimer = setTimeout(saveBoard, 600);
+  }
+});
+boardNameEl.addEventListener("input", () => {
+  clearTimeout(boardTimer);
+  boardTimer = setTimeout(saveBoard, 600);
+});
+
+document.getElementById("btnLogout").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  location.reload();
+});
+
+/* ---------- 主人模式初始化 ---------- */
+function initOwner(settings) {
+  // 文案/配色编辑器回填（看板信息从 /api/me 来，已在 init 中确定 slug）
+  setEyebrow.value = settings.eyebrow || "";
+  setTitle.value = settings.title || "";
+  setSubtitle.value = settings.subtitle || "";
+  colorState = {};
+  for (const k of ZONE_KEYS) if (settings["color_" + k]) colorState[k] = settings["color_" + k];
+  buildColorRows();
+  // 看板名/slug：取 /api/me（再取一次便宜且总是新鲜）
+  fetch("/api/me").then((r) => r.ok ? r.json() : null).then((me) => {
+    if (!me || !me.board) return;
+    boardNameEl.value = me.board.name || "";
+    boardSlugEl.value = me.board.slug || "";
+    updateBoardLink(me.board.slug || "");
+  }).catch(() => {});
+}
+
+init();
 setInterval(fetchQuotes, 60000);
 </script>
 </body>

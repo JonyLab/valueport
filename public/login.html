@@ -13,17 +13,28 @@
 </div></div>
 <script type="module">
 const err=document.getElementById("err");
+async function gotoMyBoard(replace){
+  try{
+    const r=await fetch("/api/me");
+    if(!r.ok) return false;
+    const me=await r.json();
+    if(!me.board||!me.board.slug) return false;
+    const url="/b/"+me.board.slug;
+    if(replace) location.replace(url); else location.href=url;
+    return true;
+  }catch{ return false; }
+}
 async function login(){ err.textContent="";
   const go=document.getElementById("go"); go.disabled=true;
   try{
     const r=await fetch("/api/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value,password:document.getElementById("p").value})});
-    if(r.ok){ location.href="/app"; return; }
-    err.textContent=(await r.json().catch(()=>({}))).error||"登录失败";
+    if(r.ok){ if(await gotoMyBoard(false)) return; err.textContent="已登录，但获取看板失败"; }
+    else err.textContent=(await r.json().catch(()=>({}))).error||"登录失败";
   }catch{ err.textContent="网络错误，请重试"; }
   finally{ go.disabled=false; }
 }
 document.getElementById("go").addEventListener("click",login);
 document.getElementById("p").addEventListener("keydown",(e)=>{if(e.key==="Enter")login();});
-// 已登录就直接进后台
-fetch("/api/me").then((r)=>{ if(r.ok) location.replace("/app"); }).catch(()=>{});
+// 已登录就直接进自己的看板
+gotoMyBoard(true);
 </script></body></html>

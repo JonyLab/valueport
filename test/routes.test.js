@@ -82,3 +82,17 @@ describe("per-user isolation", () => {
     expect((await SELF.fetch("https://x/api/config?slug=nobody")).status).toBe(404);
   });
 });
+
+describe("/app legacy redirect", () => {
+  it("redirects anonymous visitors to /login", async () => {
+    const r = await SELF.fetch("https://x/app", { redirect: "manual" });
+    expect(r.status).toBe(302);
+    expect(r.headers.get("location")).toContain("/login");
+  });
+  it("redirects a logged-in user to their board", async () => {
+    const { cookie } = await register("gina");
+    const r = await SELF.fetch("https://x/app", { headers: { cookie }, redirect: "manual" });
+    expect(r.status).toBe(302);
+    expect(r.headers.get("location")).toContain("/b/gina");
+  });
+});

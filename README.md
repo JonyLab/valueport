@@ -16,9 +16,9 @@ Sessions are stateless HMAC-signed cookies (`SESSION_SECRET`). The owner backend
 |-----|-------------|
 | `/login` | User login page |
 | `/register` | New-user registration (requires an activation code) |
-| `/app` | User dashboard — manage your board, items, and settings |
+| `/b/<slug>` | The board page — read-only for visitors; the signed-in owner edits items via dialogs and opens Settings (top-right) for text/colors/board config |
+| `/app` | Legacy entry — 302 redirect to your `/b/<slug>` (or `/login`) |
 | `/owner` | Station-master backend — issue activation codes, manage users, reset passwords |
-| `/b/<slug>` | Public read-only pendulum board for a given user slug |
 
 ## Architecture
 
@@ -33,10 +33,9 @@ Cloudflare Worker (src/index.js)  — Hono router
 ├── src/items.js       Watchlist item validation and DB-row ↔ camelCase mapping
 ├── src/quotes.js      Tencent Finance GBK response parsers (quotes + hints)
 │
-├── public/index.html  Public read-only pendulum board (reads /b/<slug>)
 ├── public/login.html  Login page
 ├── public/register.html  Registration page (activation code required)
-├── public/app.html    User dashboard (per-user board config, items, settings)
+├── public/index.html  Unified board page (visitor read-only / owner edit-in-place)
 ├── public/owner.html  Station-master backend (codes, users, password reset)
 └── public/shared/
     ├── core.js        Pure business logic ESM module (pendulum math, no DOM)
@@ -105,7 +104,7 @@ Then open:
 
 - http://localhost:8787/login — user login
 - http://localhost:8787/register — new-user registration
-- http://localhost:8787/app — user dashboard (redirects to `/login` if not authenticated)
+- http://localhost:8787/app — legacy redirect to your board (or `/login` if not authenticated)
 - http://localhost:8787/owner — station-master backend (enter `dev-pass`)
 - http://localhost:8787/b/\<slug\> — public board for a registered user
 
@@ -171,8 +170,8 @@ After running the migration:
 3. Open `/owner`, log in with your `ADMIN_PASSWORD`.
 4. Find the `owner` user in the Users table and click **Reset Password** to get a temporary
    password — the placeholder user has an empty password hash and cannot log in until reset.
-5. Log in at `/login` as `owner` with the temporary password, then update items/settings from
-   `/app`.
+5. Log in at `/login` as `owner` with the temporary password, then manage items/settings from
+   your board page `/b/<slug>`.
 6. Generate activation codes for additional users via `/owner`.
 
 New deployments should use `schema.sql` directly and skip this migration entirely.

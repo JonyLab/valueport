@@ -212,6 +212,15 @@ app.post("/api/owner/users/:id/reset", async (c) => {
 });
 
 /* ---------- 公开页路由 + 静态 ---------- */
+// 旧入口 /app：看板页已查看/编辑合一，重定向到自己的 /b/<slug>（无会话则去登录）。
+app.get("/app", async (c) => {
+  const uid = await currentUserId(c);
+  if (uid) {
+    const u = await c.env.DB.prepare("SELECT board_slug FROM users WHERE id=?").bind(uid).first();
+    if (u) return c.redirect("/b/" + u.board_slug, 302);
+  }
+  return c.redirect("/login", 302);
+});
 // 取根路径的 index.html（canonical，200，不会触发 .html→去扩展名的 307 跳转），
 // 浏览器地址保持 /b/<slug>，页面 JS 再从 location.pathname 解析 slug。
 app.get("/b/:slug", (c) => { const url = new URL(c.req.url); url.pathname = "/"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
