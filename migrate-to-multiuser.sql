@@ -1,4 +1,7 @@
 -- 一次性迁移：旧（无 user 概念）→ 多用户。仅在已有数据的库上跑一次。
+-- ⚠️ 本脚本不可重复执行（非幂等）：再跑一次会因 "duplicate column name: user_id"
+--    或 "table settings_old already exists" 报错，并可能停在半迁移状态。
+--    若中途失败，请先从备份恢复再重试；全新部署请用 schema.sql 而非本脚本。
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, pass_hash TEXT NOT NULL,
   pass_salt TEXT NOT NULL, board_slug TEXT NOT NULL UNIQUE, board_name TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL

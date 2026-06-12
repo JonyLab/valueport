@@ -24,4 +24,6 @@ async function login(){ err.textContent="";
 }
 document.getElementById("go").addEventListener("click",login);
 document.getElementById("p").addEventListener("keydown",(e)=>{if(e.key==="Enter")login();});
+// 已登录就直接进后台
+fetch("/api/me").then((r)=>{ if(r.ok) location.replace("/app"); }).catch(()=>{});
 </script></body></html>

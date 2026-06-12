@@ -54,6 +54,14 @@ describe("register + login", () => {
     expect(me.status).toBe(200);
     expect((await me.json()).username).toBe("carol");
   });
+  it("POST /api/login: correct password 200 + cookie, wrong 401", async () => {
+    await register("frank");
+    const ok = await SELF.fetch("https://x/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "frank", password: "secret1" }) });
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("set-cookie")).toBeTruthy();
+    const bad = await SELF.fetch("https://x/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "frank", password: "WRONG" }) });
+    expect(bad.status).toBe(401);
+  });
 });
 
 describe("per-user isolation", () => {

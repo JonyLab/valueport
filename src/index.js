@@ -178,6 +178,8 @@ app.post("/api/owner/login", async (c) => {
   return c.json({ ok: true });
 });
 app.post("/api/owner/logout", (c) => { setCookie(c, OWNER_COOKIE, "", { ...COOKIE_OPTS, maxAge: 0 }); return c.json({ ok: true }); });
+// /api/owner/login 与 /logout 故意注册在本中间件之前 → 天然公开（Hono 中间件只作用于其后注册的路由）。
+// 其余 /api/owner/* 路由都在下方注册，受本中间件保护。下面这行对 login 是冗余兜底（实际到不了）。
 app.use("/api/owner/*", async (c, next) => {
   if (c.req.path === "/api/owner/login") return next();
   const token = getCookie(c, OWNER_COOKIE);
