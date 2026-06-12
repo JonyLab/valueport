@@ -29,12 +29,18 @@
   .tip{background:var(--accent);border:1px solid var(--border);border-radius:10px;
     padding:12px 16px;font-size:13.5px;line-height:1.8;color:var(--ink-soft);margin:16px 0}
   .disclaim{font-size:12px;color:var(--ink-mute);margin-top:32px;padding-top:16px;border-top:1px solid var(--border)}
+  .hidden{display:none}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+  .topbar .back{margin-bottom:0}
+  .lang-sw{font-size:13px;color:var(--ink-soft);cursor:pointer;text-decoration:underline;text-underline-offset:2px;background:none;border:0;font-family:inherit}
+  .lang-sw:hover{color:var(--ink)}
 </style>
 </head>
 <body>
 <div class="page">
   <div class="article">
-    <a class="back" href="javascript:history.back()">← 返回</a>
+    <div class="topbar"><a class="back" href="javascript:history.back()" id="backLink">← 返回</a><button class="lang-sw" id="langSw"></button></div>
+    <div id="art-zh">
     <p class="eyebrow">Valuation · 估值方法</p>
     <h1>什么是合理价值？</h1>
     <p><b>合理价值（内在价值）</b>是一家公司值多少钱的估计——理论上等于它未来能产生的所有现金流，折算到今天的价值。价格每天在波动，但它围绕的中心是价值。本看板的钟摆，就是把「现价」放到「你估计的价值区间」里去看：现在是便宜、合理，还是贵。</p>
@@ -67,6 +73,54 @@
     <div class="tip">建议：估值是「毛估估」，把功夫花在理解生意上，而不是把数字算到小数点后两位。定期（如每季度财报后）回顾并更新区间。</div>
 
     <p class="disclaim">本页内容仅为估值方法的一般性介绍，不构成任何投资建议。市场有风险，决策需独立判断。</p>
+    </div>
+
+    <div id="art-en" class="hidden">
+    <p class="eyebrow">Valuation · Methods</p>
+    <h1>What is fair value?</h1>
+    <p><b>Fair value (intrinsic value)</b> is an estimate of what a business is worth — in theory, all the cash it will generate in the future, discounted to today. Prices fluctuate daily, but they orbit value. The pendulum on this board simply places the <b>current price</b> inside <b>your estimated value range</b>: cheap, fair, or expensive.</p>
+    <p>Two principles. First, value is a <b>range, not a precise number</b> — every valuation rests on assumptions about the future, so a low–high range is more honest than a single point. Second, the <b>margin of safety</b> (Benjamin Graham): a stock is only truly cheap when the price sits clearly below the low end, leaving a buffer for being wrong.</p>
+
+    <h2>Common valuation methods</h2>
+    <table>
+      <tr><th>Method</th><th>Idea</th><th>Best for</th></tr>
+      <tr><td>P/E</td><td>Fair price = EPS × a reasonable P/E, anchored to the company's own history and peers.</td><td>Mature, steadily profitable companies</td></tr>
+      <tr><td>P/B</td><td>Fair price = book value per share × a reasonable P/B.</td><td>Banks, insurers, asset-heavy industries</td></tr>
+      <tr><td>P/S</td><td>Value on revenue instead of profit.</td><td>Growth companies not yet profitable</td></tr>
+      <tr><td>PEG</td><td>P/E ÷ earnings growth. ≈1 is fair; lower is cheaper.</td><td>High-growth companies</td></tr>
+      <tr><td>DDM</td><td>Discount all future dividends to today.</td><td>Stable, high-dividend payers</td></tr>
+      <tr><td>DCF</td><td>Project free cash flows and discount them — rigorous in theory, but extremely sensitive to growth/discount assumptions.</td><td>Predictable cash-flow businesses</td></tr>
+      <tr><td>Historical percentile</td><td>Where does today's P/E or P/B sit in its own history? Below the 20th percentile is cheap-ish; above the 80th, expensive.</td><td>Stable-cycle companies and indices</td></tr>
+    </table>
+
+    <h3>A quick example (P/E)</h3>
+    <div class="formula">EPS ≈ ¥10; historical fair P/E range 20–26×<br>→ fair-value range ≈ ¥200 – ¥260</div>
+    <p>Pessimistic assumptions give the low end; optimistic ones give the high end. Cross-check with more than one method for a sturdier range.</p>
+
+    <h2>Using it on this board</h2>
+    <p>You enter three things per holding; they define the pendulum's five zones:</p>
+    <table>
+      <tr><th>Input</th><th>Meaning</th></tr>
+      <tr><td>Fair · low / high</td><td>Your estimated fair-value range. Price inside it = <b>Fair value</b>.</td></tr>
+      <tr><td>Margin of safety %</td><td>Below "low × (1 − MOS)" = <b>Deep value</b>; in between = <b>Undervalued</b>. E.g. low 200, MOS 50% → deep value only below 100.</td></tr>
+      <tr><td>Extreme overvalue %</td><td>Above "high × (1 + EXT)" = <b>Extreme</b>; in between = <b>Overvalued</b>.</td></tr>
+    </table>
+    <div class="tip">Tip: valuation is rough arithmetic. Spend your effort understanding the business, not polishing decimals. Revisit the range after each quarterly report.</div>
+
+    <p class="disclaim">This page is a general introduction to valuation methods, not investment advice. Markets are risky; judge independently.</p>
+    </div>
+
+    <script type="module">
+    import { LANG, toggleLang, langButtonLabel } from "/shared/i18n.js";
+    document.documentElement.lang = LANG === "zh" ? "zh-CN" : "en";
+    document.title = LANG === "zh" ? "什么是合理价值 · 常见估值方法" : "What is Fair Value · Valuation Methods";
+    document.getElementById("backLink").textContent = LANG === "zh" ? "← 返回" : "← Back";
+    document.getElementById(LANG === "zh" ? "art-en" : "art-zh").classList.add("hidden");
+    document.getElementById(LANG === "zh" ? "art-zh" : "art-en").classList.remove("hidden");
+    const sw = document.getElementById("langSw");
+    sw.textContent = langButtonLabel();
+    sw.addEventListener("click", toggleLang);
+    </script>
   </div>
 </div>
 </body>

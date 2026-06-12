@@ -10,6 +10,8 @@ gets a private dashboard to manage their own watchlist and a public read-only bo
 Sessions are stateless HMAC-signed cookies (`SESSION_SECRET`). The owner backend is gated by
 `ADMIN_PASSWORD`.
 
+**Languages:** the UI is bilingual (中文 / English). A switcher appears on the board, login, register and valuation pages; the choice persists in `localStorage` (`pendulum_lang`) and defaults to the browser language. Dictionaries live in `public/shared/i18n.js`; the owner backend (`/owner`) is Chinese-only.
+
 ## Entry Points
 
 | URL | Description |

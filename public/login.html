@@ -5,13 +5,17 @@
 .auth h2{font-size:18px;margin:0 0 16px}.auth input{width:100%;font-size:14px;padding:10px;border:1px solid #dfe3ea;border-radius:8px;margin-bottom:12px}
 .auth .err{color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px}.auth .alt{font-size:12.5px;color:var(--ink-soft);margin-top:14px;text-align:center}</style>
 </head><body><div class="page"><div class="auth">
-<h2>登录</h2><div class="err" id="err"></div>
-<input id="u" placeholder="用户名" autocomplete="username">
-<input id="p" type="password" placeholder="密码" autocomplete="current-password">
-<button class="btn primary" id="go" style="width:100%">登录</button>
-<div class="alt">没有账号？<a href="/register">用激活码注册</a></div>
+<h2 data-i18n="a_login_title">登录</h2><div class="err" id="err"></div>
+<input id="u" data-i18n-ph="a_username_ph" placeholder="用户名" autocomplete="username">
+<input id="p" type="password" data-i18n-ph="a_password_ph" placeholder="密码" autocomplete="current-password">
+<button class="btn primary" id="go" style="width:100%" data-i18n="a_login_btn">登录</button>
+<div class="alt"><span data-i18n="a_no_account">没有账号？</span><a href="/register" data-i18n="a_register_link">用激活码注册</a> · <a href="#" id="langSw"></a></div>
 </div></div>
 <script type="module">
+import { t, applyI18n, toggleLang, langButtonLabel } from "/shared/i18n.js";
+applyI18n();
+const sw=document.getElementById("langSw"); sw.textContent=langButtonLabel();
+sw.addEventListener("click",(e)=>{e.preventDefault();toggleLang();});
 const err=document.getElementById("err");
 async function gotoMyBoard(replace){
   try{
@@ -28,9 +32,9 @@ async function login(){ err.textContent="";
   const go=document.getElementById("go"); go.disabled=true;
   try{
     const r=await fetch("/api/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value,password:document.getElementById("p").value})});
-    if(r.ok){ if(await gotoMyBoard(false)) return; err.textContent="已登录，但获取看板失败"; }
-    else err.textContent=(await r.json().catch(()=>({}))).error||"登录失败";
-  }catch{ err.textContent="网络错误，请重试"; }
+    if(r.ok){ if(await gotoMyBoard(false)) return; err.textContent=t("a_board_fail"); }
+    else err.textContent=(await r.json().catch(()=>({}))).error||t("a_login_fail");
+  }catch{ err.textContent=t("a_net_err"); }
   finally{ go.disabled=false; }
 }
 document.getElementById("go").addEventListener("click",login);

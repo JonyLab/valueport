@@ -40,18 +40,29 @@ export function structValid(c) {
   return c.fairLow > 0 && c.fairHigh > c.fairLow && c.mos > 0 && c.mos < 100 && c.ext > 0;
 }
 
-export function verdictOf(cfg) {
-  if (!cfg.symbol) return { cls: "v-fair", text: "未选择标的", px: "现价 —" };
-  if (!(cfg.price > 0)) return { cls: "v-fair", text: "等待报价…", px: "现价 —" };
+// 默认中文文案；页面可传入 msgs 做多语言（见 shared/i18n.js）。
+export const VERDICT_MSGS_ZH = {
+  px: (p) => `现价 ${p}`,
+  pxNone: "现价 —",
+  noSymbol: "未选择标的",
+  waiting: "等待报价…",
+  under: (pct) => `安全边际 ${pct}%`,
+  over: (pct) => `高估 ${pct}%`,
+  fair: "合理区间内",
+};
+
+export function verdictOf(cfg, msgs = VERDICT_MSGS_ZH) {
+  if (!cfg.symbol) return { cls: "v-fair", text: msgs.noSymbol, px: msgs.pxNone };
+  if (!(cfg.price > 0)) return { cls: "v-fair", text: msgs.waiting, px: msgs.pxNone };
   if (!(cfg.fairLow > 0) || !(cfg.fairHigh > cfg.fairLow))
-    return { cls: "v-fair", text: "—", px: `现价 ${cfg.price}` };
+    return { cls: "v-fair", text: "—", px: msgs.px(cfg.price) };
   if (cfg.price < cfg.fairLow) {
     const pct = (cfg.fairLow - cfg.price) / cfg.fairLow * 100;
-    return { cls: "v-under", text: `安全边际 ${pct.toFixed(0)}%`, px: `现价 ${cfg.price}` };
+    return { cls: "v-under", text: msgs.under(pct.toFixed(0)), px: msgs.px(cfg.price) };
   }
   if (cfg.price > cfg.fairHigh) {
     const pct = (cfg.price - cfg.fairHigh) / cfg.fairHigh * 100;
-    return { cls: "v-over", text: `高估 ${pct.toFixed(0)}%`, px: `现价 ${cfg.price}` };
+    return { cls: "v-over", text: msgs.over(pct.toFixed(0)), px: msgs.px(cfg.price) };
   }
-  return { cls: "v-fair", text: "合理区间内", px: `现价 ${cfg.price}` };
+  return { cls: "v-fair", text: msgs.fair, px: msgs.px(cfg.price) };
 }

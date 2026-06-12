@@ -20,8 +20,8 @@
   .page{position:relative}
 
   /* 顶部：更新时间 + 分享入口 */
-  .board-bar{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;min-height:24px}
-  .updated{font-family:var(--mono);font-size:12px;color:var(--ink-mute);margin:12px 0 0}
+  .board-bar{display:flex;align-items:flex-end;gap:8px;min-height:24px}
+  .updated{font-family:var(--mono);font-size:12px;color:var(--ink-mute);margin:12px 0 0;flex:1;min-width:0}
   .btn.icon{width:36px;padding:0;justify-content:center;flex:none}
   .btn.icon svg{width:16px;height:16px}
   .page-head{margin-bottom:0;padding-bottom:20px}
@@ -169,12 +169,13 @@
 <body>
 <div class="page">
   <div class="page-head">
-    <p class="eyebrow" id="eyebrow">市场情绪 · Valuation Pendulum</p>
-    <h1 id="title">估值钟摆看板</h1>
-    <p class="sub" id="sub">每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。</p>
+    <p class="eyebrow" id="eyebrow" data-i18n="def_eyebrow">市场情绪 · Valuation Pendulum</p>
+    <h1 id="title" data-i18n="def_title">估值钟摆看板</h1>
+    <p class="sub" id="sub" data-i18n="def_sub">每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。</p>
     <div class="board-bar">
       <p class="updated" id="updated" aria-live="polite"></p>
-      <button class="btn icon hidden" id="btnShare" aria-label="分享 / 看板设置" title="分享 / 看板设置">
+      <button class="btn sm" id="btnLang" aria-label="Language"></button>
+      <button class="btn icon hidden" id="btnShare" aria-label="分享 / 看板设置" data-i18n-title="s_share" title="分享 / 看板设置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
       </button>
     </div>
@@ -185,15 +186,15 @@
   <nav class="app-nav hidden" id="appNav" aria-label="导航">
     <button class="nav-tab on" data-view="board">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-      <span>Watchlist</span>
+      <span data-i18n="nav_watchlist">Watchlist</span>
     </button>
-    <button class="nav-tab" data-view="macro" disabled title="即将上线" aria-disabled="true">
+    <button class="nav-tab" data-view="macro" disabled data-i18n-title="nav_macro_soon" title="即将上线" aria-disabled="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-      <span>宏观看板</span>
+      <span data-i18n="nav_macro">宏观看板</span>
     </button>
     <button class="nav-tab" data-view="settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
-      <span>设置</span>
+      <span data-i18n="nav_settings">设置</span>
     </button>
   </nav>
 
@@ -204,24 +205,24 @@
   <!-- 设置视图（主人模式，由导航切换） -->
   <div class="view-settings hidden" id="viewSettings">
     <div class="cfg-block">
-      <div class="cfg-top"><span class="cfg-name">页面文案</span><span class="save-state" id="setSave"></span></div>
+      <div class="cfg-top"><span class="cfg-name" data-i18n="set_text">页面文案</span><span class="save-state" id="setSave"></span></div>
       <div class="cfg-grid">
-        <label class="field full"><span class="f-lab">小标题</span>
-          <input id="setEyebrow" class="plain" type="text" autocomplete="off" placeholder="市场情绪 · Valuation Pendulum"></label>
-        <label class="field full"><span class="f-lab">大标题</span>
-          <input id="setTitle" class="plain" type="text" autocomplete="off" placeholder="估值钟摆看板"></label>
-        <label class="field full"><span class="f-lab">说明</span>
-          <textarea id="setSubtitle" placeholder="每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。"></textarea></label>
+        <label class="field full"><span class="f-lab" data-i18n="set_eyebrow">小标题</span>
+          <input id="setEyebrow" class="plain" type="text" autocomplete="off" data-i18n-ph="def_eyebrow" placeholder="市场情绪 · Valuation Pendulum"></label>
+        <label class="field full"><span class="f-lab" data-i18n="set_title">大标题</span>
+          <input id="setTitle" class="plain" type="text" autocomplete="off" data-i18n-ph="def_title" placeholder="估值钟摆看板"></label>
+        <label class="field full"><span class="f-lab" data-i18n="set_sub">说明</span>
+          <textarea id="setSubtitle" data-i18n-ph="def_sub" placeholder="每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。"></textarea></label>
       </div>
-      <p class="quote-note">留空即使用默认文案。改动自动保存，本页即时生效。</p>
+      <p class="quote-note" data-i18n="set_text_note">留空即使用默认文案。改动自动保存，本页即时生效。</p>
     </div>
     <div class="cfg-block">
-      <div class="cfg-top"><span class="cfg-name">色块配色</span><span class="save-state" id="colSave"></span></div>
+      <div class="cfg-top"><span class="cfg-name" data-i18n="set_colors">色块配色</span><span class="save-state" id="colSave"></span></div>
       <div id="colorRows"></div>
-      <p class="quote-note">各估值区间的高亮色。用取色器或直接填 <code>#rrggbb</code>，改动自动保存、实时预览；清空恢复默认。</p>
+      <p class="quote-note" data-i18n="set_colors_note">各估值区间的高亮色。用取色器或直接填 #rrggbb，改动自动保存、实时预览；清空恢复默认。</p>
     </div>
     <div style="padding:18px 0">
-      <button class="btn" id="btnLogout" style="width:100%;justify-content:center">退出登录</button>
+      <button class="btn" id="btnLogout" style="width:100%;justify-content:center" data-i18n="set_logout">退出登录</button>
     </div>
   </div>
 </div>
@@ -230,24 +231,24 @@
 <div class="overlay hidden" id="shareOverlay">
   <div class="modal" role="dialog" aria-modal="true" aria-label="分享与看板设置">
     <div class="modal-head">
-      <span class="modal-title" style="font-family:var(--font)">分享 · 看板设置</span>
+      <span class="modal-title" style="font-family:var(--font)" data-i18n="s_title">分享 · 看板设置</span>
       <span class="save-state" id="boardSave"></span>
     </div>
     <div class="cfg-grid">
-      <label class="field full"><span class="f-lab">看板名称</span>
-        <input id="boardName" class="plain" type="text" autocomplete="off" placeholder="我的估值看板"></label>
-      <label class="field full"><span class="f-lab">公开地址 Slug</span>
+      <label class="field full"><span class="f-lab" data-i18n="s_name">看板名称</span>
+        <input id="boardName" class="plain" type="text" autocomplete="off" data-i18n-ph="s_name_ph" placeholder="我的估值看板"></label>
+      <label class="field full"><span class="f-lab" data-i18n="s_slug">公开地址 Slug</span>
         <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
     </div>
-    <div class="f-lab" style="margin-top:12px">纯查看网址（分享给任何人，只能看不能改）</div>
+    <div class="f-lab" style="margin-top:12px" data-i18n="s_url_lab">纯查看网址（分享给任何人，只能看不能改）</div>
     <div class="share-url">
       <a id="boardLink" href="#" target="_blank">…</a>
-      <button class="btn" id="btnCopyUrl" type="button">复制</button>
+      <button class="btn" id="btnCopyUrl" type="button" data-i18n="s_copy">复制</button>
     </div>
-    <p class="quote-note">改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。</p>
+    <p class="quote-note" data-i18n="s_note">改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。</p>
     <div class="modal-foot">
       <span></span>
-      <button class="btn primary" id="btnShareDone">完成</button>
+      <button class="btn primary" id="btnShareDone" data-i18n="m_done">完成</button>
     </div>
   </div>
 </div>
@@ -262,10 +263,10 @@
     <div id="modalForm"></div>
     <div class="modal-err" id="modalErr" role="alert"></div>
     <div class="modal-foot">
-      <button class="btn danger" id="btnModalRemove">移除</button>
+      <button class="btn danger" id="btnModalRemove" data-i18n="m_remove">移除</button>
       <div style="display:flex;gap:8px;margin-left:auto">
-        <button class="btn" id="btnModalCancel">取消</button>
-        <button class="btn primary" id="btnModalDone">完成</button>
+        <button class="btn" id="btnModalCancel" data-i18n="m_cancel">取消</button>
+        <button class="btn primary" id="btnModalDone" data-i18n="m_done">完成</button>
       </div>
     </div>
   </div>
@@ -276,10 +277,20 @@
 import { Gauge } from "/shared/gauge.js";
 import { verdictOf, structValid, applyZoneColors, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
 import { MKT_LABEL } from "/shared/market.js";
+import { t, applyI18n, toggleLang, langButtonLabel } from "/shared/i18n.js";
+
+applyI18n(); // 静态文案先按当前语言渲染
+const VMSGS = {
+  px: (p) => t("v_px", p), pxNone: t("v_px_none"), noSymbol: t("v_no_symbol"),
+  waiting: t("v_waiting"), under: (pct) => t("v_under", pct), over: (pct) => t("v_over", pct), fair: t("v_fair"),
+};
+const langBtn = document.getElementById("btnLang");
+langBtn.textContent = langButtonLabel();
+langBtn.addEventListener("click", toggleLang);
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 const ZONE_KEYS = ZONES.map((z) => z.key);
-const ZONE_LABELS = { deep: "深度低估", under: "低估", fair: "合理", over: "高估", xover: "极度高估" };
+const ZONE_LABELS = { deep: t("zone_deep"), under: t("zone_under"), fair: t("zone_fair"), over: t("zone_over"), xover: t("zone_xover") };
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const SLUG_RE = /^[a-z0-9-]{3,32}$/;
 
@@ -290,12 +301,8 @@ let boardSlug = "";
 let owner = false;
 let addCardEl = null;
 
-// 默认文案（自定义清空时恢复）
-const DEFAULT_TEXT = {
-  eyebrow: document.getElementById("eyebrow").textContent,
-  title: document.getElementById("title").textContent,
-  subtitle: document.getElementById("sub").textContent,
-};
+// 默认文案（自定义清空时恢复；随当前语言）
+const DEFAULT_TEXT = { eyebrow: t("def_eyebrow"), title: t("def_title"), subtitle: t("def_sub") };
 
 function applyColors(s) {
   const m = {};
@@ -312,7 +319,7 @@ function applySettings(s) {
 
 /* ---------- 图表渲染 ---------- */
 function renderVerdict(item) {
-  const v = verdictOf(item.cfg);
+  const v = verdictOf(item.cfg, VMSGS);
   const el = item.verdictEl;
   el.className = "verdict " + v.cls;
   el.innerHTML = "";
@@ -333,7 +340,7 @@ function addChart(cfg) {
   if (owner) {
     const edit = document.createElement("button");
     edit.className = "btn sm card-edit";
-    edit.textContent = "编辑";
+    edit.textContent = t("b_edit");
     edit.addEventListener("click", () => openItemModal(item, false));
     wrap.appendChild(edit);
   }
@@ -374,9 +381,9 @@ async function fetchQuotes() {
     }
   });
   if (ok > 0) {
-    const t = new Date();
+    const now = new Date();
     const p2 = (n) => String(n).padStart(2, "0");
-    updatedEl.textContent = `行情更新于 ${p2(t.getHours())}:${p2(t.getMinutes())}:${p2(t.getSeconds())} · 腾讯延时行情`;
+    updatedEl.textContent = t("b_updated", `${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`);
   }
 }
 
@@ -399,11 +406,11 @@ async function init() {
   owner = !!(me && me.board && me.board.slug === boardSlug);
 
   // 看板数据
-  if (cfgRes.status !== "fulfilled") { chartsEl.innerHTML = '<div class="charts-empty">加载失败，请稍后重试。</div>'; return; }
+  if (cfgRes.status !== "fulfilled") { chartsEl.innerHTML = `<div class="charts-empty">${t("b_loadfail")}</div>`; return; }
   const res = cfgRes.value;
-  if (res.status === 404) { chartsEl.innerHTML = '<div class="charts-empty">看板不存在。</div>'; return; }
+  if (res.status === 404) { chartsEl.innerHTML = `<div class="charts-empty">${t("b_notfound")}</div>`; return; }
   let data;
-  try { data = await res.json(); } catch { chartsEl.innerHTML = '<div class="charts-empty">加载失败，请稍后重试。</div>'; return; }
+  try { data = await res.json(); } catch { chartsEl.innerHTML = `<div class="charts-empty">${t("b_loadfail")}</div>`; return; }
   applySettings(data.settings || {});
   applyColors(data.settings || {});
   const rows = data.items || [];
@@ -417,7 +424,7 @@ async function init() {
   } else if (me && me.board && me.board.slug) {
     const mine = document.createElement("a");
     mine.className = "btn"; mine.style.textDecoration = "none";
-    mine.href = "/b/" + me.board.slug; mine.textContent = "我的看板";
+    mine.href = "/b/" + me.board.slug; mine.textContent = t("b_myboard");
     actions.appendChild(mine);
   }
 
@@ -427,7 +434,7 @@ async function init() {
   if (owner) {
     addCardEl = document.createElement("button");
     addCardEl.className = "add-card";
-    addCardEl.textContent = "＋ 添加标的";
+    addCardEl.textContent = t("b_add");
     addCardEl.addEventListener("click", () => {
       // 低/高点不预填（必须自己想清楚估值）；安全边际默认 50%、极度高估默认 40%
       const item = addChart({ ticker: "", name: "", symbol: null, price: 0, fairLow: "", fairHigh: "", mos: 50, ext: 40, sortOrder: items.length });
@@ -437,7 +444,7 @@ async function init() {
     chartsEl.appendChild(addCardEl);
   }
   if (!rows.length && !owner) {
-    chartsEl.innerHTML = '<div class="charts-empty">看板暂未配置内容。</div>';
+    chartsEl.innerHTML = `<div class="charts-empty">${t("b_empty")}</div>`;
     return;
   }
   rows.forEach((r) => addChart({ ...r, price: 0 }));
@@ -457,7 +464,7 @@ async function saveItem(item) {
   if (!item.cfg.symbol || !structValid(item.cfg)) return;
   if (item._saving) { item._pendingSave = true; return; }
   item._saving = true;
-  setSaveState("", "保存中…");
+  setSaveState("", t("st_saving"));
   const payload = {
     ticker: item.cfg.ticker, name: item.cfg.name, symbol: item.cfg.symbol,
     fairLow: item.cfg.fairLow, fairHigh: item.cfg.fairHigh, mos: item.cfg.mos, ext: item.cfg.ext,
@@ -474,9 +481,9 @@ async function saveItem(item) {
         fetch(`/api/my/items/${item.id}`, { method: "DELETE" }).catch(() => {});
         item.id = null;
       }
-      setSaveState("ok", "已保存");
-    } else setSaveState("err", "保存失败");
-  } catch { setSaveState("err", "保存失败"); }
+      setSaveState("ok", t("st_saved"));
+    } else setSaveState("err", t("st_failed"));
+  } catch { setSaveState("err", t("st_failed")); }
   finally {
     item._saving = false;
     if (item._pendingSave) { item._pendingSave = false; saveItem(item); }
@@ -500,11 +507,11 @@ async function loadHints(q) {
 
 /* ---------- 标的编辑弹窗 ---------- */
 const FIELDS = [
-  { k: "ticker", lab: "标的代码", type: "text" },
-  { k: "fairLow", lab: "合理 · 低点", type: "number" },
-  { k: "fairHigh", lab: "合理 · 高点", type: "number" },
-  { k: "mos", lab: "安全边际 %", type: "number", presets: [10, 20, 30, 40, 50] },
-  { k: "ext", lab: "极度高估 %", type: "number", presets: [10, 20, 30, 40, 50] },
+  { k: "ticker", lab: t("m_ticker"), type: "text" },
+  { k: "fairLow", lab: t("m_fair_low"), type: "number" },
+  { k: "fairHigh", lab: t("m_fair_high"), type: "number" },
+  { k: "mos", lab: t("m_mos"), type: "number", presets: [10, 20, 30, 40, 50] },
+  { k: "ext", lab: t("m_ext"), type: "number", presets: [10, 20, 30, 40, 50] },
 ];
 const modalOverlay = document.getElementById("modalOverlay");
 const modalForm = document.getElementById("modalForm");
@@ -515,7 +522,7 @@ let modalItem = null, modalIsNew = false, modalSnapshot = null;
 function modalTitleFor(item) {
   return item.cfg.symbol
     ? `${(item.cfg.ticker || "").toUpperCase()}${item.cfg.name ? " · " + item.cfg.name : ""}`
-    : (modalIsNew ? "添加标的" : (item.cfg.ticker || "—").toUpperCase());
+    : (modalIsNew ? t("m_add_title") : (item.cfg.ticker || "—").toUpperCase());
 }
 
 function buildItemForm(item) {
@@ -530,7 +537,7 @@ function buildItemForm(item) {
     const input = document.createElement("input");
     input.type = f.type;
     if (f.type === "number") { input.min = "0"; input.step = "any"; }
-    else { input.maxLength = 24; input.spellcheck = false; input.placeholder = "代码 / 名称 / 拼音"; input.autocomplete = "off"; }
+    else { input.maxLength = 24; input.spellcheck = false; input.placeholder = t("m_ph_ticker"); input.autocomplete = "off"; }
     input.value = item.cfg[f.k] ?? "";
 
     input.addEventListener("input", () => {
@@ -564,7 +571,7 @@ function buildItemForm(item) {
       const list = document.createElement("div");
       list.className = "combo-list"; list.style.display = "none";
       const err = document.createElement("div");
-      err.className = "f-err"; err.textContent = "请从下拉中选择标的";
+      err.className = "f-err"; err.textContent = t("m_pick_err");
       let opts = [], act = -1, searchTimer = null;
       const close = () => { list.style.display = "none"; act = -1; };
       const markState = () => {
@@ -646,7 +653,7 @@ function buildItemForm(item) {
       const note = document.createElement("p");
       note.className = "quote-note";
       note.style.cssText = "grid-column:1 / -1;margin:0";
-      note.innerHTML = '合理价值 = 你对这家公司内在价值的估计区间。<a href="/valuation" target="_blank" rel="noopener">什么是合理价值？常见估值方法 →</a>';
+      note.innerHTML = t("m_note_html");
       grid.appendChild(note);
     }
   });
@@ -688,12 +695,12 @@ function trySubmitModal() {
   const c = item.cfg;
   const untouched = modalIsNew && !item.id && !c.symbol && !(c.fairLow > 0) && !(c.fairHigh > 0);
   if (untouched) { closeItemModal(); return; }   // 完全空白的新表单视为放弃
-  if (!c.symbol) { showModalErr("请先在「标的代码」中输入并从下拉里选择标的。"); return; }
+  if (!c.symbol) { showModalErr(t("m_err_symbol")); return; }
   if (!(c.fairLow > 0) || !(c.fairHigh > c.fairLow)) {
-    showModalErr("请设置合理价格区间：低点需大于 0，高点需大于低点。");
+    showModalErr(t("m_err_range"));
     return;
   }
-  if (!structValid(c)) { showModalErr("请检查安全边际（0–100 之间）与极度高估（大于 0）。"); return; }
+  if (!structValid(c)) { showModalErr(t("m_err_pct")); return; }
   clearTimeout(item._saveT);
   saveItem(item);            // 立即提交（不等防抖）
   modalItem = null;
@@ -722,7 +729,7 @@ document.getElementById("btnModalCancel").addEventListener("click", async () => 
 });
 btnModalRemove.addEventListener("click", async () => {
   if (!modalItem) return;
-  if (!confirm("确定移除该标的？")) return;
+  if (!confirm(t("m_confirm_remove"))) return;
   if (modalItem.id) await fetch(`/api/my/items/${modalItem.id}`, { method: "DELETE" });
   removeChart(modalItem);
   modalItem = null;
@@ -762,17 +769,17 @@ const setSubtitle = document.getElementById("setSubtitle");
 const setSaveEl = document.getElementById("setSave");
 let setTimer = null;
 async function saveSettings() {
-  setSaveEl.className = "save-state"; setSaveEl.textContent = "保存中…";
+  setSaveEl.className = "save-state"; setSaveEl.textContent = t("st_saving");
   try {
     const res = await fetch("/api/my/settings", {
       method: "PUT", headers: { "content-type": "application/json" },
       body: JSON.stringify({ eyebrow: setEyebrow.value, title: setTitle.value, subtitle: setSubtitle.value }),
     });
     if (res.ok) {
-      setSaveEl.className = "save-state ok"; setSaveEl.textContent = "已保存";
+      setSaveEl.className = "save-state ok"; setSaveEl.textContent = t("st_saved");
       applySettings({ eyebrow: setEyebrow.value.trim(), title: setTitle.value.trim(), subtitle: setSubtitle.value.trim() });
-    } else { setSaveEl.className = "save-state err"; setSaveEl.textContent = "保存失败"; }
-  } catch { setSaveEl.className = "save-state err"; setSaveEl.textContent = "保存失败"; }
+    } else { setSaveEl.className = "save-state err"; setSaveEl.textContent = t("st_failed"); }
+  } catch { setSaveEl.className = "save-state err"; setSaveEl.textContent = t("st_failed"); }
 }
 [setEyebrow, setTitle, setSubtitle].forEach((el) =>
   el.addEventListener("input", () => { clearTimeout(setTimer); setTimer = setTimeout(saveSettings, 600); }));
@@ -820,7 +827,7 @@ function onColorChange(key, value) {
   colTimer = setTimeout(saveColors, 600);
 }
 async function saveColors() {
-  colSaveEl.className = "save-state"; colSaveEl.textContent = "保存中…";
+  colSaveEl.className = "save-state"; colSaveEl.textContent = t("st_saving");
   const payload = {};
   for (const k of ZONE_KEYS) payload["color_" + k] = colorState[k] || "";
   try {
@@ -828,8 +835,8 @@ async function saveColors() {
       method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
     });
     colSaveEl.className = res.ok ? "save-state ok" : "save-state err";
-    colSaveEl.textContent = res.ok ? "已保存" : "保存失败";
-  } catch { colSaveEl.className = "save-state err"; colSaveEl.textContent = "保存失败"; }
+    colSaveEl.textContent = res.ok ? t("st_saved") : t("st_failed");
+  } catch { colSaveEl.className = "save-state err"; colSaveEl.textContent = t("st_failed"); }
 }
 
 /* ---------- 看板设置 ---------- */
@@ -845,7 +852,7 @@ function updateBoardLink(slug) {
     boardLinkEl.textContent = url;
   } else {
     boardLinkEl.href = "#";
-    boardLinkEl.textContent = "请先设置有效的 Slug";
+    boardLinkEl.textContent = t("s_slug_invalid");
   }
 }
 document.getElementById("btnCopyUrl").addEventListener("click", async (e) => {
@@ -854,7 +861,7 @@ document.getElementById("btnCopyUrl").addEventListener("click", async (e) => {
   try {
     await navigator.clipboard.writeText(boardLinkEl.href);
     const old = btn.textContent;
-    btn.textContent = "已复制";
+    btn.textContent = t("s_copied");
     setTimeout(() => { btn.textContent = old; }, 1500);
   } catch { /* 剪贴板不可用时点链接也能打开 */ }
 });
@@ -862,25 +869,25 @@ async function saveBoard() {
   const name = boardNameEl.value.trim();
   const slug = boardSlugEl.value.trim();
   if (!SLUG_RE.test(slug)) return;
-  boardSaveEl.className = "save-state"; boardSaveEl.textContent = "保存中…";
+  boardSaveEl.className = "save-state"; boardSaveEl.textContent = t("st_saving");
   try {
     const res = await fetch("/api/my/board", {
       method: "PUT", headers: { "content-type": "application/json" },
       body: JSON.stringify({ name, slug }),
     });
     if (res.ok) {
-      boardSaveEl.className = "save-state ok"; boardSaveEl.textContent = "已保存";
+      boardSaveEl.className = "save-state ok"; boardSaveEl.textContent = t("st_saved");
       updateBoardLink(slug);
       if (slug !== boardSlug) {
         boardSlug = slug;
         history.replaceState(null, "", "/b/" + slug); // 地址栏跟随新 slug
       }
     } else {
-      let errMsg = "保存失败";
+      let errMsg = t("st_failed");
       try { const b = await res.json(); if (b.error) errMsg = b.error; } catch { /* ignore */ }
       boardSaveEl.className = "save-state err"; boardSaveEl.textContent = errMsg;
     }
-  } catch { boardSaveEl.className = "save-state err"; boardSaveEl.textContent = "保存失败"; }
+  } catch { boardSaveEl.className = "save-state err"; boardSaveEl.textContent = t("st_failed"); }
 }
 boardSlugEl.addEventListener("input", () => {
   const v = boardSlugEl.value.trim();

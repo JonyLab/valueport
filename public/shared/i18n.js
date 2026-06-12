@@ -1,0 +1,207 @@
+// 轻量多语言：localStorage 持久化（pendulum_lang），未设置时跟随浏览器语言。
+// 切换后整页刷新，由各页在启动时 applyI18n() + 动态串用 t()。
+const STORE_KEY = "pendulum_lang";
+
+function detect() {
+  try {
+    const saved = localStorage.getItem(STORE_KEY);
+    if (saved === "zh" || saved === "en") return saved;
+  } catch { /* storage 不可用则跟随浏览器 */ }
+  return (navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+export const LANG = detect();
+export function setLang(l) {
+  try { localStorage.setItem(STORE_KEY, l); } catch { /* ignore */ }
+  location.reload();
+}
+export function toggleLang() { setLang(LANG === "zh" ? "en" : "zh"); }
+export function langButtonLabel() { return LANG === "zh" ? "EN" : "中文"; }
+
+const DICT = {
+  zh: {
+    /* 看板页 */
+    def_eyebrow: "市场情绪 · Valuation Pendulum",
+    def_title: "估值钟摆看板",
+    def_sub: "每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。",
+    b_updated: (t) => `行情更新于 ${t} · 腾讯延时行情`,
+    b_add: "＋ 添加标的",
+    b_edit: "编辑",
+    b_myboard: "我的看板",
+    b_notfound: "看板不存在。",
+    b_loadfail: "加载失败，请稍后重试。",
+    b_empty: "看板暂未配置内容。",
+    nav_watchlist: "Watchlist",
+    nav_macro: "宏观看板",
+    nav_macro_soon: "即将上线",
+    nav_settings: "设置",
+    /* 判定 */
+    v_px: (p) => `现价 ${p}`,
+    v_px_none: "现价 —",
+    v_no_symbol: "未选择标的",
+    v_waiting: "等待报价…",
+    v_under: (pct) => `安全边际 ${pct}%`,
+    v_over: (pct) => `高估 ${pct}%`,
+    v_fair: "合理区间内",
+    /* 标的弹窗 */
+    m_add_title: "添加标的",
+    m_ticker: "标的代码",
+    m_fair_low: "合理 · 低点",
+    m_fair_high: "合理 · 高点",
+    m_mos: "安全边际 %",
+    m_ext: "极度高估 %",
+    m_ph_ticker: "代码 / 名称 / 拼音",
+    m_pick_err: "请从下拉中选择标的",
+    m_note_html: '合理价值 = 你对这家公司内在价值的估计区间。<a href="/valuation" target="_blank" rel="noopener">什么是合理价值？常见估值方法 →</a>',
+    m_remove: "移除",
+    m_cancel: "取消",
+    m_done: "完成",
+    m_confirm_remove: "确定移除该标的？",
+    m_err_symbol: "请先在「标的代码」中输入并从下拉里选择标的。",
+    m_err_range: "请设置合理价格区间：低点需大于 0，高点需大于低点。",
+    m_err_pct: "请检查安全边际（0–100 之间）与极度高估（大于 0）。",
+    /* 保存状态 */
+    st_saving: "保存中…",
+    st_saved: "已保存",
+    st_failed: "保存失败",
+    /* 分享弹窗 */
+    s_title: "分享 · 看板设置",
+    s_share: "分享 / 看板设置",
+    s_name: "看板名称",
+    s_name_ph: "我的估值看板",
+    s_slug: "公开地址 Slug",
+    s_url_lab: "纯查看网址（分享给任何人，只能看不能改）",
+    s_copy: "复制",
+    s_copied: "已复制",
+    s_note: "改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。",
+    s_slug_invalid: "请先设置有效的 Slug",
+    /* 设置视图 */
+    set_text: "页面文案",
+    set_eyebrow: "小标题",
+    set_title: "大标题",
+    set_sub: "说明",
+    set_text_note: "留空即使用默认文案。改动自动保存，本页即时生效。",
+    set_colors: "色块配色",
+    set_colors_note: "各估值区间的高亮色。用取色器或直接填 #rrggbb，改动自动保存、实时预览；清空恢复默认。",
+    set_logout: "退出登录",
+    zone_deep: "深度低估",
+    zone_under: "低估",
+    zone_fair: "合理",
+    zone_over: "高估",
+    zone_xover: "极度高估",
+    /* 登录 / 注册 */
+    a_login_title: "登录",
+    a_username_ph: "用户名",
+    a_password_ph: "密码",
+    a_login_btn: "登录",
+    a_no_account: "没有账号？",
+    a_register_link: "用激活码注册",
+    a_login_fail: "登录失败",
+    a_net_err: "网络错误，请重试",
+    a_board_fail: "已登录，但获取看板失败",
+    a_reg_title: "注册",
+    a_reg_hint: "需要一枚激活码（向站长索取）。",
+    a_reg_username_ph: "用户名（3-20 位字母/数字/_-）",
+    a_reg_password_ph: "密码（至少 6 位）",
+    a_reg_code_ph: "激活码 XXXX-XXXX-XXXX",
+    a_reg_btn: "注册并进入",
+    a_has_account: "已有账号？",
+    a_login_link: "去登录",
+    a_reg_fail: "注册失败",
+  },
+  en: {
+    def_eyebrow: "Market Mood · Valuation Pendulum",
+    def_title: "Valuation Pendulum Board",
+    def_sub: "One pendulum per holding: the needle's position is set by the current price against your fair-value range and margin of safety. Markets swing between extremes — the pendulum always returns to the middle.",
+    b_updated: (t) => `Quotes updated ${t} · Tencent delayed feed`,
+    b_add: "＋ Add symbol",
+    b_edit: "Edit",
+    b_myboard: "My board",
+    b_notfound: "Board not found.",
+    b_loadfail: "Failed to load. Please try again.",
+    b_empty: "Nothing on this board yet.",
+    nav_watchlist: "Watchlist",
+    nav_macro: "Macro",
+    nav_macro_soon: "Coming soon",
+    nav_settings: "Settings",
+    v_px: (p) => `Price ${p}`,
+    v_px_none: "Price —",
+    v_no_symbol: "No symbol selected",
+    v_waiting: "Awaiting quote…",
+    v_under: (pct) => `Margin of safety ${pct}%`,
+    v_over: (pct) => `Overvalued ${pct}%`,
+    v_fair: "Within fair range",
+    m_add_title: "Add symbol",
+    m_ticker: "Symbol",
+    m_fair_low: "Fair · low",
+    m_fair_high: "Fair · high",
+    m_mos: "Margin of safety %",
+    m_ext: "Extreme overvalue %",
+    m_ph_ticker: "Code / name / pinyin",
+    m_pick_err: "Pick a symbol from the dropdown",
+    m_note_html: 'Fair value = your estimate of the business\'s intrinsic-value range. <a href="/valuation" target="_blank" rel="noopener">What is fair value? Common methods →</a>',
+    m_remove: "Remove",
+    m_cancel: "Cancel",
+    m_done: "Done",
+    m_confirm_remove: "Remove this symbol?",
+    m_err_symbol: "Type a code and pick the symbol from the dropdown first.",
+    m_err_range: "Set the fair-value range: low must be > 0 and high must be greater than low.",
+    m_err_pct: "Check margin of safety (0–100) and extreme overvalue (> 0).",
+    st_saving: "Saving…",
+    st_saved: "Saved",
+    st_failed: "Save failed",
+    s_title: "Share · Board settings",
+    s_share: "Share / board settings",
+    s_name: "Board name",
+    s_name_ph: "My valuation board",
+    s_slug: "Public URL slug",
+    s_url_lab: "Read-only URL (share with anyone — view only)",
+    s_copy: "Copy",
+    s_copied: "Copied",
+    s_note: "Changes auto-save (600 ms debounce). Slug: 3–32 lowercase letters, digits or hyphens; the page URL updates after saving.",
+    s_slug_invalid: "Set a valid slug first",
+    set_text: "Page text",
+    set_eyebrow: "Eyebrow",
+    set_title: "Title",
+    set_sub: "Description",
+    set_text_note: "Leave blank to use the defaults. Changes auto-save and apply immediately.",
+    set_colors: "Zone colors",
+    set_colors_note: "Highlight color per valuation zone. Use the picker or type #rrggbb; auto-saves with live preview. Clear to restore defaults.",
+    set_logout: "Sign out",
+    zone_deep: "Deep value",
+    zone_under: "Undervalued",
+    zone_fair: "Fair value",
+    zone_over: "Overvalued",
+    zone_xover: "Extreme",
+    a_login_title: "Sign in",
+    a_username_ph: "Username",
+    a_password_ph: "Password",
+    a_login_btn: "Sign in",
+    a_no_account: "No account?",
+    a_register_link: "Register with a code",
+    a_login_fail: "Sign-in failed",
+    a_net_err: "Network error, please retry",
+    a_board_fail: "Signed in, but failed to load your board",
+    a_reg_title: "Register",
+    a_reg_hint: "An activation code is required (ask the site owner).",
+    a_reg_username_ph: "Username (3–20 letters/digits/_-)",
+    a_reg_password_ph: "Password (6+ characters)",
+    a_reg_code_ph: "Code XXXX-XXXX-XXXX",
+    a_reg_btn: "Register & enter",
+    a_has_account: "Have an account?",
+    a_login_link: "Sign in",
+    a_reg_fail: "Registration failed",
+  },
+};
+
+export function t(key, ...args) {
+  const v = (DICT[LANG] && DICT[LANG][key]) ?? DICT.zh[key] ?? key;
+  return typeof v === "function" ? v(...args) : v;
+}
+
+// 把 data-i18n / data-i18n-ph / data-i18n-title 标记的静态文案换成当前语言。
+export function applyI18n(root = document) {
+  document.documentElement.lang = LANG === "zh" ? "zh-CN" : "en";
+  root.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  root.querySelectorAll("[data-i18n-ph]").forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
+  root.querySelectorAll("[data-i18n-title]").forEach((el) => { el.title = t(el.dataset.i18nTitle); });
+}

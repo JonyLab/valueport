@@ -6,22 +6,26 @@
 .auth input{width:100%;font-size:14px;padding:10px;border:1px solid #dfe3ea;border-radius:8px;margin-bottom:12px}
 .auth .err{color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px}.auth .alt{font-size:12.5px;color:var(--ink-soft);margin-top:14px;text-align:center}</style>
 </head><body><div class="page"><div class="auth">
-<h2>注册</h2><p class="hint">需要一枚激活码（向站长索取）。</p><div class="err" id="err"></div>
-<input id="u" placeholder="用户名（3-20 位字母/数字/_-）" autocomplete="username">
-<input id="p" type="password" placeholder="密码（至少 6 位）" autocomplete="new-password">
-<input id="c" placeholder="激活码 XXXX-XXXX-XXXX">
-<button class="btn primary" id="go" style="width:100%">注册并进入</button>
-<div class="alt">已有账号？<a href="/login">去登录</a></div>
+<h2 data-i18n="a_reg_title">注册</h2><p class="hint" data-i18n="a_reg_hint">需要一枚激活码（向站长索取）。</p><div class="err" id="err"></div>
+<input id="u" data-i18n-ph="a_reg_username_ph" placeholder="用户名（3-20 位字母/数字/_-）" autocomplete="username">
+<input id="p" type="password" data-i18n-ph="a_reg_password_ph" placeholder="密码（至少 6 位）" autocomplete="new-password">
+<input id="c" data-i18n-ph="a_reg_code_ph" placeholder="激活码 XXXX-XXXX-XXXX">
+<button class="btn primary" id="go" style="width:100%" data-i18n="a_reg_btn">注册并进入</button>
+<div class="alt"><span data-i18n="a_has_account">已有账号？</span><a href="/login" data-i18n="a_login_link">去登录</a> · <a href="#" id="langSw"></a></div>
 </div></div>
 <script type="module">
+import { t, applyI18n, toggleLang, langButtonLabel } from "/shared/i18n.js";
+applyI18n();
+const sw=document.getElementById("langSw"); sw.textContent=langButtonLabel();
+sw.addEventListener("click",(e)=>{e.preventDefault();toggleLang();});
 const err=document.getElementById("err");
 async function reg(){ err.textContent="";
   const go=document.getElementById("go"); go.disabled=true;
   try{
     const r=await fetch("/api/register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value.trim(),password:document.getElementById("p").value,code:document.getElementById("c").value.trim()})});
     if(r.ok){ const b=await r.json().catch(()=>({})); location.href=b.board&&b.board.slug?"/b/"+b.board.slug:"/app"; return; }
-    err.textContent=(await r.json().catch(()=>({}))).error||"注册失败";
-  }catch{ err.textContent="网络错误，请重试"; }
+    err.textContent=(await r.json().catch(()=>({}))).error||t("a_reg_fail");
+  }catch{ err.textContent=t("a_net_err"); }
   finally{ go.disabled=false; }
 }
 document.getElementById("go").addEventListener("click",reg);
