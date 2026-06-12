@@ -55,21 +55,28 @@ app.get("/api/hints", async (c) => {
 app.post("/api/register", async (c) => {
   const { username, password, code } = await c.req.json().catch(() => ({}));
   if (!validateUsername(username)) return c.json({ ok: false, error: "用户名需 3-20 位字母/数字/_/-" }, 400);
-  if (typeof password !== "string" || password.length < 6) return c.json({ ok: false, error: "密码至少 6 位" }, 400);
-  const codeRow = await c.env.DB.prepare("SELECT code FROM activation_codes WHERE code=? AND used_by IS NULL").bind(code || "").first();
-  if (!codeRow) return c.json({ ok: false, error: "激活码无效或已被使用" }, 400);
-  const exists = await c.env.DB.prepare("SELECT id FROM users WHERE username=?").bind(username).first();
-  if (exists) return c.json({ ok: false, error: "用户名已被占用" }, 409);
+  if (typeof password !== "string" || password.length < 6 || password.length > 1024) return c.json({ ok: false, error: "密码需 6-1024 位" }, 400);
+  if (await c.env.DB.prepare("SELECT id FROM users WHERE username=?").bind(username).first()) return c.json({ ok: false, error: "用户名已被占用" }, 409);
+  // 原子领取激活码：仅未使用的码能被领取，防并发重复使用（TOCTOU）
+  const claim = await c.env.DB.prepare("UPDATE activation_codes SET used_by=-1, used_at=? WHERE code=? AND used_by IS NULL").bind(new Date().toISOString(), code || "").run();
+  if (!claim.meta.changes) return c.json({ ok: false, error: "激活码无效或已被使用" }, 400);
   let slug = username.toLowerCase().replace(/[^a-z0-9-]/g, "-");
   if (!validateSlug(slug)) slug = "b-" + slug;
   if (await c.env.DB.prepare("SELECT id FROM users WHERE board_slug=?").bind(slug).first()) slug = slug + "-" + (Date.now() % 10000);
   const { hash, salt } = await hashPassword(password);
   const now = new Date().toISOString();
-  const { meta } = await c.env.DB.prepare(
-    "INSERT INTO users (username,pass_hash,pass_salt,board_slug,board_name,created_at) VALUES (?,?,?,?,?,?)"
-  ).bind(username, hash, salt, slug, username, now).run();
-  await c.env.DB.prepare("UPDATE activation_codes SET used_by=?, used_at=? WHERE code=?").bind(meta.last_row_id, now, code).run();
-  const token = await signToken(c.env.SESSION_SECRET, { role: "user", uid: meta.last_row_id }, TTL);
+  let uid;
+  try {
+    const { meta } = await c.env.DB.prepare(
+      "INSERT INTO users (username,pass_hash,pass_salt,board_slug,board_name,created_at) VALUES (?,?,?,?,?,?)"
+    ).bind(username, hash, salt, slug, username, now).run();
+    uid = meta.last_row_id;
+  } catch {
+    await c.env.DB.prepare("UPDATE activation_codes SET used_by=NULL, used_at=NULL WHERE code=?").bind(code).run(); // 注册失败，归还激活码
+    return c.json({ ok: false, error: "用户名或网址已被占用，请重试" }, 409);
+  }
+  await c.env.DB.prepare("UPDATE activation_codes SET used_by=? WHERE code=?").bind(uid, code).run();
+  const token = await signToken(c.env.SESSION_SECRET, { role: "user", uid }, TTL);
   setCookie(c, USER_COOKIE, token, COOKIE_OPTS);
   return c.json({ ok: true, board: { slug, name: username } });
 });
@@ -153,7 +160,12 @@ app.put("/api/my/board", async (c) => {
   if (!validateSlug(slug)) return c.json({ ok: false, error: "网址 slug 需 3-32 位小写字母/数字/-" }, 400);
   const clash = await c.env.DB.prepare("SELECT id FROM users WHERE board_slug=? AND id<>?").bind(slug, c.get("uid")).first();
   if (clash) return c.json({ ok: false, error: "该网址已被占用" }, 409);
-  await c.env.DB.prepare("UPDATE users SET board_slug=?, board_name=? WHERE id=?").bind(slug, typeof name === "string" ? name : "", c.get("uid")).run();
+  try {
+    await c.env.DB.prepare("UPDATE users SET board_slug=?, board_name=? WHERE id=?").bind(slug, typeof name === "string" ? name : "", c.get("uid")).run();
+  } catch (e) {
+    if (String(e).includes("UNIQUE")) return c.json({ ok: false, error: "该网址已被占用" }, 409); // 并发抢占
+    throw e;
+  }
   return c.json({ ok: true, board: { slug, name: name || "" } });
 });
 
