@@ -110,21 +110,31 @@
   .modal-title{font-size:15px;font-weight:600;font-family:var(--mono)}
   .modal-foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
 
-  /* ===== 设置抽屉（shadcn Sheet）===== */
-  .overlay.right{justify-content:flex-end}
-  .drawer{width:min(400px,92vw);height:100dvh;background:#fff;border-left:1px solid var(--border);
-    box-shadow:-8px 0 30px rgba(0,0,0,.12);padding:0 18px 18px;overflow:auto;display:flex;flex-direction:column}
-  .drawer-sticky{position:sticky;top:0;z-index:5;background:#fff;margin:0 -18px 6px;padding:14px 18px 10px;border-bottom:1px solid var(--border)}
-  .drawer-head{display:flex;align-items:center;justify-content:space-between}
-  .drawer-title{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);font-weight:600}
-  .drawer-foot{margin-top:auto;padding-top:16px}
-  .tabs{display:flex;gap:2px;background:var(--accent);border-radius:10px;padding:3px;margin:10px 0 0}
-  .tab{flex:1;height:32px;border:0;background:transparent;border-radius:7px;cursor:pointer;
-    font-family:var(--font);font-size:13px;font-weight:500;color:var(--ink-mute);
+  /* ===== 导航（主人模式：桌面顶部 tabs / 移动端底部 tab 栏）===== */
+  .app-nav{position:absolute;top:0;right:0;display:flex;gap:2px;background:var(--accent);
+    border-radius:10px;padding:3px;z-index:50}
+  .nav-tab{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border:0;
+    background:transparent;border-radius:7px;cursor:pointer;font-family:var(--font);
+    font-size:13px;font-weight:500;color:var(--ink-mute);
     transition:background .15s,color .15s,box-shadow .15s}
-  .tab:hover{color:var(--ink)}
-  .tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.03)}
-  .tab:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+  .nav-tab svg{width:15px;height:15px;flex:none}
+  .nav-tab:hover{color:var(--ink)}
+  .nav-tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.03)}
+  .nav-tab:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+  .nav-tab:disabled{opacity:.45;cursor:not-allowed}
+  .nav-tab:disabled:hover{color:var(--ink-mute);background:transparent}
+  @media (max-width:560px){
+    .app-nav{position:fixed;top:auto;bottom:0;left:0;right:0;border-radius:0;background:#fff;
+      border-top:1px solid var(--border);padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+      gap:4px;box-shadow:0 -2px 12px rgba(0,0,0,.05)}
+    .nav-tab{flex:1;flex-direction:column;gap:3px;height:auto;padding:5px 0 3px;font-size:11px}
+    .nav-tab svg{width:20px;height:20px}
+    .nav-tab.on{background:var(--accent);box-shadow:none}
+    body.has-nav{padding-bottom:88px}
+  }
+
+  /* ===== 设置视图 ===== */
+  .view-settings{max-width:640px;margin:0 auto;padding-top:4px}
   .cfg-block{padding:16px 0 14px;border-bottom:1px solid var(--border)}
   .cfg-block:last-of-type{border-bottom:0}
   .cfg-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -159,8 +169,64 @@
     <p class="updated" id="updated" aria-live="polite"></p>
     <div class="head-actions" id="headActions"></div>
   </div>
+
+  <!-- 导航（主人模式可见）：桌面顶部 / 移动端底部 -->
+  <nav class="app-nav hidden" id="appNav" aria-label="导航">
+    <button class="nav-tab on" data-view="board">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+      <span>Watchlist</span>
+    </button>
+    <button class="nav-tab" data-view="macro" disabled title="即将上线" aria-disabled="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      <span>宏观看板</span>
+    </button>
+    <button class="nav-tab" data-view="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+      <span>设置</span>
+    </button>
+  </nav>
+
   <div class="layout">
     <div class="charts" id="charts"></div>
+  </div>
+
+  <!-- 设置视图（主人模式，由导航切换） -->
+  <div class="view-settings hidden" id="viewSettings">
+    <div class="cfg-block">
+      <div class="cfg-top"><span class="cfg-name">页面文案</span><span class="save-state" id="setSave"></span></div>
+      <div class="cfg-grid">
+        <label class="field full"><span class="f-lab">小标题</span>
+          <input id="setEyebrow" class="plain" type="text" autocomplete="off" placeholder="市场情绪 · Valuation Pendulum"></label>
+        <label class="field full"><span class="f-lab">大标题</span>
+          <input id="setTitle" class="plain" type="text" autocomplete="off" placeholder="估值钟摆看板"></label>
+        <label class="field full"><span class="f-lab">说明</span>
+          <textarea id="setSubtitle" placeholder="每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。"></textarea></label>
+      </div>
+      <p class="quote-note">留空即使用默认文案。改动自动保存，本页即时生效。</p>
+    </div>
+    <div class="cfg-block">
+      <div class="cfg-top"><span class="cfg-name">色块配色</span><span class="save-state" id="colSave"></span></div>
+      <div id="colorRows"></div>
+      <p class="quote-note">各估值区间的高亮色。用取色器或直接填 <code>#rrggbb</code>，改动自动保存、实时预览；清空恢复默认。</p>
+    </div>
+    <div class="cfg-block">
+      <div class="cfg-top"><span class="cfg-name">看板设置</span><span class="save-state" id="boardSave"></span></div>
+      <div class="cfg-grid">
+        <label class="field full"><span class="f-lab">看板名称</span>
+          <input id="boardName" class="plain" type="text" autocomplete="off" placeholder="我的估值看板"></label>
+        <label class="field full"><span class="f-lab">公开地址 Slug</span>
+          <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
+      </div>
+      <div class="f-lab" style="margin-top:4px">纯查看网址（分享给任何人，只能看不能改）</div>
+      <div class="share-url">
+        <a id="boardLink" href="#" target="_blank">…</a>
+        <button class="btn" id="btnCopyUrl" type="button">复制</button>
+      </div>
+      <p class="quote-note">改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。</p>
+    </div>
+    <div style="padding:18px 0">
+      <button class="btn" id="btnLogout" style="width:100%;justify-content:center">退出登录</button>
+    </div>
   </div>
 </div>
 
@@ -182,63 +248,6 @@
   </div>
 </div>
 
-<!-- 设置抽屉（主人模式） -->
-<div class="overlay right hidden" id="drawerOverlay">
-  <div class="drawer" role="dialog" aria-modal="true" aria-label="设置">
-    <div class="drawer-sticky">
-      <div class="drawer-head">
-        <span class="drawer-title">设置</span>
-        <button class="btn sm" id="btnDrawerClose">关闭</button>
-      </div>
-      <div class="tabs" role="tablist">
-        <button class="tab on" role="tab" aria-selected="true" data-pane="panePage">页面</button>
-        <button class="tab" role="tab" aria-selected="false" data-pane="paneBoard">看板</button>
-      </div>
-    </div>
-
-    <div id="panePage" class="tab-pane">
-      <div class="cfg-block">
-        <div class="cfg-top"><span class="cfg-name">页面文案</span><span class="save-state" id="setSave"></span></div>
-        <div class="cfg-grid">
-          <label class="field full"><span class="f-lab">小标题</span>
-            <input id="setEyebrow" class="plain" type="text" autocomplete="off" placeholder="市场情绪 · Valuation Pendulum"></label>
-          <label class="field full"><span class="f-lab">大标题</span>
-            <input id="setTitle" class="plain" type="text" autocomplete="off" placeholder="估值钟摆看板"></label>
-          <label class="field full"><span class="f-lab">说明</span>
-            <textarea id="setSubtitle" placeholder="每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。"></textarea></label>
-        </div>
-        <p class="quote-note">留空即使用默认文案。改动自动保存，本页即时生效。</p>
-      </div>
-      <div class="cfg-block">
-        <div class="cfg-top"><span class="cfg-name">色块配色</span><span class="save-state" id="colSave"></span></div>
-        <div id="colorRows"></div>
-        <p class="quote-note">各估值区间的高亮色。用取色器或直接填 <code>#rrggbb</code>，改动自动保存、实时预览；清空恢复默认。</p>
-      </div>
-    </div>
-
-    <div id="paneBoard" class="tab-pane hidden">
-      <div class="cfg-block">
-        <div class="cfg-top"><span class="cfg-name">看板设置</span><span class="save-state" id="boardSave"></span></div>
-        <div class="cfg-grid">
-          <label class="field full"><span class="f-lab">看板名称</span>
-            <input id="boardName" class="plain" type="text" autocomplete="off" placeholder="我的估值看板"></label>
-          <label class="field full"><span class="f-lab">公开地址 Slug</span>
-            <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
-        </div>
-        <div class="f-lab" style="margin-top:4px">纯查看网址（分享给任何人，只能看不能改）</div>
-        <div class="share-url">
-          <a id="boardLink" href="#" target="_blank">…</a>
-          <button class="btn" id="btnCopyUrl" type="button">复制</button>
-        </div>
-        <p class="quote-note">改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。</p>
-      </div>
-    </div>
-
-    <div class="drawer-foot">
-      <button class="btn" id="btnLogout" style="width:100%;justify-content:center">退出登录</button>
-    </div>
-  </div>
-</div>
 
 <script type="module">
 import { Gauge } from "/shared/gauge.js";
@@ -376,13 +385,11 @@ async function init() {
   applyColors(data.settings || {});
   const rows = data.items || [];
 
-  // 头部入口
+  // 头部入口 / 导航
   const actions = document.getElementById("headActions");
   if (owner) {
-    const set = document.createElement("button");
-    set.className = "btn"; set.textContent = "设置";
-    set.addEventListener("click", openDrawer);
-    actions.appendChild(set);
+    document.getElementById("appNav").classList.remove("hidden");
+    document.body.classList.add("has-nav");
   } else if (me && me.board && me.board.slug) {
     const mine = document.createElement("a");
     mine.className = "btn"; mine.style.textDecoration = "none";
@@ -657,25 +664,21 @@ btnModalRemove.addEventListener("click", async () => {
   modalOverlay.classList.add("hidden");
 });
 
-/* ---------- 设置抽屉 ---------- */
-const drawerOverlay = document.getElementById("drawerOverlay");
-function openDrawer() { drawerOverlay.classList.remove("hidden"); }
-function closeDrawer() { drawerOverlay.classList.add("hidden"); }
-document.getElementById("btnDrawerClose").addEventListener("click", closeDrawer);
-drawerOverlay.addEventListener("click", (e) => { if (e.target === drawerOverlay) closeDrawer(); });
-document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape") return;
-  if (!modalOverlay.classList.contains("hidden")) closeItemModal();
-  else if (!drawerOverlay.classList.contains("hidden")) closeDrawer();
-});
-document.querySelectorAll(".tab").forEach((t) =>
+/* ---------- 导航：Watchlist / 宏观看板(置灰) / 设置 ---------- */
+const layoutEl = document.querySelector(".layout");
+const viewSettings = document.getElementById("viewSettings");
+document.querySelectorAll(".nav-tab").forEach((t) =>
   t.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((x) => {
-      x.classList.toggle("on", x === t);
-      x.setAttribute("aria-selected", x === t ? "true" : "false");
-    });
-    document.querySelectorAll(".tab-pane").forEach((p) => p.classList.toggle("hidden", p.id !== t.dataset.pane));
+    if (t.disabled) return;
+    document.querySelectorAll(".nav-tab").forEach((x) => x.classList.toggle("on", x === t));
+    const v = t.dataset.view;
+    layoutEl.classList.toggle("hidden", v !== "board");
+    updatedEl.classList.toggle("hidden", v !== "board");
+    viewSettings.classList.toggle("hidden", v !== "settings");
   }));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !modalOverlay.classList.contains("hidden")) closeItemModal();
+});
 
 /* ---------- 页面文案（自动保存 + 本页实时生效） ---------- */
 const setEyebrow = document.getElementById("setEyebrow");
