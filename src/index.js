@@ -3,6 +3,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { signToken, verifyToken } from "./auth.js";
 import { validateItem, rowToItem } from "./items.js";
 import { parseTencentQuotes, parseTencentHints } from "./quotes.js";
+import { fetchLongbridgeQuotes } from "./longbridge.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
@@ -38,11 +39,24 @@ app.get("/api/config", async (c) => {
   const { results } = await c.env.DB.prepare("SELECT * FROM items WHERE user_id=? ORDER BY sort_order ASC, id ASC").bind(user.id).all();
   return c.json({ board: { slug: user.board_slug, name: user.board_name }, items: (results || []).map(rowToItem), settings: await readSettings(c.env.DB, user.id) });
 });
+async function tencentQuotes(symbols) {
+  if (!symbols.length) return {};
+  try { return parseTencentQuotes(await fetchGbk("https://qt.gtimg.cn/q=" + symbols.join(",")), symbols); }
+  catch { return {}; }
+}
 app.get("/api/quotes", async (c) => {
   const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim()).filter((s) => s && s.length <= 16).slice(0, 50);
   if (!symbols.length) return c.json({ quotes: {}, ts: new Date().toISOString() });
-  try { const text = await fetchGbk("https://qt.gtimg.cn/q=" + symbols.join(",")); return c.json({ quotes: parseTencentQuotes(text, symbols), ts: new Date().toISOString() }); }
-  catch { return c.json({ quotes: {}, error: "upstream unreachable", ts: new Date().toISOString() }, 502); }
+  let quotes = {}, source = "tencent";
+  // 有长桥凭据则优先用其实时行情；失败或缺漏的退回腾讯延时
+  if (c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN) {
+    try { quotes = await fetchLongbridgeQuotes(c.env, symbols); source = "longbridge"; }
+    catch (e) { console.error("longbridge failed, fall back to tencent:", e && e.message); quotes = {}; source = "tencent"; }
+  }
+  const missing = symbols.filter((s) => !(s in quotes));
+  if (missing.length) Object.assign(quotes, await tencentQuotes(missing));
+  if (!Object.keys(quotes).length) return c.json({ quotes: {}, error: "upstream unreachable", ts: new Date().toISOString() }, 502);
+  return c.json({ quotes, source, ts: new Date().toISOString() });
 });
 app.get("/api/hints", async (c) => {
   const q = c.req.query("q") || "";

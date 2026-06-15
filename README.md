@@ -10,6 +10,8 @@ gets a private dashboard to manage their own watchlist and a public read-only bo
 Sessions are stateless HMAC-signed cookies (`SESSION_SECRET`). The owner backend is gated by
 `ADMIN_PASSWORD`.
 
+**Real-time quotes:** if `LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN` are set as Worker secrets, `/api/quotes` pulls real-time prices from LongPort/Longbridge OpenAPI over its WebSocket long-connection (OTP → auth → QuerySecurityQuote cmd 11, parsed in `src/longbridge.js`); any symbol it can't return falls back to Tencent's delayed feed. Without the secrets it's Tencent-only. The access token expires — refresh it in the Longbridge developer portal and re-run `wrangler secret put LONGBRIDGE_ACCESS_TOKEN`.
+
 **Languages:** the UI is bilingual (中文 / English). Switch language in the board's Settings tab; login, register and valuation pages have their own switcher; the choice persists in `localStorage` (`pendulum_lang`) and defaults to the browser language. Dictionaries live in `public/shared/i18n.js`; the owner backend (`/owner`) is Chinese-only.
 
 ## Entry Points

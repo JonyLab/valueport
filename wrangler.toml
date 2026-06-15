@@ -11,5 +11,8 @@ database_name = "pendulum-db"
 database_id = "0be2e6bd-01f6-4b58-8112-516b9a1034db"
 
 # secrets（不写明文，用 `wrangler secret put` 设置）:
-#   ADMIN_PASSWORD   后台登录密码
-#   SESSION_SECRET   cookie HMAC 签名密钥
+#   ADMIN_PASSWORD            站长后台登录密码
+#   SESSION_SECRET            cookie HMAC 签名密钥
+#   LONGBRIDGE_APP_KEY        长桥 OpenAPI App Key（实时行情，可选）
+#   LONGBRIDGE_APP_SECRET     长桥 OpenAPI App Secret
+#   LONGBRIDGE_ACCESS_TOKEN   长桥 OpenAPI Access Token（有有效期，过期需更新）
