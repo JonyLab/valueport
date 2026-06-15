@@ -55,7 +55,7 @@
   .chart-info .verdict{text-align:left;margin:0;line-height:1.3}
   .chart-info .verdict .px{font-size:24px}
   .chart-info .verdict .lbl{font-size:13px}
-  .chart-gauge{flex:none;width:200px}
+  .chart-gauge{flex:none;width:200px;margin-top:-12px} /* 上移：半圆视觉重心偏下，往上挪一点更居中 */
   .chart-gauge svg{display:block;width:100%;height:auto;overflow:visible}
   @media (min-width:760px){
     .charts{display:grid;grid-template-columns:1fr 1fr}
@@ -140,8 +140,12 @@
   .combo-opt .c-name{color:var(--ink-soft);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .combo-opt .c-mkt{font-size:10.5px;color:var(--ink-mute);background:var(--accent);border:1px solid var(--border);padding:1px 6px;border-radius:999px;white-space:nowrap}
 
-  /* 卡片上的编辑按钮 + 末尾添加卡片（仅主人模式注入） */
-  .card-edit{position:absolute;top:22px;right:20px;z-index:5}
+  /* 卡片上的编辑按钮：靠上角，hover 卡片时才出现（触屏设备常驻） */
+  .card-edit{position:absolute;top:12px;right:14px;z-index:5}
+  @media (hover:hover){
+    .card-edit{opacity:0;transition:opacity .15s}
+    .chart-item:hover .card-edit,.card-edit:focus-visible{opacity:1}
+  }
   /* 末尾「添加」做成一行标尺行，融入方格，而非浮起的虚线盒 */
   .add-card{grid-column:1 / -1;border:0;border-bottom:1px solid var(--divider);margin:0;padding:20px 0;
     width:100%;background:none;color:var(--ink-mute);font-size:13.5px;font-weight:500;cursor:pointer;font-family:var(--font);
