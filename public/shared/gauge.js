@@ -6,8 +6,9 @@ const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 let UID = 0;
 
 export class Gauge {
-  constructor(mount) {
+  constructor(mount, opts = {}) {
     this.uid = ++UID;
+    this.compact = !!opts.compact; // 紧凑模式：隐藏区间标签/刻度数字/中枢文字（名称已移到左侧信息区）
     this.cx = 300; this.cy = 112;
     this.rO = 190; this.rI = 134;
     this.rM = (this.rO + this.rI) / 2;
@@ -83,6 +84,10 @@ export class Gauge {
     this.hubCode = this.mk("text", { x: cx, y: cy + this.RHUB * 0.70, "text-anchor": "middle", "dominant-baseline": "middle" });
     this.hubCode.style.cssText = "font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;fill:var(--ink-mute)";
     svg.append(gT, gB, gD, base, defs, gL, gN, this.gNeedle, hubShadow, hubRing, this.hubName, this.hubCode);
+    if (this.compact) { // 小图：去掉文字与细刻度，只留色带+分隔+指针+中枢
+      gT.style.display = "none"; gL.style.display = "none"; gN.style.display = "none";
+      this.hubName.style.display = "none"; this.hubCode.style.display = "none";
+    }
     mount.appendChild(svg);
     this.svg = svg;
   }
@@ -111,6 +116,7 @@ export class Gauge {
   setName(name) { this.displayName = name; this._renderHub(name); }
   // 中枢两行：名称行按长度自适应字号/截断（中文短、英文长），代码行用 ticker
   _renderHub(name) {
+    if (this.compact) return; // 紧凑模式不显示中枢文字
     name = (name || "").trim();
     const code = this._code || "—";
     if (!name) {

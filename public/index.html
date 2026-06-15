@@ -44,14 +44,28 @@
 
   /* 钟摆排成有线分隔的方格：横线分行、竖线分列，外框由 .page 两侧竖线收口 */
   .charts{background:none;border:0;border-radius:0;margin:0;padding:0;max-width:none}
-  .chart-item{border-bottom:1px solid var(--divider);padding:30px 24px 18px;position:relative}
+  /* 每格：左侧信息（名称/代码/股价/判定）+ 右侧小钟摆 */
+  .chart-item{display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--divider);padding:22px 24px;position:relative}
+  .chart-item.chart-empty{display:block} /* 空位占位格不需要 flex 内容 */
+  .chart-info{flex:1;min-width:0}
+  .ci-id{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;min-width:0}
+  .ci-name{font-family:var(--font);font-size:17px;font-weight:600;letter-spacing:-.01em;color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ci-code{flex:none;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--ink-mute)}
+  .chart-info .verdict{text-align:left;margin:0;line-height:1.3}
+  .chart-info .verdict .px{font-size:24px}
+  .chart-info .verdict .lbl{font-size:13px}
+  .chart-gauge{flex:none;width:200px}
+  .chart-gauge svg{display:block;width:100%;height:auto;overflow:visible}
   @media (min-width:760px){
     .charts{display:grid;grid-template-columns:1fr 1fr}
     .chart-item:nth-child(odd){border-right:1px solid var(--divider)}
   }
   @media (max-width:560px){
     .page-head{padding:24px 16px 18px}
-    .chart-item{padding:22px 16px 12px}
+    .chart-item{padding:18px 16px;gap:12px}
+    .chart-gauge{width:150px}
+    .chart-info .verdict .px{font-size:21px}
   }
 
   /* ===== 按钮 / 表单（shadcn 形态）===== */
@@ -422,18 +436,35 @@ async function loadNames(syms) {
       const n = names[item.cfg.symbol];
       if (!n) continue;
       item.nameCn = n.cn || ""; item.nameEn = n.en || "";
-      item.gauge.setName(displayName(item));
+      renderItemHead(item);
     }
   } catch { /* 拿不到就保持已存名 */ }
+}
+// 左侧信息区的名称行（名称随语言、代码用 ticker）
+function renderItemHead(item) {
+  if (item.nameEl) item.nameEl.textContent = displayName(item);
+  if (item.codeEl) item.codeEl.textContent = (item.cfg.ticker || "").toUpperCase();
 }
 function addChart(cfg) {
   const wrap = document.createElement("div");
   wrap.className = "chart-item";
-  const gauge = new Gauge(wrap);
+  // 左：信息区（名称/代码 + 股价/判定）
+  const info = document.createElement("div");
+  info.className = "chart-info";
+  const idRow = document.createElement("div");
+  idRow.className = "ci-id";
+  const nameEl = document.createElement("span"); nameEl.className = "ci-name";
+  const codeEl = document.createElement("span"); codeEl.className = "ci-code";
+  idRow.append(nameEl, codeEl);
   const verdict = document.createElement("p");
   verdict.className = "verdict v-fair";
-  wrap.appendChild(verdict);
-  const item = { id: cfg.id || null, cfg: { ...cfg }, gauge, chartEl: wrap, verdictEl: verdict, live: false, gotQuote: false };
+  info.append(idRow, verdict);
+  // 右：小钟摆
+  const gwrap = document.createElement("div");
+  gwrap.className = "chart-gauge";
+  const gauge = new Gauge(gwrap, { compact: true });
+  wrap.append(info, gwrap);
+  const item = { id: cfg.id || null, cfg: { ...cfg }, gauge, chartEl: wrap, verdictEl: verdict, nameEl, codeEl, live: false, gotQuote: false };
   if (owner) {
     const edit = document.createElement("button");
     edit.className = "btn sm ghost card-edit";
@@ -445,6 +476,7 @@ function addChart(cfg) {
   items.push(item);
   gauge.set(item.cfg, false);
   renderVerdict(item);
+  renderItemHead(item);
   syncEmptyCell();
   return item;
 }
@@ -706,7 +738,7 @@ function buildItemForm(item) {
         item.live = false; item.gotQuote = false;
         modalTitle.textContent = modalTitleFor(item);
         item.nameCn = ""; item.nameEn = ""; // 换标的后旧名作废，重新拉
-        if (structValid(item.cfg)) { item.gauge.set(item.cfg); renderVerdict(item); saveItem(item); }
+        if (structValid(item.cfg)) { item.gauge.set(item.cfg); renderVerdict(item); renderItemHead(item); saveItem(item); }
         close(); markState(); fetchQuotes(); loadNames([item.cfg.symbol]);
       };
       const renderList = (arr) => {
