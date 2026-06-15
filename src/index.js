@@ -55,6 +55,7 @@ app.get("/api/quotes", async (c) => {
   }
   const missing = symbols.filter((s) => !(s in quotes));
   if (missing.length) Object.assign(quotes, await tencentQuotes(missing));
+  c.header("Cache-Control", "no-store"); // 实时行情不缓存
   if (!Object.keys(quotes).length) return c.json({ quotes: {}, error: "upstream unreachable", ts: new Date().toISOString() }, 502);
   return c.json({ quotes, source, ts: new Date().toISOString() });
 });
