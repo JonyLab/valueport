@@ -202,7 +202,11 @@ relative h-3.5 w-full
 
 ### 我们的简化
 
-本项目把 zed 的「per-section flex 留白栏」简化成 **整页一个 `.page` 框**（两侧 `border-x` 栏轨 + `page-head`/`frame-foot` 横线 + 「+」节点）——同一套语言的精简版，单看板页够用。若以后做**多区段落地页**（宏观看板、营销页），应上 zed 完整结构：内容段 + 14px 满幅标尺带 + flex 留白栏。
+本项目把 zed 的「per-section flex 留白栏」简化成 **整页一个 `.page` 框**（两侧 `border-x` 栏轨 + `page-head`/`frame-foot` 横线 + 「+」节点）——同一套语言的精简版，单看板页够用。
+
+Watchlist 页内部已按区段模型分成 **标题段 / 看板段**：两者之间插一条 **14px 标尺隔断带**（`.section-divider`）——`page-head` 的底线+节点作上线，隔断带自带下线+节点，中间 14px 空带，复刻 zed 的 section divider。隔断带随看板段一起在设置视图隐藏。
+
+若以后做**多区段落地页**（宏观看板、营销页），应上 zed 完整结构：内容段 + 14px 满幅标尺带 + flex 留白栏。
 
 ---
 
