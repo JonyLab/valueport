@@ -33,14 +33,13 @@
   .charts{background:var(--card);border-radius:22px;box-shadow:var(--shadow);padding:18px 28px 8px}
   .chart-item{padding:18px 0 6px}
   .chart-item svg{display:block;width:100%;height:auto;overflow:visible}
-  .verdict{
-    text-align:center;font-size:14px;font-weight:600;
-    margin:2px 0 16px;letter-spacing:.01em;
-  }
-  .verdict .px{font-family:var(--mono);font-weight:600;color:var(--ink-mute);margin-right:10px;font-size:13px}
-  .verdict.v-under{color:var(--green)}
-  .verdict.v-over{color:var(--red)}
-  .verdict.v-fair{color:var(--ink-mute);font-weight:500}
+  /* 现价 = 英雄数字（中性墨色、等宽、大）；判定 = 次级语义色小字 */
+  .verdict{text-align:center;margin:6px 0 14px;line-height:1.32;font-variant-numeric:tabular-nums}
+  .verdict .px{display:block;font-family:var(--mono);font-weight:600;font-size:21px;
+    color:var(--ink);letter-spacing:-.01em}
+  .verdict .lbl{font-size:13px;font-weight:500;color:var(--ink-mute)}
+  .verdict.v-under .lbl{color:var(--green)}
+  .verdict.v-over .lbl{color:var(--red)}
   .charts-empty{padding:48px 0;text-align:center;color:var(--ink-mute);font-size:14px}
 
   /* ---- config column ---- */
@@ -68,7 +67,6 @@
   .quote-status.err{color:var(--red)}
   .quote-note{font-size:11.5px;color:var(--ink-mute);line-height:1.6;margin:6px 0 4px}
   .quote-note code{font-family:var(--mono);background:#f3f5f8;padding:1px 4px;border-radius:4px}
-  .px-live{color:var(--green)!important}
 
   .cfg-block{padding:16px 0 14px;border-bottom:1px solid #eef0f3}
   .cfg-block:last-of-type{border-bottom:0}

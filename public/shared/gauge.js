@@ -63,7 +63,7 @@ export class Gauge {
     for (let i = 1; i < N; i++) {
       const [x, y] = this.pt(rN, i * SEG);
       const t = this.mk("text", { x, y: y + 4, "text-anchor": "middle" });
-      t.style.cssText = "font-family:var(--mono);font-size:12px;font-weight:600;fill:var(--ink-soft)";
+      t.style.cssText = "font-family:var(--mono);font-size:12px;font-weight:600;fill:var(--ink-soft);font-variant-numeric:tabular-nums";
       gN.appendChild(t); this.nums.push(t);
     }
     this.gNeedle = this.mk("g");

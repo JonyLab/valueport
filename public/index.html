@@ -292,7 +292,7 @@ import { t, applyI18n, setLang, LANG } from "/shared/i18n.js";
 
 applyI18n(); // 静态文案先按当前语言渲染
 const VMSGS = {
-  px: (p) => t("v_px", p), pxNone: t("v_px_none"), noSymbol: t("v_no_symbol"),
+  px: (p) => t("v_px", typeof p === "number" ? p.toFixed(2) : p), pxNone: t("v_px_none"), noSymbol: t("v_no_symbol"),
   waiting: t("v_waiting"), under: (pct) => t("v_under", pct), over: (pct) => t("v_over", pct), fair: t("v_fair"),
 };
 // 语言切换（设置页内的分段控件）
@@ -337,10 +337,13 @@ function renderVerdict(item) {
   el.className = "verdict " + v.cls;
   el.innerHTML = "";
   const px = document.createElement("span");
-  px.className = "px" + (item.live ? " px-live" : "");
+  px.className = "px";
   px.textContent = v.px;
+  const lbl = document.createElement("span");
+  lbl.className = "lbl";
+  lbl.textContent = v.text;
   el.appendChild(px);
-  el.appendChild(document.createTextNode(v.text));
+  el.appendChild(lbl);
 }
 function addChart(cfg) {
   const wrap = document.createElement("div");
