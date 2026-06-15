@@ -12,7 +12,7 @@ export class Gauge {
     this.rO = 190; this.rI = 134;
     this.rM = (this.rO + this.rI) / 2;
     this.rB = this.rI + 12; this.rL = this.rM + 9; this.rN = this.rI - 14;
-    this.RHUB = 58;
+    this.RHUB = 74;
     this.anchors = [0, 1, 2, 3, 4, Infinity];
     this.current = 0; this.target = 0; this.raf = null; this.swinging = false;
     this.build(mount);
@@ -77,9 +77,12 @@ export class Gauge {
     const hubPath = `M ${cx - this.RHUB} ${cy} A ${this.RHUB} ${this.RHUB} 0 0 0 ${cx + this.RHUB} ${cy} Z`;
     const hubShadow = this.mk("path", { d: hubPath, fill: "rgba(20,30,50,.08)", transform: "translate(0,2)" });
     const hubRing = this.mk("path", { d: hubPath, fill: "#fff", stroke: "#dfe3ea", "stroke-width": 1.5 });
-    this.hubText = this.mk("text", { x: cx, y: cy + this.RHUB * 0.42, "text-anchor": "middle", "dominant-baseline": "middle" });
-    this.hubText.style.cssText = "font-family:var(--mono);font-size:20px;font-weight:700;letter-spacing:.02em;fill:var(--ink)";
-    svg.append(gT, gB, gD, base, defs, gL, gN, this.gNeedle, hubShadow, hubRing, this.hubText);
+    // 第一行：名称（大）；第二行：代码（小）
+    this.hubName = this.mk("text", { x: cx, y: cy + this.RHUB * 0.40, "text-anchor": "middle", "dominant-baseline": "middle" });
+    this.hubName.style.cssText = "font-family:var(--font);font-weight:700;letter-spacing:.01em;fill:var(--ink)";
+    this.hubCode = this.mk("text", { x: cx, y: cy + this.RHUB * 0.70, "text-anchor": "middle", "dominant-baseline": "middle" });
+    this.hubCode.style.cssText = "font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;fill:var(--ink-mute)";
+    svg.append(gT, gB, gD, base, defs, gL, gN, this.gNeedle, hubShadow, hubRing, this.hubName, this.hubCode);
     mount.appendChild(svg);
     this.svg = svg;
   }
@@ -96,8 +99,18 @@ export class Gauge {
     this.anchors = computeAnchors(cfg);
     // 区间未填完时锚点为 NaN：刻度留空而不是显示 "NaN"
     this.nums.forEach((t, k) => { const v = this.anchors[k + 1]; t.textContent = isFinite(v) ? Math.round(v) : ""; });
-    this.hubText.textContent = (cfg.ticker || "—").toUpperCase();
-    this.hubText.style.fontSize = (cfg.ticker || "").length > 6 ? "15px" : "20px";
+    // 第一行名称、第二行代码；无名称时名称行直接显示代码、隐藏第二行
+    const code = (cfg.ticker || "—").toUpperCase();
+    const name = (cfg.name || "").trim();
+    if (name) {
+      this.hubName.textContent = name.length > 9 ? name.slice(0, 8) + "…" : name;
+      this.hubName.style.fontSize = name.length > 6 ? "15px" : "18px";
+      this.hubCode.textContent = code;
+    } else {
+      this.hubName.textContent = code;
+      this.hubName.style.fontSize = code.length > 6 ? "15px" : "20px";
+      this.hubCode.textContent = "";
+    }
     this.hasPrice = cfg.price > 0;
     this.target = this.hasPrice ? priceToPhi(this.anchors, cfg.price) : 90;
     if (!animate || REDUCE) { this.current = this.target; this.paint(this.current); return; }
