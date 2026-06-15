@@ -273,7 +273,6 @@
       <span class="save-state" id="modalSave"></span>
     </div>
     <div id="modalForm"></div>
-    <div class="modal-err" id="modalErr" role="alert"></div>
     <div class="modal-foot">
       <button class="btn danger" id="btnModalRemove" data-i18n="m_remove">移除</button>
       <div style="display:flex;gap:8px;margin-left:auto">
@@ -533,6 +532,9 @@ const modalForm = document.getElementById("modalForm");
 const modalTitle = document.getElementById("modalTitle");
 const btnModalRemove = document.getElementById("btnModalRemove");
 let modalItem = null, modalIsNew = false, modalSnapshot = null;
+let fieldErrs = {}, fieldInputs = {};   // 字段级内联报错：key → 错误元素 / 输入框
+function showFieldErr(key, msg) { const e = fieldErrs[key]; if (e) { e.textContent = msg; e.style.display = "block"; } if (fieldInputs[key]) fieldInputs[key].classList.add("bad"); }
+function clearFieldErrs() { for (const k in fieldErrs) if (fieldErrs[k]) fieldErrs[k].style.display = "none"; }
 
 function modalTitleFor(item) {
   return item.cfg.symbol
@@ -542,6 +544,7 @@ function modalTitleFor(item) {
 
 function buildItemForm(item) {
   modalForm.innerHTML = "";
+  fieldErrs = {}; fieldInputs = {};
   const grid = document.createElement("div");
   grid.className = "cfg-grid";
   FIELDS.forEach((f) => {
@@ -554,8 +557,10 @@ function buildItemForm(item) {
     if (f.type === "number") { input.min = "0"; input.step = "any"; }
     else { input.maxLength = 24; input.spellcheck = false; input.placeholder = t("m_ph_ticker"); input.autocomplete = "off"; }
     input.value = item.cfg[f.k] ?? "";
+    fieldInputs[f.k] = input;
 
     input.addEventListener("input", () => {
+      if (fieldErrs[f.k]) fieldErrs[f.k].style.display = "none"; // 输入即清除本字段报错
       const v = f.type === "number" ? parseFloat(input.value) : input.value.trim();
       const next = { ...item.cfg, [f.k]: v };
       let bad = false;
@@ -587,12 +592,13 @@ function buildItemForm(item) {
       list.className = "combo-list"; list.style.display = "none";
       const err = document.createElement("div");
       err.className = "f-err"; err.textContent = t("m_pick_err");
+      fieldErrs.ticker = err;
       let opts = [], act = -1, searchTimer = null;
       const close = () => { list.style.display = "none"; act = -1; };
       const markState = () => {
         const txt = input.value.trim();
         if (item.cfg.symbol) { input.classList.add("ok"); input.classList.remove("bad"); err.style.display = "none"; }
-        else if (txt) { input.classList.add("bad"); input.classList.remove("ok"); err.style.display = ""; }
+        else if (txt) { input.classList.add("bad"); input.classList.remove("ok"); err.textContent = t("m_pick_err"); err.style.display = "block"; }
         else { input.classList.remove("ok", "bad"); err.style.display = "none"; }
       };
       const pick = (o) => {
@@ -662,6 +668,9 @@ function buildItemForm(item) {
       syncChips();
       lab.appendChild(chips);
     }
+    const fe = document.createElement("div");
+    fe.className = "f-err"; fieldErrs[f.k] = fe;
+    lab.appendChild(fe);
     grid.appendChild(lab);
     if (f.k === "fairHigh") {
       // 合理价值注释：紧贴低点/高点输入下方，链接到估值方法介绍页
@@ -675,16 +684,11 @@ function buildItemForm(item) {
   modalForm.appendChild(grid);
 }
 
-const modalErrEl = document.getElementById("modalErr");
-function showModalErr(msg) { modalErrEl.textContent = msg; modalErrEl.style.display = "block"; }
-function hideModalErr() { modalErrEl.style.display = "none"; }
-
 function openItemModal(item, isNew) {
   modalItem = item; modalIsNew = isNew;
   modalSnapshot = { ...item.cfg }; // 取消时回滚到打开前的状态
   modalTitle.textContent = modalTitleFor(item);
   setSaveState("", "");
-  hideModalErr();
   btnModalRemove.classList.toggle("hidden", isNew && !item.id);
   buildItemForm(item);
   modalOverlay.classList.remove("hidden");
@@ -703,27 +707,29 @@ function closeItemModal() {
   modalItem = null;
   modalOverlay.classList.add("hidden");
 }
-// 「完成」= 提交：必须选定标的且设置好合理价格区间，否则报错拦截
+// 「完成」= 提交：逐字段校验，报错就近显示在对应输入下方
 function trySubmitModal() {
   const item = modalItem;
   if (!item) return;
   const c = item.cfg;
-  // 仅当全新表单「什么都没动」（没选标的、代码框也空、没填区间）才视为放弃；否则一律校验报错
+  // 仅当全新表单「什么都没动」才视为放弃；否则逐字段校验
   const untouched = modalIsNew && !item.id && !c.symbol && !c.ticker && !(c.fairLow > 0) && !(c.fairHigh > 0);
   if (untouched) { closeItemModal(); return; }
-  if (!c.symbol) { showModalErr(t("m_err_symbol")); return; }
-  if (!(c.fairLow > 0) || !(c.fairHigh > c.fairLow)) {
-    showModalErr(t("m_err_range"));
-    return;
-  }
-  if (!structValid(c)) { showModalErr(t("m_err_pct")); return; }
+  clearFieldErrs();
+  let firstBad = null;
+  const flag = (key, msg) => { showFieldErr(key, msg); if (!firstBad) firstBad = key; };
+  if (!c.symbol) flag("ticker", t("m_err_symbol"));
+  if (!(c.fairLow > 0)) flag("fairLow", t("m_err_low"));
+  else if (!(c.fairHigh > c.fairLow)) flag("fairHigh", t("m_err_high"));
+  if (!(c.mos > 0 && c.mos < 100)) flag("mos", t("m_err_mos"));
+  if (!(c.ext > 0)) flag("ext", t("m_err_ext"));
+  if (firstBad) { const el = fieldInputs[firstBad]; if (el) { el.focus(); el.scrollIntoView({ block: "nearest" }); } return; }
   clearTimeout(item._saveT);
   saveItem(item);            // 立即提交（不等防抖）
   modalItem = null;
   modalOverlay.classList.add("hidden");
 }
 document.getElementById("btnModalDone").addEventListener("click", trySubmitModal);
-modalForm.addEventListener("input", hideModalErr);
 modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) closeItemModal(); });
 document.getElementById("btnModalCancel").addEventListener("click", async () => {
   if (!modalItem) return;
