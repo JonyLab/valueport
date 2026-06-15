@@ -13,17 +13,30 @@
     --divider:#e3dfd3; --shadow:0 1px 2px rgba(60,50,25,.05);
   }
   .article h1,.article h2,.article h3{font-family:var(--serif);font-weight:500;letter-spacing:-.01em}
-  .article{max-width:720px;margin:0 auto}
+  /* zed.dev 线条：框线内容列 + 交叉点菱形角标 */
+  .article{max-width:760px;margin:0 auto;position:relative;padding:30px 30px 0;
+    border-left:1px solid var(--divider);border-right:1px solid var(--divider)}
+  .article::before,.article::after{content:"";position:absolute;top:-3.5px;width:6px;height:6px;
+    background:var(--bg);border:1px solid var(--divider);transform:rotate(45deg)}
+  .article::before{left:-3.5px} .article::after{right:-3.5px}
   .article h2{font-size:18px;margin:36px 0 10px;letter-spacing:-.01em}
   .article h3{font-size:15px;margin:22px 0 6px}
   .article p{font-size:14.5px;line-height:1.85;color:var(--ink-soft);margin:8px 0}
   .article p b{color:var(--ink)}
   .article .formula{font-family:var(--mono);font-size:13px;background:var(--accent);
     border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:10px 0;color:var(--ink)}
-  .article table{width:100%;border-collapse:collapse;font-size:13.5px;margin:14px 0}
-  .article th,.article td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  /* 有线对照表：横行标尺 + 竖向列分隔（zed 账本表） */
+  .article table{width:100%;border-collapse:collapse;font-size:13.5px;margin:18px 0;border-top:1px solid var(--border)}
+  .article th,.article td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:top}
+  .article th:last-child,.article td:last-child{border-right:0}
   .article th{font-size:12.5px;color:var(--ink-mute);font-weight:600}
   .article td:first-child{font-weight:600;white-space:nowrap}
+  /* 斜纹填充底栏（横贯框线，顶角加菱形） */
+  .frame-foot{position:relative;min-height:130px;margin:36px -30px 0;border-top:1px solid var(--divider);
+    background-image:repeating-linear-gradient(45deg,var(--divider) 0,var(--divider) 1px,transparent 1px,transparent 9px)}
+  .frame-foot::before,.frame-foot::after{content:"";position:absolute;top:-3.5px;width:6px;height:6px;
+    background:var(--bg);border:1px solid var(--divider);transform:rotate(45deg)}
+  .frame-foot::before{left:-3.5px} .frame-foot::after{right:-3.5px}
   .back{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink-soft);
     text-decoration:none;margin-bottom:18px}
   .back:hover{color:var(--ink)}
@@ -110,6 +123,8 @@
 
     <p class="disclaim">This page is a general introduction to valuation methods, not investment advice. Markets are risky; judge independently.</p>
     </div>
+
+    <div class="frame-foot" aria-hidden="true"></div>
 
     <script type="module">
     import { LANG, toggleLang, langButtonLabel } from "/shared/i18n.js";
