@@ -32,7 +32,7 @@
     background-image:var(--hatch)}
   .frame-foot::before,.frame-foot::after{content:"";position:absolute;top:-3.5px;width:6px;height:6px;
     background:#fff;border:1px solid var(--node);transform:translate(-1px,-1px) rotate(45deg);z-index:2}
-  .frame-foot::before{left:-3.5px} .frame-foot::after{right:-3.5px}
+  .frame-foot::before{left:-3.5px} .frame-foot::after{right:-3.5px;transform:translate(1px,-1px) rotate(45deg)}
   /* zed 式标尺隔断带（divider-slash）：分开「标题段 / 看板段」。page-head 底线+节点作上线，本带自带下线+节点，
      中间填一层很淡的 45° 斜线网（比页脚 --hatch 更密更淡，对应 zed 的 offgray-200 ~20%） */
   .section-divider{position:relative;height:14px;border-bottom:1px solid var(--divider);
@@ -155,7 +155,7 @@
     height:52px;padding:0 28px;border-bottom:1px solid var(--divider)}
   .topnav::before,.topnav::after{content:"";position:absolute;bottom:-3.5px;width:6px;height:6px;
     background:#fff;border:1px solid var(--node);transform:translate(-1px,1px) rotate(45deg);z-index:2}
-  .topnav::before{left:-3.5px} .topnav::after{right:-3.5px}
+  .topnav::before{left:-3.5px} .topnav::after{right:-3.5px;transform:translate(1px,1px) rotate(45deg)}
   /* 产品名（顶部左侧，加粗字号） */
   .brand{grid-column:1;justify-self:start;display:inline-flex;align-items:center;font-family:var(--serif);
     font-style:italic;font-weight:700;font-size:19px;letter-spacing:0;color:var(--ink);text-decoration:none}
