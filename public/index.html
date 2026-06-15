@@ -17,32 +17,29 @@
   }
   h1{font-family:var(--serif);font-weight:400;letter-spacing:-.025em}
   .eyebrow{color:var(--ink-mute)}
-  body{overflow-x:hidden}
+  body{overflow-x:hidden;padding:0}
   .layout{display:block}
-  .page{position:relative}
-
-  /* 顶部：更新时间 + 分享入口 */
+  /* ===== zed.dev 线条系统：有界中央栏（两侧满高竖线）+ 区块横标尺线 + 钟摆方格 ===== */
+  .page{max-width:1120px;margin:0 auto;position:relative;min-height:100vh;padding:0;
+    border-left:1px solid var(--divider);border-right:1px solid var(--divider)}
+  .page-head{margin:0;padding:30px 28px 22px;border-bottom:1px solid var(--divider)}
   .board-bar{display:flex;align-items:flex-end;gap:8px;min-height:24px}
   .updated{font-family:var(--mono);font-size:12px;color:var(--ink-mute);margin:12px 0 0;flex:1;min-width:0}
-  .btn.icon{width:36px;padding:0;justify-content:center;flex:none}
+  .btn.icon{width:34px;padding:0;justify-content:center;flex:none}
   .btn.icon svg{width:16px;height:16px}
-  .page-head{margin-bottom:0;padding-bottom:20px}
-  .head-actions{position:absolute;top:0;right:0;display:flex;gap:8px}
+  .head-actions{position:absolute;top:26px;right:28px;display:flex;gap:8px}
 
-  /* 图表区：白色扁平面板，左右铺满 */
-  .charts{background:var(--card);box-shadow:none;border-radius:0;border-top:1px solid var(--divider);
-    max-width:none;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);padding:6px 24px 16px}
-  .chart-item{border-top:1px solid var(--track-edge);padding:26px 0 10px;position:relative}
-  .chart-item:first-child{border-top:none}
-  @media (min-width:1100px){
-    .charts{display:grid;grid-template-columns:1fr 1fr;gap:0 48px;
-      padding-left:calc((100vw - 1080px) / 2);padding-right:calc((100vw - 1080px) / 2)}
-    .chart-item:nth-child(2){border-top:none}
+  /* 钟摆排成有线分隔的方格：横线分行、竖线分列，外框由 .page 两侧竖线收口 */
+  .charts{background:none;border:0;border-radius:0;margin:0;padding:0;max-width:none}
+  .chart-item{border-bottom:1px solid var(--divider);padding:30px 24px 18px;position:relative}
+  @media (min-width:760px){
+    .charts{display:grid;grid-template-columns:1fr 1fr}
+    .chart-item:nth-child(odd){border-right:1px solid var(--divider)}
   }
   @media (max-width:560px){
-    body{padding:20px 10px 56px}
-    .charts{padding:2px 12px 12px}
-    .chart-item{padding:20px 0 8px}
+    .page-head{padding:24px 16px 18px}
+    .head-actions{top:22px;right:16px}
+    .chart-item{padding:22px 16px 12px}
   }
 
   /* ===== 按钮 / 表单（shadcn 形态）===== */
@@ -102,12 +99,12 @@
   .combo-opt .c-mkt{font-size:10.5px;color:var(--ink-mute);background:var(--accent);border:1px solid var(--border);padding:1px 6px;border-radius:999px;white-space:nowrap}
 
   /* 卡片上的编辑按钮 + 末尾添加卡片（仅主人模式注入） */
-  .card-edit{position:absolute;top:18px;right:0;z-index:5}
-  .add-card{border:1.5px dashed var(--border);border-radius:12px;margin:18px 0 8px;padding:24px 0;
-    width:100%;background:none;color:var(--ink-mute);font-size:14px;font-weight:500;cursor:pointer;font-family:var(--font);
+  .card-edit{position:absolute;top:22px;right:20px;z-index:5}
+  /* 末尾「添加」做成一行标尺行，融入方格，而非浮起的虚线盒 */
+  .add-card{grid-column:1 / -1;border:0;border-bottom:1px solid var(--divider);margin:0;padding:20px 0;
+    width:100%;background:none;color:var(--ink-mute);font-size:13.5px;font-weight:500;cursor:pointer;font-family:var(--font);
     transition:background .15s,color .15s}
   .add-card:hover{background:var(--accent);color:var(--ink)}
-  @media (min-width:1100px){ .add-card{grid-column:1 / -1} }
 
   /* ===== 弹窗（shadcn Dialog）===== */
   .overlay{position:fixed;inset:0;background:rgba(9,9,11,.45);z-index:90;display:flex}
@@ -120,7 +117,7 @@
   .modal-foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
 
   /* ===== 导航（主人模式：桌面顶部 tabs / 移动端底部 tab 栏）===== */
-  .app-nav{position:absolute;top:0;right:0;display:flex;gap:2px;background:var(--accent);
+  .app-nav{position:absolute;top:24px;right:28px;display:flex;gap:2px;background:var(--accent);
     border-radius:10px;padding:3px;z-index:50}
   .nav-tab{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border:0;
     background:transparent;border-radius:7px;cursor:pointer;font-family:var(--font);
