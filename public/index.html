@@ -36,8 +36,10 @@
   .frame-foot::before,.frame-foot::after{content:"";position:absolute;top:-5px;width:9px;height:9px;
     background:var(--xn);z-index:2}
   .frame-foot::before{left:-5px} .frame-foot::after{right:-5px}
-  /* zed 式标尺隔断带：分开「标题段 / 看板段」。page-head 底线+节点作上线，本带自带下线+节点，中间 14px 空带 */
-  .section-divider{position:relative;height:14px;border-bottom:1px solid var(--divider)}
+  /* zed 式标尺隔断带（divider-slash）：分开「标题段 / 看板段」。page-head 底线+节点作上线，本带自带下线+节点，
+     中间填一层很淡的 45° 斜线网（比页脚 --hatch 更密更淡，对应 zed 的 offgray-200 ~20%） */
+  .section-divider{position:relative;height:14px;border-bottom:1px solid var(--divider);
+    background-image:repeating-linear-gradient(45deg,rgba(120,128,142,.16) 0,rgba(120,128,142,.16) 1px,transparent 1px,transparent 6px)}
   .section-divider::before,.section-divider::after{content:"";position:absolute;bottom:-5px;width:9px;height:9px;background:var(--xn);z-index:2}
   .section-divider::before{left:-5px} .section-divider::after{right:-5px}
   .board-bar{display:flex;align-items:flex-end;gap:8px;min-height:24px}
