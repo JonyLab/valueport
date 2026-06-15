@@ -133,6 +133,8 @@
     width:100%;background:none;color:var(--ink-mute);font-size:13.5px;font-weight:500;cursor:pointer;font-family:var(--font);
     transition:background .15s,color .15s}
   .add-card:hover{background:var(--accent);color:var(--ink)}
+  /* 奇数个标的时补一格空位，底边用虚线把横向标尺线接过去（虚线=空位/占位） */
+  .chart-empty{border-bottom-style:dashed}
 
   /* ===== 弹窗（shadcn Dialog）===== */
   .overlay{position:fixed;inset:0;background:rgba(9,9,11,.45);z-index:90;display:flex}
@@ -402,11 +404,24 @@ function addChart(cfg) {
   items.push(item);
   gauge.set(item.cfg, false);
   renderVerdict(item);
+  syncEmptyCell();
   return item;
 }
 function removeChart(item) {
   const idx = items.indexOf(item);
   if (idx >= 0) { item.gauge.destroy(); item.chartEl.remove(); items.splice(idx, 1); }
+  syncEmptyCell();
+}
+// 标的为奇数时，在末尾空格子补一个虚线占位，把横向标尺线接过去（2 列网格右下角不再开口）
+function syncEmptyCell() {
+  const old = chartsEl.querySelector(".chart-empty");
+  if (old) old.remove();
+  if (items.length % 2 === 1) {
+    const ph = document.createElement("div");
+    ph.className = "chart-item chart-empty";
+    ph.setAttribute("aria-hidden", "true");
+    if (addCardEl) chartsEl.insertBefore(ph, addCardEl); else chartsEl.appendChild(ph);
+  }
 }
 
 /* ---------- 行情 ---------- */
