@@ -6,15 +6,17 @@
 <title>估值钟摆 · 看板</title>
 <link rel="stylesheet" href="/shared/styles.css">
 <style>
-  /* ===== shadcn(zinc) 主题层 ===== */
+  /* ===== zed.dev 风：暖白纸张 + 衬线标题 + 蓝灰强调 ===== */
   :root{
-    --bg:#fafafa; --card:#ffffff;
-    --ink:#09090b; --ink-soft:#52525b; --ink-mute:#71717a;
-    --border:#e4e4e7; --accent:#f4f4f5;
-    --ring:rgba(161,161,170,.4); --ring-border:#a1a1aa;
-    --divider:#e4e4e7; --track:#f0f0f1; --track-edge:#e4e4e7;
-    --shadow:0 1px 2px rgba(0,0,0,.05);
+    --bg:#f4f2ec; --card:#faf9f4;
+    --ink:#1b1a17; --ink-soft:#57534a; --ink-mute:#8a857a;
+    --border:#e3dfd3; --accent:#ece8de;
+    --ring:rgba(46,64,102,.26); --ring-border:#2e4066;
+    --divider:#e3dfd3; --track:#ece8de; --track-edge:#e0dccf;
+    --shadow:0 1px 2px rgba(60,50,25,.05);
   }
+  h1{font-family:var(--serif);font-weight:400;letter-spacing:-.025em}
+  .eyebrow{color:var(--ink-mute)}
   body{overflow-x:hidden}
   .layout{display:block}
   .page{position:relative}

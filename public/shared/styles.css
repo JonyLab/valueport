@@ -1,19 +1,23 @@
+  @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@300;400;500;600&display=swap");
+  /* zed.dev 风：暖白纸张 + Plex Serif 衬线标题 + 等宽数字 + 克制蓝灰强调 */
   :root{
-    --bg:#eef0f3;
-    --card:#ffffff;
-    --ink:#1d2530;
-    --ink-soft:#5c6675;
-    --ink-mute:#929aa6;
-    --track:#e7eaf0;
-    --track-edge:#dadfe8;
-    --divider:#cfd4dc;
-    --hub:#1c2430;
-    --green:#1f9150;
-    --red:#cf3f3f;
-    --shadow:0 1px 2px rgba(20,30,50,.04), 0 12px 40px rgba(20,30,50,.08);
+    --bg:#f4f2ec;            /* 暖白纸张 */
+    --card:#faf9f4;          /* 略亮的暖白面板 */
+    --ink:#1b1a17;           /* 暖近黑 */
+    --ink-soft:#57534a;      /* 暖石板 */
+    --ink-mute:#8a857a;      /* 暖灰 */
+    --track:#ece8de;
+    --track-edge:#e0dccf;
+    --divider:#e3dfd3;       /* 暖发丝线 */
+    --hub:#1b1a17;
+    --green:#1f8f54;
+    --red:#c64141;
+    --shadow:0 1px 2px rgba(60,50,25,.05);
     --font:"Inter","SF Pro Text",-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
     --mono:"SF Mono","JetBrains Mono",ui-monospace,"Roboto Mono",Menlo,Consolas,monospace;
+    --serif:"IBM Plex Serif",Georgia,"Songti SC","Noto Serif SC",serif;
   }
+  h1{font-family:var(--serif);font-weight:400;letter-spacing:-.02em}
   *{box-sizing:border-box}
   html,body{margin:0}
   body{
