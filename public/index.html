@@ -372,6 +372,7 @@ function applySettings(s) {
 
 /* ---------- 图表渲染 ---------- */
 function renderVerdict(item) {
+  if (item._pxRaf) { cancelAnimationFrame(item._pxRaf); item._pxRaf = null; }
   const v = verdictOf(item.cfg, VMSGS);
   const el = item.verdictEl;
   el.className = "verdict " + v.cls;
@@ -384,6 +385,23 @@ function renderVerdict(item) {
   lbl.textContent = v.text;
   el.appendChild(px);
   el.appendChild(lbl);
+}
+// 入场动画：现价数字从 0 计数到目标，与钟摆 swingIn 同步入场（呼应 motion.dev number-trend）
+function animatePriceIn(item) {
+  const px = item.verdictEl.querySelector(".px");
+  const to = item.cfg.price;
+  if (!px || !(to > 0)) return;
+  if (REDUCE) { px.textContent = VMSGS.px(to); return; }
+  const dur = 1300, t0 = performance.now();
+  const ease = (x) => 1 - Math.pow(1 - x, 3); // easeOutCubic：快出慢收，呼应指针入场
+  px.textContent = VMSGS.px(0);
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur);
+    px.textContent = VMSGS.px(to * ease(k));
+    if (k < 1) item._pxRaf = requestAnimationFrame(step);
+    else { px.textContent = VMSGS.px(to); item._pxRaf = null; }
+  };
+  item._pxRaf = requestAnimationFrame(step);
 }
 function addChart(cfg) {
   const wrap = document.createElement("div");
@@ -447,6 +465,7 @@ async function fetchQuotes() {
       item.gauge.set(item.cfg, !first);
       if (first) item.gauge.swingIn();
       renderVerdict(item);
+      if (first) animatePriceIn(item);
     }
   });
   if (ok > 0) {
