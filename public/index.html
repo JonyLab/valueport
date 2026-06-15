@@ -397,7 +397,8 @@ async function fetchQuotes() {
   if (ok > 0) {
     const now = new Date();
     const p2 = (n) => String(n).padStart(2, "0");
-    updatedEl.textContent = t("b_updated", `${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`);
+    const src = data.source === "longbridge" ? t("src_longbridge") : t("src_tencent");
+    updatedEl.textContent = t("b_updated", `${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`, src);
   }
 }
 
