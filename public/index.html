@@ -25,10 +25,7 @@
     display:flex;flex-direction:column;
     border-left:1px solid var(--divider);border-right:1px solid var(--divider)}
   .page-head{position:relative;margin:0;padding:30px 28px 22px;border-bottom:1px solid var(--divider)}
-  /* 交叉点「+」registration mark：标题标尺线 ∩ 两侧框线 */
-  .page-head::before,.page-head::after{content:"";position:absolute;bottom:-3.5px;width:6px;height:6px;
-    background:#fff;border:1px solid var(--node);transform:rotate(45deg);z-index:2}
-  .page-head::before{left:-3.5px} .page-head::after{right:-3.5px}
+  /* 标题段底线（与隔断带共同围出 14px 账本带）——本线不放菱形，节点交给结构边界（顶栏线/页脚线），呼应 zed 的 divider-slash 不带节点 */
   /* 斜线填充底栏：填满中央栏剩余高度，呼应 zed 方格纸 */
   /* margin-top:-1px 让本元素的上边线压在上方元素的下边线上，合成单根 1px（避免双线变粗） */
   .frame-foot{flex:1 0 auto;min-height:120px;position:relative;margin-top:-1px;border-top:1px solid var(--divider);
@@ -40,9 +37,6 @@
      中间填一层很淡的 45° 斜线网（比页脚 --hatch 更密更淡，对应 zed 的 offgray-200 ~20%） */
   .section-divider{position:relative;height:14px;border-bottom:1px solid var(--divider);
     background-image:repeating-linear-gradient(45deg,rgba(120,128,142,.16) 0,rgba(120,128,142,.16) 1px,transparent 1px,transparent 6px)}
-  .section-divider::before,.section-divider::after{content:"";position:absolute;bottom:-3.5px;width:6px;height:6px;
-    background:#fff;border:1px solid var(--node);transform:rotate(45deg);z-index:2}
-  .section-divider::before{left:-3.5px} .section-divider::after{right:-3.5px}
   .board-bar{display:flex;align-items:flex-end;gap:8px;min-height:24px}
   .updated{font-family:var(--mono);font-size:12px;color:var(--ink-mute);margin:12px 0 0;flex:1;min-width:0}
   .btn.icon{width:34px;padding:0;justify-content:center;flex:none}
