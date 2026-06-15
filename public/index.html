@@ -21,8 +21,19 @@
   .layout{display:block}
   /* ===== zed.dev 线条系统：有界中央栏（两侧满高竖线）+ 区块横标尺线 + 钟摆方格 ===== */
   .page{max-width:1120px;margin:0 auto;position:relative;min-height:100vh;padding:0;
+    display:flex;flex-direction:column;
     border-left:1px solid var(--divider);border-right:1px solid var(--divider)}
-  .page-head{margin:0;padding:30px 28px 22px;border-bottom:1px solid var(--divider)}
+  .page-head{position:relative;margin:0;padding:30px 28px 22px;border-bottom:1px solid var(--divider)}
+  /* 交叉点菱形角标（蓝图节点）：标题标尺线 ∩ 两侧框线 */
+  .page-head::before,.page-head::after{content:"";position:absolute;bottom:-3.5px;width:6px;height:6px;
+    background:var(--bg);border:1px solid var(--divider);transform:rotate(45deg);z-index:1}
+  .page-head::before{left:-3.5px} .page-head::after{right:-3.5px}
+  /* 斜线填充底栏：填满中央栏剩余高度，呼应 zed 方格纸 */
+  .frame-foot{flex:1 0 auto;min-height:120px;position:relative;border-top:1px solid var(--divider);
+    background-image:repeating-linear-gradient(45deg,var(--divider) 0,var(--divider) 1px,transparent 1px,transparent 9px)}
+  .frame-foot::before,.frame-foot::after{content:"";position:absolute;top:-3.5px;width:6px;height:6px;
+    background:var(--bg);border:1px solid var(--divider);transform:rotate(45deg)}
+  .frame-foot::before{left:-3.5px} .frame-foot::after{right:-3.5px}
   .board-bar{display:flex;align-items:flex-end;gap:8px;min-height:24px}
   .updated{font-family:var(--mono);font-size:12px;color:var(--ink-mute);margin:12px 0 0;flex:1;min-width:0}
   .btn.icon{width:34px;padding:0;justify-content:center;flex:none}
@@ -237,6 +248,7 @@
       <button class="btn" id="btnLogout" style="width:100%;justify-content:center" data-i18n="set_logout">退出登录</button>
     </div>
   </div>
+  <div class="frame-foot" aria-hidden="true"></div>
 </div>
 
 <!-- 分享 / 看板设置弹窗（主人模式，Watchlist 右上角分享图标打开） -->
