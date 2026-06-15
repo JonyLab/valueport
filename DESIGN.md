@@ -8,7 +8,7 @@
 
 ## 0. 一句话
 
-暖纸面 · 冷灰发丝线 · 套印「+」节点 · 硬边偏移投影 · 斜线/网点/方格纸三档底纹 · 系统无衬线 + 等宽 + Plex 衬线。整体克制：小圆角、发丝线、紧字距。
+暖纸面 · 冷灰发丝线 · 套印菱形节点 · 硬边偏移投影 · 斜线/网点/方格纸三档底纹 · 系统无衬线 + 等宽 + Plex 衬线。整体克制：小圆角、发丝线、紧字距。
 
 ---
 
@@ -31,7 +31,7 @@ zed 用 `color-mix` 从两个基色生成两套色阶：**cream（暖，做背�
 | `--card` | `#faf9f4` | 略亮面板 |
 | `--ink` / `--ink-soft` / `--ink-mute` | `#1b1a17` / `#57534a` / `#8a857a` | 文字三档 |
 | `--border` / `--divider` | `#dadde2` | **冷灰描边 / 发丝线**（对齐 zed） |
-| `--node` | `#c3c7ce` | 「+」节点（比线略深的冷灰） |
+| `--node` | `#c3c7ce` | 菱形节点（比线略深的冷灰） |
 | `--track` / `--track-edge` / `--accent` | `#ece8de` / `#e0dccf` / `#ece8de` | **暖色填充**（hover、分段底、色带）——保持暖 |
 | `--ring` / `--ring-border` | `rgba(46,64,102,.22)` / `#5a6886` | 聚焦环（克制蓝灰） |
 | `--green` / `--red` | `#1f8f54` / `#c64141` | 语义色 |
@@ -77,16 +77,16 @@ zed 不用柔和 drop shadow，而是 **硬边、零模糊、双对角、半透�
 
 - **实线 = 结构**（框线、栏轨、分隔线）；**虚线 = 软注解**（内缩高亮盒，少量，如估值页的「建议」条、注册页激活码提示）。
 - zed 真实令牌：`--node-vertical-offset: 3.5px`、`--node-horizontal-offset`（随断点 `4.5 → 45.5px`）。
-- 交叉点用 **「+」registration cross**（套印十字标）标在栏轨与横线相交处。
+- 交叉点用 **菱形 registration mark**（zed 的 `size-1.5 rotate-45 border-offgray-100 bg-white`）标在栏轨与横线相交处。
 
-本项目的节点用 CSS 渐变实现，9px 臂、1px、`--node` 色：
+本项目的节点 = **6px 旋转方块**：白填充、1px `--node` 冷灰描边，`transform:rotate(45deg)`：
 
 ```css
---xn: linear-gradient(var(--node),var(--node)) center/1px 100% no-repeat,
-      linear-gradient(var(--node),var(--node)) center/100% 1px no-repeat;
+.X::before,.X::after{content:"";position:absolute;width:6px;height:6px;
+  background:#fff;border:1px solid var(--node);transform:rotate(45deg);z-index:2}
 ```
 
-对 9px 方盒，居中在 1px 线交叉点上的偏移量为 **`-5px`**（页眉 `bottom:-5px`、页脚 `top:-5px`、左右 `±-5px`）。
+对 6px 方盒（border-box），居中在 1px 线交叉点上的偏移量为 **`-3.5px`**（页眉 `bottom:-3.5px`、页脚/估值列 `top:-3.5px`、左右 `±-3.5px`）——对应 zed 的 `--node-vertical-offset:3.5px`。
 相邻两条 1px 边线相撞会变粗 → 用 `margin-top:-1px` 让其压成单根（见 `.frame-foot`）。
 
 ---
@@ -136,7 +136,7 @@ zed 不用柔和 drop shadow，而是 **硬边、零模糊、双对角、半透�
 - **中**：菜单 tabs（`Watchlist` / `宏观看板`），选中态为底部 **2px 墨色下划线**，压在顶栏标尺线上
 - **右**：`⚙ 设置`（齿轮图标，激活态高亮）· `🌐 语言`（地球 + 可切到的语言码）
 
-底部一条发丝线 + 两端「+」节点。**语言切换全员可见**（含访客）；**设置/分享仅主人可见**。
+底部一条发丝线 + 两端菱形节点。**语言切换全员可见**（含访客）；**设置/分享仅主人可见**。
 
 ## 9. 视图与标题作用域
 
@@ -184,25 +184,25 @@ relative h-3.5 w-full
 - 两侧 **留白栏 `flex-1 border-x`** 弹性吸收多余视口宽度，把内容挤到居中；其**内侧边框就是竖向栏轨**。
 - 桌面才显示（`hidden lg:block`），移动端塌成单列贴边。
 - 内容栏 `~1100px`，正文再收到 `max-w-[580px]` 一类。
-- `outer-section-node-offset` 按断点设 `--node-horizontal-offset`（`4.5 → 45.5px`），决定「+」节点离栏轨多远。
+- `outer-section-node-offset` 按断点设 `--node-horizontal-offset`（`4.5 → 45.5px`），决定菱形节点离栏轨多远。
 
 ### 层级样式分工（结构层平、内容层才有阴影）
 
 | 层 | 元素 | 样式 | 职责 |
 |---|---|---|---|
 | **L0 页壳** | `max-w` 容器 + 噪点叠层 | 居中、满幅出血横线、~3.5% noise | 定边界 |
-| **L1 段（结构）** | `section flex + gutter border-x + 节点` | **只有线 + 「+」节点**，`min-h`，**无阴影无圆角** | 搭网格骨架 |
+| **L1 段（结构）** | `section flex + gutter border-x + 节点` | **只有线 + 菱形节点**，`min-h`，**无阴影无圆角** | 搭网格骨架 |
 | **L2 内容卡（内容）** | feature card | `rounded-xs/sm` + `border #dadde2` + **偏移蓝投影** + 渐变/网点/方格/斜线底纹 | 把内容「抬」离骨架 |
 | **L3 原子** | 按钮(三档+kbd)、虚线高亮、徽章、等宽标签 | 4px 圆角、键帽内阴影、`dashed` 注解 | 交互/标注 |
 
 三条铁律：
-1. **「+」节点只在 L1**（栏轨上、线交叉处），不进卡片。
+1. **菱形节点只在 L1**（栏轨上、线交叉处），不进卡片。
 2. **偏移投影只在 L2 卡片**，结构层（段/栏轨）永远纯线、零阴影。
 3. **底纹按角色分**：空带=斜线、内容卡=网点、大面板=方格纸、正文=纯净。
 
 ### 我们的简化
 
-本项目把 zed 的「per-section flex 留白栏」简化成 **整页一个 `.page` 框**（两侧 `border-x` 栏轨 + `page-head`/`frame-foot` 横线 + 「+」节点）——同一套语言的精简版，单看板页够用。
+本项目把 zed 的「per-section flex 留白栏」简化成 **整页一个 `.page` 框**（两侧 `border-x` 栏轨 + `page-head`/`frame-foot` 横线 + 菱形节点）——同一套语言的精简版，单看板页够用。
 
 Watchlist 页内部已按区段模型分成 **标题段 / 看板段**：两者之间插一条 **14px 标尺隔断带**（`.section-divider`）——`page-head` 的底线+节点作上线，隔断带自带下线+节点，中间 14px 空带，复刻 zed 的 section divider。隔断带随看板段一起在设置视图隐藏。
 

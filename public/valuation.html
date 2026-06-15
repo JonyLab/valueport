@@ -17,8 +17,9 @@
   /* zed.dev 线条：框线内容列 + 交叉点「+」registration mark */
   .article{max-width:760px;margin:0 auto;position:relative;padding:30px 30px 0;
     border-left:1px solid var(--divider);border-right:1px solid var(--divider)}
-  .article::before,.article::after{content:"";position:absolute;top:-5px;width:9px;height:9px;background:var(--xn)}
-  .article::before{left:-5px} .article::after{right:-5px}
+  .article::before,.article::after{content:"";position:absolute;top:-3.5px;width:6px;height:6px;
+    background:#fff;border:1px solid var(--node);transform:rotate(45deg)}
+  .article::before{left:-3.5px} .article::after{right:-3.5px}
   .article h2{font-size:18px;margin:36px 0 10px;letter-spacing:-.01em}
   .article h3{font-size:15px;margin:22px 0 6px}
   .article p{font-size:14.5px;line-height:1.85;color:var(--ink-soft);margin:8px 0}
@@ -36,8 +37,9 @@
   /* 斜纹填充底栏（横贯框线，顶角加「+」节点） */
   .frame-foot{position:relative;min-height:130px;margin:36px -30px 0;border-top:1px solid var(--divider);
     background-image:var(--hatch)}
-  .frame-foot::before,.frame-foot::after{content:"";position:absolute;top:-5px;width:9px;height:9px;background:var(--xn)}
-  .frame-foot::before{left:-5px} .frame-foot::after{right:-5px}
+  .frame-foot::before,.frame-foot::after{content:"";position:absolute;top:-3.5px;width:6px;height:6px;
+    background:#fff;border:1px solid var(--node);transform:rotate(45deg)}
+  .frame-foot::before{left:-3.5px} .frame-foot::after{right:-3.5px}
   .back{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink-soft);
     text-decoration:none;margin-bottom:18px}
   .back:hover{color:var(--ink)}

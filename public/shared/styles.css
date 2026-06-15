@@ -20,10 +20,8 @@
     /* 聚焦环（克制蓝灰，全站统一） */
     --ring:rgba(46,64,102,.22);
     --ring-border:#5a6886;
-    /* zed.dev 节点：交叉点上的「+」registration mark（冷灰，比发丝线略深，9px 臂、1px） */
+    /* zed.dev 节点：交叉点上的菱形 registration mark（6px 旋转方块、白填充、--node 冷灰描边，对应 zed size-1.5 rotate-45 border-offgray-100 bg-white） */
     --node:#c3c7ce;
-    --xn:linear-gradient(var(--node),var(--node)) center/1px 100% no-repeat,
-         linear-gradient(var(--node),var(--node)) center/100% 1px no-repeat;
     /* zed.dev 网点 / 网格 底纹 */
     --dots:radial-gradient(var(--divider) .75px,transparent .75px);
     --grid:linear-gradient(var(--divider) 1px,transparent 1px),
