@@ -99,22 +99,32 @@ export class Gauge {
     this.anchors = computeAnchors(cfg);
     // 区间未填完时锚点为 NaN：刻度留空而不是显示 "NaN"
     this.nums.forEach((t, k) => { const v = this.anchors[k + 1]; t.textContent = isFinite(v) ? Math.round(v) : ""; });
-    // 第一行名称、第二行代码；无名称时名称行直接显示代码、隐藏第二行
-    const code = (cfg.ticker || "—").toUpperCase();
-    const name = (cfg.name || "").trim();
-    if (name) {
-      this.hubName.textContent = name.length > 9 ? name.slice(0, 8) + "…" : name;
-      this.hubName.style.fontSize = name.length > 6 ? "15px" : "18px";
-      this.hubCode.textContent = code;
-    } else {
-      this.hubName.textContent = code;
-      this.hubName.style.fontSize = code.length > 6 ? "15px" : "20px";
-      this.hubCode.textContent = "";
-    }
+    // 第一行名称、第二行代码；名称可被 setName() 覆盖（双语切换），否则用 cfg.name
+    this._code = (cfg.ticker || "—").toUpperCase();
+    this._renderHub(this.displayName != null ? this.displayName : (cfg.name || ""));
     this.hasPrice = cfg.price > 0;
     this.target = this.hasPrice ? priceToPhi(this.anchors, cfg.price) : 90;
     if (!animate || REDUCE) { this.current = this.target; this.paint(this.current); return; }
     if (!this.raf && !this.swinging) this.follow();
+  }
+  // 覆盖中枢名称（双语切换用）；持久保存，后续 set() 仍沿用
+  setName(name) { this.displayName = name; this._renderHub(name); }
+  // 中枢两行：名称行按长度自适应字号/截断（中文短、英文长），代码行用 ticker
+  _renderHub(name) {
+    name = (name || "").trim();
+    const code = this._code || "—";
+    if (!name) {
+      this.hubName.textContent = code;
+      this.hubName.style.fontSize = code.length > 6 ? "15px" : "20px";
+      this.hubCode.textContent = "";
+      return;
+    }
+    const len = name.length;
+    const fs = len <= 6 ? 18 : len <= 9 ? 15 : len <= 13 ? 13 : 12;
+    const cap = len <= 6 ? 6 : len <= 9 ? 9 : len <= 13 ? 13 : 16;
+    this.hubName.textContent = len > cap ? name.slice(0, cap - 1) + "…" : name;
+    this.hubName.style.fontSize = fs + "px";
+    this.hubCode.textContent = code;
   }
   follow() {
     const step = () => {

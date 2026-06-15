@@ -3,7 +3,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { signToken, verifyToken } from "./auth.js";
 import { validateItem, rowToItem } from "./items.js";
 import { parseTencentQuotes, parseTencentHints } from "./quotes.js";
-import { fetchLongbridgeQuotes } from "./longbridge.js";
+import { fetchLongbridgeQuotes, fetchLongbridgeNames } from "./longbridge.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
@@ -58,6 +58,18 @@ app.get("/api/quotes", async (c) => {
   c.header("Cache-Control", "no-store"); // 实时行情不缓存
   if (!Object.keys(quotes).length) return c.json({ quotes: {}, error: "upstream unreachable", ts: new Date().toISOString() }, 502);
   return c.json({ quotes, source, ts: new Date().toISOString() });
+});
+// 标的中英文名（用于切语言时显示对应名）。仅长桥提供，缺则返回空、前端回退已存名。
+app.get("/api/names", async (c) => {
+  const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim()).filter((s) => s && s.length <= 16).slice(0, 50);
+  if (!symbols.length) return c.json({ names: {} });
+  let names = {};
+  if (c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN) {
+    try { names = await fetchLongbridgeNames(c.env, symbols); }
+    catch (e) { console.error("longbridge names failed:", e && e.message); names = {}; }
+  }
+  c.header("Cache-Control", "public, max-age=86400"); // 名称基本不变，可缓存一天
+  return c.json({ names });
 });
 app.get("/api/hints", async (c) => {
   const q = c.req.query("q") || "";

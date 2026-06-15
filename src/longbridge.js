@@ -84,6 +84,23 @@ function parseQuotes(body) { // SecurityQuoteResponse{repeated SecurityQuote sec
   }
   return out;
 }
+function parseStaticInfo(body) { // SecurityStaticInfoResponse{repeated secu_static_info=1}; StaticInfo{symbol=1,name_cn=2,name_en=3,name_hk=4}
+  const dec = new TextDecoder();
+  const out = [];
+  for (const [f, wt, val] of pbFields(body)) {
+    if (f === 1 && wt === 2) {
+      let sym = null, cn = "", en = "", hk = "";
+      for (const [ff, ww, vv] of pbFields(val)) {
+        if (ff === 1 && ww === 2) sym = dec.decode(vv);
+        else if (ff === 2 && ww === 2) cn = dec.decode(vv);
+        else if (ff === 3 && ww === 2) en = dec.decode(vv);
+        else if (ff === 4 && ww === 2) hk = dec.decode(vv);
+      }
+      if (sym) out.push({ sym, cn, en, hk });
+    }
+  }
+  return out;
+}
 
 /* ---------- v1 帧 ---------- */
 let REQ = 0;
@@ -174,6 +191,50 @@ export async function fetchLongbridgeQuotes(env, tencentSymbols) {
       ws.addEventListener("error", () => fail(new Error("longbridge ws error")));
       ws.addEventListener("close", () => fail(new Error("longbridge ws closed")));
       ws.send(packReq(2, authBody(otp))); // accept() 后连接已建立，直接发鉴权
+    });
+  } finally {
+    try { ws.close(); } catch {}
+  }
+}
+
+/* ---------- 静态信息：取一批腾讯格式符号的中英文名 → {tencentSym: {cn, en}} ---------- */
+export async function fetchLongbridgeNames(env, tencentSymbols) {
+  const lpToTc = new Map();
+  for (const s of tencentSymbols) { const lp = tencentToLongport(s); if (lp) lpToTc.set(lp, s); }
+  const lpSyms = [...lpToTc.keys()];
+  if (!lpSyms.length) return {};
+
+  const otp = await getOtp(env);
+  const resp = await fetch(WS_URL, { headers: { Upgrade: "websocket" } });
+  const ws = resp.webSocket;
+  if (!ws) throw new Error("longbridge ws upgrade failed");
+  ws.accept();
+
+  try {
+    return await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("longbridge timeout")); }, 8000);
+      const done = (v) => { clearTimeout(timer); try { ws.close(); } catch {} resolve(v); };
+      const fail = (e) => { clearTimeout(timer); try { ws.close(); } catch {} reject(e); };
+      ws.addEventListener("message", async (ev) => {
+        try {
+          const fr = await parseFrame(ev.data);
+          if (fr.cmd === 2) {
+            if (fr.status !== 0) return fail(new Error("longbridge auth status " + fr.status));
+            ws.send(packReq(10, multiBody(lpSyms))); // QuerySecurityStaticInfo
+          } else if (fr.cmd === 10) {
+            if (fr.status !== 0) return fail(new Error("longbridge staticinfo status " + fr.status));
+            const out = {};
+            for (const { sym, cn, en, hk } of parseStaticInfo(fr.body)) {
+              const tc = lpToTc.get(sym);
+              if (tc) out[tc] = { cn: cn || "", en: en || hk || "" };
+            }
+            done(out);
+          }
+        } catch (e) { fail(e); }
+      });
+      ws.addEventListener("error", () => fail(new Error("longbridge ws error")));
+      ws.addEventListener("close", () => fail(new Error("longbridge ws closed")));
+      ws.send(packReq(2, authBody(otp)));
     });
   } finally {
     try { ws.close(); } catch {}

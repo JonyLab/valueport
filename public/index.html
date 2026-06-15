@@ -404,6 +404,28 @@ function animatePriceIn(item) {
   };
   item._pxRaf = requestAnimationFrame(step);
 }
+// 当前语言下该显示的标的名：英文用 Longbridge name_en，缺则回退已存名/代码
+function displayName(item) {
+  const c = item.cfg;
+  if (LANG === "en") return item.nameEn || c.name || c.ticker || "";
+  return c.name || item.nameCn || c.ticker || "";
+}
+// 拉取一批标的的中英文名（Longbridge），写回各 item 并刷新中枢名称
+async function loadNames(syms) {
+  syms = [...new Set((syms || []).filter(Boolean))];
+  if (!syms.length) return;
+  try {
+    const res = await fetch("/api/names?symbols=" + encodeURIComponent(syms.join(",")));
+    const { names } = await res.json();
+    if (!names) return;
+    for (const item of items) {
+      const n = names[item.cfg.symbol];
+      if (!n) continue;
+      item.nameCn = n.cn || ""; item.nameEn = n.en || "";
+      item.gauge.setName(displayName(item));
+    }
+  } catch { /* 拿不到就保持已存名 */ }
+}
 function addChart(cfg) {
   const wrap = document.createElement("div");
   wrap.className = "chart-item";
@@ -540,6 +562,7 @@ async function init() {
   rows.forEach((r) => addChart({ ...r, price: 0 }));
   if (owner) initOwner(data.settings || {});
   await fetchQuotes();
+  loadNames(items.map((i) => i.cfg.symbol)); // 双语名（不阻塞首屏）
 }
 
 /* ================= 以下仅主人模式 ================= */
@@ -682,8 +705,9 @@ function buildItemForm(item) {
         item.cfg = { ...item.cfg, ticker: o.code, name: o.name, symbol: o.symbol, price: 0 };
         item.live = false; item.gotQuote = false;
         modalTitle.textContent = modalTitleFor(item);
+        item.nameCn = ""; item.nameEn = ""; // 换标的后旧名作废，重新拉
         if (structValid(item.cfg)) { item.gauge.set(item.cfg); renderVerdict(item); saveItem(item); }
-        close(); markState(); fetchQuotes();
+        close(); markState(); fetchQuotes(); loadNames([item.cfg.symbol]);
       };
       const renderList = (arr) => {
         opts = arr; act = -1; list.innerHTML = "";
