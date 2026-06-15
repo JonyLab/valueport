@@ -10,10 +10,11 @@
   :root{
     --bg:#f4f2ec; --card:#faf9f4;
     --ink:#1b1a17; --ink-soft:#57534a; --ink-mute:#8a857a;
-    --border:#e3dfd3; --accent:#ece8de;
-    --ring:rgba(46,64,102,.26); --ring-border:#2e4066;
-    --divider:#e3dfd3; --track:#ece8de; --track-edge:#e0dccf;
+    --border:#dadde2; --accent:#ece8de;
+    --ring:rgba(46,64,102,.22); --ring-border:#5a6886;
+    --divider:#dadde2; --track:#ece8de; --track-edge:#e0dccf;
     --shadow:0 1px 2px rgba(60,50,25,.05);
+    --sh:4px 4px 0 rgba(46,84,180,.06),-4px -4px 0 rgba(46,84,180,.05);
   }
   h1{font-family:var(--serif);font-weight:400;letter-spacing:-.025em}
   .eyebrow{color:var(--ink-mute)}
@@ -24,21 +25,21 @@
     display:flex;flex-direction:column;
     border-left:1px solid var(--divider);border-right:1px solid var(--divider)}
   .page-head{position:relative;margin:0;padding:30px 28px 22px;border-bottom:1px solid var(--divider)}
-  /* 交叉点菱形角标（蓝图节点）：标题标尺线 ∩ 两侧框线 */
-  .page-head::before,.page-head::after{content:"";position:absolute;bottom:-3.5px;width:6px;height:6px;
-    background:var(--bg);border:1px solid var(--divider);transform:rotate(45deg);z-index:1}
-  .page-head::before{left:-3.5px} .page-head::after{right:-3.5px}
+  /* 交叉点「+」registration mark：标题标尺线 ∩ 两侧框线 */
+  .page-head::before,.page-head::after{content:"";position:absolute;bottom:-5px;width:9px;height:9px;
+    background:var(--xn);z-index:2}
+  .page-head::before{left:-5px} .page-head::after{right:-5px}
   /* 斜线填充底栏：填满中央栏剩余高度，呼应 zed 方格纸 */
-  .frame-foot{flex:1 0 auto;min-height:120px;position:relative;border-top:1px solid var(--divider);
-    background-image:repeating-linear-gradient(45deg,var(--divider) 0,var(--divider) 1px,transparent 1px,transparent 9px)}
-  .frame-foot::before,.frame-foot::after{content:"";position:absolute;top:-3.5px;width:6px;height:6px;
-    background:var(--bg);border:1px solid var(--divider);transform:rotate(45deg)}
-  .frame-foot::before{left:-3.5px} .frame-foot::after{right:-3.5px}
+  /* margin-top:-1px 让本元素的上边线压在上方元素的下边线上，合成单根 1px（避免双线变粗） */
+  .frame-foot{flex:1 0 auto;min-height:120px;position:relative;margin-top:-1px;border-top:1px solid var(--divider);
+    background-image:var(--hatch)}
+  .frame-foot::before,.frame-foot::after{content:"";position:absolute;top:-5px;width:9px;height:9px;
+    background:var(--xn);z-index:2}
+  .frame-foot::before{left:-5px} .frame-foot::after{right:-5px}
   .board-bar{display:flex;align-items:flex-end;gap:8px;min-height:24px}
   .updated{font-family:var(--mono);font-size:12px;color:var(--ink-mute);margin:12px 0 0;flex:1;min-width:0}
   .btn.icon{width:34px;padding:0;justify-content:center;flex:none}
   .btn.icon svg{width:16px;height:16px}
-  .head-actions{position:absolute;top:26px;right:28px;display:flex;gap:8px}
 
   /* 钟摆排成有线分隔的方格：横线分行、竖线分列，外框由 .page 两侧竖线收口 */
   .charts{background:none;border:0;border-radius:0;margin:0;padding:0;max-width:none}
@@ -49,29 +50,44 @@
   }
   @media (max-width:560px){
     .page-head{padding:24px 16px 18px}
-    .head-actions{top:22px;right:16px}
     .chart-item{padding:22px 16px 12px}
   }
 
   /* ===== 按钮 / 表单（shadcn 形态）===== */
-  .btn{height:36px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;
-    border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--ink);
-    font-size:13.5px;font-weight:500;transition:background .15s,border-color .15s,box-shadow .15s}
-  .btn:hover{background:var(--accent)}
-  .btn:active{transform:none}
+  /* 三档按钮：填充 primary / 描边 .btn / 纯文字 .ghost；带边框或背景的都有底缘内阴影（zed 键帽厚度） */
+  .btn{height:36px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;letter-spacing:-.01em;
+    border:1px solid var(--border);border-radius:4px;background:#fff;color:var(--ink);
+    font-size:13.5px;font-weight:500;box-shadow:inset 0 -2px 0 rgba(60,50,25,.05);
+    transition:background .15s,border-color .15s,box-shadow .1s,transform .05s}
+  .btn:hover{background:var(--accent);border-color:var(--track-edge)}
+  .btn:active{transform:translateY(.5px);box-shadow:inset 0 -1px 0 rgba(60,50,25,.05)}
   .btn:focus-visible{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
-  .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
-  .btn.primary:hover{background:#27272a}
-  .btn.danger{color:#dc2626}
-  .btn.danger:hover{background:#fef2f2;border-color:#fecaca}
-  .btn.sm{height:30px;padding:0 10px;font-size:12.5px;border-radius:7px}
+  /* primary = 填充键帽（更深的底缘内阴影） */
+  .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff;
+    box-shadow:inset 0 -2px 0 rgba(0,0,0,.24),0 1px 2px rgba(60,50,25,.12)}
+  .btn.primary:hover{background:#2a2723}
+  .btn.primary:active{box-shadow:inset 0 -1px 0 rgba(0,0,0,.24)}
+  /* ghost = 纯文字（无边框无底色，无键帽），低权重动作 */
+  .btn.ghost{background:none;border-color:transparent;box-shadow:none;color:var(--ink-soft)}
+  .btn.ghost:hover{background:var(--accent);border-color:transparent;color:var(--ink)}
+  .btn.ghost:active{transform:translateY(.5px);box-shadow:none}
+  .btn.danger{color:var(--red)}
+  .btn.danger:hover{background:#fbeaea;border-color:#e6c7c2}
+  .btn.ghost.danger{color:var(--red)} .btn.ghost.danger:hover{background:#fbeaea;border-color:transparent}
+  .btn.sm{height:30px;padding:0 10px;font-size:12.5px;border-radius:4px}
+  /* 快捷键徽章（zed kbd）：方角小键帽，等宽 */
+  .kbd{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;
+    border-radius:2px;font-family:var(--mono);font-size:10.5px;font-weight:700;line-height:1}
+  .btn:not(.primary) .kbd{background:var(--card);border:1px solid var(--border);color:var(--ink-mute)}
+  .btn.primary .kbd{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.26);color:#fff}
+  .btn:has(.kbd){padding-right:6px}
 
   .field{display:flex;flex-direction:column;gap:6px}
   .f-lab{font-size:12.5px;font-weight:500;color:#3f3f46}
   .field input,.field textarea{
     height:36px;font-size:14px;font-weight:500;color:var(--ink);font-family:var(--mono);
     font-variant-numeric:tabular-nums;
-    border:1px solid var(--border);border-radius:8px;padding:0 12px;width:100%;
+    border:1px solid var(--border);border-radius:5px;padding:0 12px;width:100%;
     background:#fff;outline:none;box-shadow:0 1px 2px rgba(0,0,0,.03);
     transition:border-color .15s,box-shadow .15s}
   .field textarea{height:auto;min-height:76px;padding:8px 12px;resize:vertical;line-height:1.55;font-family:var(--font);font-size:13.5px}
@@ -91,7 +107,7 @@
 
   .chips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
   .chip{appearance:none;font-family:var(--font);font-size:12px;font-weight:500;padding:4px 10px;
-    border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--ink-soft);cursor:pointer;
+    border-radius:4px;border:1px solid var(--border);background:#fff;color:var(--ink-soft);cursor:pointer;
     transition:background .12s,color .12s,border-color .12s}
   .chip:hover{background:var(--accent)}
   .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
@@ -100,10 +116,10 @@
   /* 联想下拉 */
   .combo{position:relative}
   .combo-list{position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:230px;
-    background:#fff;border:1px solid var(--border);border-radius:10px;
-    box-shadow:0 4px 16px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);z-index:30;
+    background:#fff;border:1px solid var(--border);border-radius:6px;
+    box-shadow:0 4px 16px rgba(60,50,25,.10),0 1px 2px rgba(60,50,25,.06);z-index:30;
     max-height:236px;overflow:auto;padding:4px}
-  .combo-opt{display:flex;gap:8px;align-items:baseline;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px}
+  .combo-opt{display:flex;gap:8px;align-items:baseline;padding:8px 10px;border-radius:4px;cursor:pointer;font-size:13px}
   .combo-opt:hover,.combo-opt.act{background:var(--accent)}
   .combo-opt .c-code{font-family:var(--mono);font-weight:700}
   .combo-opt .c-name{color:var(--ink-soft);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -120,44 +136,50 @@
   /* ===== 弹窗（shadcn Dialog）===== */
   .overlay{position:fixed;inset:0;background:rgba(9,9,11,.45);z-index:90;display:flex}
   .overlay.hidden{display:none}
+  /* zed.dev：方角卡 + 实线分隔的「头/体/脚」三段 */
   .modal{margin:auto;width:min(440px,calc(100vw - 32px));background:#fff;border:1px solid var(--border);
-    border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.18);padding:18px 18px 14px;max-height:88vh;overflow:auto}
-  .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    border-radius:8px;box-shadow:var(--sh),0 10px 34px rgba(20,22,35,.16);padding:0 18px 0;max-height:88vh;overflow:auto}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;
+    margin:0 -18px 16px;padding:15px 18px 13px;border-bottom:1px solid var(--divider)}
   .modal-title{font-size:15px;font-weight:600;font-family:var(--mono)}
   .modal-err{font-size:12px;color:var(--red);margin-top:10px;display:none}
-  .modal-foot{display:flex;justify-content:space-between;align-items:center;margin-top:16px}
+  .modal-foot{display:flex;justify-content:space-between;align-items:center;
+    margin:16px -18px 0;padding:13px 18px 14px;border-top:1px solid var(--divider)}
 
-  /* ===== 导航（主人模式：桌面顶部 tabs / 移动端底部 tab 栏）===== */
-  .app-nav{position:absolute;top:24px;right:28px;display:flex;gap:2px;background:var(--accent);
-    border-radius:10px;padding:3px;z-index:50}
-  .nav-tab{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border:0;
-    background:transparent;border-radius:7px;cursor:pointer;font-family:var(--font);
-    font-size:13px;font-weight:500;color:var(--ink-mute);
-    transition:background .15s,color .15s,box-shadow .15s}
+  /* ===== 顶部导航条（zed top nav：左 tabs 下划线 / 右 图标动作；底部标尺线 + 「+」节点）===== */
+  /* 三栏：品牌左 / 菜单导航居中 / 动作图标右（grid 显式列，隐藏 tabs 时布局仍稳） */
+  .topnav{position:relative;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+    height:52px;padding:0 28px;border-bottom:1px solid var(--divider)}
+  .topnav::before,.topnav::after{content:"";position:absolute;bottom:-5px;width:9px;height:9px;background:var(--xn);z-index:2}
+  .topnav::before{left:-5px} .topnav::after{right:-5px}
+  /* 产品名（顶部左侧，加粗字号） */
+  .brand{grid-column:1;justify-self:start;display:inline-flex;align-items:center;font-family:var(--serif);
+    font-style:italic;font-weight:700;font-size:19px;letter-spacing:0;color:var(--ink);text-decoration:none}
+  .brand:hover{color:var(--ink)}
+  .topnav-tabs{grid-column:2;justify-self:center;align-self:stretch;display:flex;gap:2px}
+  .topnav-actions{grid-column:3;justify-self:end;display:flex;align-items:center;gap:6px}
+  .nav-tab{display:inline-flex;align-items:center;gap:6px;padding:0 14px;border:0;background:none;cursor:pointer;
+    font-family:var(--font);font-size:13.5px;font-weight:500;color:var(--ink-mute);letter-spacing:-.01em;
+    border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s}
   .nav-tab svg{width:15px;height:15px;flex:none}
   .nav-tab:hover{color:var(--ink)}
-  .nav-tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.03)}
-  .nav-tab:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+  .nav-tab.on{color:var(--ink);border-bottom-color:var(--ink)}
+  .nav-tab:focus-visible{outline:none;color:var(--ink);box-shadow:inset 0 -2px 0 var(--ring-border)}
   .nav-tab:disabled{opacity:.45;cursor:not-allowed}
-  .nav-tab:disabled:hover{color:var(--ink-mute);background:transparent}
+  .nav-tab:disabled:hover{color:var(--ink-mute)}
+  /* 语言图标按钮：地球 + 当前可切到的语言码 */
+  #btnLang .lang-code{font-size:12px;font-weight:600;letter-spacing:.02em}
+  /* 图标按钮的「当前激活」态（如设置面板打开时齿轮高亮） */
+  .btn.icon.on{background:var(--accent);color:var(--ink)}
   @media (max-width:560px){
-    .app-nav{position:fixed;top:auto;bottom:0;left:0;right:0;border-radius:0;background:#fff;
-      border-top:1px solid var(--border);padding:6px 8px calc(6px + env(safe-area-inset-bottom));
-      gap:4px;box-shadow:0 -2px 12px rgba(0,0,0,.05)}
-    .nav-tab{flex:1;flex-direction:column;gap:3px;height:auto;padding:5px 0 3px;font-size:11px}
-    .nav-tab svg{width:20px;height:20px}
-    .nav-tab.on{background:var(--accent);box-shadow:none}
-    body.has-nav{padding-bottom:88px}
+    .topnav{padding:0 14px;height:48px}
+    .nav-tab{padding:0 9px;font-size:12.5px}
+    .nav-tab svg{width:16px;height:16px}
   }
 
   /* ===== 设置视图 ===== */
   .view-settings{max-width:640px;margin:0 auto;padding-top:4px}
-  .lang-seg{display:inline-flex;gap:2px;background:var(--accent);border-radius:10px;padding:3px}
-  .lang-opt{height:32px;padding:0 16px;border:0;background:transparent;border-radius:7px;cursor:pointer;
-    font-family:var(--font);font-size:13px;font-weight:500;color:var(--ink-mute);transition:background .15s,color .15s,box-shadow .15s}
-  .lang-opt:hover{color:var(--ink)}
-  .lang-opt.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.03)}
-  .lang-opt:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+  .set-title{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.01em;margin:8px 0 18px}
   .cfg-block{padding:16px 0 14px;border-bottom:1px solid var(--border)}
   .cfg-block:last-of-type{border-bottom:0}
   .cfg-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -185,48 +207,49 @@
 </head>
 <body>
 <div class="page">
+  <!-- 顶部导航条：左 tabs（主人模式）/ 右 图标动作（语言全员可见、分享主人可见） -->
+  <header class="topnav">
+    <a class="brand" href="/" id="brand">ValuePort</a>
+    <nav class="topnav-tabs hidden" id="appNav" aria-label="导航">
+      <button class="nav-tab on" data-view="board">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        <span data-i18n="nav_watchlist">Watchlist</span>
+      </button>
+      <button class="nav-tab" data-view="macro" disabled data-i18n-title="nav_macro_soon" title="即将上线" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span data-i18n="nav_macro">宏观看板</span>
+      </button>
+    </nav>
+    <div class="topnav-actions" id="topActions">
+      <button class="btn icon ghost hidden" id="btnSettings" data-i18n-title="nav_settings" title="设置" aria-label="设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+      </button>
+      <button class="btn sm ghost" id="btnLang" aria-label="切换语言 / Switch language" title="切换语言 / Switch language">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span class="lang-code" id="langCode"></span>
+      </button>
+    </div>
+  </header>
+
   <div class="page-head">
     <p class="eyebrow" id="eyebrow" data-i18n="def_eyebrow">市场情绪 · Valuation Pendulum</p>
     <h1 id="title" data-i18n="def_title">估值钟摆看板</h1>
     <p class="sub" id="sub" data-i18n="def_sub">每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。</p>
     <div class="board-bar">
       <p class="updated" id="updated" aria-live="polite"></p>
-      <button class="btn icon hidden" id="btnShare" aria-label="分享 / 看板设置" data-i18n-title="s_share" title="分享 / 看板设置">
+      <button class="btn icon ghost hidden" id="btnShare" aria-label="分享 / 看板设置" data-i18n-title="s_share" title="分享列表 / 看板设置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
       </button>
     </div>
-    <div class="head-actions" id="headActions"></div>
   </div>
-
-  <!-- 导航（主人模式可见）：桌面顶部 / 移动端底部 -->
-  <nav class="app-nav hidden" id="appNav" aria-label="导航">
-    <button class="nav-tab on" data-view="board">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
-      <span data-i18n="nav_watchlist">Watchlist</span>
-    </button>
-    <button class="nav-tab" data-view="macro" disabled data-i18n-title="nav_macro_soon" title="即将上线" aria-disabled="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-      <span data-i18n="nav_macro">宏观看板</span>
-    </button>
-    <button class="nav-tab" data-view="settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
-      <span data-i18n="nav_settings">设置</span>
-    </button>
-  </nav>
 
   <div class="layout">
     <div class="charts" id="charts"></div>
   </div>
 
-  <!-- 设置视图（主人模式，由导航切换） -->
+  <!-- 设置视图（主人模式，由顶部齿轮图标切换） -->
   <div class="view-settings hidden" id="viewSettings">
-    <div class="cfg-block">
-      <div class="cfg-top"><span class="cfg-name" data-i18n="set_language">语言 Language</span></div>
-      <div class="lang-seg" id="langSeg" role="tablist" aria-label="Language">
-        <button class="lang-opt" data-lang="zh">中文</button>
-        <button class="lang-opt" data-lang="en">English</button>
-      </div>
-    </div>
+    <h1 class="set-title" data-i18n="nav_settings">设置</h1>
     <div class="cfg-block">
       <div class="cfg-top"><span class="cfg-name" data-i18n="set_text">页面文案</span><span class="save-state" id="setSave"></span></div>
       <div class="cfg-grid">
@@ -286,10 +309,10 @@
     </div>
     <div id="modalForm"></div>
     <div class="modal-foot">
-      <button class="btn danger" id="btnModalRemove" data-i18n="m_remove">移除</button>
+      <button class="btn ghost danger" id="btnModalRemove" data-i18n="m_remove">移除</button>
       <div style="display:flex;gap:8px;margin-left:auto">
-        <button class="btn" id="btnModalCancel" data-i18n="m_cancel">取消</button>
-        <button class="btn primary" id="btnModalDone" data-i18n="m_done">完成</button>
+        <button class="btn ghost" id="btnModalCancel"><span data-i18n="m_cancel">取消</span><kbd class="kbd">esc</kbd></button>
+        <button class="btn primary" id="btnModalDone"><span data-i18n="m_done">完成</span><kbd class="kbd">↵</kbd></button>
       </div>
     </div>
   </div>
@@ -300,18 +323,17 @@
 import { Gauge } from "/shared/gauge.js";
 import { verdictOf, structValid, applyZoneColors, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
 import { MKT_LABEL } from "/shared/market.js";
-import { t, applyI18n, setLang, LANG } from "/shared/i18n.js";
+import { t, applyI18n, toggleLang, langButtonLabel, LANG } from "/shared/i18n.js";
 
 applyI18n(); // 静态文案先按当前语言渲染
 const VMSGS = {
   px: (p) => t("v_px", typeof p === "number" ? p.toFixed(2) : p), pxNone: t("v_px_none"), noSymbol: t("v_no_symbol"),
   waiting: t("v_waiting"), under: (pct) => t("v_under", pct), over: (pct) => t("v_over", pct), fair: t("v_fair"),
 };
-// 语言切换（设置页内的分段控件）
-document.querySelectorAll(".lang-opt").forEach((b) => {
-  b.classList.toggle("on", b.dataset.lang === LANG);
-  b.addEventListener("click", () => { if (b.dataset.lang !== LANG) setLang(b.dataset.lang); });
-});
+// 语言切换（顶部地球图标按钮，全员可见）：显示「可切到的语言」码
+const btnLang = document.getElementById("btnLang");
+document.getElementById("langCode").textContent = langButtonLabel();
+btnLang.addEventListener("click", toggleLang);
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 const ZONE_KEYS = ZONES.map((z) => z.key);
@@ -367,7 +389,7 @@ function addChart(cfg) {
   const item = { id: cfg.id || null, cfg: { ...cfg }, gauge, chartEl: wrap, verdictEl: verdict, live: false, gotQuote: false };
   if (owner) {
     const edit = document.createElement("button");
-    edit.className = "btn sm card-edit";
+    edit.className = "btn sm ghost card-edit";
     edit.textContent = t("b_edit");
     edit.addEventListener("click", () => openItemModal(item, false));
     wrap.appendChild(edit);
@@ -445,16 +467,16 @@ async function init() {
   const rows = data.items || [];
 
   // 头部入口 / 导航
-  const actions = document.getElementById("headActions");
+  const actions = document.getElementById("topActions");
   if (owner) {
     document.getElementById("appNav").classList.remove("hidden");
     document.getElementById("btnShare").classList.remove("hidden");
-    document.body.classList.add("has-nav");
+    document.getElementById("btnSettings").classList.remove("hidden");
   } else if (me && me.board && me.board.slug) {
     const mine = document.createElement("a");
-    mine.className = "btn"; mine.style.textDecoration = "none";
+    mine.className = "btn sm ghost"; mine.style.textDecoration = "none";
     mine.href = "/b/" + me.board.slug; mine.textContent = t("b_myboard");
-    actions.appendChild(mine);
+    actions.insertBefore(mine, document.getElementById("btnLang"));
   }
 
   // 渲染
@@ -776,16 +798,22 @@ btnModalRemove.addEventListener("click", async () => {
 /* ---------- 导航：Watchlist / 宏观看板(置灰) / 设置 ---------- */
 const layoutEl = document.querySelector(".layout");
 const viewSettings = document.getElementById("viewSettings");
-document.querySelectorAll(".nav-tab").forEach((t) =>
-  t.addEventListener("click", () => {
-    if (t.disabled) return;
-    document.querySelectorAll(".nav-tab").forEach((x) => x.classList.toggle("on", x === t));
-    const v = t.dataset.view;
-    layoutEl.classList.toggle("hidden", v !== "board");
-    updatedEl.classList.toggle("hidden", v !== "board");
-    document.getElementById("btnShare").classList.toggle("hidden", v !== "board");
-    viewSettings.classList.toggle("hidden", v !== "settings");
-  }));
+const pageHeadEl = document.querySelector(".page-head");
+const btnSettings = document.getElementById("btnSettings");
+// 切换视图：标题块（page-head）只属于 Watchlist；设置由右上角齿轮进入
+function setView(v) {
+  document.querySelectorAll(".nav-tab").forEach((x) => x.classList.toggle("on", x.dataset.view === v));
+  btnSettings.classList.toggle("on", v === "settings");
+  const isBoard = v === "board";
+  layoutEl.classList.toggle("hidden", !isBoard);
+  pageHeadEl.classList.toggle("hidden", !isBoard);          // 标题块 + 分享按钮仅 Watchlist 显示（分享在 page-head 内）
+  viewSettings.classList.toggle("hidden", v !== "settings");
+}
+document.querySelectorAll(".nav-tab").forEach((tab) =>
+  tab.addEventListener("click", () => { if (!tab.disabled) setView(tab.dataset.view); }));
+btnSettings.addEventListener("click", () => setView("settings"));
+// 产品名 = 回到 Watchlist（不离开看板）
+document.getElementById("brand").addEventListener("click", (e) => { e.preventDefault(); setView("board"); });
 
 /* ---------- 分享 / 看板设置弹窗 ---------- */
 const shareOverlay = document.getElementById("shareOverlay");
@@ -794,9 +822,18 @@ document.getElementById("btnShareDone").addEventListener("click", () => shareOve
 shareOverlay.addEventListener("click", (e) => { if (e.target === shareOverlay) shareOverlay.classList.add("hidden"); });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape") return;
-  if (!modalOverlay.classList.contains("hidden")) closeItemModal();
-  else if (!shareOverlay.classList.contains("hidden")) shareOverlay.classList.add("hidden");
+  if (e.key === "Escape") {
+    if (!modalOverlay.classList.contains("hidden")) closeItemModal();
+    else if (!shareOverlay.classList.contains("hidden")) shareOverlay.classList.add("hidden");
+    return;
+  }
+  // Enter = 提交编辑弹窗（但代码联想下拉打开时让其自行处理，textarea 内不拦截）
+  if (e.key === "Enter" && !modalOverlay.classList.contains("hidden")) {
+    if (document.querySelector("#modalOverlay .combo-list")) return;
+    if ((e.target.tagName || "").toLowerCase() === "textarea") return;
+    e.preventDefault();
+    trySubmitModal();
+  }
 });
 
 /* ---------- 页面文案（自动保存 + 本页实时生效） ---------- */

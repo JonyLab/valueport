@@ -9,38 +9,40 @@
   :root{
     --bg:#f4f2ec; --card:#faf9f4;
     --ink:#1b1a17; --ink-soft:#57534a; --ink-mute:#8a857a;
-    --border:#e3dfd3; --accent:#ece8de;
-    --divider:#e3dfd3; --shadow:0 1px 2px rgba(60,50,25,.05);
+    --border:#dadde2; --accent:#ece8de;
+    --divider:#dadde2; --shadow:0 1px 2px rgba(60,50,25,.05);
+    --sh:4px 4px 0 rgba(46,84,180,.06),-4px -4px 0 rgba(46,84,180,.05);
   }
   .article h1,.article h2,.article h3{font-family:var(--serif);font-weight:500;letter-spacing:-.01em}
-  /* zed.dev 线条：框线内容列 + 交叉点菱形角标 */
+  /* zed.dev 线条：框线内容列 + 交叉点「+」registration mark */
   .article{max-width:760px;margin:0 auto;position:relative;padding:30px 30px 0;
     border-left:1px solid var(--divider);border-right:1px solid var(--divider)}
-  .article::before,.article::after{content:"";position:absolute;top:-3.5px;width:6px;height:6px;
-    background:var(--bg);border:1px solid var(--divider);transform:rotate(45deg)}
-  .article::before{left:-3.5px} .article::after{right:-3.5px}
+  .article::before,.article::after{content:"";position:absolute;top:-5px;width:9px;height:9px;background:var(--xn)}
+  .article::before{left:-5px} .article::after{right:-5px}
   .article h2{font-size:18px;margin:36px 0 10px;letter-spacing:-.01em}
   .article h3{font-size:15px;margin:22px 0 6px}
   .article p{font-size:14.5px;line-height:1.85;color:var(--ink-soft);margin:8px 0}
   .article p b{color:var(--ink)}
-  .article .formula{font-family:var(--mono);font-size:13px;background:var(--accent);
-    border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:10px 0;color:var(--ink)}
+  /* 内容样本卡：网点底纹 + 实线框（zed：dot-grid behind content tiles） */
+  .article .formula{font-family:var(--mono);font-size:13px;color:var(--ink);
+    background-color:var(--card);background-image:var(--dots);background-size:8px 8px;
+    border:1px solid var(--border);border-radius:3px;padding:11px 14px;margin:10px 0}
   /* 有线对照表：横行标尺 + 竖向列分隔（zed 账本表） */
   .article table{width:100%;border-collapse:collapse;font-size:13.5px;margin:18px 0;border-top:1px solid var(--border)}
   .article th,.article td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);vertical-align:top}
   .article th:last-child,.article td:last-child{border-right:0}
   .article th{font-size:12.5px;color:var(--ink-mute);font-weight:600}
   .article td:first-child{font-weight:600;white-space:nowrap}
-  /* 斜纹填充底栏（横贯框线，顶角加菱形） */
+  /* 斜纹填充底栏（横贯框线，顶角加「+」节点） */
   .frame-foot{position:relative;min-height:130px;margin:36px -30px 0;border-top:1px solid var(--divider);
-    background-image:repeating-linear-gradient(45deg,var(--divider) 0,var(--divider) 1px,transparent 1px,transparent 9px)}
-  .frame-foot::before,.frame-foot::after{content:"";position:absolute;top:-3.5px;width:6px;height:6px;
-    background:var(--bg);border:1px solid var(--divider);transform:rotate(45deg)}
-  .frame-foot::before{left:-3.5px} .frame-foot::after{right:-3.5px}
+    background-image:var(--hatch)}
+  .frame-foot::before,.frame-foot::after{content:"";position:absolute;top:-5px;width:9px;height:9px;background:var(--xn)}
+  .frame-foot::before{left:-5px} .frame-foot::after{right:-5px}
   .back{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink-soft);
     text-decoration:none;margin-bottom:18px}
   .back:hover{color:var(--ink)}
-  .tip{background:var(--accent);border:1px solid var(--border);border-radius:10px;
+  /* 注解条：虚线框（zed：dashed = soft annotation，不承重） */
+  .tip{background:none;border:1px dashed var(--node);border-radius:3px;
     padding:12px 16px;font-size:13.5px;line-height:1.8;color:var(--ink-soft);margin:16px 0}
   .disclaim{font-size:12px;color:var(--ink-mute);margin-top:32px;padding-top:16px;border-top:1px solid var(--border)}
   .hidden{display:none}
