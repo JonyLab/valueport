@@ -146,6 +146,66 @@ zed 不用柔和 drop shadow，而是 **硬边、零模糊、双对角、半透�
 
 ---
 
+## 10. 布局结构（zed 整页拆解）
+
+zed 整页是一套「**全宽标尺带 × 居中内容栏**」的网格系统。
+
+### 纵向：内容段 + 分隔带交替
+
+```
+[ 内容段 section ]      ← min-h-[450px]，flex 行
+[ 分隔带 h-3.5=14px ]   ← 上下各一条满幅 1px 标尺线
+[ 内容段 section ]
+[ 分隔带 ]
+…
+```
+
+分隔带本体（实测）：14px 高空带，用 `before`/`after` 各画一条 1px 线，
+关键是 **`w-[200vw] -left-[100vw]`**——线满幅出血到屏幕两端，而内容仍居中：
+
+```html
+relative h-3.5 w-full
+  before: top-0  -left-[100vw] h-px w-[200vw] default-border-before-color
+  after:  bottom-0 -left-[100vw] h-px w-[200vw] default-border-after-color
+```
+
+> 「全宽横线 + 居中内容」并存的诀窍：横线靠出血脱离容器，内容靠 max-width 居中。
+
+### 横向：留白栏 — 内容栏 — 留白栏
+
+每个 section 是 flex 行：
+
+```
+[ flex-1 gutter ]   [ 内容栏 max-w-[1100px] ]   [ flex-1 gutter ]
+  border-x #dadde2                                border-x #dadde2
+  hidden lg:block                                 hidden lg:block
+```
+
+- 两侧 **留白栏 `flex-1 border-x`** 弹性吸收多余视口宽度，把内容挤到居中；其**内侧边框就是竖向栏轨**。
+- 桌面才显示（`hidden lg:block`），移动端塌成单列贴边。
+- 内容栏 `~1100px`，正文再收到 `max-w-[580px]` 一类。
+- `outer-section-node-offset` 按断点设 `--node-horizontal-offset`（`4.5 → 45.5px`），决定「+」节点离栏轨多远。
+
+### 层级样式分工（结构层平、内容层才有阴影）
+
+| 层 | 元素 | 样式 | 职责 |
+|---|---|---|---|
+| **L0 页壳** | `max-w` 容器 + 噪点叠层 | 居中、满幅出血横线、~3.5% noise | 定边界 |
+| **L1 段（结构）** | `section flex + gutter border-x + 节点` | **只有线 + 「+」节点**，`min-h`，**无阴影无圆角** | 搭网格骨架 |
+| **L2 内容卡（内容）** | feature card | `rounded-xs/sm` + `border #dadde2` + **偏移蓝投影** + 渐变/网点/方格/斜线底纹 | 把内容「抬」离骨架 |
+| **L3 原子** | 按钮(三档+kbd)、虚线高亮、徽章、等宽标签 | 4px 圆角、键帽内阴影、`dashed` 注解 | 交互/标注 |
+
+三条铁律：
+1. **「+」节点只在 L1**（栏轨上、线交叉处），不进卡片。
+2. **偏移投影只在 L2 卡片**，结构层（段/栏轨）永远纯线、零阴影。
+3. **底纹按角色分**：空带=斜线、内容卡=网点、大面板=方格纸、正文=纯净。
+
+### 我们的简化
+
+本项目把 zed 的「per-section flex 留白栏」简化成 **整页一个 `.page` 框**（两侧 `border-x` 栏轨 + `page-head`/`frame-foot` 横线 + 「+」节点）——同一套语言的精简版，单看板页够用。若以后做**多区段落地页**（宏观看板、营销页），应上 zed 完整结构：内容段 + 14px 满幅标尺带 + flex 留白栏。
+
+---
+
 ## 取舍（我们 vs zed）
 
 | 维度 | 决定 |
