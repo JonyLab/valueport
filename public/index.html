@@ -178,6 +178,9 @@
   .modal-err{font-size:12px;color:var(--red);margin-top:10px;display:none}
   .modal-foot{display:flex;justify-content:space-between;align-items:center;
     margin:16px -18px 0;padding:13px 18px 14px;border-top:1px solid var(--divider)}
+  /* 大弹窗（估值编辑器）：更宽，并给内容底部留白，避免按钮贴到弹窗下沿 */
+  .modal-lg{width:min(680px,calc(100vw - 32px))}
+  #valModalBody{padding-bottom:22px}
 
   /* ===== 顶部导航条（zed top nav：左 tabs 下划线 / 右 图标动作；底部标尺线 + 「+」节点）===== */
   /* 三栏：品牌左 / 菜单导航居中 / 动作图标右（grid 显式列，隐藏 tabs 时布局仍稳） */
@@ -453,6 +456,16 @@
         <button class="btn primary" id="btnModalDone"><span data-i18n="m_done">完成</span><kbd class="kbd">↵</kbd></button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 估值编辑器：大弹窗 -->
+<div class="overlay hidden" id="valOverlay">
+  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="valModalTitle">
+    <div class="modal-head">
+      <span class="modal-title" style="font-family:var(--font)" id="valModalTitle">添加估值</span>
+    </div>
+    <div id="valModalBody"></div>
   </div>
 </div>
 
@@ -1300,14 +1313,16 @@ function renderValuationPanel(item, panel, idBlock) {
   }
 
   function showEditor(card) {
-    panel.innerHTML = "";
-    const host = document.createElement("div"); panel.appendChild(host);
-    mountValuationCalc(host, valuationCtx(item), {
+    const body = document.getElementById("valModalBody");
+    document.getElementById("valModalTitle").textContent = card
+      ? (LANG === "zh" ? "编辑估值" : "Edit valuation")
+      : (LANG === "zh" ? "添加估值" : "Add valuation");
+    mountValuationCalc(body, valuationCtx(item), {
       lang: LANG,
       initialMethod: card ? card.method : undefined,
       initialInputs: card ? card.inputs : undefined,
       initialNote: card ? card.note : undefined,
-      onCancel: () => showList(),
+      onCancel: () => closeValModal(),
       onDone: ({ method, inputs, low, high, note }) => {
         if (!Array.isArray(c.valuations)) c.valuations = [];
         if (card) {
@@ -1318,12 +1333,23 @@ function renderValuationPanel(item, panel, idBlock) {
           c.valuations.push(fresh);
           if (!c.selectedValuationId) selectValuation(item, fresh, idBlock); // 首张/无选中时自动设为合理区间
         }
-        saveItem(item); showList();
+        saveItem(item); closeValModal(); showList();
       },
     });
+    document.getElementById("valOverlay").classList.remove("hidden");
+    const first = body.querySelector("input, button");
+    if (first) first.focus();
   }
 
   showList();
+}
+
+// 关闭估值大弹窗并清空内容（取消/完成/背景点击/Esc 共用）
+function closeValModal() {
+  const o = document.getElementById("valOverlay");
+  if (!o || o.classList.contains("hidden")) return;
+  o.classList.add("hidden");
+  document.getElementById("valModalBody").innerHTML = "";
 }
 
 function currentDetailCode() {
@@ -1348,10 +1374,13 @@ const shareOverlay = document.getElementById("shareOverlay");
 document.getElementById("btnShare").addEventListener("click", () => shareOverlay.classList.remove("hidden"));
 document.getElementById("btnShareDone").addEventListener("click", () => shareOverlay.classList.add("hidden"));
 shareOverlay.addEventListener("click", (e) => { if (e.target === shareOverlay) shareOverlay.classList.add("hidden"); });
+const valOverlayEl = document.getElementById("valOverlay");
+valOverlayEl.addEventListener("click", (e) => { if (e.target === valOverlayEl) closeValModal(); });
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (!modalOverlay.classList.contains("hidden")) closeItemModal();
+    if (!valOverlayEl.classList.contains("hidden")) closeValModal();
+    else if (!modalOverlay.classList.contains("hidden")) closeItemModal();
     else if (!shareOverlay.classList.contains("hidden")) shareOverlay.classList.add("hidden");
     return;
   }
