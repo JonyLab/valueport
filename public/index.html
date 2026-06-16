@@ -241,13 +241,10 @@
   .vd-method{display:inline-block;margin-top:16px;font-size:13px;color:var(--ink-soft);text-decoration:underline;text-underline-offset:2px}
   /* ===== 估值计算器（Damodaran）— 账本工作表，圆角统一 8px，颜色只在区间条上说话 ===== */
   .vc-mount{margin-top:24px;padding-top:24px;border-top:1px solid var(--divider)}
-  /* 方法选择：内在/相对 两组安静 chip（非看板那种实心黑胶囊，避免与上方下划线 tab 抢） */
-  .vc-methods{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
-  .vc-mgroup{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
-  .vc-mglabel{font-size:11px;color:var(--ink-mute);letter-spacing:.04em;text-transform:uppercase;width:64px;flex:none}
-  .vc-method{height:28px;padding:0 11px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:12.5px;font-weight:500;color:var(--ink-soft);transition:background .12s,color .12s,border-color .12s}
-  .vc-method:hover{color:var(--ink);border-color:var(--node)}
-  .vc-method.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  /* 方法选择：分组下拉 */
+  .vc-methods{margin-bottom:24px}
+  .vc-select{height:36px;min-width:240px;padding:0 34px 0 12px;border:1px solid var(--border);border-radius:8px;background-color:var(--card);color:var(--ink);font-family:var(--font);font-size:13.5px;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a857a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 11px center}
+  .vc-select:focus{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
   /* 统一工作表：左为标签列，右为 保守/乐观 两列；单列事实只占第一输入列。所有标签、输入框整列对齐。 */
   .vc-form{max-width:600px}
   .vc-sheet{display:grid;grid-template-columns:minmax(0,1fr) 144px 144px;gap:11px 14px;align-items:center}

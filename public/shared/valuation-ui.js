@@ -44,24 +44,25 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const root = el("div", "vc");
   mount.appendChild(root);
 
-  // 方法选择：内在/相对 两组 chip
+  // 方法选择：分组下拉（内在价值 / 相对估值 两个 optgroup）
   const methodsBar = el("div", "vc-methods");
-  root.appendChild(methodsBar);
-  const methodBtns = [];
-  [{ key: "intrinsic", models: MODELS.filter((m) => m.group === "intrinsic") },
-   { key: "relative", models: MODELS.filter((m) => m.group === "relative") }].forEach((g) => {
-    if (!g.models.length) return;
-    const gwrap = el("div", "vc-mgroup");
-    const glabel = el("span", "vc-mglabel"); glabel.textContent = tx(g.key); gwrap.appendChild(glabel);
-    g.models.forEach((model) => {
-      const idx = MODELS.indexOf(model);
-      const btn = el("button", "vc-method"); btn.type = "button";
-      btn.textContent = (model.label && model.label[lang]) || model.key;
-      btn.addEventListener("click", () => { if (activeIdx === idx) return; activeIdx = idx; refreshMethodBtns(); renderForm(); });
-      methodBtns[idx] = btn; gwrap.appendChild(btn);
+  const select = el("select", "vc-select");
+  [["intrinsic", MODELS.filter((m) => m.group === "intrinsic")],
+   ["relative", MODELS.filter((m) => m.group === "relative")]].forEach(([gk, models]) => {
+    if (!models.length) return;
+    const og = document.createElement("optgroup"); og.label = tx(gk);
+    models.forEach((model) => {
+      const o = document.createElement("option");
+      o.value = String(MODELS.indexOf(model));
+      o.textContent = (model.label && model.label[lang]) || model.key;
+      og.appendChild(o);
     });
-    methodsBar.appendChild(gwrap);
+    select.appendChild(og);
   });
+  select.value = String(activeIdx);
+  select.addEventListener("change", () => { activeIdx = Number(select.value); renderForm(); });
+  methodsBar.appendChild(select);
+  root.appendChild(methodsBar);
 
   const formWrap = el("div", "vc-form");
   root.appendChild(formWrap);
@@ -101,8 +102,6 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   result.appendChild(actions);
 
   let lastForm = {};
-
-  function refreshMethodBtns() { methodBtns.forEach((btn, i) => { if (btn) btn.classList.toggle("on", i === activeIdx); }); }
 
   function compute(formData) {
     lastForm = formData;
@@ -192,6 +191,5 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     return inp;
   }
 
-  refreshMethodBtns();
   renderForm();
 }
