@@ -296,6 +296,18 @@
   .vcard-del{margin-left:auto}
   .vcard-add{margin-top:14px;height:34px;padding:0 14px;border:1px dashed var(--node);border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink-soft)}
   .vcard-add:hover{color:var(--ink);border-color:var(--ink)}
+  /* 财报 tab */
+  .fin-controls{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px}
+  .fin-seg{display:flex;gap:4px}
+  .fin-segbtn{height:28px;padding:0 11px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);transition:background .12s,color .12s,border-color .12s}
+  .fin-segbtn:hover{color:var(--ink);border-color:var(--node)}
+  .fin-segbtn.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .fin-table{width:100%;border-collapse:collapse;font-size:13px}
+  .fin-table th{text-align:right;padding:8px 10px;font-weight:500;color:var(--ink-mute);font-size:11.5px;border-bottom:1px solid var(--divider);white-space:nowrap}
+  .fin-table th:first-child{text-align:left}
+  .fin-table td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--border);font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+  .fin-table td.fin-name{text-align:left;font-family:var(--font);color:var(--ink-soft);white-space:normal}
+  .fin-table tr:hover td{background:var(--card)}
   @media (max-width:680px){ .view-detail{padding:24px 16px 0} .vd-top{flex-direction:column;align-items:flex-start} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} .vc-sheet{grid-template-columns:minmax(0,1fr) 1fr 1fr} .vc-mglabel{width:auto} }
   .view-settings{max-width:640px;margin:0 auto;padding-top:4px}
   .set-title{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.01em;margin:8px 0 18px}
@@ -1113,7 +1125,8 @@ function renderDetail(item) {
   const fr = fundamentalsRows(item);
   if (fr.length) fillRows(panelEls[0], fr);
   else { const e = document.createElement("div"); e.className = "vd-empty"; e.textContent = t("d_no_fundamentals"); panelEls[0].appendChild(e); }
-  { const e = document.createElement("div"); e.className = "vd-empty"; e.textContent = t("d_soon"); panelEls[1].appendChild(e); }
+  renderFinancialsPanel(item, panelEls[1]);
+  loadFinancials(item, "annual"); // 预取年报，供计算器预填
   renderValuationPanel(item, panelEls[2], idBlock);
 
   viewDetail.append(back, top, tabsNav, panels);
@@ -1127,8 +1140,12 @@ function newValuationId() { return "v" + Date.now().toString(36) + Math.floor(Ma
 
 function valuationCtx(item) {
   const c = item.cfg, s = item.statics || {};
+  const latest = (item._financials && item._financials.annual && item._financials.annual.latest) || {};
   return { price: c.price || 0, epsTtm: parseFloat(s.epsTtm) || NaN, bps: parseFloat(s.bps) || NaN,
-    shares: Number(s.totalShares) || 0, dividendYield: parseFloat(s.dividendYield) || NaN, mos: c.mos || 0, ext: c.ext || 0 };
+    shares: Number(s.totalShares) || 0, dividendYield: parseFloat(s.dividendYield) || NaN, mos: c.mos || 0, ext: c.ext || 0,
+    revenue: Number.isFinite(latest.revenue) ? latest.revenue : undefined,
+    netIncome: Number.isFinite(latest.netIncome) ? latest.netIncome : undefined,
+    netDebt: Number.isFinite(latest.netDebt) ? latest.netDebt : undefined };
 }
 
 // 把某卡设为合理区间：写 fair 区间 + 选中 id，刷新钟摆/顶部判定/列表行，并保存。
@@ -1152,6 +1169,77 @@ function assumeSummary(model, inputs) {
     const unit = f.unit === "%" ? "%" : "";
     return `${lab} ${v.c}–${v.o}${unit}`;
   }).filter(Boolean).join(" · ");
+}
+
+// 按需取财报（按 period 在 item 上内存缓存本会话）。返回 { financials, latest }。
+function loadFinancials(item, period) {
+  item._financials = item._financials || {};
+  if (item._financials[period]) return Promise.resolve(item._financials[period]);
+  const url = `/api/financials?symbol=${encodeURIComponent(item.cfg.symbol)}&period=${period}`;
+  return fetch(url).then((r) => r.json()).then((j) => (item._financials[period] = j))
+    .catch(() => (item._financials[period] = { financials: null, latest: null }));
+}
+
+// 财报数值格式：大额用 fmtBig（按币种），小额（比率/每股）保留两位
+function finFmt(n, currency) {
+  if (!Number.isFinite(n)) return "—";
+  const a = Math.abs(n);
+  if (a >= 1000) return (n < 0 ? "-" : "") + fmtBig(a, currency);
+  return n.toFixed(2);
+}
+
+// 一张报表（accounts）→ 多期表格（最多 6 期）
+function financialsTable(accounts) {
+  const cols = Math.min(6, (accounts[0] && accounts[0].values.length) || 0);
+  const table = document.createElement("table"); table.className = "fin-table";
+  const thead = document.createElement("thead"); const htr = document.createElement("tr");
+  htr.appendChild(document.createElement("th"));
+  for (let j = 0; j < cols; j++) { const th = document.createElement("th"); th.textContent = accounts[0].values[j].period; htr.appendChild(th); }
+  thead.appendChild(htr); table.appendChild(thead);
+  const tb = document.createElement("tbody");
+  accounts.forEach((a) => {
+    const tr = document.createElement("tr");
+    const nm = document.createElement("td"); nm.className = "fin-name"; nm.textContent = a.name; tr.appendChild(nm);
+    for (let j = 0; j < cols; j++) { const td = document.createElement("td"); const v = a.values[j]; td.textContent = v ? finFmt(v.value, a.currency) : "—"; tr.appendChild(td); }
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb); return table;
+}
+
+// 财报 tab：报表(利润表/资产负债表/现金流) × 周期(年报/季报) 切换 + 表格
+function renderFinancialsPanel(item, panel) {
+  panel.innerHTML = "";
+  let stmt = "IS", period = "annual";
+  const controls = document.createElement("div"); controls.className = "fin-controls";
+  const stmtSeg = document.createElement("div"); stmtSeg.className = "fin-seg";
+  const perSeg = document.createElement("div"); perSeg.className = "fin-seg";
+  const body = document.createElement("div"); body.className = "fin-body";
+  panel.append(controls, body); controls.append(stmtSeg, perSeg);
+
+  const stmtBtns = [["IS", "d_stmt_is"], ["BS", "d_stmt_bs"], ["CF", "d_stmt_cf"]].map(([k, key]) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "fin-segbtn"; b.textContent = t(key);
+    b.addEventListener("click", () => { stmt = k; sync(); draw(); }); stmtSeg.appendChild(b); return [k, b];
+  });
+  const perBtns = [["annual", "d_period_annual"], ["quarter", "d_period_quarter"]].map(([k, key]) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "fin-segbtn"; b.textContent = t(key);
+    b.addEventListener("click", () => { period = k; sync(); draw(); }); perSeg.appendChild(b); return [k, b];
+  });
+  function sync() {
+    stmtBtns.forEach(([k, b]) => b.classList.toggle("on", k === stmt));
+    perBtns.forEach(([k, b]) => b.classList.toggle("on", k === period));
+  }
+  function draw() {
+    body.innerHTML = `<div class="vd-empty">${t("d_loading")}</div>`;
+    const reqStmt = stmt, reqPeriod = period;
+    loadFinancials(item, period).then(({ financials }) => {
+      if (reqStmt !== stmt || reqPeriod !== period) return; // 期间用户又切了，忽略旧结果
+      body.innerHTML = "";
+      const accts = financials && financials[stmt];
+      if (!accts || !accts.length) { const e = document.createElement("div"); e.className = "vd-empty"; e.textContent = t("d_no_financials"); body.appendChild(e); return; }
+      body.appendChild(financialsTable(accts));
+    });
+  }
+  sync(); draw();
 }
 
 function renderValuationPanel(item, panel, idBlock) {
