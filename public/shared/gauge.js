@@ -84,9 +84,10 @@ export class Gauge {
     this.hubCode = this.mk("text", { x: cx, y: cy + this.RHUB * 0.70, "text-anchor": "middle", "dominant-baseline": "middle" });
     this.hubCode.style.cssText = "font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;fill:var(--ink-mute)";
     svg.append(gT, gB, gD, base, defs, gL, gN, this.gNeedle, hubShadow, hubRing, this.hubName, this.hubCode);
-    if (this.compact) { // 小图：去掉文字与细刻度，只留色带+分隔+指针+中枢
-      gT.style.display = "none"; gL.style.display = "none"; gN.style.display = "none";
+    if (this.compact) { // 小图：保留刻度数字+分段线，隐藏区间词标签/细刻度/中枢文字
+      gT.style.display = "none"; gL.style.display = "none";
       this.hubName.style.display = "none"; this.hubCode.style.display = "none";
+      this.nums.forEach((t) => { t.style.fontSize = "24px"; }); // 放大刻度数字，小图上才看得清
     }
     mount.appendChild(svg);
     this.svg = svg;
