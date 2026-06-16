@@ -45,7 +45,8 @@
   /* 钟摆排成有线分隔的方格：横线分行、竖线分列，外框由 .page 两侧竖线收口 */
   .charts{background:none;border:0;border-radius:0;margin:0;padding:0;max-width:none}
   /* 每格：左侧信息（名称/代码/股价/判定）+ 右侧小钟摆 */
-  .chart-item{display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--divider);padding:22px 24px;position:relative}
+  .chart-item{display:flex;align-items:center;gap:18px;border-bottom:1px solid var(--divider);padding:22px 24px;position:relative;transition:background .15s}
+  .chart-item:not(.chart-empty):hover{background:var(--card)} /* 可点的标的卡 hover 高亮 */
   .chart-item.chart-empty{display:block} /* 空位占位格不需要 flex 内容 */
   .chart-info{flex:1;min-width:0}
   .ci-id{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;min-width:0}
