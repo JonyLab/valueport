@@ -31,6 +31,75 @@ export function longportToTencent(lp) {
   return null;
 }
 
+/* ---------- 财报（Fundamental Financial Report） ---------- */
+// LongPort symbol → counter_id：AAPL.US → ST/US/AAPL
+export function symbolToCounterId(lp) {
+  const i = lp.lastIndexOf(".");
+  if (i < 0) return lp;
+  return `ST/${lp.slice(i + 1).toUpperCase()}/${lp.slice(0, i)}`;
+}
+
+// 解析 /v1/quote/financial-reports 响应 → { IS:[Acct], BS:[Acct], CF:[Acct] } 或 null
+// Acct = { field, name, currency, values:[{ year, fpEnd, period, value:Number, yoy }] }（最新期在前）
+export function parseFinancials(json) {
+  if (!json || json.code !== 0 || !json.data || !json.data.list) return null;
+  const list = json.data.list;
+  const out = {};
+  for (const kind of Object.keys(list)) {
+    const inds = (list[kind] && list[kind].indicators) || [];
+    const accts = [];
+    for (const ind of inds) {
+      const cur = ind.currency || "";
+      for (const a of ind.accounts || []) {
+        accts.push({
+          field: a.field, name: a.name, currency: a.currency || cur,
+          values: (a.values || []).map((v) => ({ year: v.year, fpEnd: v.fp_end, period: v.period, value: parseFloat(v.value), yoy: v.yoy || "" })),
+        });
+      }
+    }
+    out[kind] = accts;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+// 从已解析财报取最近一期年报的关键数字（取不到为 null）
+export function pickLatestAnnual(financials) {
+  const pick = (kind, field) => {
+    const a = financials && financials[kind] && financials[kind].find((x) => x.field === field);
+    const v = a && a.values && a.values[0] && a.values[0].value;
+    return Number.isFinite(v) ? v : null;
+  };
+  return { revenue: pick("IS", "OperatingRevenue"), netIncome: pick("IS", "NetProfit"), netDebt: pick("BS", "NetDebt") };
+}
+
+// 签名 GET（沿用 getOtp 的 canonical 规则；query 须按 key 字母序，签名与 URL 用同一字符串）
+async function signedGet(env, path, query) {
+  const ts = (Date.now() / 1000).toFixed(3);
+  const names = "authorization;x-api-key;x-timestamp";
+  const sh = `authorization:${env.LONGBRIDGE_ACCESS_TOKEN}\nx-api-key:${env.LONGBRIDGE_APP_KEY}\nx-timestamp:${ts}\n`;
+  const canonical = `GET|${path}|${query}|${sh}|${names}|`;
+  const sig = await hmac256hex(env.LONGBRIDGE_APP_SECRET, "HMAC-SHA256|" + await sha1hex(canonical));
+  const res = await fetch(HTTP_HOST + path + (query ? "?" + query : ""), {
+    headers: {
+      authorization: env.LONGBRIDGE_ACCESS_TOKEN,
+      "x-api-key": env.LONGBRIDGE_APP_KEY,
+      "x-timestamp": ts,
+      "x-api-signature": `HMAC-SHA256 SignedHeaders=${names}, Signature=${sig}`,
+    },
+  });
+  return res.json();
+}
+
+// 取财报：report = "af"(年报) | "qf"(季报)。失败/空 → null。
+export async function fetchLongbridgeFinancials(env, tencentSymbol, report) {
+  const lp = tencentToLongport(tencentSymbol);
+  if (!lp) return null;
+  const rep = report === "qf" ? "qf" : "af";
+  const query = `counter_id=${symbolToCounterId(lp)}&kind=ALL&report=${rep}`; // 已按字母序：counter_id<kind<report
+  try { return parseFinancials(await signedGet(env, "/v1/quote/financial-reports", query)); }
+  catch { return null; }
+}
+
 /* ---------- 工具 ---------- */
 function toHex(buf) {
   const b = new Uint8Array(buf); let s = "";

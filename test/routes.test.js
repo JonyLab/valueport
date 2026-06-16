@@ -96,3 +96,18 @@ describe("/app legacy redirect", () => {
     expect(r.headers.get("location")).toContain("/b/gina");
   });
 });
+
+describe("financials", () => {
+  it("returns {financials:null} for an unconvertible symbol", async () => {
+    const r = await SELF.fetch("https://x/api/financials?symbol=INVALID_SYMBOL");
+    expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j).toHaveProperty("financials");
+    expect(j.financials).toBe(null);
+  });
+  it("returns {financials:null} for a missing symbol", async () => {
+    const r = await SELF.fetch("https://x/api/financials");
+    expect(r.status).toBe(200);
+    expect((await r.json()).financials).toBe(null);
+  });
+});
