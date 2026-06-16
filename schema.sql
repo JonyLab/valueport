@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS items (
   mos         REAL    NOT NULL,
   ext         REAL    NOT NULL,
   sort_order  INTEGER NOT NULL DEFAULT 0,
+  valuations            TEXT NOT NULL DEFAULT '[]',
+  selected_valuation_id TEXT,
   updated_at  TEXT    NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_items_user ON items(user_id);

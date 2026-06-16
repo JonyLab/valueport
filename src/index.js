@@ -148,8 +148,9 @@ app.post("/api/my/items", async (c) => {
   if (!v.ok) return c.json({ ok: false, errors: v.errors }, 400);
   const it = v.value;
   const { meta } = await c.env.DB.prepare(
-    "INSERT INTO items (user_id,ticker,name,symbol,fair_low,fair_high,mos,ext,sort_order,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)"
-  ).bind(c.get("uid"), it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder, new Date().toISOString()).run();
+    "INSERT INTO items (user_id,ticker,name,symbol,fair_low,fair_high,mos,ext,sort_order,valuations,selected_valuation_id,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+  ).bind(c.get("uid"), it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder,
+    JSON.stringify(it.valuations), it.selectedValuationId, new Date().toISOString()).run();
   return c.json({ ok: true, id: meta.last_row_id }, 201);
 });
 app.put("/api/my/items/:id", async (c) => {
@@ -157,8 +158,10 @@ app.put("/api/my/items/:id", async (c) => {
   if (!v.ok) return c.json({ ok: false, errors: v.errors }, 400);
   const it = v.value;
   const { meta } = await c.env.DB.prepare(
-    "UPDATE items SET ticker=?,name=?,symbol=?,fair_low=?,fair_high=?,mos=?,ext=?,sort_order=?,updated_at=? WHERE id=? AND user_id=?"
-  ).bind(it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder, new Date().toISOString(), Number(c.req.param("id")), c.get("uid")).run();
+    "UPDATE items SET ticker=?,name=?,symbol=?,fair_low=?,fair_high=?,mos=?,ext=?,sort_order=?,valuations=?,selected_valuation_id=?,updated_at=? WHERE id=? AND user_id=?"
+  ).bind(it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder,
+    JSON.stringify(it.valuations), it.selectedValuationId, new Date().toISOString(),
+    Number(c.req.param("id")), c.get("uid")).run();
   if (!meta.changes) return c.json({ ok: false, error: "not found" }, 404);
   return c.json({ ok: true });
 });
