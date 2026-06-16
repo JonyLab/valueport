@@ -211,8 +211,8 @@
   }
 
   /* ===== 设置视图 ===== */
-  /* ===== 标的详情视图 ===== */
-  .view-detail{max-width:900px;margin:0 auto;padding-top:4px}
+  /* ===== 标的详情视图（宽度与看板内容一致：满栏 + 与 page-head 相同的 28px 边距） ===== */
+  .view-detail{padding:28px 28px 0}
   .vd-back{display:inline-flex;align-items:center;font-size:13.5px;color:var(--ink-soft);text-decoration:none;margin-bottom:18px}
   .vd-back:hover{color:var(--ink)}
   .vd-top{display:flex;gap:24px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--divider);padding-bottom:24px;margin-bottom:20px}
@@ -235,7 +235,7 @@
   .vd-row .v{font-family:var(--mono);font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
   .vd-empty{color:var(--ink-mute);font-size:13.5px;padding:24px 0}
   .vd-method{display:inline-block;margin-top:16px;font-size:13px;color:var(--ink-soft);text-decoration:underline;text-underline-offset:2px}
-  @media (max-width:680px){ .vd-top{flex-direction:column;align-items:flex-start} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} }
+  @media (max-width:680px){ .view-detail{padding:24px 16px 0} .vd-top{flex-direction:column;align-items:flex-start} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} }
   .view-settings{max-width:640px;margin:0 auto;padding-top:4px}
   .set-title{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.01em;margin:8px 0 18px}
   .cfg-block{padding:16px 0 14px;border-bottom:1px solid var(--border)}
