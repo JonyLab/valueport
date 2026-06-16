@@ -294,8 +294,11 @@
   .vcard-edit,.vcard-del{height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:12px;color:var(--ink-mute)}
   .vcard-edit:hover,.vcard-del:hover{color:var(--ink);border-color:var(--border)}
   .vcard-del{margin-left:auto}
-  .vcard-add{margin-top:14px;height:34px;padding:0 14px;border:1px dashed var(--node);border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink-soft)}
+  .vcard-add{display:block;width:fit-content;margin-top:16px;height:34px;padding:0 14px;border:1px dashed var(--node);border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink-soft)}
   .vcard-add:hover{color:var(--ink);border-color:var(--ink)}
+  /* 次级脚注链接：自成一行，与上方操作明确分隔，不贴边 */
+  .vcard-foot{margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
+  .vcard-foot .vd-method{margin-top:0}
   /* 财报 tab */
   .fin-controls{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px}
   .fin-seg{display:flex;gap:4px}
@@ -1261,8 +1264,10 @@ function renderValuationPanel(item, panel, idBlock) {
     add.addEventListener("click", () => showEditor(null));
     panel.appendChild(add);
 
+    const foot = document.createElement("div"); foot.className = "vcard-foot";
     const method = document.createElement("a"); method.className = "vd-method"; method.href = "/valuation"; method.textContent = t("d_method");
-    panel.appendChild(method);
+    foot.appendChild(method);
+    panel.appendChild(foot);
   }
 
   function cardEl(card) {
