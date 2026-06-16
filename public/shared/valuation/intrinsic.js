@@ -27,7 +27,7 @@ const FCFF = {
   group: "intrinsic",
   label: { zh: "FCFF 两阶段", en: "FCFF (2-stage)" },
   fields: [
-    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" } },
+    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" } },
     { k: "n", label: { zh: "高增长年数", en: "High-growth years" }, col: "single", unit: "", prefill: (ctx) => 10, default: 10 },
     { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10 },
     { k: "opMargin", label: { zh: "目标营业利润率", en: "Target operating margin" }, col: "dual", unit: "%", default: 15 },
@@ -35,7 +35,7 @@ const FCFF = {
     { k: "salesToCap", label: { zh: "销售/资本比", en: "Sales-to-capital ratio" }, col: "dual", unit: "", default: 2 },
     { k: "wacc", label: { zh: "WACC", en: "WACC" }, col: "dual", unit: "%", default: 9 },
     { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5 },
-    { k: "netDebt", label: { zh: "净负债", en: "Net debt" }, col: "single", unit: "", prefill: (ctx) => 0, default: 0 },
+    { k: "netDebt", label: { zh: "净负债", en: "Net debt" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.netDebt)) ? ctx.netDebt : 0, default: 0 },
   ],
   compute(vals, ctx) {
     const shares = ctx && ctx.shares;
@@ -88,8 +88,9 @@ const FCFE = {
       label: { zh: "净利润", en: "Net income" },
       col: "single",
       unit: "",
-      // 预填 = 每股收益 × 股本（不可用时返回 ""）
+      // 预填 = 优先 ctx.netIncome，回退到每股收益 × 股本（不可用时返回 ""）
       prefill: (ctx) => {
+        if (ctx && Number.isFinite(ctx.netIncome)) return ctx.netIncome;
         const v = (ctx && ctx.epsTtm) * (ctx && ctx.shares);
         return Number.isFinite(v) ? v : "";
       },

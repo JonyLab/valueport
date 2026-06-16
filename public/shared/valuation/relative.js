@@ -17,7 +17,7 @@ const PE = {
   group: "relative",
   label: { zh: "PE 估值", en: "P/E" },
   fields: [
-    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" } },
+    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" } },
     { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: (ctx) => "", default: 5 },
     { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10 },
     { k: "netMargin", label: { zh: "净利率", en: "Net margin" }, col: "dual", unit: "%", default: 15 },
@@ -77,7 +77,7 @@ const PS = {
   group: "relative",
   label: { zh: "PS 估值", en: "P/S" },
   fields: [
-    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" } },
+    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" } },
     { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: (ctx) => "", default: 5 },
     { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10 },
     { k: "targetPS", label: { zh: "目标 PS", en: "Target P/S" }, col: "dual", unit: "", default: 5 },
@@ -103,7 +103,7 @@ const EVEBITDA = {
     { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: (ctx) => "", default: 5 },
     { k: "growth", label: { zh: "EBITDA 增速", en: "EBITDA growth" }, col: "dual", unit: "%", default: 10 },
     { k: "targetMultiple", label: { zh: "目标倍数", en: "Target multiple" }, col: "dual", unit: "", default: 12 },
-    { k: "netDebt", label: { zh: "净负债", en: "Net debt" }, col: "single", unit: "", prefill: (ctx) => "", default: 0 },
+    { k: "netDebt", label: { zh: "净负债", en: "Net debt" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.netDebt)) ? ctx.netDebt : "", default: 0 },
   ],
   compute(vals, ctx) {
     const shares = ctx.shares;
