@@ -236,7 +236,60 @@
   .vd-row .v{font-family:var(--mono);font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
   .vd-empty{color:var(--ink-mute);font-size:13.5px;padding:24px 0}
   .vd-method{display:inline-block;margin-top:16px;font-size:13px;color:var(--ink-soft);text-decoration:underline;text-underline-offset:2px}
-  @media (max-width:680px){ .view-detail{padding:24px 16px 0} .vd-top{flex-direction:column;align-items:flex-start} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} }
+  /* ===== 估值计算器（Damodaran）— 账本工作表，圆角统一 8px，颜色只在区间条上说话 ===== */
+  .vc-mount{margin-top:24px;padding-top:24px;border-top:1px solid var(--divider)}
+  /* 方法选择：内在/相对 两组安静 chip（非看板那种实心黑胶囊，避免与上方下划线 tab 抢） */
+  .vc-methods{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+  .vc-mgroup{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  .vc-mglabel{font-size:11px;color:var(--ink-mute);letter-spacing:.04em;text-transform:uppercase;width:64px;flex:none}
+  .vc-method{height:28px;padding:0 11px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:12.5px;font-weight:500;color:var(--ink-soft);transition:background .12s,color .12s,border-color .12s}
+  .vc-method:hover{color:var(--ink);border-color:var(--node)}
+  .vc-method.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  /* 统一工作表：左为标签列，右为 保守/乐观 两列；单列事实只占第一输入列。所有标签、输入框整列对齐。 */
+  .vc-form{max-width:600px}
+  .vc-sheet{display:grid;grid-template-columns:minmax(0,1fr) 144px 144px;gap:11px 14px;align-items:center}
+  .vc-shead{grid-column:1/-1;font-size:11px;color:var(--ink-mute);letter-spacing:.04em;text-transform:uppercase;margin-top:18px}
+  .vc-sheet>.vc-shead:first-child{margin-top:0}
+  .vc-chead{font-size:11px;color:var(--ink-mute);letter-spacing:.02em;padding-left:2px}
+  .vc-label{font-size:13px;color:var(--ink-soft);min-width:0}
+  .vc-unit{color:var(--ink-mute);margin-left:3px}
+  .vc-input{height:34px;padding:0 10px;width:100%;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:var(--mono);font-size:13.5px;color:var(--ink);font-variant-numeric:tabular-nums;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield}
+  .vc-input::-webkit-outer-spin-button,.vc-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .vc-input::placeholder{color:var(--ink-mute);font-family:var(--font);font-size:11.5px}
+  .vc-input:focus{outline:none;border-color:var(--ring-border);background:#fff;box-shadow:0 0 0 3px var(--ring)}
+  /* 结果 hero：低~高 中性大字 + 区间条预览（颜色全交给区间条） */
+  .vc-result{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+  .vc-rnums{display:flex;align-items:baseline;gap:10px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .vc-out-label{font-family:var(--font);font-size:12px;color:var(--ink-mute);letter-spacing:.02em;align-self:center}
+  .vc-rlow,.vc-rhigh{font-size:24px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+  .vc-rdash{font-size:18px;color:var(--ink-mute)}
+  .vc-bar-mount{margin-top:16px;max-width:520px}
+  .vc-actions{margin-top:18px;display:flex;gap:10px}
+  .vc-done{height:36px;padding:0 16px;border:1px solid var(--ink);border-radius:8px;background:var(--ink);color:var(--bg);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:500;transition:opacity .12s}
+  .vc-done:hover{opacity:.88}
+  .vc-done:disabled{opacity:.32;cursor:not-allowed}
+  .vc-cancel{height:36px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--ink-soft);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:500}
+  .vc-cancel:hover{color:var(--ink);border-color:var(--node)}
+  /* 估值卡片列表 */
+  .vcards{margin-top:20px;display:flex;flex-direction:column;gap:10px}
+  .vcard{border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--card);transition:border-color .12s,box-shadow .12s}
+  .vcard.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+  .vcard-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .vcard-method{font-size:13.5px;font-weight:600;color:var(--ink)}
+  .vcard-range{font-family:var(--mono);font-weight:700;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .vcard-assume{margin-top:6px;font-size:12px;color:var(--ink-soft)}
+  .vcard-verdict{margin-top:4px;font-size:12px}
+  .vcard-verdict.v-under{color:var(--green)} .vcard-verdict.v-over{color:var(--red)} .vcard-verdict.v-fair{color:var(--ink-mute)}
+  .vcard-actions{margin-top:12px;display:flex;gap:8px;align-items:center}
+  .vcard-sel{height:28px;padding:0 11px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:12px;color:var(--ink-soft)}
+  .vcard-sel:hover{color:var(--ink);border-color:var(--node)}
+  .vcard-sel.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .vcard-edit,.vcard-del{height:28px;padding:0 10px;border:1px solid transparent;border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:12px;color:var(--ink-mute)}
+  .vcard-edit:hover,.vcard-del:hover{color:var(--ink);border-color:var(--border)}
+  .vcard-del{margin-left:auto}
+  .vcard-add{margin-top:14px;height:34px;padding:0 14px;border:1px dashed var(--node);border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink-soft)}
+  .vcard-add:hover{color:var(--ink);border-color:var(--ink)}
+  @media (max-width:680px){ .view-detail{padding:24px 16px 0} .vd-top{flex-direction:column;align-items:flex-start} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} .vc-sheet{grid-template-columns:minmax(0,1fr) 1fr 1fr} .vc-mglabel{width:auto} }
   .view-settings{max-width:640px;margin:0 auto;padding-top:4px}
   .set-title{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.01em;margin:8px 0 18px}
   .cfg-block{padding:16px 0 14px;border-bottom:1px solid var(--border)}
@@ -388,6 +441,8 @@ import { Bar } from "/shared/bar.js";
 import { verdictOf, structValid, applyZoneColors, computeAnchors, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
 import { MKT_LABEL } from "/shared/market.js";
 import { t, applyI18n, toggleLang, langButtonLabel, LANG } from "/shared/i18n.js";
+import { mountValuationCalc } from "/shared/valuation-ui.js";
+import { MODELS } from "/shared/valuation/index.js";
 
 applyI18n(); // 静态文案先按当前语言渲染
 const VMSGS = {
@@ -511,15 +566,17 @@ function addChart(cfg) {
   const gauge = new Bar(gwrap);
   wrap.append(info, gwrap);
   const item = { id: cfg.id || null, cfg: { ...cfg }, gauge, chartEl: wrap, verdictEl: verdict, nameEl, codeEl, live: false, gotQuote: false };
-  // 整行可点 → 进详情（编辑按钮除外）
-  wrap.style.cursor = "pointer";
-  wrap.addEventListener("click", (e) => {
-    if (e.target.closest(".card-edit")) return;
-    const code = (item.cfg.ticker || "").toUpperCase();
-    if (!code) return;
-    history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug) + "/" + encodeURIComponent(code));
-    showDetail(item);
-  });
+  // 整行可点 → 进详情（仅主人；访客只看列表）
+  if (owner) {
+    wrap.style.cursor = "pointer";
+    wrap.addEventListener("click", (e) => {
+      if (e.target.closest(".card-edit")) return;
+      const code = (item.cfg.ticker || "").toUpperCase();
+      if (!code) return;
+      history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug) + "/" + encodeURIComponent(code));
+      showDetail(item);
+    });
+  }
   if (owner) {
     const edit = document.createElement("button");
     edit.className = "btn sm ghost card-edit";
@@ -636,7 +693,7 @@ async function init() {
     addCardEl.textContent = t("b_add");
     addCardEl.addEventListener("click", () => {
       // 低/高点不预填（必须自己想清楚估值）；安全边际默认 50%、极度高估默认 40%
-      const item = addChart({ ticker: "", name: "", symbol: null, price: 0, fairLow: "", fairHigh: "", mos: 50, ext: 40, sortOrder: items.length });
+      const item = addChart({ ticker: "", name: "", symbol: null, price: 0, fairLow: "", fairHigh: "", mos: 50, ext: 40, sortOrder: items.length, valuations: [], selectedValuationId: null });
       openItemModal(item, true);
       item.chartEl.scrollIntoView({ behavior: REDUCE ? "auto" : "smooth", block: "center" });
     });
@@ -670,6 +727,7 @@ async function saveItem(item) {
     ticker: item.cfg.ticker, name: item.cfg.name, symbol: item.cfg.symbol,
     fairLow: item.cfg.fairLow, fairHigh: item.cfg.fairHigh, mos: item.cfg.mos, ext: item.cfg.ext,
     sortOrder: item.cfg.sortOrder || 0,
+    valuations: item.cfg.valuations || [], selectedValuationId: item.cfg.selectedValuationId || null,
   };
   const url = item.id ? `/api/my/items/${item.id}` : "/api/my/items";
   const method = item.id ? "PUT" : "POST";
@@ -1049,14 +1107,121 @@ function renderDetail(item) {
   if (fr.length) fillRows(panelEls[0], fr);
   else { const e = document.createElement("div"); e.className = "vd-empty"; e.textContent = t("d_no_fundamentals"); panelEls[0].appendChild(e); }
   { const e = document.createElement("div"); e.className = "vd-empty"; e.textContent = t("d_soon"); panelEls[1].appendChild(e); }
-  fillRows(panelEls[2], valuationRows(item));
-  const method = document.createElement("a"); method.className = "vd-method"; method.href = "/valuation"; method.textContent = t("d_method");
-  panelEls[2].appendChild(method);
+  renderValuationPanel(item, panelEls[2], idBlock);
 
   viewDetail.append(back, top, tabsNav, panels);
   detailGauge = new Gauge(gwrap);          // 详情页用完整钟摆
   detailGauge.set(c, false);
   if (c.price > 0) detailGauge.swingIn();
+}
+
+// 估值研究面板：摘要 + 估值卡片列表 ⇄ 卡片编辑器。idBlock 用于联动刷新顶部判定。
+function newValuationId() { return "v" + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36); }
+
+function valuationCtx(item) {
+  const c = item.cfg, s = item.statics || {};
+  return { price: c.price || 0, epsTtm: parseFloat(s.epsTtm) || NaN, bps: parseFloat(s.bps) || NaN,
+    shares: Number(s.totalShares) || 0, dividendYield: parseFloat(s.dividendYield) || NaN, mos: c.mos || 0, ext: c.ext || 0 };
+}
+
+// 把某卡设为合理区间：写 fair 区间 + 选中 id，刷新钟摆/顶部判定/列表行，并保存。
+function selectValuation(item, card, idBlock) {
+  const c = item.cfg;
+  c.fairLow = Math.round(Math.min(card.low, card.high) * 100) / 100;
+  c.fairHigh = Math.round(Math.max(card.low, card.high) * 100) / 100;
+  c.selectedValuationId = card.id;
+  if (detailGauge) detailGauge.set(c, true);
+  if (idBlock) { const vv = verdictOf(c, VMSGS); const vEl = idBlock.querySelector(".vd-verdict"); vEl.textContent = vv.text; vEl.className = "vd-verdict " + vv.cls; }
+  if (item.gauge) item.gauge.set(c, true);
+  renderVerdict(item); renderItemHead(item);
+  saveItem(item);
+}
+
+// 关键假设摘要（dual 字段：标签 保守–乐观）
+function assumeSummary(model, inputs) {
+  return (model.fields || []).filter((f) => f.col === "dual").map((f) => {
+    const v = inputs[f.k]; if (!v || typeof v !== "object") return null;
+    const lab = (f.label && f.label[LANG]) || f.k;
+    const unit = f.unit === "%" ? "%" : "";
+    return `${lab} ${v.c}–${v.o}${unit}`;
+  }).filter(Boolean).join(" · ");
+}
+
+function renderValuationPanel(item, panel, idBlock) {
+  const c = item.cfg;
+  panel.innerHTML = "";
+
+  function showList() {
+    panel.innerHTML = "";
+    const summary = document.createElement("div");
+    fillRows(summary, valuationRows(item));
+    panel.appendChild(summary);
+
+    const list = document.createElement("div"); list.className = "vcards";
+    (c.valuations || []).forEach((card) => list.appendChild(cardEl(card)));
+    panel.appendChild(list);
+
+    const add = document.createElement("button"); add.className = "vcard-add"; add.type = "button";
+    add.textContent = LANG === "zh" ? "＋ 添加估值" : "＋ Add valuation";
+    add.addEventListener("click", () => showEditor(null));
+    panel.appendChild(add);
+
+    const method = document.createElement("a"); method.className = "vd-method"; method.href = "/valuation"; method.textContent = t("d_method");
+    panel.appendChild(method);
+  }
+
+  function cardEl(card) {
+    const model = MODELS.find((m) => m.key === card.method);
+    const wrap = document.createElement("div");
+    wrap.className = "vcard" + (c.selectedValuationId === card.id ? " on" : "");
+    const head = document.createElement("div"); head.className = "vcard-head";
+    const name = document.createElement("span"); name.className = "vcard-method"; name.textContent = model ? (model.label[LANG] || model.key) : card.method;
+    const range = document.createElement("span"); range.className = "vcard-range"; range.textContent = `${card.low.toFixed(2)} ~ ${card.high.toFixed(2)}`;
+    head.append(name, range);
+    const sum = document.createElement("div"); sum.className = "vcard-assume"; sum.textContent = model ? assumeSummary(model, card.inputs) : "";
+    const vinfo = verdictOf({ ...c, fairLow: card.low, fairHigh: card.high }, VMSGS);
+    const verd = document.createElement("div"); verd.className = "vcard-verdict " + vinfo.cls; verd.textContent = c.price > 0 ? vinfo.text : "";
+    const actions = document.createElement("div"); actions.className = "vcard-actions";
+    const sel = document.createElement("button"); sel.type = "button"; sel.className = "vcard-sel" + (c.selectedValuationId === card.id ? " on" : "");
+    sel.textContent = c.selectedValuationId === card.id ? (LANG === "zh" ? "● 合理区间" : "● Fair range") : (LANG === "zh" ? "○ 设为合理区间" : "○ Set as fair range");
+    sel.addEventListener("click", () => { selectValuation(item, card, idBlock); showList(); });
+    const edit = document.createElement("button"); edit.type = "button"; edit.className = "vcard-edit"; edit.textContent = LANG === "zh" ? "编辑" : "Edit";
+    edit.addEventListener("click", () => showEditor(card));
+    const del = document.createElement("button"); del.type = "button"; del.className = "vcard-del"; del.textContent = LANG === "zh" ? "删除" : "Delete";
+    del.addEventListener("click", () => {
+      c.valuations = (c.valuations || []).filter((x) => x.id !== card.id);
+      if (c.selectedValuationId === card.id) c.selectedValuationId = null;
+      saveItem(item); showList();
+    });
+    actions.append(sel, edit, del);
+    wrap.append(head, sum, verd, actions);
+    return wrap;
+  }
+
+  function showEditor(card) {
+    panel.innerHTML = "";
+    const host = document.createElement("div"); panel.appendChild(host);
+    mountValuationCalc(host, valuationCtx(item), {
+      lang: LANG,
+      initialMethod: card ? card.method : undefined,
+      initialInputs: card ? card.inputs : undefined,
+      onCancel: () => showList(),
+      onDone: ({ method, inputs, low, high }) => {
+        if (!Array.isArray(c.valuations)) c.valuations = [];
+        if (card) {
+          Object.assign(card, { method, inputs, low, high, updatedAt: new Date().toISOString() });
+          if (c.selectedValuationId === card.id) selectValuation(item, card, idBlock);
+        } else {
+          const fresh = { id: newValuationId(), method, inputs, low, high, updatedAt: new Date().toISOString() };
+          c.valuations.push(fresh);
+          if (!c.selectedValuationId) selectValuation(item, fresh, idBlock); // 首张/无选中时自动设为合理区间
+        }
+        saveItem(item); showList();
+      },
+    });
+  }
+
+  showList();
 }
 
 function currentDetailCode() {
@@ -1066,7 +1231,7 @@ function currentDetailCode() {
 function route() {
   const code = currentDetailCode();
   const item = code ? items.find((i) => (i.cfg.ticker || "").toUpperCase() === code) : null;
-  if (item) showDetail(item); else showList();
+  if (item && owner) showDetail(item); else showList();
 }
 window.addEventListener("popstate", route);
 

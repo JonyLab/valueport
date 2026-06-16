@@ -1,0 +1,187 @@
+/**
+ * valuation-ui.js — 估值卡片编辑器（方法选择 + 前提/情景假设工作表 + 实时低~高 + 区间条预览）。
+ * 依赖：MODELS/runModel（valuation/index.js）、Bar（bar.js）。
+ * 导出：mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, onDone, onCancel })
+ *   onDone({ method, inputs, low, high })  —— 用户点「完成」、且低~高有效时触发
+ *   onCancel()                              —— 用户点「取消」
+ *   initialMethod / initialInputs           —— 编辑既有卡片时回填（否则用 prefill/default）
+ */
+import { MODELS, runModel } from "/shared/valuation/index.js";
+import { Bar } from "/shared/bar.js";
+
+const TX = {
+  zh: { intrinsic: "内在价值", relative: "相对估值", facts: "前提", assume: "情景假设",
+        conservative: "保守", optimistic: "乐观", fair: "合理价值", done: "完成", cancel: "取消", dash: "—" },
+  en: { intrinsic: "Intrinsic", relative: "Relative", facts: "Inputs", assume: "Assumptions",
+        conservative: "Conservative", optimistic: "Optimistic", fair: "Fair value", done: "Done", cancel: "Cancel", dash: "—" },
+};
+
+function el(tag, cls, attrs) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (attrs) Object.assign(node, attrs);
+  return node;
+}
+function fmt(v, dash) { return (v !== null && isFinite(v)) ? Number(v).toFixed(2) : dash; }
+function initialFor(field, ctx) {
+  let v = "";
+  if (typeof field.prefill === "function") { try { v = field.prefill(ctx); } catch { v = ""; } }
+  const blank = v === "" || v === undefined || v === null || (typeof v === "number" && !isFinite(v));
+  if (blank && field.default !== undefined) v = field.default;
+  return v;
+}
+
+export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, onDone, onCancel }) {
+  const L = TX[lang] || TX.zh;
+  const tx = (k) => L[k];
+
+  let activeIdx = Math.max(0, MODELS.findIndex((m) => m.key === initialMethod));
+  let lastLow = null, lastHigh = null;
+
+  mount.innerHTML = "";
+  const root = el("div", "vc");
+  mount.appendChild(root);
+
+  // 方法选择：内在/相对 两组 chip
+  const methodsBar = el("div", "vc-methods");
+  root.appendChild(methodsBar);
+  const methodBtns = [];
+  [{ key: "intrinsic", models: MODELS.filter((m) => m.group === "intrinsic") },
+   { key: "relative", models: MODELS.filter((m) => m.group === "relative") }].forEach((g) => {
+    if (!g.models.length) return;
+    const gwrap = el("div", "vc-mgroup");
+    const glabel = el("span", "vc-mglabel"); glabel.textContent = tx(g.key); gwrap.appendChild(glabel);
+    g.models.forEach((model) => {
+      const idx = MODELS.indexOf(model);
+      const btn = el("button", "vc-method"); btn.type = "button";
+      btn.textContent = (model.label && model.label[lang]) || model.key;
+      btn.addEventListener("click", () => { if (activeIdx === idx) return; activeIdx = idx; refreshMethodBtns(); renderForm(); });
+      methodBtns[idx] = btn; gwrap.appendChild(btn);
+    });
+    methodsBar.appendChild(gwrap);
+  });
+
+  const formWrap = el("div", "vc-form");
+  root.appendChild(formWrap);
+
+  // 结果 hero
+  const result = el("div", "vc-result");
+  root.appendChild(result);
+  const nums = el("div", "vc-rnums");
+  const outLabel = el("span", "vc-out-label"); outLabel.textContent = tx("fair");
+  const outLow = el("span", "vc-rlow");
+  const outDash = el("span", "vc-rdash"); outDash.textContent = "~";
+  const outHigh = el("span", "vc-rhigh");
+  nums.append(outLabel, outLow, outDash, outHigh);
+  result.appendChild(nums);
+  const barMount = el("div", "vc-bar-mount");
+  result.appendChild(barMount);
+  let bar = null;
+
+  // 完成 / 取消
+  const actions = el("div", "vc-actions");
+  const doneBtn = el("button", "vc-done"); doneBtn.type = "button"; doneBtn.textContent = tx("done"); doneBtn.disabled = true;
+  doneBtn.addEventListener("click", () => {
+    if (lastLow === null || lastHigh === null || !isFinite(lastLow) || !isFinite(lastHigh)) return;
+    onDone({ method: MODELS[activeIdx].key, inputs: lastForm, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh) });
+  });
+  const cancelBtn = el("button", "vc-cancel"); cancelBtn.type = "button"; cancelBtn.textContent = tx("cancel");
+  cancelBtn.addEventListener("click", () => onCancel && onCancel());
+  actions.append(doneBtn, cancelBtn);
+  result.appendChild(actions);
+
+  let lastForm = {};
+
+  function refreshMethodBtns() { methodBtns.forEach((btn, i) => { if (btn) btn.classList.toggle("on", i === activeIdx); }); }
+
+  function compute(formData) {
+    lastForm = formData;
+    const model = MODELS[activeIdx];
+    let r = { low: null, high: null };
+    try { r = runModel(model, formData, ctx); } catch { /* 输入不完整 */ }
+    lastLow = r.low; lastHigh = r.high;
+    const dash = tx("dash");
+    const valid = lastLow !== null && lastHigh !== null && isFinite(lastLow) && isFinite(lastHigh);
+    outLow.textContent = fmt(lastLow, dash); outHigh.textContent = fmt(lastHigh, dash);
+    outDash.style.opacity = valid ? "1" : ".4";
+    if (valid && ctx.price > 0) {
+      if (!bar) bar = new Bar(barMount);
+      barMount.style.display = "";
+      bar.set({ price: ctx.price, fairLow: Math.min(lastLow, lastHigh), fairHigh: Math.max(lastLow, lastHigh), mos: ctx.mos || 0, ext: ctx.ext || 0 }, true);
+    } else { barMount.style.display = "none"; }
+    doneBtn.disabled = !valid;
+  }
+
+  function fieldLabel(field) {
+    const lab = el("div", "vc-label");
+    lab.textContent = (field.label && field.label[lang]) || field.k;
+    if (field.unit === "%") { const u = el("span", "vc-unit"); u.textContent = "%"; lab.appendChild(u); }
+    return lab;
+  }
+
+  // 单列初值：编辑态优先用 initialInputs，否则 prefill/default
+  function singleInit(field) {
+    if (initialInputs && Object.prototype.hasOwnProperty.call(initialInputs, field.k)) {
+      const v = initialInputs[field.k];
+      if (typeof v === "number") return v;
+    }
+    return initialFor(field, ctx);
+  }
+  function dualInit(field) {
+    if (initialInputs && initialInputs[field.k] && typeof initialInputs[field.k] === "object") {
+      return { c: initialInputs[field.k].c, o: initialInputs[field.k].o };
+    }
+    const d = field.default ?? "";
+    return { c: d, o: d };
+  }
+
+  function renderForm() {
+    formWrap.innerHTML = "";
+    const model = MODELS[activeIdx];
+    const fields = model.fields || [];
+    const readers = [];
+    const singles = fields.filter((f) => f.col !== "dual");
+    const duals = fields.filter((f) => f.col === "dual");
+    const sheet = el("div", "vc-sheet");
+
+    if (singles.length) {
+      const h = el("div", "vc-shead"); h.textContent = tx("facts"); sheet.appendChild(h);
+      singles.forEach((field) => {
+        sheet.appendChild(fieldLabel(field));
+        const input = makeInput(singleInit(field));
+        if (field.hint && field.hint[lang]) input.placeholder = field.hint[lang];
+        readers.push({ field, getVal: () => input.value !== "" ? Number(input.value) : NaN });
+        input.addEventListener("input", () => compute(buildForm(readers)));
+        sheet.appendChild(input);
+        sheet.appendChild(el("div"));
+      });
+    }
+    if (duals.length) {
+      const h = el("div", "vc-shead"); h.textContent = tx("assume"); sheet.appendChild(h);
+      sheet.appendChild(el("div"));
+      const hc = el("div", "vc-chead"); hc.textContent = tx("conservative"); sheet.appendChild(hc);
+      const ho = el("div", "vc-chead"); ho.textContent = tx("optimistic"); sheet.appendChild(ho);
+      duals.forEach((field) => {
+        sheet.appendChild(fieldLabel(field));
+        const init = dualInit(field);
+        const inC = makeInput(init.c), inO = makeInput(init.o);
+        readers.push({ field, getVal: () => ({ c: inC.value !== "" ? Number(inC.value) : NaN, o: inO.value !== "" ? Number(inO.value) : NaN }) });
+        inC.addEventListener("input", () => compute(buildForm(readers)));
+        inO.addEventListener("input", () => compute(buildForm(readers)));
+        sheet.append(inC, inO);
+      });
+    }
+    formWrap.appendChild(sheet);
+    compute(buildForm(readers));
+  }
+
+  function buildForm(readers) { const form = {}; readers.forEach(({ field, getVal }) => { form[field.k] = getVal(); }); return form; }
+  function makeInput(initVal) {
+    const inp = el("input", "vc-input", { type: "number", inputMode: "decimal", step: "any" });
+    if (initVal !== "" && initVal !== undefined && initVal !== null) inp.value = String(initVal);
+    return inp;
+  }
+
+  refreshMethodBtns();
+  renderForm();
+}
