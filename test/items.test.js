@@ -63,6 +63,13 @@ describe("validateItem with valuations", () => {
   it("rejects valuations that is not an array", () => {
     expect(validateItem({ ...base, valuations: { id: "v1" } }).ok).toBe(false);
   });
+  it("keeps a card note (string) and defaults to '' when absent, capped at 2000 chars", () => {
+    const withNote = validateItem({ ...base, valuations: [{ ...card, note: "看好 AI 周期" }] });
+    expect(withNote.value.valuations[0].note).toBe("看好 AI 周期");
+    expect(validateItem({ ...base, valuations: [card] }).value.valuations[0].note).toBe("");
+    const long = validateItem({ ...base, valuations: [{ ...card, note: "x".repeat(3000) }] });
+    expect(long.value.valuations[0].note).toHaveLength(2000);
+  });
 });
 
 describe("rowToItem with valuations", () => {

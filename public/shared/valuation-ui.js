@@ -11,9 +11,11 @@ import { Bar } from "/shared/bar.js";
 
 const TX = {
   zh: { intrinsic: "内在价值", relative: "相对估值", facts: "前提", assume: "情景假设",
-        conservative: "保守", optimistic: "乐观", fair: "合理价值", done: "完成", cancel: "取消", dash: "—" },
+        conservative: "保守", optimistic: "乐观", fair: "合理价值", done: "完成", cancel: "取消", dash: "—",
+        note: "备注", notePh: "为什么给出这个估值？关键逻辑、假设依据、风险…" },
   en: { intrinsic: "Intrinsic", relative: "Relative", facts: "Inputs", assume: "Assumptions",
-        conservative: "Conservative", optimistic: "Optimistic", fair: "Fair value", done: "Done", cancel: "Cancel", dash: "—" },
+        conservative: "Conservative", optimistic: "Optimistic", fair: "Fair value", done: "Done", cancel: "Cancel", dash: "—",
+        note: "Note", notePh: "Why this valuation? Key logic, assumptions, risks…" },
 };
 
 function el(tag, cls, attrs) {
@@ -31,7 +33,7 @@ function initialFor(field, ctx) {
   return v;
 }
 
-export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, onDone, onCancel }) {
+export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, onDone, onCancel }) {
   const L = TX[lang] || TX.zh;
   const tx = (k) => L[k];
 
@@ -64,6 +66,14 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const formWrap = el("div", "vc-form");
   root.appendChild(formWrap);
 
+  // 备注（长文本，跨方法切换保留）
+  const noteWrap = el("div", "vc-note");
+  const noteLabel = el("div", "vc-note-label"); noteLabel.textContent = tx("note");
+  const noteInput = el("textarea", "vc-note-input"); noteInput.placeholder = tx("notePh");
+  if (initialNote) noteInput.value = initialNote;
+  noteWrap.append(noteLabel, noteInput);
+  root.appendChild(noteWrap);
+
   // 结果 hero
   const result = el("div", "vc-result");
   root.appendChild(result);
@@ -83,7 +93,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const doneBtn = el("button", "vc-done"); doneBtn.type = "button"; doneBtn.textContent = tx("done"); doneBtn.disabled = true;
   doneBtn.addEventListener("click", () => {
     if (lastLow === null || lastHigh === null || !isFinite(lastLow) || !isFinite(lastHigh)) return;
-    onDone({ method: MODELS[activeIdx].key, inputs: lastForm, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh) });
+    onDone({ method: MODELS[activeIdx].key, inputs: lastForm, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
   });
   const cancelBtn = el("button", "vc-cancel"); cancelBtn.type = "button"; cancelBtn.textContent = tx("cancel");
   cancelBtn.addEventListener("click", () => onCancel && onCancel());

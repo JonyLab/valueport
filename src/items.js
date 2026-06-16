@@ -14,6 +14,7 @@ function validateValuations(raw) {
     const low = Number(card.low), high = Number(card.high);
     if (!(low > 0) || !(high > low)) return { ok: false };
     out.push({ id: card.id, method: card.method, inputs: card.inputs, low, high,
+      note: typeof card.note === "string" ? card.note.slice(0, 2000) : "",
       updatedAt: typeof card.updatedAt === "string" ? card.updatedAt : "" });
   }
   return { ok: true, value: out };

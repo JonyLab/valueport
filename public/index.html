@@ -264,6 +264,12 @@
   .vc-rlow,.vc-rhigh{font-size:24px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
   .vc-rdash{font-size:18px;color:var(--ink-mute)}
   .vc-bar-mount{margin-top:16px;max-width:520px}
+  /* 备注（长文本） */
+  .vc-note{margin-top:20px;max-width:600px}
+  .vc-note-label{font-size:11px;color:var(--ink-mute);letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
+  .vc-note-input{width:100%;min-height:72px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:var(--font);font-size:13px;line-height:1.55;color:var(--ink);box-sizing:border-box;resize:vertical}
+  .vc-note-input::placeholder{color:var(--ink-mute)}
+  .vc-note-input:focus{outline:none;border-color:var(--ring-border);background:#fff;box-shadow:0 0 0 3px var(--ring)}
   .vc-actions{margin-top:18px;display:flex;gap:10px}
   .vc-done{height:36px;padding:0 16px;border:1px solid var(--ink);border-radius:8px;background:var(--ink);color:var(--bg);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:500;transition:opacity .12s}
   .vc-done:hover{opacity:.88}
@@ -280,6 +286,7 @@
   .vcard-assume{margin-top:6px;font-size:12px;color:var(--ink-soft)}
   .vcard-verdict{margin-top:4px;font-size:12px}
   .vcard-verdict.v-under{color:var(--green)} .vcard-verdict.v-over{color:var(--red)} .vcard-verdict.v-fair{color:var(--ink-mute)}
+  .vcard-note{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12.5px;line-height:1.6;color:var(--ink-soft);white-space:pre-wrap;word-break:break-word}
   .vcard-actions{margin-top:12px;display:flex;gap:8px;align-items:center}
   .vcard-sel{height:28px;padding:0 11px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:12px;color:var(--ink-soft)}
   .vcard-sel:hover{color:var(--ink);border-color:var(--node)}
@@ -1181,6 +1188,7 @@ function renderValuationPanel(item, panel, idBlock) {
     const sum = document.createElement("div"); sum.className = "vcard-assume"; sum.textContent = model ? assumeSummary(model, card.inputs) : "";
     const vinfo = verdictOf({ ...c, fairLow: card.low, fairHigh: card.high }, VMSGS);
     const verd = document.createElement("div"); verd.className = "vcard-verdict " + vinfo.cls; verd.textContent = c.price > 0 ? vinfo.text : "";
+    const note = document.createElement("div"); note.className = "vcard-note"; note.textContent = card.note || ""; if (!card.note) note.style.display = "none";
     const actions = document.createElement("div"); actions.className = "vcard-actions";
     const sel = document.createElement("button"); sel.type = "button"; sel.className = "vcard-sel" + (c.selectedValuationId === card.id ? " on" : "");
     sel.textContent = c.selectedValuationId === card.id ? (LANG === "zh" ? "● 合理区间" : "● Fair range") : (LANG === "zh" ? "○ 设为合理区间" : "○ Set as fair range");
@@ -1194,7 +1202,7 @@ function renderValuationPanel(item, panel, idBlock) {
       saveItem(item); showList();
     });
     actions.append(sel, edit, del);
-    wrap.append(head, sum, verd, actions);
+    wrap.append(head, sum, verd, note, actions);
     return wrap;
   }
 
@@ -1205,14 +1213,15 @@ function renderValuationPanel(item, panel, idBlock) {
       lang: LANG,
       initialMethod: card ? card.method : undefined,
       initialInputs: card ? card.inputs : undefined,
+      initialNote: card ? card.note : undefined,
       onCancel: () => showList(),
-      onDone: ({ method, inputs, low, high }) => {
+      onDone: ({ method, inputs, low, high, note }) => {
         if (!Array.isArray(c.valuations)) c.valuations = [];
         if (card) {
-          Object.assign(card, { method, inputs, low, high, updatedAt: new Date().toISOString() });
+          Object.assign(card, { method, inputs, low, high, note, updatedAt: new Date().toISOString() });
           if (c.selectedValuationId === card.id) selectValuation(item, card, idBlock);
         } else {
-          const fresh = { id: newValuationId(), method, inputs, low, high, updatedAt: new Date().toISOString() };
+          const fresh = { id: newValuationId(), method, inputs, low, high, note, updatedAt: new Date().toISOString() };
           c.valuations.push(fresh);
           if (!c.selectedValuationId) selectValuation(item, fresh, idBlock); // 首张/无选中时自动设为合理区间
         }
