@@ -14,16 +14,29 @@
 - 该接口是独立 HTTP（签名），不同于现用 WS quote 协议。**签名复用 `getOtp` 的模式**：canonical = `GET|<path>|<query>|<signed-headers-block>|<header-names>|`，`sig = hmac256hex(SECRET, "HMAC-SHA256|" + sha1hex(canonical))`，头 `authorization / x-api-key / x-timestamp / x-api-signature`。
 - 来源：open.longbridge.com/docs/fundamental/fundamental/financial-report（及 snapshot）。
 
-## Task 0：探针（必须先跑，整套实现依赖其产出）
+## 接口（已用 `.dev.vars` 凭据实测确认，token 有 fundamental 权限）
 
-用 `.dev.vars` 凭据，按 `getOtp` 签名模式对 Fundamental Financial Report 端点发一次真实 GET（候选 path `/v1/fundamental/financial-report`，query `symbol=AAPL.US&kind=All&period=Annual`；若候选 path 不对，依据文档/错误码修正）。必须产出：
+- **path**：`GET /v1/quote/financial-reports`（host `https://openapi.longportapp.com`）。
+- **query（必须按字母序，签名 canonical 与 URL 一致）**：`counter_id` + `kind` + `report`。
+  - `counter_id`：由 longport symbol 转 `ST/<MARKET>/<CODE>`，如 `AAPL.US→ST/US/AAPL`、`700.HK→ST/HK/700`（code=最后一个 `.` 前，market=后，大写）。
+  - `kind`：`ALL`（默认）/ `IS` / `BS` / `CF`。
+  - `report`：`af`(年报，默认) / `saf` / `q1` / `q2` / `q3` / `qf`(季报) / `3q`。
+- **签名**：沿用 `getOtp` 模式，`canonical = GET|/v1/quote/financial-reports|<sorted-query>|<sh>|authorization;x-api-key;x-timestamp|`。
+- **响应**（实测）：
+  ```
+  { code:0, data:{ report:"af", list:{
+      IS:{ indicators:[ { title, currency, periods:[...], accounts:[
+            { name, field, currency?, values:[ {year, fp_end, period, value, yoy, ratio} ] } ] } ] },
+      BS:{...}, CF:{...} } } }
+  ```
+  `values` 最新期在前；`value` 是字符串（`parseFloat`）。
+- **字段码（实测）**：
+  - IS：`OperatingRevenue`(营收)、`NetProfit`(净利)、`OperatingIncome`(营业利润/EBIT)、`EPS`、`GrossMgn`、`NetProfitMargin`、`ROE`。
+  - BS：`TotalAssets`、`TotalLiability`、`BPS`、`NetDebt`、`CashSTInvest` 等。
+  - CF：`NetOperateCashFlow`、`NetInvestCashFlow`、`NetFinanceCashFlow`、`NetFreeCashFlow`、`CapEx` 等。
+  - **EBITDA 接口不提供**（仅 `OperatingIncome`=EBIT）→ EV/EBITDA 的 EBITDA 维持手填。
 
-1. 确认**精确 HTTP path 与 query 参数名/取值**。
-2. 确认 token **是否有 fundamental 权限**（返回 `code===0 && data`）。
-3. 把 AAPL 的真实 JSON 存为 fixture：`test-core/fixtures/financials-aapl.json`。
-4. 从 fixture 记录：IS/BS/CF 的**分组键**，以及营收 / 净利 / 营业利润(EBIT) / EBITDA 对应的 `field` 码（写进代码里的字段码常量）。
-
-**门禁**：若无权限或拿不到数据 → 停止本功能，向用户报告，回退方案 = 财报 tab 维持「即将上线」、预填维持现状（FCFE 用 eps×股数、营收手填）。其余任务都不做。
+测试 fixture：把实测响应裁剪为小样本存 `test-core/fixtures/financials-aapl.json`（每个 kind 留 2–3 个 account、2 期）。
 
 ## 数据层（`src/longbridge.js`）
 
@@ -32,7 +45,7 @@
   - 调 `parseFinancials(json)` 归一化为 `{ IS:[Acct], BS:[Acct], CF:[Acct] }`，`Acct = { field, name, values:[{ period, year, fpEnd, value, yoy }] }`（最新期在前）。
   - 任意错误/空 → 返回 `null`。
 - `parseFinancials(json)`：**导出的纯函数**，按 Task 0 确认的响应键解析；坏数据兜底 `null`。
-- `pickLatestAnnual(financials)`：导出纯函数，按字段码常量从 IS 取最近一期年报的 `{ revenue, netIncome, ebitda }`（取不到的项为 `null`）。字段码常量来自 Task 0。
+- `pickLatestAnnual(financials)`：导出纯函数，取最近一期年报 `{ revenue, netIncome, netDebt }`：IS.`OperatingRevenue`→revenue、IS.`NetProfit`→netIncome、BS.`NetDebt`→netDebt（取不到的项为 `null`）。EBITDA 接口不提供，不预填。
 
 ## 服务端路由（`src/index.js`）
 
@@ -49,12 +62,13 @@
 - 三态：加载中 / 空（暂无财报数据）/ 错误。
 
 ### 预填（计算器）
-- `valuationCtx(item)` 增加 `revenue / netIncome / ebitda = pickLatestAnnual(item._financials.annual)`（无则 `undefined`）。
+- `valuationCtx(item)` 增加 `revenue / netIncome / netDebt = pickLatestAnnual(item._financials.annual)`（无则 `undefined`）。
 - 模型 prefill 调整（`valuation/intrinsic.js`、`valuation/relative.js`）：
   - FCFF / PE / PS 的 `revenue`：`prefill:(ctx)=> ctx.revenue ?? ""`。
   - FCFE 的 `netIncome`：`prefill:(ctx)=> ctx.netIncome ?? (isFinite(ctx.epsTtm*ctx.shares) ? ctx.epsTtm*ctx.shares : "")`。
-  - EV/EBITDA 的 `ebitda`：`prefill:(ctx)=> ctx.ebitda ?? ""`。
-- 财报未取到时 ctx 无这些字段 → prefill 返回 ""，回退手填，不报错。
+  - FCFF / EV-EBITDA 的 `netDebt`：`prefill:(ctx)=> ctx.netDebt ?? 0`（现默认 0，有则用真实净负债）。
+  - EV/EBITDA 的 `ebitda`：接口无此数据，维持手填（prefill 不变）。
+- 财报未取到时 ctx 无这些字段 → prefill 回退（""/0），不报错。
 
 ### i18n（`public/shared/i18n.js`）
 - 新增：`d_stmt_is/d_stmt_bs/d_stmt_cf`、`d_period_annual/d_period_quarter`、`d_yoy`、`d_no_financials`。

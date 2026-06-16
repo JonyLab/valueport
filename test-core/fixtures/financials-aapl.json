@@ -1,0 +1,177 @@
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "report": "af",
+    "list": {
+      "IS": {
+        "indicators": [
+          {
+            "title": "IS",
+            "currency": "USD",
+            "accounts": [
+              {
+                "name": "营业收入(USD)",
+                "field": "OperatingRevenue",
+                "currency": "USD",
+                "values": [
+                  {
+                    "year": 2025,
+                    "fp_end": "1758945600",
+                    "period": "FY 2025",
+                    "value": "416161000000.0000",
+                    "yoy": "6.42551178283274",
+                    "ratio": ""
+                  },
+                  {
+                    "year": 2024,
+                    "fp_end": "1727496000",
+                    "period": "FY 2024",
+                    "value": "391035000000.0000",
+                    "yoy": "2.02199407751412",
+                    "ratio": ""
+                  }
+                ]
+              },
+              {
+                "name": "净利润(USD)",
+                "field": "NetProfit",
+                "currency": "USD",
+                "values": [
+                  {
+                    "year": 2025,
+                    "fp_end": "1758945600",
+                    "period": "FY 2025",
+                    "value": "112010000000.0000",
+                    "yoy": "19.49517794657335",
+                    "ratio": ""
+                  },
+                  {
+                    "year": 2024,
+                    "fp_end": "1727496000",
+                    "period": "FY 2024",
+                    "value": "93736000000.0000",
+                    "yoy": "-3.35996700860869",
+                    "ratio": ""
+                  }
+                ]
+              },
+              {
+                "name": "营业利润(USD)",
+                "field": "OperatingIncome",
+                "currency": "USD",
+                "values": [
+                  {
+                    "year": 2025,
+                    "fp_end": "1758945600",
+                    "period": "FY 2025",
+                    "value": "133050000000.0000",
+                    "yoy": "7.9811063498247",
+                    "ratio": ""
+                  },
+                  {
+                    "year": 2024,
+                    "fp_end": "1727496000",
+                    "period": "FY 2024",
+                    "value": "123216000000.0000",
+                    "yoy": "7.79958180593346",
+                    "ratio": ""
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "BS": {
+        "indicators": [
+          {
+            "title": "BS",
+            "currency": "USD",
+            "accounts": [
+              {
+                "name": "总资产(USD)",
+                "field": "TotalAssets",
+                "currency": "USD",
+                "values": [
+                  {
+                    "year": 2025,
+                    "fp_end": "1758945600",
+                    "period": "FY 2025",
+                    "value": "359241000000.0000",
+                    "yoy": "",
+                    "ratio": ""
+                  },
+                  {
+                    "year": 2024,
+                    "fp_end": "1727496000",
+                    "period": "FY 2024",
+                    "value": "364980000000.0000",
+                    "yoy": "",
+                    "ratio": ""
+                  }
+                ]
+              },
+              {
+                "name": "净债务(USD)",
+                "field": "NetDebt",
+                "currency": "USD",
+                "values": [
+                  {
+                    "year": 2025,
+                    "fp_end": "1758945600",
+                    "period": "FY 2025",
+                    "value": "-20043000000.0000",
+                    "yoy": "46.68138650208827",
+                    "ratio": ""
+                  },
+                  {
+                    "year": 2024,
+                    "fp_end": "1727496000",
+                    "period": "FY 2024",
+                    "value": "-37591000000.0000",
+                    "yoy": "1.51431790196233",
+                    "ratio": ""
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "CF": {
+        "indicators": [
+          {
+            "title": "CF",
+            "currency": "USD",
+            "accounts": [
+              {
+                "name": "自由现金流(USD)",
+                "field": "NetFreeCashFlow",
+                "currency": "USD",
+                "values": [
+                  {
+                    "year": 2025,
+                    "fp_end": "1758945600",
+                    "period": "FY 2025",
+                    "value": "78862250000.0000",
+                    "yoy": "-28.85422117171571",
+                    "ratio": ""
+                  },
+                  {
+                    "year": 2024,
+                    "fp_end": "1727496000",
+                    "period": "FY 2024",
+                    "value": "110846000000.0000",
+                    "yoy": "30.96462143980623",
+                    "ratio": ""
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
