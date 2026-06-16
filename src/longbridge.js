@@ -84,19 +84,25 @@ function parseQuotes(body) { // SecurityQuoteResponse{repeated SecurityQuote sec
   }
   return out;
 }
-function parseStaticInfo(body) { // SecurityStaticInfoResponse{repeated secu_static_info=1}; StaticInfo{symbol=1,name_cn=2,name_en=3,name_hk=4}
+export function parseStaticInfo(body) { // SecurityStaticInfoResponse{repeated secu_static_info=1}；字段号按线上网关实测：symbol=1,name_cn=2,name_en=3,name_hk=4,exchange=6,currency=7,total_shares=9,eps_ttm=13,bps=14,dividend_yield=15
   const dec = new TextDecoder();
   const out = [];
   for (const [f, wt, val] of pbFields(body)) {
     if (f === 1 && wt === 2) {
-      let sym = null, cn = "", en = "", hk = "";
+      let sym = null, cn = "", en = "", hk = "", exchange = "", currency = "", totalShares = 0, epsTtm = "", bps = "", dividendYield = "";
       for (const [ff, ww, vv] of pbFields(val)) {
         if (ff === 1 && ww === 2) sym = dec.decode(vv);
         else if (ff === 2 && ww === 2) cn = dec.decode(vv);
         else if (ff === 3 && ww === 2) en = dec.decode(vv);
         else if (ff === 4 && ww === 2) hk = dec.decode(vv);
+        else if (ff === 6 && ww === 2) exchange = dec.decode(vv);
+        else if (ff === 7 && ww === 2) currency = dec.decode(vv);
+        else if (ff === 9 && ww === 0) totalShares = vv;
+        else if (ff === 13 && ww === 2) epsTtm = dec.decode(vv);
+        else if (ff === 14 && ww === 2) bps = dec.decode(vv);
+        else if (ff === 15 && ww === 2) dividendYield = dec.decode(vv);
       }
-      if (sym) out.push({ sym, cn, en, hk });
+      if (sym) out.push({ sym, cn, en, hk, exchange, currency, totalShares, epsTtm, bps, dividendYield });
     }
   }
   return out;
@@ -224,9 +230,13 @@ export async function fetchLongbridgeNames(env, tencentSymbols) {
           } else if (fr.cmd === 10) {
             if (fr.status !== 0) return fail(new Error("longbridge staticinfo status " + fr.status));
             const out = {};
-            for (const { sym, cn, en, hk } of parseStaticInfo(fr.body)) {
-              const tc = lpToTc.get(sym);
-              if (tc) out[tc] = { cn: cn || "", en: en || hk || "" };
+            for (const r of parseStaticInfo(fr.body)) {
+              const tc = lpToTc.get(r.sym);
+              if (tc) out[tc] = {
+                cn: r.cn || "", en: r.en || r.hk || "",
+                exchange: r.exchange || "", currency: r.currency || "",
+                totalShares: r.totalShares || 0, epsTtm: r.epsTtm || "", bps: r.bps || "", dividendYield: r.dividendYield || "",
+              };
             }
             done(out);
           }

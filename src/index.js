@@ -251,6 +251,8 @@ app.get("/app", async (c) => {
 // 取根路径的 index.html（canonical，200，不会触发 .html→去扩展名的 307 跳转），
 // 浏览器地址保持 /b/<slug>，页面 JS 再从 location.pathname 解析 slug。
 app.get("/b/:slug", (c) => { const url = new URL(c.req.url); url.pathname = "/"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
+// 标的详情页：同一个 SPA，前端按 /b/<slug>/<code> 解析后渲染详情
+app.get("/b/:slug/:code", (c) => { const url = new URL(c.req.url); url.pathname = "/"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
 // 估值方法介绍页（干净 URL，公开）
 app.get("/valuation", (c) => { const url = new URL(c.req.url); url.pathname = "/valuation.html"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
 app.all("*", (c) => {
