@@ -35,8 +35,8 @@ export const FIELD_META = {
 };
 
 const TX = {
-  zh: { latest: "最新", avg5: "5年均", now: "当前", own5y: "自身5年均", indMed: "行业中位" },
-  en: { latest: "Latest", avg5: "5y avg", now: "Now", own5y: "5y avg", indMed: "Industry median" },
+  zh: { latest: "最新年报", avg5: "近5年报均", now: "当前", own5y: "自身5年均", indMed: "行业中位" },
+  en: { latest: "Latest FY", avg5: "5Y avg", now: "Now", own5y: "5y avg", indMed: "Industry median" },
 };
 
 function ser(data, kind, field) {
