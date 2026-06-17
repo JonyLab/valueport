@@ -215,11 +215,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       b.addEventListener("click", () => fillFn(Math.round(chip.value * 100) / 100));
       row.appendChild(b);
     });
+    // 仅财报派生参考给溯源（链向年报：美股 10-K / 非美长桥财报页）；倍数类是当前市场/行业口径，不给申报源
     const isMultiple = meta.ref === "pe" || meta.ref === "pb" || meta.ref === "ps";
-    const src = refData.sources && (isMultiple ? refData.sources.valuation : refData.sources.financial);
+    const src = (!isMultiple && refData.sources) ? refData.sources.financial : null;
     if (src) {
       const a = el("a", "vc-srclink"); a.href = src; a.target = "_blank"; a.rel = "noopener";
-      a.textContent = "↗"; a.title = lang === "zh" ? "查看出处" : "View source";
+      a.textContent = "↗"; a.title = lang === "zh" ? "查看年报出处" : "View annual report";
       row.appendChild(a);
     }
     return row;
