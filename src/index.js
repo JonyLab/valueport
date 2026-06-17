@@ -3,7 +3,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { signToken, verifyToken } from "./auth.js";
 import { validateItem, rowToItem } from "./items.js";
 import { parseTencentQuotes, parseTencentHints } from "./quotes.js";
-import { fetchLongbridgeQuotes, fetchLongbridgeNames, fetchLongbridgeFinancials, pickLatestAnnual } from "./longbridge.js";
+import { fetchLongbridgeQuotes, fetchLongbridgeNames, fetchLongbridgeFinancials, pickLatestAnnual, fetchValuationRefs } from "./longbridge.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
@@ -74,14 +74,22 @@ app.get("/api/names", async (c) => {
 // 财报（Fundamental）：按需取 + 缓存一天。无凭据/无权限 → financials:null（前端优雅降级）。
 app.get("/api/financials", async (c) => {
   const symbol = (c.req.query("symbol") || "").trim();
-  const report = c.req.query("period") === "quarter" ? "qf" : "af";
-  let financials = null;
-  if (symbol && c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN) {
-    try { financials = await fetchLongbridgeFinancials(c.env, symbol, report); }
-    catch (e) { console.error("financials failed:", e && e.message); financials = null; }
+  const isAnnual = c.req.query("period") !== "quarter";
+  const report = isAnnual ? "af" : "qf";
+  const haveCreds = c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN;
+  let financials = null, valuationRefs = null;
+  if (symbol && haveCreds) {
+    try {
+      if (isAnnual) {
+        const [f, vr] = await Promise.all([fetchLongbridgeFinancials(c.env, symbol, report), fetchValuationRefs(c.env, symbol)]);
+        financials = f; valuationRefs = vr;
+      } else {
+        financials = await fetchLongbridgeFinancials(c.env, symbol, report);
+      }
+    } catch (e) { console.error("financials failed:", e && e.message); financials = null; }
   }
   c.header("Cache-Control", "public, max-age=86400");
-  return c.json({ financials, latest: pickLatestAnnual(financials) });
+  return c.json({ financials, latest: pickLatestAnnual(financials), valuationRefs });
 });
 app.get("/api/hints", async (c) => {
   const q = c.req.query("q") || "";

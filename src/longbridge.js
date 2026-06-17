@@ -100,6 +100,64 @@ export async function fetchLongbridgeFinancials(env, tencentSymbol, report) {
   catch { return null; }
 }
 
+/* ---------- 行业估值参考（PE/PB/PS：当前 / 自身5年均 / 行业中位） ---------- */
+function _median(arr) {
+  const a = (arr || []).filter(Number.isFinite).sort((x, y) => x - y);
+  if (!a.length) return null;
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+// industry-valuation-distribution → { pe:{value,median}, pb:{...}, ps:{...} } | null
+export function parseValuationDist(json) {
+  if (!json || json.code !== 0 || !json.data) return null;
+  const out = {};
+  for (const m of ["pe", "pb", "ps"]) {
+    const d = json.data[m];
+    if (!d) continue;
+    out[m] = { value: parseFloat(d.value), median: parseFloat(d.median) };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+// industry-valuation-comparison → 自身（首条）history → { pe:[...], pb:[...], ps:[...] } | null
+export function parseIndustryComp(json) {
+  if (!json || json.code !== 0 || !json.data || !Array.isArray(json.data.list) || !json.data.list.length) return null;
+  const self = json.data.list[0];
+  const hist = Array.isArray(self.history) ? self.history : [];
+  if (!hist.length) return null;
+  return {
+    pe: hist.map((h) => parseFloat(h.pe)),
+    pb: hist.map((h) => parseFloat(h.pb)),
+    ps: hist.map((h) => parseFloat(h.ps)),
+  };
+}
+
+// 合成参考：current=dist.value，industryMedian=dist.median，own5y=最近~20季 history 的中位
+export function buildValuationRefs(dist, comp) {
+  const out = {}; let any = false;
+  for (const m of ["pe", "pb", "ps"]) {
+    const current = dist && dist[m] && Number.isFinite(dist[m].value) ? dist[m].value : null;
+    const industryMedian = dist && dist[m] && Number.isFinite(dist[m].median) ? dist[m].median : null;
+    const own5y = comp && comp[m] ? _median(comp[m].slice(-20)) : null;
+    if (current != null || industryMedian != null || own5y != null) { out[m] = { current, own5y, industryMedian }; any = true; }
+  }
+  return any ? out : null;
+}
+
+export async function fetchValuationRefs(env, tencentSymbol) {
+  const lp = tencentToLongport(tencentSymbol);
+  if (!lp) return null;
+  const q = `counter_id=${symbolToCounterId(lp)}`;
+  try {
+    const [distJson, compJson] = await Promise.all([
+      signedGet(env, "/v1/quote/industry-valuation-distribution", q),
+      signedGet(env, "/v1/quote/industry-valuation-comparison", q),
+    ]);
+    return buildValuationRefs(parseValuationDist(distJson), parseIndustryComp(compJson));
+  } catch { return null; }
+}
+
 /* ---------- 工具 ---------- */
 function toHex(buf) {
   const b = new Uint8Array(buf); let s = "";
