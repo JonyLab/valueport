@@ -165,11 +165,11 @@
   .combo-opt .c-name{color:var(--ink-soft);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .combo-opt .c-mkt{font-size:10.5px;color:var(--ink-mute);background:var(--accent);border:1px solid var(--border);padding:1px 6px;border-radius:999px;white-space:nowrap}
 
-  /* 卡片上的编辑按钮：靠上角，hover 卡片时才出现（触屏设备常驻） */
-  .card-edit{position:absolute;top:12px;right:14px;z-index:5}
+  /* 卡片操作（查看详情 / 编辑）：靠上角，hover 卡片时才出现（触屏设备常驻） */
+  .card-actions{position:absolute;top:12px;right:14px;z-index:5;display:flex;gap:4px}
   @media (hover:hover){
-    .card-edit{opacity:0;transition:opacity .15s}
-    .chart-item:hover .card-edit,.card-edit:focus-visible{opacity:1}
+    .card-actions{opacity:0;transition:opacity .15s}
+    .chart-item:hover .card-actions,.card-actions:focus-within{opacity:1}
   }
   /* 末尾「添加」做成一行标尺行，融入方格，而非浮起的虚线盒 */
   .add-card{grid-column:1 / -1;border:0;border-bottom:1px solid var(--divider);margin:0;padding:20px 0;
@@ -674,23 +674,28 @@ function addChart(cfg) {
   const gauge = new Bar(gwrap);
   wrap.append(info, gwrap);
   const item = { id: cfg.id || null, cfg: { ...cfg }, gauge, chartEl: wrap, verdictEl: verdict, nameEl, codeEl, live: false, gotQuote: false };
-  // 整行可点 → 进详情（仅主人；访客只看列表）
+  // 进详情（仅主人；访客只看列表）
+  const openDetail = () => {
+    const code = (item.cfg.ticker || "").toUpperCase();
+    if (!code) return;
+    history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug) + "/" + encodeURIComponent(code));
+    showDetail(item);
+  };
   if (owner) {
     wrap.style.cursor = "pointer";
-    wrap.addEventListener("click", (e) => {
-      if (e.target.closest(".card-edit")) return;
-      const code = (item.cfg.ticker || "").toUpperCase();
-      if (!code) return;
-      history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug) + "/" + encodeURIComponent(code));
-      showDetail(item);
-    });
-  }
-  if (owner) {
+    wrap.addEventListener("click", (e) => { if (e.target.closest(".card-actions")) return; openDetail(); });
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+    const detail = document.createElement("button");
+    detail.className = "btn sm ghost";
+    detail.textContent = t("b_detail");
+    detail.addEventListener("click", openDetail);
     const edit = document.createElement("button");
-    edit.className = "btn sm ghost card-edit";
+    edit.className = "btn sm ghost";
     edit.textContent = t("b_edit");
     edit.addEventListener("click", () => openItemModal(item, false));
-    wrap.appendChild(edit);
+    actions.append(detail, edit);
+    wrap.appendChild(actions);
   }
   if (addCardEl) chartsEl.insertBefore(wrap, addCardEl); else chartsEl.appendChild(wrap);
   items.push(item);
