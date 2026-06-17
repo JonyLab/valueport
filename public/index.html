@@ -314,6 +314,7 @@
   .vc-refchip:hover{color:var(--ink);border-color:var(--node)}
   .vc-refrange{border-color:#31679b;color:#31679b}
   .vc-refrange:hover{background:#31679b;color:#fff;border-color:#31679b}
+  .vc-refq{border-style:dashed;color:var(--ink-mute)}/* 季报/TTM 口径：虚线区分于年报 */
   .vc-srclink{margin-left:2px;color:var(--ink-mute);text-decoration:none;font-size:12px;cursor:pointer}
   .vc-srclink:hover{color:var(--ink)}
   /* 估值卡片列表 */
@@ -1176,6 +1177,7 @@ function renderDetail(item) {
   else { const e = document.createElement("div"); e.className = "vd-empty"; e.textContent = t("d_no_fundamentals"); panelEls[0].appendChild(e); }
   renderFinancialsPanel(item, panelEls[1]);
   loadFinancials(item, "annual"); // 预取年报，供计算器预填
+  loadFinancials(item, "quarter"); // 预取季报，供「最新季 / 近4季 TTM」参考
   renderValuationPanel(item, panelEls[2], idBlock);
 
   viewDetail.append(back, top, tabsNav, panels);
@@ -1379,9 +1381,12 @@ function renderValuationPanel(item, panel, idBlock) {
       initialMethod: card ? card.method : undefined,
       initialInputs: card ? card.inputs : undefined,
       initialNote: card ? card.note : undefined,
-      refData: (item._financials && item._financials.annual)
-        ? { financials: item._financials.annual.financials || null, valuationRefs: item._financials.annual.valuationRefs || null, sources: valuationSources(item, LANG) }
-        : { financials: null, valuationRefs: null, sources: valuationSources(item, LANG) },
+      refData: {
+        financials: (item._financials && item._financials.annual && item._financials.annual.financials) || null,
+        financialsQ: (item._financials && item._financials.quarter && item._financials.quarter.financials) || null,
+        valuationRefs: (item._financials && item._financials.annual && item._financials.annual.valuationRefs) || null,
+        sources: valuationSources(item, LANG),
+      },
       verdict: (low, high) => { const vv = verdictOf({ ...c, fairLow: low, fairHigh: high }, VMSGS); return { text: vv.text, cls: vv.cls }; },
       onCancel: () => finishValEdit(),
       onDone: ({ method, inputs, low, high, note }) => {

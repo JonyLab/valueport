@@ -8,7 +8,7 @@
  *   verdict(low, high) → { text, cls } | null     —— 由宿主提供（结果卡判定行）
  */
 import { MODELS, runModel } from "/shared/valuation/index.js";
-import { FIELD_META, fieldReference } from "/shared/field-meta.js";
+import { FIELD_META, fieldReference, moneyQuarterRef } from "/shared/field-meta.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -197,9 +197,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     if (!r) return null;
     const row = el("div", "vc-ref");
     const unitFmt = (n) => r.unit === "%" ? n.toFixed(1) + "%" : n.toFixed(1) + "x";
-    // 一键套用区间：把参考的最小/最大配成 保守–乐观（仅 dual 字段）
-    if (fillRange && r.chips.length >= 2) {
-      const vals = r.chips.map((c) => c.value).filter(Number.isFinite);
+    // 一键套用区间：用「年报口径」筹码的最小/最大配成 保守–乐观（忽略季报口径，仅 dual 字段）
+    if (fillRange && r.chips.filter((c) => !c.q).length >= 2) {
+      const vals = r.chips.filter((c) => !c.q).map((c) => c.value).filter(Number.isFinite);
       const lo = Math.min(...vals), hi = Math.max(...vals);
       if (hi > lo) {
         const rb = el("button", "vc-refchip vc-refrange"); rb.type = "button";
@@ -209,7 +209,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       }
     }
     r.chips.forEach((chip) => {
-      const b = el("button", "vc-refchip"); b.type = "button";
+      const b = el("button", "vc-refchip" + (chip.q ? " vc-refq" : "")); b.type = "button";
       const shown = r.unit === "%" ? chip.value.toFixed(1) + "%" : chip.value.toFixed(1) + "x";
       b.textContent = `${chip.label} ${shown}`;
       b.addEventListener("click", () => fillFn(Math.round(chip.value * 100) / 100));
@@ -282,6 +282,18 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         fld.append(lab, input);
         const refRow = buildRefRow(field, (v) => { if (money) { input.value = fmtMoney(v); input.dataset.raw = String(v); } else input.value = String(v); recompute(); });
         if (refRow) fld.appendChild(refRow);
+        // money 字段：季报口径估值（近4季 TTM / 最新季报余额），点击回填，明确标注
+        if (money && refData) {
+          const mq = moneyQuarterRef(field.meta, refData, lang);
+          if (mq) {
+            const mrow = el("div", "vc-ref");
+            const b = el("button", "vc-refchip vc-refq"); b.type = "button";
+            b.textContent = `${mq.label} ≈ ${fmtMoney(mq.value)}`;
+            b.addEventListener("click", () => { input.value = fmtMoney(mq.value); input.dataset.raw = String(mq.value); recompute(); });
+            mrow.appendChild(b);
+            fld.appendChild(mrow);
+          }
+        }
         if (guideRow) fld.appendChild(guideRow);
         card.appendChild(fld);
       });

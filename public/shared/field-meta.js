@@ -35,13 +35,38 @@ export const FIELD_META = {
 };
 
 const TX = {
-  zh: { latest: "最新年报", avg5: "近5年报均", now: "当前", own5y: "自身5年均", indMed: "行业中位" },
-  en: { latest: "Latest FY", avg5: "5Y avg", now: "Now", own5y: "5y avg", indMed: "Industry median" },
+  zh: { latest: "最新年报", avg5: "近5年报均", now: "当前", own5y: "自身5年均", indMed: "行业中位", qoy: "最新季同比", q: "最新季", ttm: "近4季 TTM", latestQ: "最新季报" },
+  en: { latest: "Latest FY", avg5: "5Y avg", now: "Now", own5y: "5y avg", indMed: "Industry median", qoy: "Latest Q YoY", q: "Latest Q", ttm: "TTM (4Q)", latestQ: "Latest Q" },
 };
 
 function ser(data, kind, field) {
   const acc = data && data.financials && data.financials[kind] && data.financials[kind].find((a) => a.field === field);
   return acc ? acc.values.map((v) => v.value) : [];
+}
+// 季报（单季）序列：最新在前
+function serQ(data, kind, field) {
+  const acc = data && data.financialsQ && data.financialsQ[kind] && data.financialsQ[kind].find((a) => a.field === field);
+  return acc ? acc.values.map((v) => v.value) : [];
+}
+// 最新季单季同比：本季 vs 去年同季（s[0] vs s[4]）
+function qYoY(s) {
+  return (s.length >= 5 && Number.isFinite(s[0]) && Number.isFinite(s[4]) && s[4] !== 0) ? (s[0] - s[4]) / Math.abs(s[4]) * 100 : null;
+}
+// 给参考对象追加一个「季报口径」筹码（带 q:true，套用区间会忽略它）
+function withQ(ref, label, value, unit) {
+  if (!Number.isFinite(value)) return ref;
+  const chip = { label, value, q: true };
+  if (!ref) return { unit, chips: [chip] };
+  ref.chips.push(chip); return ref;
+}
+// money 字段的季报口径估值：营收/净利 → 近4季 TTM 求和；净负债 → 最新季报余额
+export function moneyQuarterRef(metaTag, data, lang) {
+  const t = TX[lang] || TX.zh;
+  const sum4 = (kind, field) => { const s = serQ(data, kind, field).slice(0, 4).filter(Number.isFinite); return s.length === 4 ? s.reduce((a, b) => a + b, 0) : null; };
+  if (metaTag === "revenue") { const v = sum4("IS", "OperatingRevenue"); return Number.isFinite(v) ? { label: t.ttm, value: v } : null; }
+  if (metaTag === "netIncome") { const v = sum4("IS", "NetProfit"); return Number.isFinite(v) ? { label: t.ttm, value: v } : null; }
+  if (metaTag === "netDebt") { const s = serQ(data, "BS", "NetDebt"); return Number.isFinite(s[0]) ? { label: t.latestQ, value: s[0] } : null; }
+  return null;
 }
 function yoyLatest(s) {
   return (s.length >= 2 && Number.isFinite(s[0]) && Number.isFinite(s[1]) && s[1] !== 0) ? (s[0] - s[1]) / Math.abs(s[1]) * 100 : null;
@@ -68,14 +93,16 @@ function pair(latest, avg, unit, t) {
 export function fieldReference(refTag, data, ctx, lang) {
   const t = TX[lang] || TX.zh;
   switch (refTag) {
-    case "revGrowth": { const s = ser(data, "IS", "OperatingRevenue"); return pair(yoyLatest(s), yoyAvg(s), "%", t); }
-    case "niGrowth": { const s = ser(data, "IS", "NetProfit"); return pair(yoyLatest(s), yoyAvg(s), "%", t); }
-    case "epsGrowth": { const s = ser(data, "IS", "EPS"); return pair(yoyLatest(s), yoyAvg(s), "%", t); }
-    case "netMargin": { const s = ser(data, "IS", "NetProfitMargin"); return pair(s[0], avgN(s, 5), "%", t); }
+    case "revGrowth": { const s = ser(data, "IS", "OperatingRevenue"); return withQ(pair(yoyLatest(s), yoyAvg(s), "%", t), t.qoy, qYoY(serQ(data, "IS", "OperatingRevenue")), "%"); }
+    case "niGrowth": { const s = ser(data, "IS", "NetProfit"); return withQ(pair(yoyLatest(s), yoyAvg(s), "%", t), t.qoy, qYoY(serQ(data, "IS", "NetProfit")), "%"); }
+    case "epsGrowth": { const s = ser(data, "IS", "EPS"); return withQ(pair(yoyLatest(s), yoyAvg(s), "%", t), t.qoy, qYoY(serQ(data, "IS", "EPS")), "%"); }
+    case "netMargin": { const s = ser(data, "IS", "NetProfitMargin"); return withQ(pair(s[0], avgN(s, 5), "%", t), t.q, serQ(data, "IS", "NetProfitMargin")[0], "%"); }
     case "opMargin": {
       const oi = ser(data, "IS", "OperatingIncome"), or = ser(data, "IS", "OperatingRevenue");
       const m = oi.map((v, i) => (Number.isFinite(v) && or[i]) ? v / or[i] * 100 : NaN);
-      return pair(m[0], avgN(m, 5), "%", t);
+      const qoi = serQ(data, "IS", "OperatingIncome"), qor = serQ(data, "IS", "OperatingRevenue");
+      const qm = (Number.isFinite(qoi[0]) && qor[0]) ? qoi[0] / qor[0] * 100 : NaN;
+      return withQ(pair(m[0], avgN(m, 5), "%", t), t.q, qm, "%");
     }
     case "reinvest": {
       const fcf = ser(data, "CF", "NetFreeCashFlow"), ni = ser(data, "IS", "NetProfit");
