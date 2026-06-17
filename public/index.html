@@ -276,6 +276,15 @@
   .vc-done:disabled{opacity:.32;cursor:not-allowed}
   .vc-cancel{height:36px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--ink-soft);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:500}
   .vc-cancel:hover{color:var(--ink);border-color:var(--node)}
+  /* 估值提示 ⓘ + 参考筹码 + 溯源 */
+  .vc-info{margin-left:6px;border:0;background:none;color:var(--ink-mute);font-size:12px;cursor:pointer;padding:0;line-height:1;vertical-align:baseline}
+  .vc-info:hover{color:var(--ink)}
+  .vc-guide{grid-column:1 / -1;margin:-2px 0 2px;padding:9px 11px;background:var(--accent);border-radius:8px;font-size:12px;line-height:1.6;color:var(--ink-soft)}
+  .vc-ref{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:-2px}
+  .vc-refchip{border:1px solid var(--border);background:var(--card);border-radius:6px;padding:2px 8px;font-family:var(--font);font-size:11px;color:var(--ink-soft);cursor:pointer;transition:color .12s,border-color .12s}
+  .vc-refchip:hover{color:var(--ink);border-color:var(--node)}
+  .vc-srclink{margin-left:2px;color:var(--ink-mute);text-decoration:none;font-size:12px;cursor:pointer}
+  .vc-srclink:hover{color:var(--ink)}
   /* 估值卡片列表 */
   .vcards{margin-top:20px;display:flex;flex-direction:column;gap:10px}
   .vcard{border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--card);transition:border-color .12s,box-shadow .12s}
@@ -1188,7 +1197,7 @@ function assumeSummary(model, inputs) {
 function loadFinancials(item, period) {
   item._financials = item._financials || {};
   if (item._financials[period]) return Promise.resolve(item._financials[period]);
-  const url = `/api/financials?symbol=${encodeURIComponent(item.cfg.symbol)}&period=${period}`;
+  const url = `/api/financials?symbol=${encodeURIComponent(item.cfg.symbol)}&period=${period}&v=2`;
   return fetch(url).then((r) => r.json()).then((j) => (item._financials[period] = j))
     .catch(() => (item._financials[period] = { financials: null, latest: null }));
 }
@@ -1255,6 +1264,21 @@ function renderFinancialsPanel(item, panel) {
   sync(); draw();
 }
 
+// 参考溯源 URL：财报→优先官方监管(美股 EDGAR)否则长桥财报页；倍数→长桥估值页
+function valuationSources(item, lang) {
+  const m = /^(us|hk|sh|sz|bj)(.+)$/i.exec(item.cfg.symbol || "");
+  if (!m) return null;
+  const mkt = m[1].toUpperCase();
+  const code = mkt === "HK" ? String(parseInt(m[2], 10)) : (mkt === "US" ? m[2].toUpperCase() : m[2]);
+  const counterId = encodeURIComponent(`ST/${mkt}/${code}`);
+  const lblang = lang === "zh" ? "zh-CN" : "en-US";
+  const lb = (page) => `https://activity.lbkrs.com/${lblang}/lightning/${page}?counterId=${counterId}&need_login=0&lblang=${lblang}&lbtheme=light&lbapp=0`;
+  const financial = mkt === "US"
+    ? `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&ticker=${encodeURIComponent(code)}&type=10-K&dateb=&owner=include&count=40`
+    : lb("financial-report");
+  return { financial, valuation: lb("valuation") };
+}
+
 function renderValuationPanel(item, panel, idBlock) {
   const c = item.cfg;
   panel.innerHTML = "";
@@ -1319,6 +1343,9 @@ function renderValuationPanel(item, panel, idBlock) {
       initialMethod: card ? card.method : undefined,
       initialInputs: card ? card.inputs : undefined,
       initialNote: card ? card.note : undefined,
+      refData: (item._financials && item._financials.annual)
+        ? { financials: item._financials.annual.financials || null, valuationRefs: item._financials.annual.valuationRefs || null, sources: valuationSources(item, LANG) }
+        : { financials: null, valuationRefs: null, sources: valuationSources(item, LANG) },
       onCancel: () => closeValModal(),
       onDone: ({ method, inputs, low, high, note }) => {
         if (!Array.isArray(c.valuations)) c.valuations = [];
