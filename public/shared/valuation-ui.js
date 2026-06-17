@@ -1,22 +1,20 @@
 /**
- * valuation-ui.js — 估值卡片编辑器（方法选择 + 前提/情景假设工作表 + 实时低~高 + 区间条预览）。
- * 依赖：MODELS/runModel（valuation/index.js）、Bar（bar.js）。
- * 导出：mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, onDone, onCancel })
- *   onDone({ method, inputs, low, high })  —— 用户点「完成」、且低~高有效时触发
- *   onCancel()                              —— 用户点「取消」
- *   initialMethod / initialInputs           —— 编辑既有卡片时回填（否则用 prefill/default）
+ * valuation-ui.js — 估值编辑器（Figma「Add Valuation」结构）。
+ * 左栏：估值方法下拉 + Inputs(前提) 卡 + Assumptions(情景假设) 卡 + 备注。
+ * 右栏：结果卡（低~高 + 判定 + 预测明细 breakdown）+ Submit。
+ * 依赖：MODELS/runModel（valuation/index.js）、FIELD_META/fieldReference（field-meta.js）。
+ * 导出：mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, refData, verdict, onDone, onCancel })
+ *   onDone({ method, inputs, low, high, note })  —— 点 Submit、且低~高有效时触发
+ *   verdict(low, high) → { text, cls } | null     —— 由宿主提供（结果卡判定行）
  */
 import { MODELS, runModel } from "/shared/valuation/index.js";
-import { Bar } from "/shared/bar.js";
 import { FIELD_META, fieldReference } from "/shared/field-meta.js";
 
 const TX = {
-  zh: { intrinsic: "内在价值", relative: "相对估值", facts: "前提", assume: "情景假设",
-        conservative: "保守", optimistic: "乐观", fair: "合理价值", done: "完成", cancel: "取消", dash: "—",
-        note: "备注", notePh: "为什么给出这个估值？关键逻辑、假设依据、风险…" },
-  en: { intrinsic: "Intrinsic", relative: "Relative", facts: "Inputs", assume: "Assumptions",
-        conservative: "Conservative", optimistic: "Optimistic", fair: "Fair value", done: "Done", cancel: "Cancel", dash: "—",
-        note: "Note", notePh: "Why this valuation? Key logic, assumptions, risks…" },
+  zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
+        submit: "保存", dash: "—", note: "备注", notePh: "为什么给出这个估值？关键逻辑、假设依据、风险…" },
+  en: { method: "Method", facts: "Inputs", assume: "Assumptions", conservative: "Conservative", optimistic: "Optimistic",
+        submit: "Submit", dash: "—", note: "Note", notePh: "Why this valuation? Key logic, assumptions, risks…" },
 };
 
 function el(tag, cls, attrs) {
@@ -26,6 +24,27 @@ function el(tag, cls, attrs) {
   return node;
 }
 function fmt(v, dash) { return (v !== null && isFinite(v)) ? Number(v).toFixed(2) : dash; }
+function fmtMoney(n) {
+  const s = n < 0 ? "-" : "", a = Math.abs(n);
+  if (a >= 1e12) return s + (a / 1e12).toFixed(2) + "T";
+  if (a >= 1e9) return s + (a / 1e9).toFixed(2) + "B";
+  if (a >= 1e6) return s + (a / 1e6).toFixed(2) + "M";
+  if (a >= 1e3) return s + (a / 1e3).toFixed(2) + "K";
+  return s + a.toFixed(2);
+}
+function fmtKind(n, kind) {
+  if (!Number.isFinite(n)) return null;
+  if (kind === "mult") return n.toFixed(1) + "x";
+  if (kind === "pct") return n.toFixed(1) + "%";
+  if (kind === "money") return fmtMoney(n);
+  return n.toFixed(2);
+}
+function fmtRange(a, b, kind) {
+  const A = fmtKind(a, kind), B = fmtKind(b, kind);
+  if (A === null && B === null) return "—";
+  if (A === null) return B; if (B === null) return A;
+  return A === B ? A : `${A}–${B}`;
+}
 function initialFor(field, ctx) {
   let v = "";
   if (typeof field.prefill === "function") { try { v = field.prefill(ctx); } catch { v = ""; } }
@@ -34,27 +53,27 @@ function initialFor(field, ctx) {
   return v;
 }
 
-export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, refData, onDone, onCancel }) {
+export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, refData, verdict, onDone, onCancel }) {
   const L = TX[lang] || TX.zh;
   const tx = (k) => L[k];
-
   let activeIdx = Math.max(0, MODELS.findIndex((m) => m.key === initialMethod));
-  let lastLow = null, lastHigh = null;
+  let lastLow = null, lastHigh = null, lastForm = {};
 
   mount.innerHTML = "";
   const root = el("div", "vc");
-  const main = el("div", "vc-main");   // 左栏：输入（随页面滚动）
-  const side = el("div", "vc-side");   // 右栏：结果（桌面 sticky 常驻）
+  const main = el("div", "vc-main");
+  const side = el("div", "vc-side");
   root.append(main, side);
   mount.appendChild(root);
 
-  // 方法选择：分组下拉（内在价值 / 相对估值 两个 optgroup）
-  const methodsBar = el("div", "vc-methods");
+  // ── 估值方法（卡片外，独立标签 + 下拉）──
+  const mblock = el("div", "vc-mblock");
+  const mlabel = el("div", "vc-mlabel"); mlabel.textContent = tx("method");
   const select = el("select", "vc-select");
   [["intrinsic", MODELS.filter((m) => m.group === "intrinsic")],
    ["relative", MODELS.filter((m) => m.group === "relative")]].forEach(([gk, models]) => {
     if (!models.length) return;
-    const og = document.createElement("optgroup"); og.label = tx(gk);
+    const og = document.createElement("optgroup"); og.label = gk === "intrinsic" ? (lang === "zh" ? "内在价值" : "Intrinsic") : (lang === "zh" ? "相对估值" : "Relative");
     models.forEach((model) => {
       const o = document.createElement("option");
       o.value = String(MODELS.indexOf(model));
@@ -65,13 +84,13 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   });
   select.value = String(activeIdx);
   select.addEventListener("change", () => { activeIdx = Number(select.value); renderForm(); });
-  methodsBar.appendChild(select);
-  main.appendChild(methodsBar);
+  mblock.append(mlabel, select);
+  main.appendChild(mblock);
 
   const formWrap = el("div", "vc-form");
   main.appendChild(formWrap);
 
-  // 备注（长文本，跨方法切换保留）
+  // ── 备注 ──
   const noteWrap = el("div", "vc-note");
   const noteLabel = el("div", "vc-note-label"); noteLabel.textContent = tx("note");
   const noteInput = el("textarea", "vc-note-input"); noteInput.placeholder = tx("notePh");
@@ -79,34 +98,51 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   noteWrap.append(noteLabel, noteInput);
   main.appendChild(noteWrap);
 
-  // 结果 hero
-  const result = el("div", "vc-result");
-  side.appendChild(result);
+  // ── 右栏：结果卡 + Submit ──
+  const rcard = el("div", "vc-rcard");
+  const rtop = el("div", "vc-rcard-top");
   const nums = el("div", "vc-rnums");
-  const outLabel = el("span", "vc-out-label"); outLabel.textContent = tx("fair");
-  const outLow = el("span", "vc-rlow");
-  const outDash = el("span", "vc-rdash"); outDash.textContent = "~";
-  const outHigh = el("span", "vc-rhigh");
-  nums.append(outLabel, outLow, outDash, outHigh);
-  result.appendChild(nums);
-  const barMount = el("div", "vc-bar-mount");
-  result.appendChild(barMount);
-  let bar = null;
+  const outLow = el("span", "vc-rlow"), outDash = el("span", "vc-rdash"), outHigh = el("span", "vc-rhigh");
+  outDash.textContent = "–";
+  nums.append(outLow, outDash, outHigh);
+  const verdictEl = el("div", "vc-rverdict");
+  rtop.append(nums, verdictEl);
+  const bdMount = el("div", "vc-rcard-rows");
+  rcard.append(rtop, bdMount);
+  side.appendChild(rcard);
 
-  // 完成 / 取消
-  const actions = el("div", "vc-actions");
-  const doneBtn = el("button", "vc-done"); doneBtn.type = "button"; doneBtn.textContent = tx("done"); doneBtn.disabled = true;
-  doneBtn.addEventListener("click", () => {
+  const submitBtn = el("button", "vc-submit"); submitBtn.type = "button"; submitBtn.textContent = tx("submit"); submitBtn.disabled = true;
+  submitBtn.addEventListener("click", () => {
     if (lastLow === null || lastHigh === null || !isFinite(lastLow) || !isFinite(lastHigh)) return;
     onDone({ method: MODELS[activeIdx].key, inputs: lastForm, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
   });
-  const cancelBtn = el("button", "vc-cancel"); cancelBtn.type = "button"; cancelBtn.textContent = tx("cancel");
-  cancelBtn.addEventListener("click", () => onCancel && onCancel());
-  actions.append(doneBtn, cancelBtn);
-  result.appendChild(actions);
+  side.appendChild(submitBtn);
 
-  let lastForm = {};
-
+  // ── 计算 + 渲染结果 ──
+  function consOpt(model, form) {
+    const cons = {}, opt = {};
+    for (const f of model.fields) {
+      const v = form[f.k];
+      if (f.col === "dual") { cons[f.k] = v && typeof v === "object" ? v.c : NaN; opt[f.k] = v && typeof v === "object" ? v.o : NaN; }
+      else { cons[f.k] = v; opt[f.k] = v; }
+    }
+    return { cons, opt };
+  }
+  function renderBreakdown(model, form, valid) {
+    bdMount.innerHTML = "";
+    if (!valid || typeof model.breakdown !== "function") return;
+    const { cons, opt } = consOpt(model, form);
+    let bc, bo;
+    try { bc = model.breakdown(cons, ctx); bo = model.breakdown(opt, ctx); } catch { return; }
+    if (!Array.isArray(bc)) return;
+    bc.forEach((row, i) => {
+      const o = (bo && bo[i]) || {};
+      const r = el("div", "vc-rrow");
+      const k = el("span", "vc-rk"); k.textContent = (row.label && row.label[lang]) || row.key;
+      const val = el("span", "vc-rv"); val.textContent = fmtRange(row.value, o.value, row.kind);
+      r.append(k, val); bdMount.appendChild(r);
+    });
+  }
   function compute(formData) {
     lastForm = formData;
     const model = MODELS[activeIdx];
@@ -116,18 +152,19 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const dash = tx("dash");
     const valid = lastLow !== null && lastHigh !== null && isFinite(lastLow) && isFinite(lastHigh);
     outLow.textContent = fmt(lastLow, dash); outHigh.textContent = fmt(lastHigh, dash);
-    outDash.style.opacity = valid ? "1" : ".4";
-    if (valid && ctx.price > 0) {
-      if (!bar) bar = new Bar(barMount);
-      barMount.style.display = "";
-      bar.set({ price: ctx.price, fairLow: Math.min(lastLow, lastHigh), fairHigh: Math.max(lastLow, lastHigh), mos: ctx.mos || 0, ext: ctx.ext || 0 }, true);
-    } else { barMount.style.display = "none"; }
-    doneBtn.disabled = !valid;
+    outDash.style.opacity = valid ? "1" : ".35";
+    let v = null;
+    if (valid && typeof verdict === "function") { try { v = verdict(Math.min(lastLow, lastHigh), Math.max(lastLow, lastHigh)); } catch { v = null; } }
+    verdictEl.textContent = v ? v.text : "";
+    verdictEl.className = "vc-rverdict " + (v && v.cls ? v.cls : "");
+    verdictEl.style.display = v ? "" : "none";
+    renderBreakdown(model, formData, valid);
+    submitBtn.disabled = !valid;
   }
 
-  // 标签 + 可选 ⓘ 提示（提示框作为整行 grid 子元素返回，供后续插入）
-  function buildLabel(field) {
-    const lab = el("div", "vc-label");
+  // ── 字段构件（标签 + ⓘ、参考筹码 + ↗）──
+  function buildLabel(field, cls) {
+    const lab = el("div", cls || "vc-label");
     const span = el("span"); span.textContent = (field.label && field.label[lang]) || field.k; lab.appendChild(span);
     if (field.unit === "%") { const u = el("span", "vc-unit"); u.textContent = "%"; lab.appendChild(u); }
     const meta = field.meta && FIELD_META[field.meta];
@@ -140,14 +177,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     }
     return { lab, guideRow };
   }
-
-  // 参考筹码行（grid-column:2/-1）；点击回填 fillFn(value)；行末 ↗ 溯源
   function buildRefRow(field, fillFn) {
     const meta = field.meta && FIELD_META[field.meta];
     if (!meta || !meta.ref || !refData) return null;
     const r = fieldReference(meta.ref, refData, ctx, lang);
     if (!r) return null;
-    const row = el("div", "vc-ref"); row.style.gridColumn = "2 / -1";
+    const row = el("div", "vc-ref");
     r.chips.forEach((chip) => {
       const b = el("button", "vc-refchip"); b.type = "button";
       const shown = r.unit === "%" ? chip.value.toFixed(1) + "%" : chip.value.toFixed(1) + "x";
@@ -164,8 +199,6 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     }
     return row;
   }
-
-  // 单列初值：编辑态优先用 initialInputs，否则 prefill/default
   function singleInit(field) {
     if (initialInputs && Object.prototype.hasOwnProperty.call(initialInputs, field.k)) {
       const v = initialInputs[field.k];
@@ -180,8 +213,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const d = field.default ?? "";
     return { c: d, o: d };
   }
+  function makeInput(initVal) {
+    const inp = el("input", "vc-input", { type: "number", inputMode: "decimal", step: "any" });
+    if (initVal !== "" && initVal !== undefined && initVal !== null) inp.value = String(initVal);
+    return inp;
+  }
 
-  // 账本式分录：每个参数一行（共享网格模板 + 底部发丝线），无盒子输入，靠行线与对齐定位
   function renderForm() {
     formWrap.innerHTML = "";
     const model = MODELS[activeIdx];
@@ -191,55 +228,52 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const duals = fields.filter((f) => f.col === "dual");
     const recompute = () => compute(buildForm(readers));
 
-    const section = (headKey, items, dual) => {
-      const sec = el("div", "vc-section");
-      const h = el("div", "vc-shead"); h.textContent = tx(headKey); sec.appendChild(h);
-      if (dual) {
-        const ch = el("div", "vc-colhead-row");
-        const e0 = el("div"); const cc = el("div", "vc-chead"); cc.textContent = tx("conservative");
-        const co = el("div", "vc-chead"); co.textContent = tx("optimistic");
-        ch.append(e0, cc, co); sec.appendChild(ch);
-      }
-      items.forEach((field) => {
-        const prow = el("div", "vc-prow");
-        const { lab, guideRow } = buildLabel(field);
-        prow.appendChild(lab);
-        let fillFn;
-        if (dual) {
-          const init = dualInit(field);
-          const inC = makeInput(init.c), inO = makeInput(init.o);
-          readers.push({ field, getVal: () => ({ c: inC.value !== "" ? Number(inC.value) : NaN, o: inO.value !== "" ? Number(inO.value) : NaN }) });
-          inC.addEventListener("input", recompute); inO.addEventListener("input", recompute);
-          prow.append(inC, inO);
-          fillFn = (v) => { inC.value = String(v); inO.value = String(v); recompute(); };
-        } else {
-          const input = makeInput(singleInit(field));
-          if (field.hint && field.hint[lang]) input.placeholder = field.hint[lang];
-          input.style.gridColumn = "2 / -1";
-          readers.push({ field, getVal: () => input.value !== "" ? Number(input.value) : NaN });
-          input.addEventListener("input", recompute);
-          prow.appendChild(input);
-          fillFn = (v) => { input.value = String(v); recompute(); };
-        }
-        const refRow = buildRefRow(field, fillFn);
-        if (refRow) prow.appendChild(refRow);   // grid-column:2/-1 已在 buildRefRow 设好
-        if (guideRow) prow.appendChild(guideRow);
-        sec.appendChild(prow);
+    // Inputs（前提）卡：堆叠 标签 + 输入
+    if (singles.length) {
+      const card = el("div", "vc-card");
+      const h = el("div", "vc-card-head"); h.textContent = tx("facts"); card.appendChild(h);
+      singles.forEach((field) => {
+        const fld = el("div", "vc-fld");
+        const { lab, guideRow } = buildLabel(field, "vc-flabel");
+        const input = makeInput(singleInit(field));
+        if (field.hint && field.hint[lang]) input.placeholder = field.hint[lang];
+        readers.push({ field, getVal: () => input.value !== "" ? Number(input.value) : NaN });
+        input.addEventListener("input", recompute);
+        fld.append(lab, input);
+        const refRow = buildRefRow(field, (v) => { input.value = String(v); recompute(); });
+        if (refRow) fld.appendChild(refRow);
+        if (guideRow) fld.appendChild(guideRow);
+        card.appendChild(fld);
       });
-      formWrap.appendChild(sec);
-    };
+      formWrap.appendChild(card);
+    }
 
-    if (singles.length) section("facts", singles, false);
-    if (duals.length) section("assume", duals, true);
+    // Assumptions（情景假设）卡：保守/乐观 工作表
+    if (duals.length) {
+      const card = el("div", "vc-card");
+      const h = el("div", "vc-card-head"); h.textContent = tx("assume"); card.appendChild(h);
+      const grid = el("div", "vc-assume");
+      const cc = el("div", "vc-chead"); cc.textContent = tx("conservative");
+      const co = el("div", "vc-chead"); co.textContent = tx("optimistic");
+      grid.append(el("div"), cc, co);
+      duals.forEach((field) => {
+        const { lab, guideRow } = buildLabel(field);
+        const init = dualInit(field);
+        const inC = makeInput(init.c), inO = makeInput(init.o);
+        readers.push({ field, getVal: () => ({ c: inC.value !== "" ? Number(inC.value) : NaN, o: inO.value !== "" ? Number(inO.value) : NaN }) });
+        inC.addEventListener("input", recompute); inO.addEventListener("input", recompute);
+        grid.append(lab, inC, inO);
+        const refRow = buildRefRow(field, (v) => { inC.value = String(v); inO.value = String(v); recompute(); });
+        if (refRow) { refRow.style.gridColumn = "2 / -1"; grid.appendChild(refRow); }
+        if (guideRow) { guideRow.style.gridColumn = "1 / -1"; grid.appendChild(guideRow); }
+      });
+      card.appendChild(grid);
+      formWrap.appendChild(card);
+    }
     recompute();
   }
 
   function buildForm(readers) { const form = {}; readers.forEach(({ field, getVal }) => { form[field.k] = getVal(); }); return form; }
-  function makeInput(initVal) {
-    const inp = el("input", "vc-input", { type: "number", inputMode: "decimal", step: "any" });
-    if (initVal !== "" && initVal !== undefined && initVal !== null) inp.value = String(initVal);
-    return inp;
-  }
 
   renderForm();
 }

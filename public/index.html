@@ -184,8 +184,8 @@
   .ve-back{font-size:13.5px;color:var(--ink-soft);text-decoration:none}
   .ve-back:hover{color:var(--ink)}
   .ve-title{font-family:var(--serif);font-style:italic;font-weight:700;font-size:22px;letter-spacing:-.01em;color:var(--ink)}
-  .vc{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:0;align-items:start;max-width:980px}
-  .vc-main{padding-right:36px;border-right:1px solid var(--divider)}
+  .vc{display:grid;grid-template-columns:minmax(0,1fr) 392px;gap:0;align-items:start;max-width:1060px}
+  .vc-main{padding-right:40px;border-right:1px solid var(--divider)}
   .vc-main .vc-form{max-width:none}
   .vc-side{position:sticky;top:24px;align-self:start;padding-left:32px}
   @media (max-width:860px){
@@ -253,49 +253,56 @@
   .vd-method{display:inline-block;margin-top:16px;font-size:13px;color:var(--ink-soft);text-decoration:underline;text-underline-offset:2px}
   /* ===== 估值计算器（Damodaran）— 账本工作表，圆角统一 8px，颜色只在区间条上说话 ===== */
   .vc-mount{margin-top:24px;padding-top:24px;border-top:1px solid var(--divider)}
-  /* 方法选择：分组下拉 */
-  .vc-methods{margin-bottom:24px}
-  .vc-select{height:36px;min-width:240px;padding:0 34px 0 12px;border:1px solid var(--border);border-radius:8px;background-color:var(--card);color:var(--ink);font-family:var(--font);font-size:13.5px;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a857a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 11px center}
+  /* 估值方法（卡片外，独立标签 + 下拉） */
+  .vc-mblock{margin-bottom:16px}
+  .vc-mlabel{font-size:13px;color:var(--ink);margin-bottom:6px}
+  .vc-select{height:36px;width:100%;padding:0 34px 0 12px;border:1px solid var(--border);border-radius:4px;background-color:#fff;color:var(--ink);font-family:var(--font);font-size:13.5px;cursor:pointer;box-shadow:var(--shadow);-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a857a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 11px center}
   .vc-select:focus{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
-  /* 统一工作表：左为标签列，右为 保守/乐观 两列；单列事实只占第一输入列。所有标签、输入框整列对齐。 */
-  /* 账本式分录：每行一参数，底部发丝线；输入无盒、靠行线与对齐定位 */
+  /* 卡片（Inputs / Assumptions）：白底描边圆角，蓝色标题 */
   .vc-form{max-width:none}
-  .vc-section{margin-bottom:22px}
-  .vc-shead{font-size:11px;color:var(--ink-mute);letter-spacing:.06em;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--ink-mute);margin-bottom:2px;opacity:.85}
-  .vc-colhead-row{display:grid;grid-template-columns:minmax(0,1fr) 128px 128px;gap:0 14px;padding:6px 0 2px}
-  .vc-chead{font-size:11px;color:var(--ink-mute);letter-spacing:.02em;text-align:right;padding-right:8px}
-  .vc-prow{display:grid;grid-template-columns:minmax(0,1fr) 128px 128px;gap:5px 14px;align-items:center;border-bottom:1px solid var(--border);padding:8px 0}
+  .vc-card{background:#fff;border:1px solid var(--border);border-radius:4px;padding:22px;margin-bottom:16px}
+  .vc-card-head{font-family:var(--font);font-weight:600;font-size:16px;color:#31679b;margin-bottom:16px}
+  /* 前提：堆叠 标签 + 输入 */
+  .vc-fld{margin-bottom:14px}
+  .vc-fld:last-child{margin-bottom:0}
+  .vc-flabel{font-size:13px;color:var(--ink);margin-bottom:6px;display:flex;align-items:center}
+  /* 情景假设：标签 | 保守 | 乐观 */
+  .vc-assume{display:grid;grid-template-columns:minmax(0,1.1fr) 1fr 1fr;gap:10px 12px;align-items:center}
+  .vc-chead{font-size:11px;color:var(--ink-mute);letter-spacing:.02em;padding-left:2px}
   .vc-label{font-size:13px;color:var(--ink-soft);min-width:0;display:flex;align-items:center}
   .vc-unit{color:var(--ink-mute);margin-left:3px}
-  .vc-input{height:30px;padding:0 8px;width:100%;border:1px solid transparent;border-radius:6px;background:transparent;font-family:var(--mono);font-size:13.5px;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield}
-  .vc-input:hover{background:var(--card)}
+  /* 输入：描边盒 */
+  .vc-input{height:36px;padding:0 12px;width:100%;border:1px solid var(--border);border-radius:4px;background:#fff;font-family:var(--mono);font-size:13.5px;color:var(--ink);font-variant-numeric:tabular-nums;box-sizing:border-box;box-shadow:var(--shadow);-moz-appearance:textfield;appearance:textfield}
   .vc-input::-webkit-outer-spin-button,.vc-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-  .vc-input::placeholder{color:var(--ink-mute);font-family:var(--font);font-size:11.5px;text-align:left}
-  .vc-input:focus{outline:none;border-color:var(--ring-border);background:#fff;box-shadow:0 0 0 3px var(--ring)}
-  /* 结果 hero：低~高 中性大字 + 区间条预览（右栏，无需上分隔线） */
-  .vc-result{}
-  .vc-rnums{display:flex;align-items:baseline;gap:10px;font-family:var(--mono);font-variant-numeric:tabular-nums}
-  .vc-out-label{font-family:var(--font);font-size:12px;color:var(--ink-mute);letter-spacing:.02em;align-self:center}
-  .vc-rlow,.vc-rhigh{font-size:24px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
-  .vc-rdash{font-size:18px;color:var(--ink-mute)}
-  .vc-bar-mount{margin-top:16px}
-  /* 备注（长文本） */
-  .vc-note{margin-top:20px;max-width:600px}
-  .vc-note-label{font-size:11px;color:var(--ink-mute);letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
-  .vc-note-input{width:100%;min-height:72px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:var(--font);font-size:13px;line-height:1.55;color:var(--ink);box-sizing:border-box;resize:vertical}
+  .vc-input::placeholder{color:var(--ink-mute);font-family:var(--font);font-size:12px}
+  .vc-input:focus{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
+  /* 备注 */
+  .vc-note{margin-bottom:16px}
+  .vc-note-label{font-size:13px;color:var(--ink);margin-bottom:6px}
+  .vc-note-input{width:100%;min-height:64px;padding:10px 12px;border:1px solid var(--border);border-radius:4px;background:#fff;font-family:var(--font);font-size:13px;line-height:1.55;color:var(--ink);box-sizing:border-box;resize:vertical;box-shadow:var(--shadow)}
   .vc-note-input::placeholder{color:var(--ink-mute)}
-  .vc-note-input:focus{outline:none;border-color:var(--ring-border);background:#fff;box-shadow:0 0 0 3px var(--ring)}
-  .vc-actions{display:flex;gap:10px;margin-top:20px}
-  .vc-done{height:36px;padding:0 16px;border:1px solid var(--ink);border-radius:8px;background:var(--ink);color:var(--bg);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:500;transition:opacity .12s}
-  .vc-done:hover{opacity:.88}
-  .vc-done:disabled{opacity:.32;cursor:not-allowed}
-  .vc-cancel{height:36px;padding:0 14px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--ink-soft);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:500}
-  .vc-cancel:hover{color:var(--ink);border-color:var(--node)}
+  .vc-note-input:focus{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
+  /* 右栏：结果卡（区间 + 判定 + 预测明细）+ Submit */
+  .vc-rcard{border:1px solid var(--border);border-radius:4px;overflow:hidden;background:#fff}
+  .vc-rcard-top{padding:20px 16px 16px;display:flex;flex-direction:column;gap:8px}
+  .vc-rnums{font-family:var(--mono);font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px}
+  .vc-rlow,.vc-rhigh{font-size:24px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+  .vc-rdash{font-size:20px;color:var(--ink-mute)}
+  .vc-rverdict{font-size:13px}
+  .vc-rverdict.v-under{color:var(--green)} .vc-rverdict.v-over{color:var(--red)} .vc-rverdict.v-fair{color:var(--ink-mute)}
+  .vc-rcard-rows{background:var(--bg);border-top:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:12px}
+  .vc-rcard-rows:empty{display:none}
+  .vc-rrow{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13.5px}
+  .vc-rk{color:var(--ink-soft)}
+  .vc-rv{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+  .vc-submit{margin-top:20px;width:100%;height:36px;border:0;border-radius:4px;background:#31679b;color:#fff;cursor:pointer;font-family:var(--font);font-size:14px;box-shadow:var(--shadow);transition:opacity .12s}
+  .vc-submit:hover{opacity:.92}
+  .vc-submit:disabled{opacity:.4;cursor:not-allowed}
   /* 估值提示 ⓘ + 参考筹码 + 溯源 */
   .vc-info{margin-left:6px;border:0;background:none;color:var(--ink-mute);font-size:12px;cursor:pointer;padding:0;line-height:1;vertical-align:baseline}
   .vc-info:hover{color:var(--ink)}
-  .vc-guide{grid-column:1 / -1;margin:-2px 0 2px;padding:9px 11px;background:var(--accent);border-radius:8px;font-size:12px;line-height:1.6;color:var(--ink-soft)}
-  .vc-ref{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:-2px}
+  .vc-guide{margin:7px 0 0;padding:9px 11px;background:var(--accent);border-radius:6px;font-size:12px;line-height:1.6;color:var(--ink-soft)}
+  .vc-ref{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px}
   .vc-refchip{border:1px solid var(--border);background:var(--card);border-radius:6px;padding:2px 8px;font-family:var(--font);font-size:11px;color:var(--ink-soft);cursor:pointer;transition:color .12s,border-color .12s}
   .vc-refchip:hover{color:var(--ink);border-color:var(--node)}
   .vc-srclink{margin-left:2px;color:var(--ink-mute);text-decoration:none;font-size:12px;cursor:pointer}
@@ -1365,6 +1372,7 @@ function renderValuationPanel(item, panel, idBlock) {
       refData: (item._financials && item._financials.annual)
         ? { financials: item._financials.annual.financials || null, valuationRefs: item._financials.annual.valuationRefs || null, sources: valuationSources(item, LANG) }
         : { financials: null, valuationRefs: null, sources: valuationSources(item, LANG) },
+      verdict: (low, high) => { const vv = verdictOf({ ...c, fairLow: low, fairHigh: high }, VMSGS); return { text: vv.text, cls: vv.cls }; },
       onCancel: () => finishValEdit(),
       onDone: ({ method, inputs, low, high, note }) => {
         if (!Array.isArray(c.valuations)) c.valuations = [];
