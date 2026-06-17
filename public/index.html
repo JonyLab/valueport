@@ -575,11 +575,15 @@ function applyColors(s) {
   applyZoneColors(m);
 }
 function applySettings(s) {
-  document.getElementById("eyebrow").textContent = s.eyebrow || DEFAULT_TEXT.eyebrow;
+  const eyebrow = s.eyebrow || DEFAULT_TEXT.eyebrow;
+  const eyebrowEl = document.getElementById("eyebrow");
+  eyebrowEl.textContent = eyebrow; eyebrowEl.style.display = eyebrow ? "" : "none";
   const t = s.title || DEFAULT_TEXT.title;
   document.getElementById("title").textContent = t;
   document.title = t;
-  document.getElementById("sub").textContent = s.subtitle || DEFAULT_TEXT.subtitle;
+  const sub = s.subtitle || DEFAULT_TEXT.subtitle;
+  const subEl = document.getElementById("sub");
+  subEl.textContent = sub; subEl.style.display = sub ? "" : "none";
 }
 
 /* ---------- 图表渲染 ---------- */

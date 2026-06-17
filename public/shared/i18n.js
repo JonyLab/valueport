@@ -20,9 +20,9 @@ export function langButtonLabel() { return LANG === "zh" ? "EN" : "中文"; }
 const DICT = {
   zh: {
     /* 看板页 */
-    def_eyebrow: "市场情绪 · Valuation Pendulum",
-    def_title: "估值钟摆看板",
-    def_sub: "每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。",
+    def_eyebrow: "",
+    def_title: "Watchlist",
+    def_sub: "",
     b_updated: (t, src) => `行情更新于 ${t} · ${src}`,
     src_longbridge: "实时 · 长桥",
     src_tencent: "延时 · 腾讯",
@@ -140,9 +140,9 @@ const DICT = {
     a_reg_fail: "注册失败",
   },
   en: {
-    def_eyebrow: "Market Mood · Valuation Pendulum",
-    def_title: "Valuation Pendulum Board",
-    def_sub: "One pendulum per holding: the needle's position is set by the current price against your fair-value range and margin of safety. Markets swing between extremes — the pendulum always returns to the middle.",
+    def_eyebrow: "",
+    def_title: "Watchlist",
+    def_sub: "",
     b_updated: (t, src) => `Quotes updated ${t} · ${src}`,
     src_longbridge: "Realtime · Longbridge",
     src_tencent: "Delayed · Tencent",
