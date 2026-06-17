@@ -141,6 +141,15 @@
   .chip:hover{background:var(--accent)}
   .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
   .chip:focus-visible{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
+  .valpick{grid-column:1 / -1;display:flex;flex-direction:column;gap:7px;margin-top:2px}
+  .valpick-lab{font-size:12px;color:var(--ink-mute)}
+  .valpick-row{display:flex;gap:6px;flex-wrap:wrap}
+  .valpick-chip{appearance:none;font-family:var(--font);font-size:12px;font-weight:500;padding:5px 11px;
+    border-radius:6px;border:1px solid var(--border);background:#fff;color:var(--ink-soft);cursor:pointer;
+    display:inline-flex;align-items:baseline;gap:7px;transition:background .12s,color .12s,border-color .12s}
+  .valpick-chip:hover{background:var(--accent)}
+  .valpick-chip.on{background:#31679b;color:#fff;border-color:#31679b}
+  .valpick-chip .vp-rng{font-family:var(--mono);font-size:11.5px;opacity:.85;font-variant-numeric:tabular-nums}
 
   /* 联想下拉 */
   .combo{position:relative}
@@ -883,6 +892,7 @@ function modalTitleFor(item) {
 function buildItemForm(item) {
   modalForm.innerHTML = "";
   fieldErrs = {}; fieldInputs = {};
+  let syncValPick = () => {}; // 由估值卡片选择器赋值：刷新高亮（手填区间时解除选中）
   const grid = document.createElement("div");
   grid.className = "cfg-grid";
   FIELDS.forEach((f) => {
@@ -908,7 +918,10 @@ function buildItemForm(item) {
       if (f.k === "mos") bad = !(v > 0 && v < 100);
       if (f.k === "ext") bad = !(v > 0);
       input.classList.toggle("bad", bad && input.value !== "");
+      // 手动改动区间 ⇒ 不再「跟随」某张估值卡片
+      if ((f.k === "fairLow" || f.k === "fairHigh") && next.selectedValuationId) { next.selectedValuationId = null; }
       item.cfg = next;
+      if (f.k === "fairLow" || f.k === "fairHigh") syncValPick();
       if (f.k === "ticker") {
         item.live = false; item.gotQuote = false;
         item.cfg = { ...item.cfg, price: 0, symbol: null, name: "" };
@@ -1018,6 +1031,39 @@ function buildItemForm(item) {
       note.style.cssText = "grid-column:1 / -1;margin:0";
       note.innerHTML = t("m_note_html");
       grid.appendChild(note);
+      // 已有估值卡片 → 一键选作合理区间（紧跟注释，作为「直接填」之外的另一入口）
+      const cards = Array.isArray(item.cfg.valuations) ? item.cfg.valuations : [];
+      if (cards.length) {
+        const pick = document.createElement("div"); pick.className = "valpick";
+        const plab = document.createElement("div"); plab.className = "valpick-lab";
+        plab.textContent = LANG === "zh" ? "或选用已保存的估值：" : "Or use a saved valuation:";
+        const row = document.createElement("div"); row.className = "valpick-row";
+        const chipEls = cards.map((card) => {
+          const lo = Math.round(Math.min(card.low, card.high) * 100) / 100;
+          const hi = Math.round(Math.max(card.low, card.high) * 100) / 100;
+          const model = MODELS.find((m) => m.key === card.method);
+          const b = document.createElement("button"); b.type = "button"; b.className = "valpick-chip";
+          const nm = document.createElement("span"); nm.textContent = model ? (model.label[LANG] || model.key) : card.method;
+          const rng = document.createElement("span"); rng.className = "vp-rng"; rng.textContent = `${lo} ~ ${hi}`;
+          b.append(nm, rng);
+          b.addEventListener("click", () => {
+            fieldInputs.fairLow.value = lo; fieldInputs.fairHigh.value = hi;
+            fieldInputs.fairLow.classList.remove("bad"); fieldInputs.fairHigh.classList.remove("bad");
+            if (fieldErrs.fairLow) fieldErrs.fairLow.style.display = "none";
+            if (fieldErrs.fairHigh) fieldErrs.fairHigh.style.display = "none";
+            item.cfg = { ...item.cfg, fairLow: lo, fairHigh: hi, selectedValuationId: card.id };
+            item.gauge.set(item.cfg); renderVerdict(item); renderItemHead(item);
+            if (cfgSavable(item.cfg)) debounceSave(item);
+            syncValPick();
+          });
+          return { el: b, id: card.id };
+        });
+        chipEls.forEach(({ el }) => row.appendChild(el));
+        syncValPick = () => chipEls.forEach(({ el, id }) => el.classList.toggle("on", item.cfg.selectedValuationId === id));
+        syncValPick();
+        pick.append(plab, row);
+        grid.appendChild(pick);
+      }
     }
   });
   modalForm.appendChild(grid);
