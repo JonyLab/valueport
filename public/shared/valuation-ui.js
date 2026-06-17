@@ -121,7 +121,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const verdictEl = el("div", "vc-rverdict");
   rtop.append(nums, verdictEl);
   const bdMount = el("div", "vc-rcard-rows");
-  rcard.append(rtop, bdMount);
+  const schedMount = el("div", "vc-sched");
+  rcard.append(rtop, bdMount, schedMount);
   side.appendChild(rcard);
 
   const submitBtn = el("button", "vc-submit"); submitBtn.type = "button"; submitBtn.textContent = tx("submit"); submitBtn.disabled = true;
@@ -156,6 +157,42 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       r.append(k, val); bdMount.appendChild(r);
     });
   }
+  // 情景取中（保守/乐观取均）用于逐年现金流展示
+  function midVals(model, form) {
+    const v = {};
+    for (const f of model.fields) {
+      const x = form[f.k];
+      if (f.col === "dual") {
+        const c = x && typeof x === "object" ? x.c : NaN, o = x && typeof x === "object" ? x.o : NaN;
+        v[f.k] = (Number.isFinite(c) && Number.isFinite(o)) ? (c + o) / 2 : (Number.isFinite(c) ? c : o);
+      } else v[f.k] = x;
+    }
+    return v;
+  }
+  // 逐年现金流明细（仅 DCF 模型；可展开；情景取中）
+  function renderSchedule(model, form, valid) {
+    schedMount.innerHTML = "";
+    if (!valid || typeof model.schedule !== "function") return;
+    let s; try { s = model.schedule(midVals(model, form), ctx); } catch { return; }
+    if (!s || !Array.isArray(s.rows) || !s.rows.length) return;
+    const fmtCf = (n) => s.kind === "money" ? (Number.isFinite(n) ? fmtMoney(n) : "—") : (Number.isFinite(n) ? n.toFixed(2) : "—");
+    const title = lang === "zh" ? "逐年现金流（情景取中）" : "Year-by-year cash flow (mid)";
+    const toggle = el("button", "vc-sched-toggle"); toggle.type = "button"; toggle.textContent = title + " ▾";
+    const body = el("div", "vc-sched-body"); body.style.display = "none";
+    const tbl = el("table", "vc-sched-table");
+    const head = el("tr");
+    (lang === "zh" ? ["年", "现金流", "现值"] : ["Yr", "Cash flow", "PV"]).forEach((h) => { const th = el("th"); th.textContent = h; head.appendChild(th); });
+    tbl.appendChild(head);
+    let sumPv = 0;
+    const addRow = (cls, c0, c1, c2) => { const tr = el("tr", cls); [c0, c1, c2].forEach((c) => { const td = el("td"); td.textContent = c; tr.appendChild(td); }); tbl.appendChild(tr); };
+    s.rows.forEach((r) => { addRow("", String(r.year), fmtCf(r.cf), fmtCf(r.pv)); if (Number.isFinite(r.pv)) sumPv += r.pv; });
+    addRow("vc-sched-term", lang === "zh" ? "终值" : "Term.", "—", fmtCf(s.terminalPv));
+    if (Number.isFinite(s.terminalPv)) sumPv += s.terminalPv;
+    addRow("vc-sched-sum", lang === "zh" ? "现值合计" : "Total PV", "", fmtCf(sumPv));
+    body.appendChild(tbl);
+    toggle.addEventListener("click", () => { const open = body.style.display === "none"; body.style.display = open ? "" : "none"; toggle.textContent = title + (open ? " ▴" : " ▾"); });
+    schedMount.append(toggle, body);
+  }
   function compute(formData) {
     lastForm = formData;
     const model = MODELS[activeIdx];
@@ -172,6 +209,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     verdictEl.className = "vc-rverdict " + (v && v.cls ? v.cls : "");
     verdictEl.style.display = v ? "" : "none";
     renderBreakdown(model, formData, valid);
+    renderSchedule(model, formData, valid);
     submitBtn.disabled = !valid;
   }
 

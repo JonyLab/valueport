@@ -73,6 +73,39 @@ const FCFF = {
 
     return (PV - netDebt) / shares;
   },
+  schedule(vals, ctx) {
+    const { revenue, n, growth, opMargin, taxRate, salesToCap, wacc, termGrowth } = vals;
+    if (![revenue, n, growth, opMargin, taxRate, salesToCap, wacc, termGrowth].every(Number.isFinite)) return null;
+    if (n < 1) return null;
+
+    const g = growth / 100;
+    const opM = opMargin / 100;
+    const tax = taxRate / 100;
+    const w = wacc / 100;
+    const gT = termGrowth / 100;
+
+    const rows = [];
+    let prev = revenue;
+    for (let t = 1; t <= n; t++) {
+      const rev = revenue * Math.pow(1 + g, t);
+      const nopat = rev * opM * (1 - tax);
+      const reinvest = (rev - prev) / salesToCap;
+      const fcff = nopat - reinvest;
+      const df = 1 / Math.pow(1 + w, t);
+      rows.push({ year: t, cf: fcff, pv: fcff * df });
+      prev = rev;
+    }
+    const revN = revenue * Math.pow(1 + g, n);
+    const revT = revN * (1 + gT);
+    const nopatT = revT * opM * (1 - tax);
+    const reinvestT = (revT - revN) / salesToCap;
+    const fcffT = nopatT - reinvestT;
+    if (w <= gT) return null;
+    const TV = fcffT / (w - gT);
+    const terminalPv = TV / Math.pow(1 + w, n);
+
+    return { kind: "money", rows, terminalPv };
+  },
   breakdown(vals, ctx) {
     const { revenue, n, growth, opMargin, taxRate } = vals;
     const g = growth / 100;
@@ -146,6 +179,31 @@ const FCFE = {
 
     return PV / shares;
   },
+  schedule(vals, ctx) {
+    const { netIncome, growth, reinvestRate, costOfEquity, n, termGrowth } = vals;
+    if (![netIncome, growth, reinvestRate, costOfEquity, n, termGrowth].every(Number.isFinite)) return null;
+    if (n < 1) return null;
+
+    const g = growth / 100;
+    const rr = reinvestRate / 100;
+    const ke = costOfEquity / 100;
+    const gT = termGrowth / 100;
+
+    const rows = [];
+    for (let t = 1; t <= n; t++) {
+      const ni = netIncome * Math.pow(1 + g, t);
+      const fcfe = ni * (1 - rr);
+      const df = 1 / Math.pow(1 + ke, t);
+      rows.push({ year: t, cf: fcfe, pv: fcfe * df });
+    }
+    const niN = netIncome * Math.pow(1 + g, n);
+    const fcfeT = niN * (1 + gT) * (1 - rr);
+    if (ke <= gT) return null;
+    const TV = fcfeT / (ke - gT);
+    const terminalPv = TV / Math.pow(1 + ke, n);
+
+    return { kind: "money", rows, terminalPv };
+  },
   breakdown(vals, ctx) {
     const { netIncome, n, growth } = vals;
     const g = growth / 100;
@@ -204,6 +262,28 @@ const DDM = {
     PV += TV / Math.pow(1 + ke, n);
 
     return PV; // 已是每股
+  },
+  schedule(vals, ctx) {
+    const { dps, growth, n, costOfEquity, termGrowth } = vals;
+    if (![dps, growth, n, costOfEquity, termGrowth].every(Number.isFinite)) return null;
+    if (n < 1) return null;
+
+    const g = growth / 100;
+    const ke = costOfEquity / 100;
+    const gT = termGrowth / 100;
+
+    const rows = [];
+    for (let t = 1; t <= n; t++) {
+      const d = dps * Math.pow(1 + g, t);
+      const df = 1 / Math.pow(1 + ke, t);
+      rows.push({ year: t, cf: d, pv: d * df });
+    }
+    const dT = dps * Math.pow(1 + g, n) * (1 + gT);
+    if (ke <= gT) return null;
+    const TV = dT / (ke - gT);
+    const terminalPv = TV / Math.pow(1 + ke, n);
+
+    return { kind: "num", rows, terminalPv };
   },
   breakdown(vals, ctx) {
     const { dps, n, growth } = vals;

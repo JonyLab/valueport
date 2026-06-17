@@ -302,6 +302,18 @@
   .vc-rrow{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13.5px}
   .vc-rk{color:var(--ink-soft)}
   .vc-rv{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+  /* 逐年现金流明细（DCF，可展开） */
+  .vc-sched{border-top:1px solid var(--border)}
+  .vc-sched-toggle{width:100%;text-align:left;border:0;background:none;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);padding:12px 16px}
+  .vc-sched-toggle:hover{color:var(--ink)}
+  .vc-sched-body{padding:0 16px 14px}
+  .vc-sched-table{width:100%;border-collapse:collapse;font-size:12px}
+  .vc-sched-table th{text-align:right;color:var(--ink-mute);font-weight:500;font-size:11px;padding:4px 6px;border-bottom:1px solid var(--border)}
+  .vc-sched-table th:first-child{text-align:left}
+  .vc-sched-table td{text-align:right;padding:4px 6px;font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+  .vc-sched-table td:first-child{text-align:left;font-family:var(--font);color:var(--ink-soft)}
+  .vc-sched-term td{border-top:1px solid var(--border)}
+  .vc-sched-sum td{font-weight:700;border-top:1px solid var(--divider)}
   .vc-submit{margin-top:20px;width:100%;height:36px;border:0;border-radius:4px;background:#31679b;color:#fff;cursor:pointer;font-family:var(--font);font-size:14px;box-shadow:var(--shadow);transition:opacity .12s}
   .vc-submit:hover{opacity:.92}
   .vc-submit:disabled{opacity:.4;cursor:not-allowed}
