@@ -181,6 +181,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     return { c: d, o: d };
   }
 
+  // 账本式分录：每个参数一行（共享网格模板 + 底部发丝线），无盒子输入，靠行线与对齐定位
   function renderForm() {
     formWrap.innerHTML = "";
     const model = MODELS[activeIdx];
@@ -188,42 +189,48 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const readers = [];
     const singles = fields.filter((f) => f.col !== "dual");
     const duals = fields.filter((f) => f.col === "dual");
-    const sheet = el("div", "vc-sheet");
     const recompute = () => compute(buildForm(readers));
 
-    if (singles.length) {
-      const h = el("div", "vc-shead"); h.textContent = tx("facts"); sheet.appendChild(h);
-      singles.forEach((field) => {
+    const section = (headKey, items, dual) => {
+      const sec = el("div", "vc-section");
+      const h = el("div", "vc-shead"); h.textContent = tx(headKey); sec.appendChild(h);
+      if (dual) {
+        const ch = el("div", "vc-colhead-row");
+        const e0 = el("div"); const cc = el("div", "vc-chead"); cc.textContent = tx("conservative");
+        const co = el("div", "vc-chead"); co.textContent = tx("optimistic");
+        ch.append(e0, cc, co); sec.appendChild(ch);
+      }
+      items.forEach((field) => {
+        const prow = el("div", "vc-prow");
         const { lab, guideRow } = buildLabel(field);
-        const input = makeInput(singleInit(field));
-        if (field.hint && field.hint[lang]) input.placeholder = field.hint[lang];
-        readers.push({ field, getVal: () => input.value !== "" ? Number(input.value) : NaN });
-        input.addEventListener("input", recompute);
-        sheet.append(lab, input, el("div"));
-        const refRow = buildRefRow(field, (v) => { input.value = String(v); recompute(); });
-        if (refRow) sheet.append(el("div"), refRow);
-        if (guideRow) sheet.appendChild(guideRow);
+        prow.appendChild(lab);
+        let fillFn;
+        if (dual) {
+          const init = dualInit(field);
+          const inC = makeInput(init.c), inO = makeInput(init.o);
+          readers.push({ field, getVal: () => ({ c: inC.value !== "" ? Number(inC.value) : NaN, o: inO.value !== "" ? Number(inO.value) : NaN }) });
+          inC.addEventListener("input", recompute); inO.addEventListener("input", recompute);
+          prow.append(inC, inO);
+          fillFn = (v) => { inC.value = String(v); inO.value = String(v); recompute(); };
+        } else {
+          const input = makeInput(singleInit(field));
+          if (field.hint && field.hint[lang]) input.placeholder = field.hint[lang];
+          input.style.gridColumn = "2 / -1";
+          readers.push({ field, getVal: () => input.value !== "" ? Number(input.value) : NaN });
+          input.addEventListener("input", recompute);
+          prow.appendChild(input);
+          fillFn = (v) => { input.value = String(v); recompute(); };
+        }
+        const refRow = buildRefRow(field, fillFn);
+        if (refRow) prow.appendChild(refRow);   // grid-column:2/-1 已在 buildRefRow 设好
+        if (guideRow) prow.appendChild(guideRow);
+        sec.appendChild(prow);
       });
-    }
-    if (duals.length) {
-      const h = el("div", "vc-shead"); h.textContent = tx("assume"); sheet.appendChild(h);
-      sheet.appendChild(el("div"));
-      const hc = el("div", "vc-chead"); hc.textContent = tx("conservative"); sheet.appendChild(hc);
-      const ho = el("div", "vc-chead"); ho.textContent = tx("optimistic"); sheet.appendChild(ho);
-      duals.forEach((field) => {
-        const { lab, guideRow } = buildLabel(field);
-        const init = dualInit(field);
-        const inC = makeInput(init.c), inO = makeInput(init.o);
-        readers.push({ field, getVal: () => ({ c: inC.value !== "" ? Number(inC.value) : NaN, o: inO.value !== "" ? Number(inO.value) : NaN }) });
-        inC.addEventListener("input", recompute);
-        inO.addEventListener("input", recompute);
-        sheet.append(lab, inC, inO);
-        const refRow = buildRefRow(field, (v) => { inC.value = String(v); inO.value = String(v); recompute(); });
-        if (refRow) sheet.append(el("div"), refRow);
-        if (guideRow) sheet.appendChild(guideRow);
-      });
-    }
-    formWrap.appendChild(sheet);
+      formWrap.appendChild(sec);
+    };
+
+    if (singles.length) section("facts", singles, false);
+    if (duals.length) section("assume", duals, true);
     recompute();
   }
 
