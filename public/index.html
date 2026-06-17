@@ -1296,11 +1296,12 @@ function valuationSources(item, lang) {
   const code = mkt === "HK" ? String(parseInt(m[2], 10)) : (mkt === "US" ? m[2].toUpperCase() : m[2]);
   const counterId = encodeURIComponent(`ST/${mkt}/${code}`);
   const lblang = lang === "zh" ? "zh-CN" : "en-US";
-  const lb = (page) => `https://activity.lbkrs.com/${lblang}/lightning/${page}?counterId=${counterId}&need_login=0&lblang=${lblang}&lbtheme=light&lbapp=0`;
+  // 长桥公司财报页（含营收/净利/利润率/ROE 等基本面与估值指标，全市场可渲染）
+  const lbFin = `https://app.lbkrs.com/ig/financial-report?counterId=${counterId}&need_login=0&lblang=${lblang}&lbtheme=light&lbapp=0`;
   const financial = mkt === "US"
     ? `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&ticker=${encodeURIComponent(code)}&type=10-K&dateb=&owner=include&count=40`
-    : lb("financial-report");
-  return { financial, valuation: lb("valuation") };
+    : lbFin;
+  return { financial, valuation: lbFin };
 }
 
 function renderValuationPanel(item, panel, idBlock) {
