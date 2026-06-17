@@ -17,11 +17,11 @@ const PE = {
   group: "relative",
   label: { zh: "PE 估值", en: "P/E" },
   fields: [
-    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" } },
-    { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: (ctx) => "", default: 5 },
-    { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10 },
-    { k: "netMargin", label: { zh: "净利率", en: "Net margin" }, col: "dual", unit: "%", default: 15 },
-    { k: "targetPE", label: { zh: "目标 PE", en: "Target P/E" }, col: "dual", unit: "", default: 20 },
+    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" }, meta: "revenue" },
+    { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: (ctx) => "", default: 5, meta: "forecastYears" },
+    { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10, meta: "revGrowth" },
+    { k: "netMargin", label: { zh: "净利率", en: "Net margin" }, col: "dual", unit: "%", default: 15, meta: "netMargin" },
+    { k: "targetPE", label: { zh: "目标 PE", en: "Target P/E" }, col: "dual", unit: "", default: 20, meta: "targetPE" },
   ],
   compute(vals, ctx) {
     const shares = ctx.shares;
@@ -42,9 +42,9 @@ const PEG = {
   group: "relative",
   label: { zh: "PEG 估值", en: "PEG" },
   fields: [
-    { k: "eps", label: { zh: "每股收益", en: "EPS" }, col: "single", unit: "", prefill: (ctx) => (finite(ctx.epsTtm) ? ctx.epsTtm : ""), hint: { zh: "默认取 TTM EPS", en: "Defaults to TTM EPS" } },
-    { k: "growth", label: { zh: "盈利增速", en: "Earnings growth" }, col: "dual", unit: "%", default: 10 },
-    { k: "peg", label: { zh: "PEG 系数", en: "PEG ratio" }, col: "dual", unit: "", default: 1 },
+    { k: "eps", label: { zh: "每股收益", en: "EPS" }, col: "single", unit: "", prefill: (ctx) => (finite(ctx.epsTtm) ? ctx.epsTtm : ""), hint: { zh: "默认取 TTM EPS", en: "Defaults to TTM EPS" }, meta: "eps" },
+    { k: "growth", label: { zh: "盈利增速", en: "Earnings growth" }, col: "dual", unit: "%", default: 10, meta: "epsGrowth" },
+    { k: "peg", label: { zh: "PEG 系数", en: "PEG ratio" }, col: "dual", unit: "", default: 1, meta: "peg" },
   ],
   compute(vals, ctx) {
     // 注意：PEG 约定下 growth 用「原始百分数」（如 20 表示 20%），不除以 100。
@@ -61,8 +61,8 @@ const PB = {
   group: "relative",
   label: { zh: "PB 估值", en: "P/B" },
   fields: [
-    { k: "bps", label: { zh: "每股净资产", en: "Book value/share" }, col: "single", unit: "", prefill: (ctx) => (finite(ctx.bps) ? ctx.bps : "") },
-    { k: "targetPB", label: { zh: "目标 PB", en: "Target P/B" }, col: "dual", unit: "", default: 2 },
+    { k: "bps", label: { zh: "每股净资产", en: "Book value/share" }, col: "single", unit: "", prefill: (ctx) => (finite(ctx.bps) ? ctx.bps : ""), meta: "bps" },
+    { k: "targetPB", label: { zh: "目标 PB", en: "Target P/B" }, col: "dual", unit: "", default: 2, meta: "targetPB" },
   ],
   compute(vals, ctx) {
     const { bps, targetPB } = vals;
@@ -77,10 +77,10 @@ const PS = {
   group: "relative",
   label: { zh: "PS 估值", en: "P/S" },
   fields: [
-    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" } },
-    { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: (ctx) => "", default: 5 },
-    { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10 },
-    { k: "targetPS", label: { zh: "目标 PS", en: "Target P/S" }, col: "dual", unit: "", default: 5 },
+    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" }, meta: "revenue" },
+    { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: (ctx) => "", default: 5, meta: "forecastYears" },
+    { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10, meta: "revGrowth" },
+    { k: "targetPS", label: { zh: "目标 PS", en: "Target P/S" }, col: "dual", unit: "", default: 5, meta: "targetPS" },
   ],
   compute(vals, ctx) {
     const shares = ctx.shares;
@@ -99,11 +99,11 @@ const EVEBITDA = {
   group: "relative",
   label: { zh: "EV/EBITDA 估值", en: "EV/EBITDA" },
   fields: [
-    { k: "ebitda", label: { zh: "当前 EBITDA", en: "Current EBITDA" }, col: "single", unit: "", prefill: (ctx) => "", hint: { zh: "公司总额（不是每股）", en: "Total, not per share" } },
-    { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: (ctx) => "", default: 5 },
-    { k: "growth", label: { zh: "EBITDA 增速", en: "EBITDA growth" }, col: "dual", unit: "%", default: 10 },
-    { k: "targetMultiple", label: { zh: "目标倍数", en: "Target multiple" }, col: "dual", unit: "", default: 12 },
-    { k: "netDebt", label: { zh: "净负债", en: "Net debt" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.netDebt)) ? ctx.netDebt : "", default: 0 },
+    { k: "ebitda", label: { zh: "当前 EBITDA", en: "Current EBITDA" }, col: "single", unit: "", prefill: (ctx) => "", hint: { zh: "公司总额（不是每股）", en: "Total, not per share" }, meta: "ebitda" },
+    { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: (ctx) => "", default: 5, meta: "forecastYears" },
+    { k: "growth", label: { zh: "EBITDA 增速", en: "EBITDA growth" }, col: "dual", unit: "%", default: 10, meta: "ebitdaGrowth" },
+    { k: "targetMultiple", label: { zh: "目标倍数", en: "Target multiple" }, col: "dual", unit: "", default: 12, meta: "targetMultiple" },
+    { k: "netDebt", label: { zh: "净负债", en: "Net debt" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.netDebt)) ? ctx.netDebt : "", default: 0, meta: "netDebt" },
   ],
   compute(vals, ctx) {
     const shares = ctx.shares;

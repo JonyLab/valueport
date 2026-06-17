@@ -27,15 +27,15 @@ const FCFF = {
   group: "intrinsic",
   label: { zh: "FCFF 两阶段", en: "FCFF (2-stage)" },
   fields: [
-    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" } },
-    { k: "n", label: { zh: "高增长年数", en: "High-growth years" }, col: "single", unit: "", prefill: (ctx) => 10, default: 10 },
-    { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10 },
-    { k: "opMargin", label: { zh: "目标营业利润率", en: "Target operating margin" }, col: "dual", unit: "%", default: 15 },
-    { k: "taxRate", label: { zh: "税率", en: "Tax rate" }, col: "single", unit: "%", prefill: (ctx) => 25, default: 25 },
-    { k: "salesToCap", label: { zh: "销售/资本比", en: "Sales-to-capital ratio" }, col: "dual", unit: "", default: 2 },
-    { k: "wacc", label: { zh: "WACC", en: "WACC" }, col: "dual", unit: "%", default: 9 },
-    { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5 },
-    { k: "netDebt", label: { zh: "净负债", en: "Net debt" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.netDebt)) ? ctx.netDebt : 0, default: 0 },
+    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" }, meta: "revenue" },
+    { k: "n", label: { zh: "高增长年数", en: "High-growth years" }, col: "single", unit: "", prefill: (ctx) => 10, default: 10, meta: "growthYears" },
+    { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10, meta: "revGrowth" },
+    { k: "opMargin", label: { zh: "目标营业利润率", en: "Target operating margin" }, col: "dual", unit: "%", default: 15, meta: "opMargin" },
+    { k: "taxRate", label: { zh: "税率", en: "Tax rate" }, col: "single", unit: "%", prefill: (ctx) => 25, default: 25, meta: "taxRate" },
+    { k: "salesToCap", label: { zh: "销售/资本比", en: "Sales-to-capital ratio" }, col: "dual", unit: "", default: 2, meta: "salesToCap" },
+    { k: "wacc", label: { zh: "WACC", en: "WACC" }, col: "dual", unit: "%", default: 9, meta: "wacc" },
+    { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5, meta: "termGrowth" },
+    { k: "netDebt", label: { zh: "净负债", en: "Net debt" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.netDebt)) ? ctx.netDebt : 0, default: 0, meta: "netDebt" },
   ],
   compute(vals, ctx) {
     const shares = ctx && ctx.shares;
@@ -95,12 +95,13 @@ const FCFE = {
         return Number.isFinite(v) ? v : "";
       },
       hint: { zh: "公司净利润总额（不是每股）", en: "Total net income, not per share" },
+      meta: "netIncome",
     },
-    { k: "growth", label: { zh: "净利润增速", en: "Net income growth" }, col: "dual", unit: "%", default: 10 },
-    { k: "reinvestRate", label: { zh: "股权再投资率", en: "Equity reinvestment rate" }, col: "dual", unit: "%", default: 40, hint: { zh: "占净利润的比例", en: "As % of net income" } },
-    { k: "costOfEquity", label: { zh: "股权成本", en: "Cost of equity" }, col: "dual", unit: "%", default: 9 },
-    { k: "n", label: { zh: "高增长年数", en: "High-growth years" }, col: "single", unit: "", prefill: (ctx) => 10, default: 10 },
-    { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5 },
+    { k: "growth", label: { zh: "净利润增速", en: "Net income growth" }, col: "dual", unit: "%", default: 10, meta: "niGrowth" },
+    { k: "reinvestRate", label: { zh: "股权再投资率", en: "Equity reinvestment rate" }, col: "dual", unit: "%", default: 40, hint: { zh: "占净利润的比例", en: "As % of net income" }, meta: "reinvest" },
+    { k: "costOfEquity", label: { zh: "股权成本", en: "Cost of equity" }, col: "dual", unit: "%", default: 9, meta: "costOfEquity" },
+    { k: "n", label: { zh: "高增长年数", en: "High-growth years" }, col: "single", unit: "", prefill: (ctx) => 10, default: 10, meta: "growthYears" },
+    { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5, meta: "termGrowth" },
   ],
   compute(vals, ctx) {
     const shares = ctx && ctx.shares;
@@ -148,11 +149,12 @@ const DDM = {
         const v = (ctx && ctx.price) * (ctx && ctx.dividendYield) / 100;
         return Number.isFinite(v) ? v : "";
       },
+      meta: "dps",
     },
-    { k: "growth", label: { zh: "股利增速", en: "Dividend growth" }, col: "dual", unit: "%", default: 10 },
-    { k: "n", label: { zh: "高增长年数", en: "High-growth years" }, col: "single", unit: "", prefill: (ctx) => 5, default: 5 },
-    { k: "costOfEquity", label: { zh: "股权成本", en: "Cost of equity" }, col: "dual", unit: "%", default: 9 },
-    { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5 },
+    { k: "growth", label: { zh: "股利增速", en: "Dividend growth" }, col: "dual", unit: "%", default: 10, meta: "divGrowth" },
+    { k: "n", label: { zh: "高增长年数", en: "High-growth years" }, col: "single", unit: "", prefill: (ctx) => 5, default: 5, meta: "growthYears" },
+    { k: "costOfEquity", label: { zh: "股权成本", en: "Cost of equity" }, col: "dual", unit: "%", default: 9, meta: "costOfEquity" },
+    { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5, meta: "termGrowth" },
   ],
   compute(vals, ctx) {
     const shares = ctx && ctx.shares;
