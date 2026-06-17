@@ -266,8 +266,12 @@
   .vc-fld{margin-bottom:14px}
   .vc-fld:last-child{margin-bottom:0}
   .vc-flabel{font-size:13px;color:var(--ink);margin-bottom:6px;display:flex;align-items:center}
-  /* 情景假设：标签 | 保守 | 乐观 */
-  .vc-assume{display:grid;grid-template-columns:minmax(0,1.1fr) 1fr 1fr;gap:10px 12px;align-items:center}
+  /* 情景假设：每个假设各自成行；行内 输入↔参考 紧、行间留白；各行列对齐 */
+  .vc-assume{}
+  .vc-arow{display:grid;grid-template-columns:minmax(0,1.1fr) 1fr 1fr;gap:6px 12px;align-items:center;margin-bottom:18px}
+  .vc-arow:last-child{margin-bottom:0}
+  .vc-arow-head{margin-bottom:4px}
+  .vc-arow .vc-ref,.vc-arow .vc-guide{margin-top:0}
   .vc-chead{font-size:11px;color:var(--ink-mute);letter-spacing:.02em;padding-left:2px}
   .vc-label{font-size:13px;color:var(--ink-soft);min-width:0;display:flex;align-items:center}
   .vc-unit{color:var(--ink-mute);margin-left:3px}

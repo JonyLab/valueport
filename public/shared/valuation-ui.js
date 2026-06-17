@@ -287,26 +287,27 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       formWrap.appendChild(card);
     }
 
-    // Assumptions（情景假设）卡：保守/乐观 工作表
+    // Assumptions（情景假设）卡：每个假设各自成行（字段内输入↔参考紧、字段间留白），列对齐
     if (duals.length) {
       const card = el("div", "vc-card");
       const h = el("div", "vc-card-head"); h.textContent = tx("assume"); card.appendChild(h);
-      const grid = el("div", "vc-assume");
+      const hr = el("div", "vc-arow vc-arow-head");
       const cc = el("div", "vc-chead"); cc.textContent = tx("conservative");
       const co = el("div", "vc-chead"); co.textContent = tx("optimistic");
-      grid.append(el("div"), cc, co);
+      hr.append(el("div"), cc, co); card.appendChild(hr);
       duals.forEach((field) => {
+        const arow = el("div", "vc-arow");
         const { lab, guideRow } = buildLabel(field);
         const init = dualInit(field);
         const inC = makeInput(init.c), inO = makeInput(init.o);
         readers.push({ field, getVal: () => ({ c: inC.value !== "" ? Number(inC.value) : NaN, o: inO.value !== "" ? Number(inO.value) : NaN }) });
         inC.addEventListener("input", recompute); inO.addEventListener("input", recompute);
-        grid.append(lab, inC, inO);
+        arow.append(lab, inC, inO);
         const refRow = buildRefRow(field, (v) => { inC.value = String(v); inO.value = String(v); recompute(); }, (lo, hi) => { inC.value = String(lo); inO.value = String(hi); recompute(); });
-        if (refRow) { refRow.style.gridColumn = "2 / -1"; grid.appendChild(refRow); }
-        if (guideRow) { guideRow.style.gridColumn = "1 / -1"; grid.appendChild(guideRow); }
+        if (refRow) { refRow.style.gridColumn = "2 / -1"; arow.appendChild(refRow); }
+        if (guideRow) { guideRow.style.gridColumn = "1 / -1"; arow.appendChild(guideRow); }
+        card.appendChild(arow);
       });
-      card.appendChild(grid);
       formWrap.appendChild(card);
     }
     recompute();
