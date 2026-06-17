@@ -248,7 +248,8 @@
   /* ===== 设置视图 ===== */
   /* ===== 标的详情视图（宽度与看板内容一致：满栏 + 与 page-head 相同的 28px 边距） ===== */
   .view-detail{padding:28px 28px 0}
-  .vd-back{display:inline-flex;align-items:center;font-size:13.5px;color:var(--ink-soft);text-decoration:none;margin-bottom:18px}
+  .vd-backrow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+  .vd-back{display:inline-flex;align-items:center;font-size:13.5px;color:var(--ink-soft);text-decoration:none}
   .vd-back:hover{color:var(--ink)}
   .vd-top{display:flex;gap:24px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--divider);padding-bottom:24px;margin-bottom:20px}
   .vd-id .vd-name{font-family:var(--serif);font-style:italic;font-weight:700;font-size:26px;letter-spacing:-.01em}
@@ -1152,10 +1153,14 @@ document.getElementById("btnModalCancel").addEventListener("click", async () => 
 btnModalRemove.addEventListener("click", async () => {
   if (!modalItem) return;
   if (!confirm(t("m_confirm_remove"))) return;
-  if (modalItem.id) await fetch(`/api/my/items/${modalItem.id}`, { method: "DELETE" });
-  removeChart(modalItem);
+  const removed = modalItem;
+  if (removed.id) await fetch(`/api/my/items/${removed.id}`, { method: "DELETE" });
+  const wasOnDetail = detailItem === removed && !viewDetail.classList.contains("hidden");
+  removeChart(removed);
   modalItem = null;
   modalOverlay.classList.add("hidden");
+  // 在该标的详情页删除 → 回到列表（否则详情页悬空）
+  if (wasOnDetail) { detailItem = null; history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList(); }
 });
 
 /* ---------- 视图与路由：列表 / 设置 / 详情 ---------- */
@@ -1205,7 +1210,11 @@ function refreshDetailIfOpen(item) {
   if (detailItem !== item || viewDetail.classList.contains("hidden")) return;
   mountDetailPendulum(item);
   if (detailIdBlock) {
-    const vv = verdictOf(item.cfg, VMSGS);
+    const c = item.cfg, s = item.statics || {};
+    const nameEl = detailIdBlock.querySelector(".vd-name"); if (nameEl) nameEl.textContent = displayName(item);
+    const codeEl = detailIdBlock.querySelector(".vd-code"); if (codeEl) codeEl.textContent = (c.ticker || "").toUpperCase();
+    const priceEl = detailIdBlock.querySelector(".vd-price"); if (priceEl) priceEl.textContent = c.price > 0 ? VMSGS.px(c.price) : "—";
+    const vv = verdictOf(c, VMSGS);
     const vEl = detailIdBlock.querySelector(".vd-verdict");
     if (vEl) { vEl.textContent = vv.text; vEl.className = "vd-verdict " + vv.cls; }
   }
@@ -1275,8 +1284,16 @@ function renderDetail(item) {
   if (detailGauge) { detailGauge.destroy && detailGauge.destroy(); detailGauge = null; }
   detailItem = item;
 
+  const backRow = document.createElement("div"); backRow.className = "vd-backrow";
   const back = document.createElement("a"); back.className = "vd-back"; back.href = "/b/" + boardSlug; back.textContent = t("d_back");
   back.addEventListener("click", (e) => { e.preventDefault(); history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList(); });
+  backRow.appendChild(back);
+  if (owner) { // 详情页也能编辑标的信息
+    const edit = document.createElement("button"); edit.type = "button"; edit.className = "btn sm ghost vd-edit";
+    edit.textContent = t("b_edit");
+    edit.addEventListener("click", () => openItemModal(item, false));
+    backRow.appendChild(edit);
+  }
 
   const top = document.createElement("div"); top.className = "vd-top";
   const idBlock = document.createElement("div");
@@ -1314,7 +1331,7 @@ function renderDetail(item) {
   loadFinancials(item, "quarter"); // 预取季报，供「最新季 / 近4季 TTM」参考
   renderValuationPanel(item, panelEls[2], idBlock);
 
-  viewDetail.append(back, top, tabsNav, panels);
+  viewDetail.append(backRow, top, tabsNav, panels);
   mountDetailPendulum(item);               // 已设区间→钟摆；未设→占位卡片
 }
 
