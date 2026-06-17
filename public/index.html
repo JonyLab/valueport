@@ -178,9 +178,10 @@
   .modal-err{font-size:12px;color:var(--red);margin-top:10px;display:none}
   .modal-foot{display:flex;justify-content:space-between;align-items:center;
     margin:16px -18px 0;padding:13px 18px 14px;border-top:1px solid var(--divider)}
-  /* 大弹窗（估值编辑器）：更宽，并给内容底部留白，避免按钮贴到弹窗下沿 */
+  /* 大弹窗（估值编辑器）：更宽；标题栏吸顶、动作栏吸底，内容居中滚动 */
   .modal-lg{width:min(680px,calc(100vw - 32px))}
-  #valModalBody{padding-bottom:22px}
+  .modal-lg .modal-head{position:sticky;top:0;z-index:3;background:#fff;margin-bottom:0}
+  #valModalBody{padding:16px 0 0}
 
   /* ===== 顶部导航条（zed top nav：左 tabs 下划线 / 右 图标动作；底部标尺线 + 「+」节点）===== */
   /* 三栏：品牌左 / 菜单导航居中 / 动作图标右（grid 显式列，隐藏 tabs 时布局仍稳） */
@@ -270,7 +271,7 @@
   .vc-note-input{width:100%;min-height:72px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:var(--font);font-size:13px;line-height:1.55;color:var(--ink);box-sizing:border-box;resize:vertical}
   .vc-note-input::placeholder{color:var(--ink-mute)}
   .vc-note-input:focus{outline:none;border-color:var(--ring-border);background:#fff;box-shadow:0 0 0 3px var(--ring)}
-  .vc-actions{margin-top:18px;display:flex;gap:10px}
+  .vc-actions{position:sticky;bottom:0;z-index:3;display:flex;gap:10px;margin:18px -18px 0;padding:13px 18px;background:#fff;border-top:1px solid var(--divider)}
   .vc-done{height:36px;padding:0 16px;border:1px solid var(--ink);border-radius:8px;background:var(--ink);color:var(--bg);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:500;transition:opacity .12s}
   .vc-done:hover{opacity:.88}
   .vc-done:disabled{opacity:.32;cursor:not-allowed}
