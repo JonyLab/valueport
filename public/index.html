@@ -178,10 +178,18 @@
   .modal-err{font-size:12px;color:var(--red);margin-top:10px;display:none}
   .modal-foot{display:flex;justify-content:space-between;align-items:center;
     margin:16px -18px 0;padding:13px 18px 14px;border-top:1px solid var(--divider)}
-  /* 大弹窗（估值编辑器）：更宽；标题栏吸顶、动作栏吸底，内容居中滚动 */
-  .modal-lg{width:min(680px,calc(100vw - 32px))}
-  .modal-lg .modal-head{position:sticky;top:0;z-index:3;background:#fff;margin-bottom:0}
-  #valModalBody{padding:16px 0 0;background:#fff}
+  /* 估值编辑器全屏双栏视图 */
+  .view-valedit{}
+  .ve-head{display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--divider);padding-bottom:16px;margin-bottom:22px}
+  .ve-back{font-size:13.5px;color:var(--ink-soft);text-decoration:none}
+  .ve-back:hover{color:var(--ink)}
+  .ve-title{font-family:var(--serif);font-style:italic;font-weight:700;font-size:22px;letter-spacing:-.01em;color:var(--ink)}
+  .vc{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:32px;align-items:start}
+  .vc-side{position:sticky;top:24px;align-self:start}
+  @media (max-width:860px){
+    .vc{grid-template-columns:1fr}
+    .vc-side{position:sticky;top:auto;bottom:0;background:var(--bg);border-top:1px solid var(--divider);margin:0 -28px;padding:12px 28px 14px}
+  }
 
   /* ===== 顶部导航条（zed top nav：左 tabs 下划线 / 右 图标动作；底部标尺线 + 「+」节点）===== */
   /* 三栏：品牌左 / 菜单导航居中 / 动作图标右（grid 显式列，隐藏 tabs 时布局仍稳） */
@@ -258,20 +266,20 @@
   .vc-input::-webkit-outer-spin-button,.vc-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .vc-input::placeholder{color:var(--ink-mute);font-family:var(--font);font-size:11.5px}
   .vc-input:focus{outline:none;border-color:var(--ring-border);background:#fff;box-shadow:0 0 0 3px var(--ring)}
-  /* 结果 hero：低~高 中性大字 + 区间条预览（颜色全交给区间条） */
-  .vc-result{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+  /* 结果 hero：低~高 中性大字 + 区间条预览（右栏，无需上分隔线） */
+  .vc-result{}
   .vc-rnums{display:flex;align-items:baseline;gap:10px;font-family:var(--mono);font-variant-numeric:tabular-nums}
   .vc-out-label{font-family:var(--font);font-size:12px;color:var(--ink-mute);letter-spacing:.02em;align-self:center}
   .vc-rlow,.vc-rhigh{font-size:24px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
   .vc-rdash{font-size:18px;color:var(--ink-mute)}
-  .vc-bar-mount{margin-top:16px;max-width:520px}
+  .vc-bar-mount{margin-top:16px}
   /* 备注（长文本） */
   .vc-note{margin-top:20px;max-width:600px}
   .vc-note-label{font-size:11px;color:var(--ink-mute);letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px}
   .vc-note-input{width:100%;min-height:72px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:var(--font);font-size:13px;line-height:1.55;color:var(--ink);box-sizing:border-box;resize:vertical}
   .vc-note-input::placeholder{color:var(--ink-mute)}
   .vc-note-input:focus{outline:none;border-color:var(--ring-border);background:#fff;box-shadow:0 0 0 3px var(--ring)}
-  .vc-actions{position:sticky;bottom:0;z-index:3;display:flex;gap:10px;margin:18px -18px 0;padding:13px 18px;background:#fff;border-top:1px solid var(--divider)}
+  .vc-actions{display:flex;gap:10px;margin-top:20px}
   .vc-done{height:36px;padding:0 16px;border:1px solid var(--ink);border-radius:8px;background:var(--ink);color:var(--bg);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:500;transition:opacity .12s}
   .vc-done:hover{opacity:.88}
   .vc-done:disabled{opacity:.32;cursor:not-allowed}
@@ -419,6 +427,8 @@
   </div>
   <!-- 标的详情视图（客户端路由 /b/<slug>/<code> 渲染） -->
   <div class="view-detail hidden" id="viewDetail"></div>
+  <!-- 估值编辑器全屏双栏视图 -->
+  <div class="view-detail view-valedit hidden" id="viewValEdit"></div>
   <div class="frame-foot" aria-hidden="true"></div>
 </div>
 
@@ -466,16 +476,6 @@
   </div>
 </div>
 
-<!-- 估值编辑器：大弹窗 -->
-<div class="overlay hidden" id="valOverlay">
-  <div class="modal modal-lg" role="dialog" aria-modal="true" aria-labelledby="valModalTitle">
-    <div class="modal-head">
-      <span class="modal-title" style="font-family:var(--font)" id="valModalTitle">添加估值</span>
-    </div>
-    <div id="valModalBody"></div>
-  </div>
-</div>
-
 
 <script type="module">
 import { Gauge } from "/shared/gauge.js";
@@ -507,6 +507,7 @@ const updatedEl = document.getElementById("updated");
 const items = []; // {id, cfg, gauge, chartEl, verdictEl, live, gotQuote}
 let boardSlug = "";
 let owner = false;
+let valEditReturn = null; // 估值编辑器视图打开时存当前 item；否则 null
 let addCardEl = null;
 
 // 默认文案（自定义清空时恢复；随当前语言）
@@ -1050,19 +1051,22 @@ btnModalRemove.addEventListener("click", async () => {
 const layoutEl = document.querySelector(".layout");
 const viewSettings = document.getElementById("viewSettings");
 const viewDetail = document.getElementById("viewDetail");
+const viewValEdit = document.getElementById("viewValEdit");
 const pageHeadEl = document.querySelector(".page-head");
 const boardDividerEl = document.getElementById("boardDivider");
 const btnSettings = document.getElementById("btnSettings");
 let detailGauge = null;
 
-function showView(v) { // "list" | "settings" | "detail"
-  const isList = v === "list", isSettings = v === "settings", isDetail = v === "detail";
+function showView(v) { // "list" | "settings" | "detail" | "valedit"
+  const isList = v === "list", isSettings = v === "settings", isDetail = v === "detail", isValEdit = v === "valedit";
+  if (!isValEdit) valEditReturn = null; // 离开编辑器视图即清状态
   pageHeadEl.classList.toggle("hidden", !isList);
   boardDividerEl.classList.toggle("hidden", !isList);
   layoutEl.classList.toggle("hidden", !isList);
   viewSettings.classList.toggle("hidden", !isSettings);
   viewDetail.classList.toggle("hidden", !isDetail);
-  document.querySelectorAll(".nav-tab").forEach((x) => x.classList.toggle("on", x.dataset.view === "board" && (isList || isDetail)));
+  viewValEdit.classList.toggle("hidden", !isValEdit);
+  document.querySelectorAll(".nav-tab").forEach((x) => x.classList.toggle("on", x.dataset.view === "board" && (isList || isDetail || isValEdit)));
   btnSettings.classList.toggle("on", isSettings);
 }
 function showList() { showView("list"); }
@@ -1334,12 +1338,20 @@ function renderValuationPanel(item, panel, idBlock) {
     return wrap;
   }
 
+  // 打开全屏双栏编辑器视图（添加/编辑卡片）
   function showEditor(card) {
-    const body = document.getElementById("valModalBody");
-    document.getElementById("valModalTitle").textContent = card
-      ? (LANG === "zh" ? "编辑估值" : "Edit valuation")
-      : (LANG === "zh" ? "添加估值" : "Add valuation");
-    mountValuationCalc(body, valuationCtx(item), {
+    valEditReturn = item;
+    history.pushState({ valedit: 1 }, "", location.href); // 压一条 → 后退=取消
+    viewValEdit.innerHTML = "";
+    const head = document.createElement("div"); head.className = "ve-head";
+    const back = document.createElement("a"); back.className = "ve-back"; back.href = "#"; back.textContent = t("d_back");
+    back.addEventListener("click", (e) => { e.preventDefault(); finishValEdit(); });
+    const title = document.createElement("span"); title.className = "ve-title";
+    title.textContent = card ? (LANG === "zh" ? "编辑估值" : "Edit valuation") : (LANG === "zh" ? "添加估值" : "Add valuation");
+    head.append(back, title);
+    const mountEl = document.createElement("div");
+    viewValEdit.append(head, mountEl);
+    mountValuationCalc(mountEl, valuationCtx(item), {
       lang: LANG,
       initialMethod: card ? card.method : undefined,
       initialInputs: card ? card.inputs : undefined,
@@ -1347,7 +1359,7 @@ function renderValuationPanel(item, panel, idBlock) {
       refData: (item._financials && item._financials.annual)
         ? { financials: item._financials.annual.financials || null, valuationRefs: item._financials.annual.valuationRefs || null, sources: valuationSources(item, LANG) }
         : { financials: null, valuationRefs: null, sources: valuationSources(item, LANG) },
-      onCancel: () => closeValModal(),
+      onCancel: () => finishValEdit(),
       onDone: ({ method, inputs, low, high, note }) => {
         if (!Array.isArray(c.valuations)) c.valuations = [];
         if (card) {
@@ -1358,24 +1370,18 @@ function renderValuationPanel(item, panel, idBlock) {
           c.valuations.push(fresh);
           if (!c.selectedValuationId) selectValuation(item, fresh, idBlock); // 首张/无选中时自动设为合理区间
         }
-        saveItem(item); closeValModal(); showList();
+        saveItem(item); finishValEdit();
       },
     });
-    document.getElementById("valOverlay").classList.remove("hidden");
-    const first = body.querySelector("input, button");
-    if (first) first.focus();
+    showView("valedit");
+    window.scrollTo(0, 0);
   }
 
   showList();
 }
 
-// 关闭估值大弹窗并清空内容（取消/完成/背景点击/Esc 共用）
-function closeValModal() {
-  const o = document.getElementById("valOverlay");
-  if (!o || o.classList.contains("hidden")) return;
-  o.classList.add("hidden");
-  document.getElementById("valModalBody").innerHTML = "";
-}
+// 退出编辑器：弹掉压入的历史条 → popstate 回到详情
+function finishValEdit() { if (valEditReturn) history.back(); }
 
 function currentDetailCode() {
   const m = location.pathname.match(/^\/b\/[^/]+\/([^/]+)/);
@@ -1386,7 +1392,10 @@ function route() {
   const item = code ? items.find((i) => (i.cfg.ticker || "").toUpperCase() === code) : null;
   if (item && owner) showDetail(item); else showList();
 }
-window.addEventListener("popstate", route);
+window.addEventListener("popstate", () => {
+  if (valEditReturn) { const it = valEditReturn; valEditReturn = null; showDetail(it); return; } // 退出编辑器→回详情
+  route();
+});
 
 document.querySelectorAll(".nav-tab").forEach((tab) =>
   tab.addEventListener("click", () => { if (tab.disabled) return; history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList(); }));
@@ -1399,12 +1408,10 @@ const shareOverlay = document.getElementById("shareOverlay");
 document.getElementById("btnShare").addEventListener("click", () => shareOverlay.classList.remove("hidden"));
 document.getElementById("btnShareDone").addEventListener("click", () => shareOverlay.classList.add("hidden"));
 shareOverlay.addEventListener("click", (e) => { if (e.target === shareOverlay) shareOverlay.classList.add("hidden"); });
-const valOverlayEl = document.getElementById("valOverlay");
-valOverlayEl.addEventListener("click", (e) => { if (e.target === valOverlayEl) closeValModal(); });
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (!valOverlayEl.classList.contains("hidden")) closeValModal();
+    if (valEditReturn) { finishValEdit(); }
     else if (!modalOverlay.classList.contains("hidden")) closeItemModal();
     else if (!shareOverlay.classList.contains("hidden")) shareOverlay.classList.add("hidden");
     return;

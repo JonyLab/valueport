@@ -43,6 +43,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
 
   mount.innerHTML = "";
   const root = el("div", "vc");
+  const main = el("div", "vc-main");   // 左栏：输入（随页面滚动）
+  const side = el("div", "vc-side");   // 右栏：结果（桌面 sticky 常驻）
+  root.append(main, side);
   mount.appendChild(root);
 
   // 方法选择：分组下拉（内在价值 / 相对估值 两个 optgroup）
@@ -63,10 +66,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   select.value = String(activeIdx);
   select.addEventListener("change", () => { activeIdx = Number(select.value); renderForm(); });
   methodsBar.appendChild(select);
-  root.appendChild(methodsBar);
+  main.appendChild(methodsBar);
 
   const formWrap = el("div", "vc-form");
-  root.appendChild(formWrap);
+  main.appendChild(formWrap);
 
   // 备注（长文本，跨方法切换保留）
   const noteWrap = el("div", "vc-note");
@@ -74,11 +77,11 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const noteInput = el("textarea", "vc-note-input"); noteInput.placeholder = tx("notePh");
   if (initialNote) noteInput.value = initialNote;
   noteWrap.append(noteLabel, noteInput);
-  root.appendChild(noteWrap);
+  main.appendChild(noteWrap);
 
   // 结果 hero
   const result = el("div", "vc-result");
-  root.appendChild(result);
+  side.appendChild(result);
   const nums = el("div", "vc-rnums");
   const outLabel = el("span", "vc-out-label"); outLabel.textContent = tx("fair");
   const outLow = el("span", "vc-rlow");
