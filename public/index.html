@@ -1317,9 +1317,9 @@ function renderDetail(item) {
   const tabsNav = document.createElement("div"); tabsNav.className = "vd-tabs";
   const panels = document.createElement("div");
   const defs = [
+    { label: t("d_tab_valuation") },
     { label: t("d_tab_fundamentals") },
     { label: t("d_tab_financials") },
-    { label: t("d_tab_valuation") },
   ];
   const tabEls = [], panelEls = [];
   defs.forEach((d, i) => {
@@ -1328,13 +1328,13 @@ function renderDetail(item) {
     b.addEventListener("click", () => { tabEls.forEach((x) => x.classList.remove("on")); panelEls.forEach((x) => x.classList.remove("on")); b.classList.add("on"); p.classList.add("on"); });
     tabsNav.appendChild(b); panels.appendChild(p); tabEls.push(b); panelEls.push(p);
   });
+  renderValuationPanel(item, panelEls[0], idBlock); // 估值研究置顶为默认 tab
   const fr = fundamentalsRows(item);
-  if (fr.length) fillRows(panelEls[0], fr);
-  else { const e = document.createElement("div"); e.className = "vd-empty"; e.textContent = t("d_no_fundamentals"); panelEls[0].appendChild(e); }
-  renderFinancialsPanel(item, panelEls[1]);
+  if (fr.length) fillRows(panelEls[1], fr);
+  else { const e = document.createElement("div"); e.className = "vd-empty"; e.textContent = t("d_no_fundamentals"); panelEls[1].appendChild(e); }
+  renderFinancialsPanel(item, panelEls[2]);
   loadFinancials(item, "annual"); // 预取年报，供计算器预填
   loadFinancials(item, "quarter"); // 预取季报，供「最新季 / 近4季 TTM」参考
-  renderValuationPanel(item, panelEls[2], idBlock);
 
   viewDetail.append(backRow, top, tabsNav, panels);
   mountDetailPendulum(item);               // 已设区间→钟摆；未设→占位卡片
