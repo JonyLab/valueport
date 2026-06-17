@@ -1,5 +1,5 @@
 // 横向五段色带：钟摆"展平"——同一套 priceToPhi 映射，列表行里用
-import { ZONES, computeAnchors, priceToPhi } from "./core.js";
+import { ZONES, computeAnchors, priceToPhi, hasFairRange } from "./core.js";
 import { LANG } from "./i18n.js";
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -21,6 +21,10 @@ export class Bar {
     this.segs = ZONES.map(() => { const d = document.createElement("div"); d.className = "vbar-seg"; track.appendChild(d); return d; });
     this.marker = document.createElement("div"); this.marker.className = "vbar-marker"; this.marker.style.left = "50%";
     track.appendChild(this.marker);
+    // 未设区间时覆盖在条带上的占位提示
+    this.emptyHint = document.createElement("div"); this.emptyHint.className = "vbar-empty";
+    this.emptyHint.textContent = LANG === "zh" ? "未设内在价值" : "No fair value set";
+    track.appendChild(this.emptyHint);
     const ticks = document.createElement("div"); ticks.className = "vbar-ticks";
     this.tickEls = [0, 1, 2, 3].map((k) => { const s = document.createElement("span"); s.className = "vbar-tick"; s.style.left = ((k + 1) * 20) + "%"; ticks.appendChild(s); return s; });
     root.append(labels, track, ticks);
@@ -28,6 +32,17 @@ export class Bar {
     this.root = root;
   }
   set(cfg, animate = true) {
+    // 未设内在价值区间：占位态——条带置灰、刻度留空、隐藏标记、显示提示
+    const valued = hasFairRange(cfg);
+    this.root.classList.toggle("is-empty", !valued);
+    this.emptyHint.style.display = valued ? "none" : "";
+    if (!valued) {
+      this.tickEls.forEach((el) => { el.textContent = ""; });
+      this.segs.forEach((d) => { d.style.background = "var(--track)"; });
+      this.labelEls.forEach((s) => { s.style.color = "var(--ink-mute)"; s.style.fontWeight = "500"; });
+      this.marker.style.display = "none";
+      return;
+    }
     const anchors = computeAnchors(cfg); // [0, t1, t2, t3, t4, Infinity]
     this.tickEls.forEach((el, k) => { const v = anchors[k + 1]; el.textContent = isFinite(v) ? Math.round(v) : ""; });
     const hasPrice = cfg.price > 0;

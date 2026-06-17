@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeAnchors, priceToPhi, verdictOf, structValid, SEG, N, ZONES, applyZoneColors, DEFAULT_ZONE_COLORS } from "../public/shared/core.js";
+import { computeAnchors, priceToPhi, verdictOf, structValid, hasFairRange, SEG, N, ZONES, applyZoneColors, DEFAULT_ZONE_COLORS } from "../public/shared/core.js";
 
 describe("computeAnchors", () => {
   it("derives t1..t4 from fair range, mos, ext", () => {
@@ -58,6 +58,22 @@ describe("structValid", () => {
   });
   it("rejects ext <= 0", () => {
     expect(structValid({ fairLow: 200, fairHigh: 300, mos: 20, ext: 0 })).toBe(false);
+  });
+  it("rejects an unvalued config (no fair range)", () => {
+    expect(structValid({ fairLow: 0, fairHigh: 0, mos: 20, ext: 25 })).toBe(false);
+  });
+});
+
+describe("hasFairRange", () => {
+  it("true for a valid range", () => {
+    expect(hasFairRange({ fairLow: 200, fairHigh: 300 })).toBe(true);
+  });
+  it("false when unset (0/0 or empty)", () => {
+    expect(hasFairRange({ fairLow: 0, fairHigh: 0 })).toBe(false);
+    expect(hasFairRange({ fairLow: "", fairHigh: "" })).toBe(false);
+  });
+  it("false when only one side is set", () => {
+    expect(hasFairRange({ fairLow: 200, fairHigh: 0 })).toBe(false);
   });
 });
 

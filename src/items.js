@@ -23,18 +23,27 @@ function validateValuations(raw) {
 // 校验后台提交的配置；ok=false 时 errors 描述原因。
 export function validateItem(b) {
   const errors = [];
-  const fairLow = Number(b.fairLow), fairHigh = Number(b.fairHigh);
   const mos = Number(b.mos), ext = Number(b.ext);
+  // 内在价值区间可选：留空（"" / null / 0）表示「未估值」，存 0。填了才校验低<高。
+  const rawLow = b.fairLow, rawHigh = b.fairHigh;
+  const lowSet = rawLow !== "" && rawLow != null && Number(rawLow) > 0;
+  const highSet = rawHigh !== "" && rawHigh != null && Number(rawHigh) > 0;
+  const fairLow = lowSet ? Number(rawLow) : 0;
+  const fairHigh = highSet ? Number(rawHigh) : 0;
+  const hasFair = lowSet || highSet;
   if (!b.symbol || typeof b.symbol !== "string") errors.push("symbol required");
   if (!b.ticker || typeof b.ticker !== "string") errors.push("ticker required");
-  if (!(fairLow > 0)) errors.push("fairLow must be > 0");
-  else if (!(fairHigh > fairLow)) errors.push("fairHigh must be > fairLow");
+  if (hasFair) {
+    if (!(fairLow > 0)) errors.push("fairLow must be > 0");
+    else if (!(fairHigh > fairLow)) errors.push("fairHigh must be > fairLow");
+  }
   if (!(mos > 0 && mos < 100)) errors.push("mos must be in (0,100)");
   if (!(ext > 0)) errors.push("ext must be > 0");
 
   const vals = validateValuations(b.valuations);
   if (!vals.ok) errors.push("valuations invalid");
-  let selectedValuationId = (typeof b.selectedValuationId === "string" && b.selectedValuationId) ? b.selectedValuationId : null;
+  // 未设定区间 ⇒ 不可能有选中的估值卡片
+  let selectedValuationId = (hasFair && typeof b.selectedValuationId === "string" && b.selectedValuationId) ? b.selectedValuationId : null;
   if (vals.ok && selectedValuationId && !vals.value.some((c) => c.id === selectedValuationId)) {
     errors.push("selectedValuationId not found");
   }

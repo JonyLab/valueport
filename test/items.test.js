@@ -21,6 +21,24 @@ describe("validateItem", () => {
   it("rejects mos = 0 (open interval)", () => {
     expect(validateItem({ ...good, mos: 0 }).ok).toBe(false);
   });
+  it("accepts empty fair range (unvalued), stores 0/0", () => {
+    const r = validateItem({ ...good, fairLow: "", fairHigh: "" });
+    expect(r.ok).toBe(true);
+    expect(r.value.fairLow).toBe(0);
+    expect(r.value.fairHigh).toBe(0);
+  });
+  it("treats fairLow/fairHigh = 0 as unvalued", () => {
+    expect(validateItem({ ...good, fairLow: 0, fairHigh: 0 }).ok).toBe(true);
+  });
+  it("rejects a half-filled fair range (low only)", () => {
+    expect(validateItem({ ...good, fairLow: 215, fairHigh: "" }).ok).toBe(false);
+  });
+  it("drops selectedValuationId when unvalued", () => {
+    const card = { id: "v1", method: "pe", inputs: {}, low: 200, high: 260 };
+    const r = validateItem({ ...good, fairLow: "", fairHigh: "", valuations: [card], selectedValuationId: "v1" });
+    expect(r.ok).toBe(true);
+    expect(r.value.selectedValuationId).toBe(null);
+  });
 });
 
 describe("rowToItem", () => {

@@ -36,8 +36,13 @@ export function priceToPhi(anchors, p) {
   return Math.min(PHI_MAX, SEG * 4 + SEG * (1 - t4 / p));
 }
 
+// 是否已设定内在价值区间（低<高）。未设定时钟摆改为占位态。
+export function hasFairRange(c) {
+  return c.fairLow > 0 && c.fairHigh > c.fairLow;
+}
+
 export function structValid(c) {
-  return c.fairLow > 0 && c.fairHigh > c.fairLow && c.mos > 0 && c.mos < 100 && c.ext > 0;
+  return hasFairRange(c) && c.mos > 0 && c.mos < 100 && c.ext > 0;
 }
 
 // 默认中文文案；页面可传入 msgs 做多语言（见 shared/i18n.js）。

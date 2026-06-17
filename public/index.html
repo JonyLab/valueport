@@ -68,6 +68,8 @@
   .vbar-marker::after{content:"";position:absolute;top:-5px;left:50%;transform:translateX(-50%);border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--hub)}
   .vbar-ticks{position:relative;height:13px;margin-top:4px}
   .vbar-tick{position:absolute;transform:translateX(-50%);font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .vbar.is-empty .vbar-track{border-style:dashed;background:var(--track)}
+  .vbar-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;letter-spacing:.04em;color:var(--ink-mute);pointer-events:none}
   @media (min-width:760px){
     .charts{display:grid;grid-template-columns:1fr 1fr}
     .chart-item:nth-child(odd){border-right:1px solid var(--divider)}
@@ -243,6 +245,13 @@
   .vd-verdict.v-under{color:var(--green)} .vd-verdict.v-over{color:var(--red)} .vd-verdict.v-fair{color:var(--ink-mute)}
   .vd-gauge{flex:none;width:340px}
   .vd-gauge svg{display:block;width:100%;height:auto;overflow:visible}
+  .vge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:180px;padding:28px 22px;border:1px dashed var(--border);border-radius:10px;background:var(--card);text-align:center}
+  .vge-bar{display:flex;gap:3px;width:160px;height:12px;margin-bottom:2px;opacity:.55}
+  .vge-bar i{flex:1;background:var(--track);border-radius:2px}
+  .vge-title{font-size:13px;font-weight:600;color:var(--ink)}
+  .vge-sub{font-size:12px;line-height:1.6;color:var(--ink-mute);max-width:250px}
+  .vge-cta{margin-top:4px;padding:7px 16px;font-size:12.5px;font-weight:600;color:#fff;background:#31679b;border:none;border-radius:7px;cursor:pointer}
+  .vge-cta:hover{background:#2b5a87}
   .vd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--divider);margin-bottom:18px}
   .vd-tab{height:40px;padding:0 14px;border:0;background:none;cursor:pointer;font-family:var(--font);font-size:13.5px;font-weight:500;color:var(--ink-mute);border-bottom:2px solid transparent;margin-bottom:-1px}
   .vd-tab:hover{color:var(--ink)}
@@ -515,7 +524,7 @@
 <script type="module">
 import { Gauge } from "/shared/gauge.js";
 import { Bar } from "/shared/bar.js";
-import { verdictOf, structValid, applyZoneColors, computeAnchors, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
+import { verdictOf, structValid, hasFairRange, applyZoneColors, computeAnchors, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
 import { MKT_LABEL } from "/shared/market.js";
 import { t, applyI18n, toggleLang, langButtonLabel, LANG } from "/shared/i18n.js";
 import { mountValuationCalc } from "/shared/valuation-ui.js";
@@ -704,12 +713,12 @@ async function fetchQuotes() {
     ok++;
     item.cfg = { ...item.cfg, price: p };
     item.live = true;
-    if (structValid(item.cfg)) {
-      const first = !item.gotQuote;
-      item.gotQuote = true;
-      item.gauge.set(item.cfg, true); // 列表用 Bar：set 自带标记滑入动画
-      if (first && typeof item.gauge.swingIn === "function") item.gauge.swingIn(); // 兼容钟摆形态
-      renderVerdict(item);
+    const first = !item.gotQuote;
+    item.gotQuote = true;
+    item.gauge.set(item.cfg, true);   // 列表用 Bar：自带占位/标记动画
+    renderVerdict(item);
+    if (structValid(item.cfg)) {       // 入场摆动/数字动画仅在有区间（钟摆）时
+      if (first && typeof item.gauge.swingIn === "function") item.gauge.swingIn();
       if (first) animatePriceIn(item);
     }
   });
@@ -796,8 +805,14 @@ function setSaveState(state, text) {
   modalSaveEl.className = "save-state " + (state || "");
   modalSaveEl.textContent = text || "";
 }
+// 可落库：选了标的即可；若填了内在价值区间则区间须自洽（低<高 + 安全边际/极高有效）。
+function cfgSavable(c) {
+  if (!c.symbol) return false;
+  if (hasFairRange(c)) return c.mos > 0 && c.mos < 100 && c.ext > 0;
+  return !(c.fairLow > 0) && !(c.fairHigh > 0); // 未估值：低/高都不能是「填了一半」
+}
 async function saveItem(item) {
-  if (!item.cfg.symbol || !structValid(item.cfg)) return;
+  if (!cfgSavable(item.cfg)) return;
   if (item._saving) { item._pendingSave = true; return; }
   item._saving = true;
   setSaveState("", t("st_saving"));
@@ -845,8 +860,8 @@ async function loadHints(q) {
 /* ---------- 标的编辑弹窗 ---------- */
 const FIELDS = [
   { k: "ticker", lab: t("m_ticker"), type: "text" },
-  { k: "fairLow", lab: t("m_fair_low"), type: "number" },
-  { k: "fairHigh", lab: t("m_fair_high"), type: "number" },
+  { k: "fairLow", lab: t("m_fair_low"), type: "number", ph: t("m_fair_ph") },
+  { k: "fairHigh", lab: t("m_fair_high"), type: "number", ph: t("m_fair_ph") },
   { k: "mos", lab: t("m_mos"), type: "number", presets: [10, 20, 30, 40, 50] },
   { k: "ext", lab: t("m_ext"), type: "number", presets: [10, 20, 30, 40, 50] },
 ];
@@ -877,9 +892,10 @@ function buildItemForm(item) {
     span.className = "f-lab"; span.textContent = f.lab;
     const input = document.createElement("input");
     input.type = f.type;
-    if (f.type === "number") { input.min = "0"; input.step = "any"; }
+    if (f.type === "number") { input.min = "0"; input.step = "any"; if (f.ph) input.placeholder = f.ph; }
     else { input.maxLength = 24; input.spellcheck = false; input.placeholder = t("m_ph_ticker"); input.autocomplete = "off"; }
-    input.value = item.cfg[f.k] ?? "";
+    // 内在价值（带 ph 的字段）未设定（0/空）时留空，露出「可留空」占位
+    input.value = (f.ph && !(item.cfg[f.k] > 0)) ? "" : (item.cfg[f.k] ?? "");
     fieldInputs[f.k] = input;
 
     input.addEventListener("input", () => {
@@ -901,11 +917,9 @@ function buildItemForm(item) {
         renderVerdict(item);
         item.gauge.set(item.cfg);
       }
-      if (structValid(item.cfg)) {
-        item.gauge.set(item.cfg);
-        renderVerdict(item);
-        debounceSave(item);
-      }
+      item.gauge.set(item.cfg);   // 钟摆/条带自带占位态，未估值也安全
+      renderVerdict(item);
+      if (cfgSavable(item.cfg)) debounceSave(item);
     });
 
     if (f.k === "ticker") {
@@ -930,7 +944,8 @@ function buildItemForm(item) {
         item.live = false; item.gotQuote = false;
         modalTitle.textContent = modalTitleFor(item);
         item.nameCn = ""; item.nameEn = ""; // 换标的后旧名作废，重新拉
-        if (structValid(item.cfg)) { item.gauge.set(item.cfg); renderVerdict(item); renderItemHead(item); saveItem(item); }
+        item.gauge.set(item.cfg); renderVerdict(item); renderItemHead(item);
+        if (cfgSavable(item.cfg)) saveItem(item); // 未填区间也可存（仅需标的）
         close(); markState(); fetchQuotes(); loadNames([item.cfg.symbol]);
       };
       const renderList = (arr) => {
@@ -1043,13 +1058,17 @@ function trySubmitModal() {
   let firstBad = null;
   const flag = (key, msg) => { showFieldErr(key, msg); if (!firstBad) firstBad = key; };
   if (!c.symbol) flag("ticker", t("m_err_symbol"));
-  if (!(c.fairLow > 0)) flag("fairLow", t("m_err_low"));
-  else if (!(c.fairHigh > c.fairLow)) flag("fairHigh", t("m_err_high"));
-  if (!(c.mos > 0 && c.mos < 100)) flag("mos", t("m_err_mos"));
-  if (!(c.ext > 0)) flag("ext", t("m_err_ext"));
+  // 内在价值区间可选：两个都空 = 未估值，放行；只要填了一个就按完整区间校验
+  if (c.fairLow > 0 || c.fairHigh > 0) {
+    if (!(c.fairLow > 0)) flag("fairLow", t("m_err_low"));
+    else if (!(c.fairHigh > c.fairLow)) flag("fairHigh", t("m_err_high"));
+    if (!(c.mos > 0 && c.mos < 100)) flag("mos", t("m_err_mos"));
+    if (!(c.ext > 0)) flag("ext", t("m_err_ext"));
+  }
   if (firstBad) { const el = fieldInputs[firstBad]; if (el) { el.focus(); el.scrollIntoView({ block: "nearest" }); } return; }
   clearTimeout(item._saveT);
   saveItem(item);            // 立即提交（不等防抖）
+  refreshDetailIfOpen(item); // 详情页正展示该标的时，同步钟摆/占位与判定
   modalItem = null;
   modalOverlay.classList.add("hidden");
 }
@@ -1090,7 +1109,51 @@ const viewValEdit = document.getElementById("viewValEdit");
 const pageHeadEl = document.querySelector(".page-head");
 const boardDividerEl = document.getElementById("boardDivider");
 const btnSettings = document.getElementById("btnSettings");
-let detailGauge = null;
+let detailGauge = null, detailItem = null, detailGwrap = null, detailIdBlock = null, detailValRefresh = null;
+
+// 详情页钟摆区：已设区间→渲染完整钟摆；未设→占位卡片（直接填或加估值卡片）
+function mountDetailPendulum(item) {
+  if (!detailGwrap) return;
+  if (detailGauge) { detailGauge.destroy && detailGauge.destroy(); detailGauge = null; }
+  detailGwrap.innerHTML = "";
+  if (hasFairRange(item.cfg)) {
+    detailGauge = new Gauge(detailGwrap);
+    detailGauge.set(item.cfg, false);
+    if (item.cfg.price > 0) detailGauge.swingIn();
+  } else {
+    detailGwrap.appendChild(buildValPlaceholder(item));
+  }
+}
+
+// 未估值占位：极简扁平条 + 文案 + CTA（打开标的编辑弹窗直接填区间）
+function buildValPlaceholder(item) {
+  const box = document.createElement("div"); box.className = "vge";
+  const bar = document.createElement("div"); bar.className = "vge-bar";
+  for (let i = 0; i < 5; i++) bar.appendChild(document.createElement("i"));
+  const title = document.createElement("div"); title.className = "vge-title";
+  title.textContent = LANG === "zh" ? "尚未设定内在价值" : "No fair value yet";
+  const sub = document.createElement("div"); sub.className = "vge-sub";
+  sub.textContent = LANG === "zh"
+    ? "直接填写合理价值区间，或在「估值研究」里添加估值卡片并设为合理区间。"
+    : "Enter a fair-value range directly, or add a valuation card under Valuation and mark it as the fair range.";
+  const cta = document.createElement("button"); cta.type = "button"; cta.className = "vge-cta";
+  cta.textContent = LANG === "zh" ? "设定内在价值" : "Set fair value";
+  cta.addEventListener("click", () => openItemModal(item, false));
+  box.append(bar, title, sub, cta);
+  return box;
+}
+
+// 标的编辑保存后，若详情页正展示同一标的，刷新钟摆/占位 + 顶部判定
+function refreshDetailIfOpen(item) {
+  if (detailItem !== item || viewDetail.classList.contains("hidden")) return;
+  mountDetailPendulum(item);
+  if (detailIdBlock) {
+    const vv = verdictOf(item.cfg, VMSGS);
+    const vEl = detailIdBlock.querySelector(".vd-verdict");
+    if (vEl) { vEl.textContent = vv.text; vEl.className = "vd-verdict " + vv.cls; }
+  }
+  if (detailValRefresh) detailValRefresh(); // 估值研究摘要（区间/阈值/判定）同步
+}
 
 function showView(v) { // "list" | "settings" | "detail" | "valedit"
   const isList = v === "list", isSettings = v === "settings", isDetail = v === "detail", isValEdit = v === "valedit";
@@ -1153,6 +1216,7 @@ function renderDetail(item) {
   const c = item.cfg, s = item.statics || {};
   viewDetail.innerHTML = "";
   if (detailGauge) { detailGauge.destroy && detailGauge.destroy(); detailGauge = null; }
+  detailItem = item;
 
   const back = document.createElement("a"); back.className = "vd-back"; back.href = "/b/" + boardSlug; back.textContent = t("d_back");
   back.addEventListener("click", (e) => { e.preventDefault(); history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList(); });
@@ -1168,6 +1232,7 @@ function renderDetail(item) {
   idBlock.querySelector(".vd-price").textContent = c.price > 0 ? VMSGS.px(c.price) : "—";
   idBlock.querySelector(".vd-verdict").textContent = v.text;
   const gwrap = document.createElement("div"); gwrap.className = "vd-gauge";
+  detailGwrap = gwrap; detailIdBlock = idBlock;
   top.append(idBlock, gwrap);
 
   const tabsNav = document.createElement("div"); tabsNav.className = "vd-tabs";
@@ -1193,9 +1258,7 @@ function renderDetail(item) {
   renderValuationPanel(item, panelEls[2], idBlock);
 
   viewDetail.append(back, top, tabsNav, panels);
-  detailGauge = new Gauge(gwrap);          // 详情页用完整钟摆
-  detailGauge.set(c, false);
-  if (c.price > 0) detailGauge.swingIn();
+  mountDetailPendulum(item);               // 已设区间→钟摆；未设→占位卡片
 }
 
 // 估值研究面板：摘要 + 估值卡片列表 ⇄ 卡片编辑器。idBlock 用于联动刷新顶部判定。
@@ -1218,7 +1281,20 @@ function selectValuation(item, card, idBlock) {
   c.fairLow = Math.round(Math.min(card.low, card.high) * 100) / 100;
   c.fairHigh = Math.round(Math.max(card.low, card.high) * 100) / 100;
   c.selectedValuationId = card.id;
-  if (detailGauge) detailGauge.set(c, true);
+  syncFairUI(item, idBlock);
+}
+
+// 取消选定（回到未估值占位）：清空区间 + 选中 id。
+function clearValuation(item, idBlock) {
+  const c = item.cfg;
+  c.fairLow = 0; c.fairHigh = 0; c.selectedValuationId = null;
+  syncFairUI(item, idBlock);
+}
+
+// 区间变更后统一刷新：详情钟摆/占位、顶部判定、列表行、保存。
+function syncFairUI(item, idBlock) {
+  const c = item.cfg;
+  mountDetailPendulum(item);
   if (idBlock) { const vv = verdictOf(c, VMSGS); const vEl = idBlock.querySelector(".vd-verdict"); vEl.textContent = vv.text; vEl.className = "vd-verdict " + vv.cls; }
   if (item.gauge) item.gauge.set(c, true);
   renderVerdict(item); renderItemHead(item);
@@ -1325,6 +1401,7 @@ function valuationSources(item, lang) {
 function renderValuationPanel(item, panel, idBlock) {
   const c = item.cfg;
   panel.innerHTML = "";
+  detailValRefresh = () => showList(); // 供外部（标的编辑保存后）刷新摘要
 
   function showList() {
     panel.innerHTML = "";
@@ -1360,16 +1437,19 @@ function renderValuationPanel(item, panel, idBlock) {
     const verd = document.createElement("div"); verd.className = "vcard-verdict " + vinfo.cls; verd.textContent = c.price > 0 ? vinfo.text : "";
     const note = document.createElement("div"); note.className = "vcard-note"; note.textContent = card.note || ""; if (!card.note) note.style.display = "none";
     const actions = document.createElement("div"); actions.className = "vcard-actions";
-    const sel = document.createElement("button"); sel.type = "button"; sel.className = "vcard-sel" + (c.selectedValuationId === card.id ? " on" : "");
-    sel.textContent = c.selectedValuationId === card.id ? (LANG === "zh" ? "● 合理区间" : "● Fair range") : (LANG === "zh" ? "○ 设为合理区间" : "○ Set as fair range");
-    sel.addEventListener("click", () => { selectValuation(item, card, idBlock); showList(); });
+    const picked = c.selectedValuationId === card.id;
+    const sel = document.createElement("button"); sel.type = "button"; sel.className = "vcard-sel" + (picked ? " on" : "");
+    sel.textContent = picked ? (LANG === "zh" ? "● 合理区间" : "● Fair range") : (LANG === "zh" ? "○ 设为合理区间" : "○ Set as fair range");
+    sel.title = picked ? (LANG === "zh" ? "点击取消选定" : "Click to unset") : "";
+    sel.addEventListener("click", () => { (picked ? clearValuation : (i, b) => selectValuation(i, card, b))(item, idBlock); showList(); });
     const edit = document.createElement("button"); edit.type = "button"; edit.className = "vcard-edit"; edit.textContent = LANG === "zh" ? "编辑" : "Edit";
     edit.addEventListener("click", () => showEditor(card));
     const del = document.createElement("button"); del.type = "button"; del.className = "vcard-del"; del.textContent = LANG === "zh" ? "删除" : "Delete";
     del.addEventListener("click", () => {
+      const wasPicked = c.selectedValuationId === card.id;
       c.valuations = (c.valuations || []).filter((x) => x.id !== card.id);
-      if (c.selectedValuationId === card.id) c.selectedValuationId = null;
-      saveItem(item); showList();
+      if (wasPicked) clearValuation(item, idBlock); else saveItem(item);
+      showList();
     });
     actions.append(sel, edit, del);
     wrap.append(head, sum, verd, note, actions);
