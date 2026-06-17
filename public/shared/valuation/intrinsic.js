@@ -73,6 +73,23 @@ const FCFF = {
 
     return (PV - netDebt) / shares;
   },
+  breakdown(vals, ctx) {
+    const { revenue, n, growth, opMargin, taxRate } = vals;
+    const g = growth / 100;
+    const opM = opMargin / 100;
+    const tax = taxRate / 100;
+    const baseOk = [revenue, n, growth].every(isFiniteNum);
+    const revN = baseOk ? revenue * Math.pow(1 + g, n) : null;
+    const nopatN = (revN !== null && isFiniteNum(opMargin) && isFiniteNum(taxRate)) ? revN * opM * (1 - tax) : null;
+    const shares = ctx && ctx.shares;
+    const perShare = this.compute(vals, ctx);
+    const equity = (isFinitePos(shares) && Number.isFinite(perShare)) ? perShare * shares : null;
+    return [
+      { key: "revN", label: { zh: "终期营收", en: "Terminal revenue" }, value: revN, kind: "money" },
+      { key: "nopatN", label: { zh: "终期税后经营利润", en: "Terminal NOPAT" }, value: nopatN, kind: "money" },
+      { key: "equity", label: { zh: "股权价值", en: "Equity value" }, value: equity, kind: "money" },
+    ];
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -129,6 +146,16 @@ const FCFE = {
 
     return PV / shares;
   },
+  breakdown(vals, ctx) {
+    const { netIncome, n, growth } = vals;
+    const g = growth / 100;
+    const niN = [netIncome, n, growth].every(isFiniteNum) ? netIncome * Math.pow(1 + g, n) : null;
+    const vps = this.compute(vals, ctx);
+    return [
+      { key: "niN", label: { zh: "终期净利润", en: "Terminal net income" }, value: niN, kind: "money" },
+      { key: "vps", label: { zh: "每股价值", en: "Value per share" }, value: Number.isFinite(vps) ? vps : null, kind: "num" },
+    ];
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -177,6 +204,16 @@ const DDM = {
     PV += TV / Math.pow(1 + ke, n);
 
     return PV; // 已是每股
+  },
+  breakdown(vals, ctx) {
+    const { dps, n, growth } = vals;
+    const g = growth / 100;
+    const dN = [dps, n, growth].every(isFiniteNum) ? dps * Math.pow(1 + g, n) : null;
+    const vps = this.compute(vals, ctx);
+    return [
+      { key: "dN", label: { zh: "终期股利/股", en: "Terminal DPS" }, value: dN, kind: "num" },
+      { key: "vps", label: { zh: "每股价值", en: "Value per share" }, value: Number.isFinite(vps) ? vps : null, kind: "num" },
+    ];
   },
 };
 

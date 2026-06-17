@@ -34,6 +34,16 @@ const PE = {
     const eps = (futRev * netMargin) / shares;
     return eps * targetPE;
   },
+  breakdown(vals, ctx) {
+    const { revenue, n, targetPE } = vals;
+    const futRev = (finite(revenue) && finite(n) && finite(vals.growth)) ? revenue * Math.pow(1 + vals.growth / 100, n) : null;
+    const futNi = (futRev !== null && finite(vals.netMargin)) ? futRev * (vals.netMargin / 100) : null;
+    return [
+      { key: "futRev", label: { zh: "预期营收（n年后）", en: "Projected revenue" }, value: futRev, kind: "money" },
+      { key: "futNi", label: { zh: "预期净利润", en: "Projected net income" }, value: futNi, kind: "money" },
+      { key: "pe", label: { zh: "目标 PE", en: "Target P/E" }, value: finite(targetPE) ? targetPE : null, kind: "mult" },
+    ];
+  },
 };
 
 // PEG 估值：impliedPE = peg × 增速「原始百分数」（注意此处不除以 100）
@@ -53,6 +63,13 @@ const PEG = {
     const impliedPE = peg * growth;
     return eps * impliedPE;
   },
+  breakdown(vals, ctx) {
+    const { growth, peg } = vals;
+    const impliedPE = (finite(peg) && finite(growth)) ? peg * growth : null;
+    return [
+      { key: "impliedPE", label: { zh: "隐含 PE", en: "Implied P/E" }, value: impliedPE, kind: "mult" },
+    ];
+  },
 };
 
 // PB 估值：每股净资产 × 目标 PB
@@ -68,6 +85,12 @@ const PB = {
     const { bps, targetPB } = vals;
     if (![bps, targetPB].every(finite)) return null;
     return bps * targetPB;
+  },
+  breakdown(vals, ctx) {
+    const { targetPB } = vals;
+    return [
+      { key: "pb", label: { zh: "目标 PB", en: "Target P/B" }, value: finite(targetPB) ? targetPB : null, kind: "mult" },
+    ];
   },
 };
 
@@ -90,6 +113,14 @@ const PS = {
     if (![revenue, n, vals.growth, targetPS].every(finite)) return null;
     const futRev = revenue * Math.pow(1 + g, n);
     return (futRev * targetPS) / shares;
+  },
+  breakdown(vals, ctx) {
+    const { revenue, n, targetPS } = vals;
+    const futRev = (finite(revenue) && finite(n) && finite(vals.growth)) ? revenue * Math.pow(1 + vals.growth / 100, n) : null;
+    return [
+      { key: "futRev", label: { zh: "预期营收（n年后）", en: "Projected revenue" }, value: futRev, kind: "money" },
+      { key: "ps", label: { zh: "目标 PS", en: "Target P/S" }, value: finite(targetPS) ? targetPS : null, kind: "mult" },
+    ];
   },
 };
 
@@ -114,6 +145,16 @@ const EVEBITDA = {
     const futEbitda = ebitda * Math.pow(1 + g, n);
     const ev = futEbitda * targetMultiple;
     return (ev - netDebt) / shares;
+  },
+  breakdown(vals, ctx) {
+    const { ebitda, n, targetMultiple } = vals;
+    const futEbitda = (finite(ebitda) && finite(n) && finite(vals.growth)) ? ebitda * Math.pow(1 + vals.growth / 100, n) : null;
+    const ev = (futEbitda !== null && finite(targetMultiple)) ? futEbitda * targetMultiple : null;
+    return [
+      { key: "futEbitda", label: { zh: "预期 EBITDA（n年后）", en: "Projected EBITDA" }, value: futEbitda, kind: "money" },
+      { key: "ev", label: { zh: "企业价值 EV", en: "Enterprise value" }, value: ev, kind: "money" },
+      { key: "mult", label: { zh: "目标倍数", en: "Target multiple" }, value: finite(targetMultiple) ? targetMultiple : null, kind: "mult" },
+    ];
   },
 };
 
