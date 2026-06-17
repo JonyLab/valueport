@@ -442,7 +442,7 @@ Replace the entire `renderForm` function (and the `fieldLabel` helper above it) 
     return { lab, guideRow };
   }
 
-  // 参考筹码行（grid-column:2/-1）；点击回填 fillFn(value)
+  // 参考筹码行（grid-column:2/-1）；点击回填 fillFn(value)；行末 ↗ 溯源
   function buildRefRow(field, fillFn) {
     const meta = field.meta && FIELD_META[field.meta];
     if (!meta || !meta.ref || !refData) return null;
@@ -456,6 +456,13 @@ Replace the entire `renderForm` function (and the `fieldLabel` helper above it) 
       b.addEventListener("click", () => fillFn(Math.round(chip.value * 100) / 100));
       row.appendChild(b);
     });
+    const isMultiple = meta.ref === "pe" || meta.ref === "pb" || meta.ref === "ps";
+    const src = refData.sources && (isMultiple ? refData.sources.valuation : refData.sources.financial);
+    if (src) {
+      const a = el("a", "vc-srclink"); a.href = src; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = "↗"; a.title = lang === "zh" ? "查看出处" : "View source";
+      row.appendChild(a);
+    }
     return row;
   }
 
@@ -524,12 +531,29 @@ Replace the entire `renderForm` function (and the `fieldLabel` helper above it) 
 
 Note: `.vc-guide` rows are appended with default `grid-column` (col1) but styled in CSS to span all columns; ref rows explicitly set `grid-column:2/-1`.
 
-- [ ] **Step 3: Pass `refData` from `index.html`**
+- [ ] **Step 3: Add source-URL helper + pass `refData` from `index.html`**
 
-In `public/index.html`, in `showEditor`, add `refData` to the `mountValuationCalc(...)` options object:
+In `public/index.html`, add this helper just before `function renderValuationPanel(`:
+```js
+// 参考溯源 URL：财报→优先官方监管(美股 EDGAR)否则长桥财报页；倍数→长桥估值页
+function valuationSources(item, lang) {
+  const m = /^(us|hk|sh|sz|bj)(.+)$/i.exec(item.cfg.symbol || "");
+  if (!m) return null;
+  const mkt = m[1].toUpperCase();
+  const code = mkt === "HK" ? String(parseInt(m[2], 10)) : (mkt === "US" ? m[2].toUpperCase() : m[2]);
+  const counterId = encodeURIComponent(`ST/${mkt}/${code}`);
+  const lblang = lang === "zh" ? "zh-CN" : "en-US";
+  const lb = (page) => `https://activity.lbkrs.com/${lblang}/lightning/${page}?counterId=${counterId}&need_login=0&lblang=${lblang}&lbtheme=light&lbapp=0`;
+  const financial = mkt === "US"
+    ? `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&ticker=${encodeURIComponent(code)}&type=10-K&dateb=&owner=include&count=40`
+    : lb("financial-report");
+  return { financial, valuation: lb("valuation") };
+}
+```
+Then in `showEditor`, add `refData` to the `mountValuationCalc(...)` options object:
 ```js
       refData: (item._financials && item._financials.annual)
-        ? { financials: item._financials.annual.financials || null, valuationRefs: item._financials.annual.valuationRefs || null }
+        ? { financials: item._financials.annual.financials || null, valuationRefs: item._financials.annual.valuationRefs || null, sources: valuationSources(item, LANG) }
         : null,
 ```
 
@@ -545,6 +569,8 @@ In `public/index.html`, immediately after the `.vc-cancel:hover{...}` rule, add:
   .vc-ref{display:flex;flex-wrap:wrap;gap:6px;margin-top:-2px}
   .vc-refchip{border:1px solid var(--border);background:var(--card);border-radius:6px;padding:2px 8px;font-family:var(--font);font-size:11px;color:var(--ink-soft);cursor:pointer;transition:color .12s,border-color .12s}
   .vc-refchip:hover{color:var(--ink);border-color:var(--node)}
+  .vc-srclink{align-self:center;margin-left:2px;color:var(--ink-mute);text-decoration:none;font-size:12px;cursor:pointer}
+  .vc-srclink:hover{color:var(--accent-strong,var(--ink))}
 ```
 
 - [ ] **Step 5: Verify in the browser**
@@ -552,8 +578,9 @@ In `public/index.html`, immediately after the `.vc-cancel:hover{...}` rule, add:
 Run `npm run dev`. As demo owner on `/b/demo/AAPL` → 估值研究 → 添加估值:
 1. FCFF: 营收增速 shows ⓘ; under its inputs two chips「最新 X%」「5年均 Y%」; clicking a chip fills both 保守/乐观 and the result recomputes.
 2. Click ⓘ next to WACC → a guidance callout appears under the row; click again hides it.
-3. Switch to PE: 目标 PE shows chips「当前 35.9x · 自身5年均 …x · 行业中位 26.4x」.
-4. With a symbol lacking financials, fields render with no chips and no errors.
+3. Switch to PE: 目标 PE shows chips「当前 35.9x · 自身5年均 …x · 行业中位 26.4x」, with a `↗` source link at the row end → opens the Longbridge valuation page.
+4. The 净利率/营收增速 rows show a `↗` that opens SEC EDGAR (for AAPL.US) in a new tab.
+5. With a symbol lacking financials, fields render with no chips/links and no errors.
 
 - [ ] **Step 6: Commit**
 

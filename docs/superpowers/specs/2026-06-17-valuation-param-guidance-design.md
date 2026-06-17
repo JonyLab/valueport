@@ -85,12 +85,24 @@
 | `peg` | PEG 系数 | — | 经验上 PEG≈1 视为合理，<1 偏低估；对超高/超低增长会失真，谨慎。 | PEG≈1 is the rule-of-thumb fair level, <1 cheap; breaks down at very high/low growth. |
 | `targetMultiple` | EV/EBITDA 目标倍数 | — | 参考同业与历史；资本密集/高增长行业差异大。 | Reference peers and history; varies widely by capital intensity and growth. |
 
+## 参考溯源（出处链接）
+
+每条参考筹码行末尾加一个小图标 `↗`（新窗口打开），跳到数据出处：
+
+- **财报派生参考**（增速/利润率/再投资）→ 优先官方监管，能可靠构造则用官方，否则回退长桥财报页：
+  - 美股(`.US`/`us`)→ SEC EDGAR：`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&ticker={CODE}&type=10-K&dateb=&owner=include&count=40`
+  - 港股/A股 → 长桥财报页（官方深链不稳，回退）：`https://activity.lbkrs.com/{lblang}/lightning/financial-report?counterId={ENC(counterId)}&need_login=0&lblang={lblang}&lbtheme=light&lbapp=0`
+- **倍数类参考**（PE/PB/PS）→ 长桥估值页：`https://activity.lbkrs.com/{lblang}/lightning/valuation?counterId={ENC(counterId)}&...`（路径 `lightning/valuation` 待长桥侧确认；不对则改财报页）。
+- `counterId` = `ST/{MKT}/{CODE}`（由 tencent symbol 解析：us→US 大写、hk→去前导零、sh/sz/bj 原样）；`lblang` = zh→`zh-CN`、en→`en-US`。
+- URL 在 `index.html` 端按 `item.cfg.symbol` + lang 计算，作为 `refData.sources = { financial, valuation }` 传入编辑器；编辑器按字段是否倍数类(pe/pb/ps)选 `valuation` 否则 `financial`。
+- 取不到 symbol/出处 → 不显示图标。
+
 ## 编辑器 UI（`valuation-ui.js`）
 
 - 新增可选回调 `fieldRef(field)`（由 index.html 提供，内部调 `fieldReference`）。`FIELD_META` 由 valuation-ui 直接 import。
 - 渲染每个字段时：
   - 标签若有 `FIELD_META[field.meta].guide` → 标签后加一个 `ⓘ` 按钮（`vc-info`）；点击切换显示一个小提示框（`vc-guide`，含 guide[lang]）。再次点击或点别处收起。
-  - 若 `fieldRef(field)` 返回非空 → 在该字段输入框下方加一行筹码（`vc-ref` + `vc-refchip`），文案 `label value(+unit)`；点击 → 填入该字段（dual 同时填保守&乐观，single 填单值）→ 触发实时重算。
+  - 若 `fieldRef(field)` 返回非空 → 在该字段输入框下方加一行筹码（`vc-ref` + `vc-refchip`），文案 `label value(+unit)`；点击 → 填入该字段（dual 同时填保守&乐观，single 填单值）→ 触发实时重算。该行末尾加 `↗` 溯源链接（`vc-srclink`，新窗口），URL 取 `refData.sources.valuation`（pe/pb/ps）或 `.financial`（其余）。
 - 统一网格：参考行作为 `grid-column:2/-1` 的附加行（在输入下方），与输入列对齐；ⓘ 提示框绝对定位浮于其下，不挤占布局。
 - 无 `meta` 或无 guide/ref 的字段：原样渲染。
 
