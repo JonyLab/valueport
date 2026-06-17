@@ -1445,7 +1445,7 @@ function valuationSources(item, lang) {
 }
 
 function renderValuationPanel(item, panel, idBlock) {
-  const c = item.cfg;
+  // 注意：不要捕获 item.cfg —— 行情刷新会重建该对象，捕获会读到旧引用（选中态丢失）。
   panel.innerHTML = "";
   detailValRefresh = () => showList(); // 供外部（标的编辑保存后）刷新摘要
 
@@ -1456,7 +1456,7 @@ function renderValuationPanel(item, panel, idBlock) {
     panel.appendChild(summary);
 
     const list = document.createElement("div"); list.className = "vcards";
-    (c.valuations || []).forEach((card) => list.appendChild(cardEl(card)));
+    (item.cfg.valuations || []).forEach((card) => list.appendChild(cardEl(card)));
     panel.appendChild(list);
 
     const add = document.createElement("button"); add.className = "vcard-add"; add.type = "button";
@@ -1471,6 +1471,7 @@ function renderValuationPanel(item, panel, idBlock) {
   }
 
   function cardEl(card) {
+    const c = item.cfg; // 实时读取，避免行情刷新后引用失效
     const model = MODELS.find((m) => m.key === card.method);
     const wrap = document.createElement("div");
     wrap.className = "vcard" + (c.selectedValuationId === card.id ? " on" : "");
@@ -1526,9 +1527,10 @@ function renderValuationPanel(item, panel, idBlock) {
         valuationRefs: (item._financials && item._financials.annual && item._financials.annual.valuationRefs) || null,
         sources: valuationSources(item, LANG),
       },
-      verdict: (low, high) => { const vv = verdictOf({ ...c, fairLow: low, fairHigh: high }, VMSGS); return { text: vv.text, cls: vv.cls }; },
+      verdict: (low, high) => { const vv = verdictOf({ ...item.cfg, fairLow: low, fairHigh: high }, VMSGS); return { text: vv.text, cls: vv.cls }; },
       onCancel: () => finishValEdit(),
       onDone: ({ method, inputs, low, high, note }) => {
+        const c = item.cfg; // 实时读取
         if (!Array.isArray(c.valuations)) c.valuations = [];
         if (card) {
           Object.assign(card, { method, inputs, low, high, note, updatedAt: new Date().toISOString() });
