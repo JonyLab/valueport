@@ -69,7 +69,8 @@ function initialFor(field, ctx) {
 export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, refData, verdict, onDone, onCancel }) {
   const L = TX[lang] || TX.zh;
   const tx = (k) => L[k];
-  let activeIdx = Math.max(0, MODELS.findIndex((m) => m.key === initialMethod));
+  // 新增时不替用户预选方法（activeIdx = -1，显示占位）；编辑时沿用原方法
+  let activeIdx = MODELS.findIndex((m) => m.key === initialMethod);
   let lastLow = null, lastHigh = null, lastForm = {};
 
   mount.innerHTML = "";
@@ -83,6 +84,11 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const mblock = el("div", "vc-mblock");
   const mlabel = el("div", "vc-mlabel"); mlabel.textContent = tx("method");
   const select = el("select", "vc-select");
+  // 占位项：未选方法时显示，不出现在展开列表里（hidden+disabled）
+  const ph = document.createElement("option");
+  ph.value = "-1"; ph.disabled = true; ph.hidden = true;
+  ph.textContent = lang === "zh" ? "请选择估值方法…" : "Choose a method…";
+  select.appendChild(ph);
   [["intrinsic", MODELS.filter((m) => m.group === "intrinsic")],
    ["relative", MODELS.filter((m) => m.group === "relative")]].forEach(([gk, models]) => {
     if (!models.length) return;
@@ -95,7 +101,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     });
     select.appendChild(og);
   });
-  select.value = String(activeIdx);
+  select.value = activeIdx >= 0 ? String(activeIdx) : "-1";
   select.addEventListener("change", () => { activeIdx = Number(select.value); renderForm(); });
   mblock.append(mlabel, select);
   main.appendChild(mblock);
@@ -298,6 +304,19 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
 
   function renderForm() {
     formWrap.innerHTML = "";
+    // 未选方法：显示提示、清空结果，不预填任何模型
+    if (activeIdx < 0) {
+      const hint = el("div", "vc-empty-method");
+      hint.textContent = lang === "zh" ? "请先选择一个估值方法" : "Pick a valuation method to begin";
+      formWrap.appendChild(hint);
+      lastForm = {}; lastLow = null; lastHigh = null;
+      const dash = tx("dash");
+      outLow.textContent = dash; outHigh.textContent = dash; outDash.style.opacity = ".35";
+      verdictEl.textContent = ""; verdictEl.style.display = "none";
+      bdMount.innerHTML = ""; schedMount.innerHTML = "";
+      submitBtn.disabled = true;
+      return;
+    }
     const model = MODELS[activeIdx];
     const fields = model.fields || [];
     const readers = [];
