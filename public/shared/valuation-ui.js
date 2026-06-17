@@ -12,9 +12,9 @@ import { FIELD_META, fieldReference } from "/shared/field-meta.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
-        submit: "保存", dash: "—", note: "备注", notePh: "为什么给出这个估值？关键逻辑、假设依据、风险…" },
+        submit: "保存", dash: "—", note: "备注", notePh: "为什么给出这个估值？关键逻辑、假设依据、风险…", useRange: "套用区间" },
   en: { method: "Method", facts: "Inputs", assume: "Assumptions", conservative: "Conservative", optimistic: "Optimistic",
-        submit: "Submit", dash: "—", note: "Note", notePh: "Why this valuation? Key logic, assumptions, risks…" },
+        submit: "Submit", dash: "—", note: "Note", notePh: "Why this valuation? Key logic, assumptions, risks…", useRange: "Use range" },
 };
 
 function el(tag, cls, attrs) {
@@ -31,6 +31,19 @@ function fmtMoney(n) {
   if (a >= 1e6) return s + (a / 1e6).toFixed(2) + "M";
   if (a >= 1e3) return s + (a / 1e3).toFixed(2) + "K";
   return s + a.toFixed(2);
+}
+// 大额「金额类」字段（按 meta 标签）——用单位化输入
+const MONEY_METAS = new Set(["revenue", "netIncome", "netDebt", "ebitda"]);
+// 解析带单位的金额：支持 K/M/B/T、万/亿/万亿/兆、千分位、负号
+function parseMoney(s) {
+  if (typeof s !== "string") return NaN;
+  s = s.trim().replace(/[,，\s]/g, "");
+  if (!s) return NaN;
+  const m = /^(-?\d*\.?\d+)(万亿|亿|万|兆|[kmbtKMBT])?$/.exec(s);
+  if (!m) return NaN;
+  const mult = { "": 1, k: 1e3, m: 1e6, b: 1e9, t: 1e12, "万": 1e4, "亿": 1e8, "万亿": 1e12, "兆": 1e12 };
+  const u = (m[2] || "").toLowerCase();
+  return parseFloat(m[1]) * (mult[u] ?? 1);
 }
 function fmtKind(n, kind) {
   if (!Number.isFinite(n)) return null;
@@ -177,12 +190,24 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     }
     return { lab, guideRow };
   }
-  function buildRefRow(field, fillFn) {
+  function buildRefRow(field, fillFn, fillRange) {
     const meta = field.meta && FIELD_META[field.meta];
     if (!meta || !meta.ref || !refData) return null;
     const r = fieldReference(meta.ref, refData, ctx, lang);
     if (!r) return null;
     const row = el("div", "vc-ref");
+    const unitFmt = (n) => r.unit === "%" ? n.toFixed(1) + "%" : n.toFixed(1) + "x";
+    // 一键套用区间：把参考的最小/最大配成 保守–乐观（仅 dual 字段）
+    if (fillRange && r.chips.length >= 2) {
+      const vals = r.chips.map((c) => c.value).filter(Number.isFinite);
+      const lo = Math.min(...vals), hi = Math.max(...vals);
+      if (hi > lo) {
+        const rb = el("button", "vc-refchip vc-refrange"); rb.type = "button";
+        rb.textContent = `${tx("useRange")} ${unitFmt(lo)}–${unitFmt(hi)}`;
+        rb.addEventListener("click", () => fillRange(Math.round(lo * 100) / 100, Math.round(hi * 100) / 100));
+        row.appendChild(rb);
+      }
+    }
     r.chips.forEach((chip) => {
       const b = el("button", "vc-refchip"); b.type = "button";
       const shown = r.unit === "%" ? chip.value.toFixed(1) + "%" : chip.value.toFixed(1) + "x";
@@ -218,6 +243,19 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     if (initVal !== "" && initVal !== undefined && initVal !== null) inp.value = String(initVal);
     return inp;
   }
+  // 单位化金额输入：静止显示 416.16B、聚焦显示原值便于编辑、失焦重格式化
+  function makeMoneyInput(initVal) {
+    const inp = el("input", "vc-input vc-money", { type: "text", inputMode: "decimal" });
+    inp.placeholder = lang === "zh" ? "如 416B 或 4161亿" : "e.g. 416B";
+    if (Number.isFinite(initVal)) { inp.dataset.raw = String(initVal); inp.value = fmtMoney(initVal); }
+    inp.addEventListener("focus", () => { if (inp.dataset.raw) inp.value = inp.dataset.raw; inp.select(); });
+    inp.addEventListener("blur", () => { const n = parseMoney(inp.value); if (Number.isFinite(n)) { inp.dataset.raw = String(n); inp.value = fmtMoney(n); } else { delete inp.dataset.raw; } });
+    return inp;
+  }
+  function moneyVal(inp) {
+    if (document.activeElement !== inp && inp.dataset.raw && inp.value === fmtMoney(Number(inp.dataset.raw))) return Number(inp.dataset.raw);
+    const n = parseMoney(inp.value); return Number.isFinite(n) ? n : NaN;
+  }
 
   function renderForm() {
     formWrap.innerHTML = "";
@@ -235,12 +273,13 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       singles.forEach((field) => {
         const fld = el("div", "vc-fld");
         const { lab, guideRow } = buildLabel(field, "vc-flabel");
-        const input = makeInput(singleInit(field));
-        if (field.hint && field.hint[lang]) input.placeholder = field.hint[lang];
-        readers.push({ field, getVal: () => input.value !== "" ? Number(input.value) : NaN });
+        const money = MONEY_METAS.has(field.meta);
+        const input = money ? makeMoneyInput(singleInit(field)) : makeInput(singleInit(field));
+        if (!money && field.hint && field.hint[lang]) input.placeholder = field.hint[lang];
+        readers.push({ field, getVal: money ? () => moneyVal(input) : () => input.value !== "" ? Number(input.value) : NaN });
         input.addEventListener("input", recompute);
         fld.append(lab, input);
-        const refRow = buildRefRow(field, (v) => { input.value = String(v); recompute(); });
+        const refRow = buildRefRow(field, (v) => { if (money) { input.value = fmtMoney(v); input.dataset.raw = String(v); } else input.value = String(v); recompute(); });
         if (refRow) fld.appendChild(refRow);
         if (guideRow) fld.appendChild(guideRow);
         card.appendChild(fld);
@@ -263,7 +302,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         readers.push({ field, getVal: () => ({ c: inC.value !== "" ? Number(inC.value) : NaN, o: inO.value !== "" ? Number(inO.value) : NaN }) });
         inC.addEventListener("input", recompute); inO.addEventListener("input", recompute);
         grid.append(lab, inC, inO);
-        const refRow = buildRefRow(field, (v) => { inC.value = String(v); inO.value = String(v); recompute(); });
+        const refRow = buildRefRow(field, (v) => { inC.value = String(v); inO.value = String(v); recompute(); }, (lo, hi) => { inC.value = String(lo); inO.value = String(hi); recompute(); });
         if (refRow) { refRow.style.gridColumn = "2 / -1"; grid.appendChild(refRow); }
         if (guideRow) { guideRow.style.gridColumn = "1 / -1"; grid.appendChild(guideRow); }
       });
