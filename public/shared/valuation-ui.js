@@ -8,7 +8,7 @@
  *   verdict(low, high) → { text, cls } | null     —— 由宿主提供（结果卡判定行）
  */
 import { MODELS, runModel } from "/shared/valuation/index.js";
-import { FIELD_META, fieldReference, moneyQuarterRef } from "/shared/field-meta.js";
+import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/shared/field-meta.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -282,15 +282,21 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         fld.append(lab, input);
         const refRow = buildRefRow(field, (v) => { if (money) { input.value = fmtMoney(v); input.dataset.raw = String(v); } else input.value = String(v); recompute(); });
         if (refRow) fld.appendChild(refRow);
-        // money 字段：季报口径估值（近4季 TTM / 最新季报余额），点击回填，明确标注
+        // money 字段：最新财年（实线）+ 近4季 TTM/最新季报（虚线），点击回填，明确标注
         if (money && refData) {
+          const an = moneyAnnualRef(field.meta, refData, lang);
           const mq = moneyQuarterRef(field.meta, refData, lang);
-          if (mq) {
+          if (an || mq) {
             const mrow = el("div", "vc-ref");
-            const b = el("button", "vc-refchip vc-refq"); b.type = "button";
-            b.textContent = `${mq.label} ≈ ${fmtMoney(mq.value)}`;
-            b.addEventListener("click", () => { input.value = fmtMoney(mq.value); input.dataset.raw = String(mq.value); recompute(); });
-            mrow.appendChild(b);
+            const addChip = (ref, q) => {
+              if (!ref) return;
+              const b = el("button", "vc-refchip" + (q ? " vc-refq" : "")); b.type = "button";
+              b.textContent = `${ref.label} ≈ ${fmtMoney(ref.value)}`;
+              b.addEventListener("click", () => { input.value = fmtMoney(ref.value); input.dataset.raw = String(ref.value); recompute(); });
+              mrow.appendChild(b);
+            };
+            addChip(an, false);
+            addChip(mq, true);
             fld.appendChild(mrow);
           }
         }

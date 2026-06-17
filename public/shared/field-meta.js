@@ -35,8 +35,8 @@ export const FIELD_META = {
 };
 
 const TX = {
-  zh: { latest: "最新年报", avg5: "近5年报均", now: "当前", own5y: "自身5年均", indMed: "行业中位", qoy: "最新季同比", q: "最新季", ttm: "近4季 TTM", latestQ: "最新季报" },
-  en: { latest: "Latest FY", avg5: "5Y avg", now: "Now", own5y: "5y avg", indMed: "Industry median", qoy: "Latest Q YoY", q: "Latest Q", ttm: "TTM (4Q)", latestQ: "Latest Q" },
+  zh: { latest: "最新年报", avg5: "近5年报均", now: "当前", own5y: "自身5年均", indMed: "行业中位", qoy: "最新季同比", q: "最新季", ttm: "近4季 TTM", latestQ: "最新季报", fy: "最新财年" },
+  en: { latest: "Latest FY", avg5: "5Y avg", now: "Now", own5y: "5y avg", indMed: "Industry median", qoy: "Latest Q YoY", q: "Latest Q", ttm: "TTM (4Q)", latestQ: "Latest Q", fy: "Latest FY" },
 };
 
 function ser(data, kind, field) {
@@ -58,6 +58,16 @@ function withQ(ref, label, value, unit) {
   const chip = { label, value, q: true };
   if (!ref) return { unit, chips: [chip] };
   ref.chips.push(chip); return ref;
+}
+// money 字段的最新财年值：营收/净利 → 最新年报；净负债 → 最新年报余额
+export function moneyAnnualRef(metaTag, data, lang) {
+  const t = TX[lang] || TX.zh;
+  const v0 = (kind, field) => ser(data, kind, field)[0];
+  let v = null;
+  if (metaTag === "revenue") v = v0("IS", "OperatingRevenue");
+  else if (metaTag === "netIncome") v = v0("IS", "NetProfit");
+  else if (metaTag === "netDebt") v = v0("BS", "NetDebt");
+  return Number.isFinite(v) ? { label: t.fy, value: v } : null;
 }
 // money 字段的季报口径估值：营收/净利 → 近4季 TTM 求和；净负债 → 最新季报余额
 export function moneyQuarterRef(metaTag, data, lang) {
