@@ -251,7 +251,12 @@
   .vd-backrow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
   .vd-back{display:inline-flex;align-items:center;font-size:13.5px;color:var(--ink-soft);text-decoration:none}
   .vd-back:hover{color:var(--ink)}
-  .vd-top{display:flex;gap:24px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--divider);padding-bottom:24px;margin-bottom:20px}
+  .vd-top{display:flex;gap:24px;align-items:center;justify-content:space-between;padding-bottom:24px}
+  /* 关键信息与 tab 间的贯穿斜线带（满栏出血到中央栏两侧，端点带菱形节点，呼应看板隔断带） */
+  .vd-divider{position:relative;height:14px;margin:0 -28px 22px;border-top:1px solid var(--divider);border-bottom:1px solid var(--divider);
+    background-image:repeating-linear-gradient(45deg,rgba(120,128,142,.16) 0,rgba(120,128,142,.16) 1px,transparent 1px,transparent 6px)}
+  .vd-divider::before,.vd-divider::after{content:"";position:absolute;top:-3.5px;width:6px;height:6px;background:#fff;border:1px solid var(--node);transform:translate(-1px,-1px) rotate(45deg);z-index:2}
+  .vd-divider::before{left:-3.5px} .vd-divider::after{right:-3.5px;transform:translate(1px,-1px) rotate(45deg)}
   .vd-id .vd-name{font-family:var(--serif);font-style:italic;font-weight:700;font-size:26px;letter-spacing:-.01em}
   .vd-id .vd-code{font-family:var(--mono);font-size:13px;color:var(--ink-mute);margin-left:8px}
   .vd-meta{font-size:12px;color:var(--ink-mute);margin:6px 0 12px}
@@ -261,8 +266,8 @@
   .vd-gauge{flex:none;width:340px}
   .vd-gauge svg{display:block;width:100%;height:auto;overflow:visible}
   .vge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:180px;padding:28px 22px;border:1px dashed var(--border);border-radius:10px;background:var(--card);text-align:center}
-  .vge-bar{display:flex;gap:3px;width:160px;height:12px;margin-bottom:2px;opacity:.55}
-  .vge-bar i{flex:1;background:var(--track);border-radius:2px}
+  .vge-bar{width:188px;height:14px;margin-bottom:2px;border:1px solid var(--border);border-radius:2px;
+    background-image:repeating-linear-gradient(45deg,rgba(120,128,142,.16) 0,rgba(120,128,142,.16) 1px,transparent 1px,transparent 6px)}
   .vge-title{font-size:13px;font-weight:600;color:var(--ink)}
   .vge-sub{font-size:12px;line-height:1.6;color:var(--ink-mute);max-width:250px}
   .vge-cta{margin-top:4px;padding:7px 16px;font-size:12.5px;font-weight:600;color:#fff;background:#31679b;border:none;border-radius:7px;cursor:pointer}
@@ -388,7 +393,7 @@
   .fin-table td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--border);font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
   .fin-table td.fin-name{text-align:left;font-family:var(--font);color:var(--ink-soft);white-space:normal}
   .fin-table tr:hover td{background:var(--card)}
-  @media (max-width:680px){ .view-detail{padding:24px 16px 0} .vd-top{flex-direction:column;align-items:flex-start} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} .vc-sheet{grid-template-columns:minmax(0,1fr) 1fr 1fr} .vc-mglabel{width:auto} }
+  @media (max-width:680px){ .view-detail{padding:24px 16px 0} .vd-divider{margin:0 -16px 22px} .vd-top{flex-direction:column;align-items:flex-start} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} .vc-sheet{grid-template-columns:minmax(0,1fr) 1fr 1fr} .vc-mglabel{width:auto} }
   .view-settings{max-width:640px;margin:0 auto;padding-top:4px}
   .set-title{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.01em;margin:8px 0 18px}
   .cfg-block{padding:16px 0 14px;border-bottom:1px solid var(--border)}
@@ -1195,8 +1200,7 @@ function mountDetailPendulum(item) {
 // 未估值占位：极简扁平条 + 文案 + CTA（打开标的编辑弹窗直接填区间）
 function buildValPlaceholder(item) {
   const box = document.createElement("div"); box.className = "vge";
-  const bar = document.createElement("div"); bar.className = "vge-bar";
-  for (let i = 0; i < 5; i++) bar.appendChild(document.createElement("i"));
+  const bar = document.createElement("div"); bar.className = "vge-bar"; bar.setAttribute("aria-hidden", "true");
   const title = document.createElement("div"); title.className = "vge-title";
   title.textContent = LANG === "zh" ? "尚未设定内在价值" : "No fair value yet";
   const sub = document.createElement("div"); sub.className = "vge-sub";
@@ -1314,6 +1318,8 @@ function renderDetail(item) {
   detailGwrap = gwrap; detailIdBlock = idBlock;
   top.append(idBlock, gwrap);
 
+  const divider = document.createElement("div"); divider.className = "vd-divider"; divider.setAttribute("aria-hidden", "true");
+
   const tabsNav = document.createElement("div"); tabsNav.className = "vd-tabs";
   const panels = document.createElement("div");
   const defs = [
@@ -1336,7 +1342,7 @@ function renderDetail(item) {
   loadFinancials(item, "annual"); // 预取年报，供计算器预填
   loadFinancials(item, "quarter"); // 预取季报，供「最新季 / 近4季 TTM」参考
 
-  viewDetail.append(backRow, top, tabsNav, panels);
+  viewDetail.append(backRow, top, divider, tabsNav, panels);
   mountDetailPendulum(item);               // 已设区间→钟摆；未设→占位卡片
 }
 
