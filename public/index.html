@@ -195,6 +195,9 @@
   .ve-back{font-size:13.5px;color:var(--ink-soft);text-decoration:none}
   .ve-back:hover{color:var(--ink)}
   .ve-title{font-family:var(--serif);font-style:italic;font-weight:700;font-size:22px;letter-spacing:-.01em;color:var(--ink)}
+  .ve-sym{margin-left:auto;display:flex;align-items:baseline;gap:8px}
+  .ve-sym-name{font-size:14px;font-weight:600;color:var(--ink)}
+  .ve-sym-code{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--ink-mute)}
   .vc{display:grid;grid-template-columns:minmax(0,1fr) 392px;gap:0;align-items:start;max-width:1060px}
   .vc-main{padding-right:40px;border-right:1px solid var(--divider)}
   .vc-main .vc-form{max-width:none}
@@ -1513,7 +1516,12 @@ function renderValuationPanel(item, panel, idBlock) {
     back.addEventListener("click", (e) => { e.preventDefault(); finishValEdit(); });
     const title = document.createElement("span"); title.className = "ve-title";
     title.textContent = card ? (LANG === "zh" ? "编辑估值" : "Edit valuation") : (LANG === "zh" ? "添加估值" : "Add valuation");
-    head.append(back, title);
+    // 标的身份（名称 · 代码）靠右，给计算页一个上下文锚点
+    const sym = document.createElement("span"); sym.className = "ve-sym";
+    const sname = document.createElement("span"); sname.className = "ve-sym-name"; sname.textContent = displayName(item);
+    const scode = document.createElement("span"); scode.className = "ve-sym-code"; scode.textContent = (item.cfg.ticker || "").toUpperCase();
+    sym.append(sname, scode);
+    head.append(back, title, sym);
     const mountEl = document.createElement("div");
     viewValEdit.append(head, mountEl);
     mountValuationCalc(mountEl, valuationCtx(item), {
