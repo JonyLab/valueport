@@ -1208,7 +1208,8 @@ function valuationCtx(item) {
     shares: Number(s.totalShares) || 0, dividendYield: parseFloat(s.dividendYield) || NaN, mos: c.mos || 0, ext: c.ext || 0,
     revenue: Number.isFinite(latest.revenue) ? latest.revenue : undefined,
     netIncome: Number.isFinite(latest.netIncome) ? latest.netIncome : undefined,
-    netDebt: Number.isFinite(latest.netDebt) ? latest.netDebt : undefined };
+    netDebt: Number.isFinite(latest.netDebt) ? latest.netDebt : undefined,
+    fcf: Number.isFinite(latest.fcf) ? latest.fcf : undefined };
 }
 
 // 把某卡设为合理区间：写 fair 区间 + 选中 id，刷新钟摆/顶部判定/列表行，并保存。

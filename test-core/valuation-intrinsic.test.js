@@ -6,8 +6,8 @@ const fcfe = INTRINSIC.find((m) => m.key === "fcfe");
 const ddm = INTRINSIC.find((m) => m.key === "ddm");
 
 describe("INTRINSIC contract", () => {
-  it("exports three intrinsic models with the expected keys", () => {
-    expect(INTRINSIC.map((m) => m.key)).toEqual(["fcff", "fcfe", "ddm"]);
+  it("exports the intrinsic models with the expected keys", () => {
+    expect(INTRINSIC.map((m) => m.key)).toEqual(["fcff", "fcf", "fcfe", "ddm"]);
     expect(INTRINSIC.every((m) => m.group === "intrinsic")).toBe(true);
     expect(INTRINSIC.every((m) => m.label && m.label.zh && m.label.en)).toBe(true);
     expect(INTRINSIC.every((m) => Array.isArray(m.fields) && typeof m.compute === "function")).toBe(true);

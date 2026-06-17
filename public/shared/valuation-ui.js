@@ -33,7 +33,7 @@ function fmtMoney(n) {
   return s + a.toFixed(2);
 }
 // 大额「金额类」字段（按 meta 标签）——用单位化输入
-const MONEY_METAS = new Set(["revenue", "netIncome", "netDebt", "ebitda"]);
+const MONEY_METAS = new Set(["revenue", "netIncome", "netDebt", "ebitda", "fcf"]);
 // 解析带单位的金额：支持 K/M/B/T、万/亿/万亿/兆、千分位、负号
 function parseMoney(s) {
   if (typeof s !== "string") return NaN;

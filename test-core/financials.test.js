@@ -38,6 +38,6 @@ describe("pickLatestAnnual", () => {
     expect(typeof latest.netDebt).toBe("number");
   });
   it("returns all-null for null financials", () => {
-    expect(pickLatestAnnual(null)).toEqual({ revenue: null, netIncome: null, netDebt: null });
+    expect(pickLatestAnnual(null)).toEqual({ revenue: null, netIncome: null, netDebt: null, fcf: null });
   });
 });

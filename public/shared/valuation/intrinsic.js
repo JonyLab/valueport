@@ -297,4 +297,59 @@ const DDM = {
   },
 };
 
-export const INTRINSIC = [FCFF, FCFE, DDM];
+// ---------------------------------------------------------------------------
+// 现金流折现（直接法）：直接用当前自由现金流 × 增速 外推折现 + 永续终值
+// 折现率视作 WACC（FCFF 口径）→ 企业价值；减净负债得股权价值 ÷ 股本。
+// ---------------------------------------------------------------------------
+const FCF_DCF = {
+  key: "fcf",
+  group: "intrinsic",
+  label: { zh: "现金流折现", en: "DCF (FCF)" },
+  fields: [
+    { k: "fcf", label: { zh: "当前自由现金流", en: "Current free cash flow" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.fcf)) ? ctx.fcf : "", hint: { zh: "公司自由现金流总额（不是每股）", en: "Total free cash flow, not per share" }, meta: "fcf" },
+    { k: "n", label: { zh: "增长年数", en: "Growth years" }, col: "single", unit: "", prefill: (ctx) => 10, default: 10, meta: "growthYears" },
+    { k: "growth", label: { zh: "现金流增速", en: "FCF growth" }, col: "dual", unit: "%", default: 10, meta: "fcfGrowth" },
+    { k: "discount", label: { zh: "折现率", en: "Discount rate" }, col: "dual", unit: "%", default: 9, meta: "wacc" },
+    { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5, meta: "termGrowth" },
+    { k: "netDebt", label: { zh: "净负债", en: "Net debt" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.netDebt)) ? ctx.netDebt : 0, default: 0, meta: "netDebt" },
+  ],
+  compute(vals, ctx) {
+    const shares = ctx && ctx.shares;
+    if (!isFinitePos(shares)) return null;
+    const { fcf, n, growth, discount, termGrowth, netDebt } = vals;
+    if (![fcf, n, growth, discount, termGrowth, netDebt].every(isFiniteNum)) return null;
+    const g = growth / 100, r = discount / 100, gT = termGrowth / 100;
+    if (r <= gT) return null;
+    let PV = 0;
+    for (let t = 1; t <= n; t++) PV += fcf * Math.pow(1 + g, t) / Math.pow(1 + r, t);
+    const cfT = fcf * Math.pow(1 + g, n) * (1 + gT);
+    const TV = cfT / (r - gT);
+    PV += TV / Math.pow(1 + r, n);
+    return (PV - netDebt) / shares;
+  },
+  breakdown(vals, ctx) {
+    const { fcf, n, growth } = vals;
+    const g = growth / 100;
+    const cfN = (Number.isFinite(fcf) && Number.isFinite(n) && Number.isFinite(g)) ? fcf * Math.pow(1 + g, n) : null;
+    const ps = this.compute(vals, ctx);
+    const equity = (Number.isFinite(ps) && isFinitePos(ctx && ctx.shares)) ? ps * ctx.shares : null;
+    return [
+      { key: "cfN", label: { zh: "终期自由现金流", en: "Terminal FCF" }, value: cfN, kind: "money" },
+      { key: "equity", label: { zh: "股权价值", en: "Equity value" }, value: equity, kind: "money" },
+    ];
+  },
+  schedule(vals, ctx) {
+    const { fcf, n, growth, discount, termGrowth } = vals;
+    if (![fcf, n, growth, discount, termGrowth].every(Number.isFinite)) return null;
+    if (n < 1) return null;
+    const g = growth / 100, r = discount / 100, gT = termGrowth / 100;
+    if (r <= gT) return null;
+    const rows = [];
+    for (let t = 1; t <= n; t++) { const cf = fcf * Math.pow(1 + g, t); rows.push({ year: t, cf, pv: cf / Math.pow(1 + r, t) }); }
+    const cfT = fcf * Math.pow(1 + g, n) * (1 + gT);
+    const TV = cfT / (r - gT);
+    return { kind: "money", rows, terminalPv: TV / Math.pow(1 + r, n) };
+  },
+};
+
+export const INTRINSIC = [FCFF, FCF_DCF, FCFE, DDM];

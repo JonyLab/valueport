@@ -14,7 +14,9 @@ export const FIELD_META = {
   ebitda: { guide: { zh: "息税折旧摊销前利润。接口无此项，请手填（≈营业利润+折旧摊销）。", en: "EBITDA. Not provided by the API — enter manually (≈ operating income + D&A)." } },
   growthYears: { guide: { zh: "护城河能维持超额增长的年数，通常 5–10 年；优势越强可越长。", en: "Years the moat sustains excess growth — usually 5–10; longer for stronger advantages." } },
   forecastYears: { guide: { zh: "预测到第几年的盈利来套目标倍数，常 3–5 年。", en: "How many years out you project earnings before applying the target multiple — usually 3–5." } },
+  fcf: { guide: { zh: "公司自由现金流总额（经营现金流−资本支出，非每股）。已用最近年报预填，可选近4季 TTM。", en: "Total free cash flow (operating CF − capex, not per share). Prefilled from the latest annual report; TTM also available." } },
   revGrowth: { ref: "revGrowth", guide: { zh: "自上而下：市场空间(TAM)×渗透率提升×份额变化；高增速随规模向行业/GDP 收敛，勿长期外推峰值。", en: "Top-down: TAM × penetration × share. High growth fades toward industry/GDP as scale grows — don't extrapolate peaks." } },
+  fcfGrowth: { ref: "fcfGrowth", guide: { zh: "自由现金流增速；与营收增速、利润率改善、资本开支节奏有关，长期会向营收增速收敛。", en: "FCF growth — tied to revenue growth, margin expansion and capex cadence; converges toward revenue growth long-run." } },
   niGrowth: { ref: "niGrowth", guide: { zh: "由营收增速 + 利润率变化（经营杠杆）共同驱动；成熟后向营收增速靠拢。", en: "Driven by revenue growth plus margin change (operating leverage); converges to revenue growth at maturity." } },
   epsGrowth: { ref: "epsGrowth", guide: { zh: "用未来 3–5 年 EPS 复合增速；留意回购会抬高每股增速。", en: "Use forward 3–5y EPS CAGR; buybacks inflate per-share growth." } },
   divGrowth: { guide: { zh: "由盈利增速与分红率共同决定；成熟分红股通常低个位数。", en: "Set by earnings growth and payout ratio; mature payers are usually low single digits." } },
@@ -67,6 +69,7 @@ export function moneyAnnualRef(metaTag, data, lang) {
   if (metaTag === "revenue") v = v0("IS", "OperatingRevenue");
   else if (metaTag === "netIncome") v = v0("IS", "NetProfit");
   else if (metaTag === "netDebt") v = v0("BS", "NetDebt");
+  else if (metaTag === "fcf") v = v0("CF", "NetFreeCashFlow");
   return Number.isFinite(v) ? { label: t.fy, value: v } : null;
 }
 // money 字段的季报口径估值：营收/净利 → 近4季 TTM 求和；净负债 → 最新季报余额
@@ -75,6 +78,7 @@ export function moneyQuarterRef(metaTag, data, lang) {
   const sum4 = (kind, field) => { const s = serQ(data, kind, field).slice(0, 4).filter(Number.isFinite); return s.length === 4 ? s.reduce((a, b) => a + b, 0) : null; };
   if (metaTag === "revenue") { const v = sum4("IS", "OperatingRevenue"); return Number.isFinite(v) ? { label: t.ttm, value: v } : null; }
   if (metaTag === "netIncome") { const v = sum4("IS", "NetProfit"); return Number.isFinite(v) ? { label: t.ttm, value: v } : null; }
+  if (metaTag === "fcf") { const v = sum4("CF", "NetFreeCashFlow"); return Number.isFinite(v) ? { label: t.ttm, value: v } : null; }
   if (metaTag === "netDebt") { const s = serQ(data, "BS", "NetDebt"); return Number.isFinite(s[0]) ? { label: t.latestQ, value: s[0] } : null; }
   return null;
 }
@@ -104,6 +108,7 @@ export function fieldReference(refTag, data, ctx, lang) {
   const t = TX[lang] || TX.zh;
   switch (refTag) {
     case "revGrowth": { const s = ser(data, "IS", "OperatingRevenue"); return withQ(pair(yoyLatest(s), yoyAvg(s), "%", t), t.qoy, qYoY(serQ(data, "IS", "OperatingRevenue")), "%"); }
+    case "fcfGrowth": { const s = ser(data, "CF", "NetFreeCashFlow"); return withQ(pair(yoyLatest(s), yoyAvg(s), "%", t), t.qoy, qYoY(serQ(data, "CF", "NetFreeCashFlow")), "%"); }
     case "niGrowth": { const s = ser(data, "IS", "NetProfit"); return withQ(pair(yoyLatest(s), yoyAvg(s), "%", t), t.qoy, qYoY(serQ(data, "IS", "NetProfit")), "%"); }
     case "epsGrowth": { const s = ser(data, "IS", "EPS"); return withQ(pair(yoyLatest(s), yoyAvg(s), "%", t), t.qoy, qYoY(serQ(data, "IS", "EPS")), "%"); }
     case "netMargin": { const s = ser(data, "IS", "NetProfitMargin"); return withQ(pair(s[0], avgN(s, 5), "%", t), t.q, serQ(data, "IS", "NetProfitMargin")[0], "%"); }

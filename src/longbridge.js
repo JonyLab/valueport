@@ -69,7 +69,7 @@ export function pickLatestAnnual(financials) {
     const v = a && a.values && a.values[0] && a.values[0].value;
     return Number.isFinite(v) ? v : null;
   };
-  return { revenue: pick("IS", "OperatingRevenue"), netIncome: pick("IS", "NetProfit"), netDebt: pick("BS", "NetDebt") };
+  return { revenue: pick("IS", "OperatingRevenue"), netIncome: pick("IS", "NetProfit"), netDebt: pick("BS", "NetDebt"), fcf: pick("CF", "NetFreeCashFlow") };
 }
 
 // 签名 GET（沿用 getOtp 的 canonical 规则；query 须按 key 字母序，签名与 URL 用同一字符串）

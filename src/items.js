@@ -1,5 +1,5 @@
 // 估值方法白名单（与 public/shared/valuation/* 的 model.key 一致）
-const METHODS = new Set(["fcff", "fcfe", "ddm", "pe", "peg", "pb", "ps", "evebitda"]);
+const METHODS = new Set(["fcff", "fcf", "fcfe", "ddm", "pe", "peg", "pb", "ps", "evebitda"]);
 
 // 校验估值卡片数组。返回 { ok, value } 或 { ok:false }。
 function validateValuations(raw) {
