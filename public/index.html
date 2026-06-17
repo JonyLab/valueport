@@ -273,6 +273,8 @@
   .vge-sub{font-size:12px;line-height:1.6;color:var(--ink-mute);max-width:250px}
   .vge-cta{margin-top:4px;padding:7px 16px;font-size:12.5px;font-weight:600;color:#fff;background:#31679b;border:none;border-radius:7px;cursor:pointer}
   .vge-cta:hover{background:#2b5a87}
+  .vge-method{margin-top:6px;font-size:12px;color:var(--ink-mute);text-decoration:underline;text-underline-offset:2px}
+  .vge-method:hover{color:var(--ink-soft)}
   .vd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--divider);margin-bottom:18px}
   .vd-tab{height:40px;padding:0 14px;border:0;background:none;cursor:pointer;font-family:var(--font);font-size:13.5px;font-weight:500;color:var(--ink-mute);border-bottom:2px solid transparent;margin-bottom:-1px}
   .vd-tab:hover{color:var(--ink)}
@@ -380,9 +382,6 @@
   .vcard-del{margin-left:auto}
   .vcard-add{display:block;width:fit-content;margin-top:16px;height:34px;padding:0 14px;border:1px dashed var(--node);border-radius:8px;background:transparent;cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink-soft)}
   .vcard-add:hover{color:var(--ink);border-color:var(--ink)}
-  /* 次级脚注链接：自成一行，与上方操作明确分隔，不贴边 */
-  .vcard-foot{margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
-  .vcard-foot .vd-method{margin-top:0}
   /* 财报 tab */
   .fin-controls{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px}
   .fin-seg{display:flex;gap:4px}
@@ -1212,7 +1211,8 @@ function buildValPlaceholder(item) {
   const cta = document.createElement("button"); cta.type = "button"; cta.className = "vge-cta";
   cta.textContent = LANG === "zh" ? "设定内在价值" : "Set fair value";
   cta.addEventListener("click", () => openItemModal(item, false));
-  box.append(bar, title, sub, cta);
+  const method = document.createElement("a"); method.className = "vge-method"; method.href = "/valuation"; method.textContent = t("d_method");
+  box.append(bar, title, sub, cta, method);
   return box;
 }
 
@@ -1504,11 +1504,6 @@ function renderValuationPanel(item, panel, idBlock) {
     add.textContent = LANG === "zh" ? "＋ 添加估值" : "＋ Add valuation";
     add.addEventListener("click", () => showEditor(null));
     panel.appendChild(add);
-
-    const foot = document.createElement("div"); foot.className = "vcard-foot";
-    const method = document.createElement("a"); method.className = "vd-method"; method.href = "/valuation"; method.textContent = t("d_method");
-    foot.appendChild(method);
-    panel.appendChild(foot);
   }
 
   function cardEl(card) {
