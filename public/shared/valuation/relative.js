@@ -11,38 +11,73 @@ const posFinite = (x) => Number.isFinite(x) && x > 0;
 // 工具：是否为有限数
 const finite = (x) => Number.isFinite(x);
 
-// PE 估值：营收增长 → 未来营收 → 净利率 → EPS → ×目标 PE
+// PE 估值：四种输入口径(modes),按 vals._mode 分派(segment ≡ revenue)。
+const PE_N = { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: () => "", default: 5, meta: "forecastYears" };
+const PE_TARGET = { k: "targetPE", label: { zh: "目标 PE", en: "Target P/E" }, col: "dual", unit: "", default: 20, meta: "targetPE" };
+const PE_REV_FIELDS = [
+  { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" }, meta: "revenue" },
+  PE_N,
+  { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10, meta: "revGrowth" },
+  { k: "netMargin", label: { zh: "净利率", en: "Net margin" }, col: "dual", unit: "%", default: 15, meta: "netMargin" },
+  PE_TARGET,
+];
 const PE = {
   key: "pe",
   group: "relative",
   label: { zh: "PE 估值", en: "P/E" },
-  fields: [
-    { k: "revenue", label: { zh: "当前营收", en: "Current revenue" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.revenue)) ? ctx.revenue : "", hint: { zh: "公司总营收（不是每股）", en: "Total revenue, not per share" }, meta: "revenue" },
-    { k: "n", label: { zh: "预测年数", en: "Years" }, col: "single", unit: "", prefill: (ctx) => "", default: 5, meta: "forecastYears" },
-    { k: "growth", label: { zh: "营收增速", en: "Revenue growth" }, col: "dual", unit: "%", default: 10, meta: "revGrowth" },
-    { k: "netMargin", label: { zh: "净利率", en: "Net margin" }, col: "dual", unit: "%", default: 15, meta: "netMargin" },
-    { k: "targetPE", label: { zh: "目标 PE", en: "Target P/E" }, col: "dual", unit: "", default: 20, meta: "targetPE" },
+  defaultMode: "netIncome",
+  modes: [
+    { key: "netIncome", label: { zh: "经典 PE", en: "Classic (NI)" }, fields: [
+      { k: "netIncome", label: { zh: "净利润", en: "Net income" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.netIncome)) ? ctx.netIncome : "", hint: { zh: "公司净利润总额（不是每股）", en: "Total net income, not per share" }, meta: "netIncome" },
+      PE_N,
+      { k: "growth", label: { zh: "净利润增速", en: "Net income growth" }, col: "dual", unit: "%", default: 10, meta: "niGrowth" },
+      PE_TARGET,
+    ] },
+    { key: "eps", label: { zh: "EPS", en: "EPS" }, fields: [
+      { k: "eps", label: { zh: "每股收益", en: "EPS" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.epsTtm)) ? ctx.epsTtm : "", hint: { zh: "每股收益，默认 TTM", en: "EPS, defaults to TTM" }, meta: "eps" },
+      PE_N,
+      { k: "growth", label: { zh: "EPS 增速", en: "EPS growth" }, col: "dual", unit: "%", default: 10, meta: "epsGrowth" },
+      PE_TARGET,
+    ] },
+    { key: "revenue", label: { zh: "营收·利润率", en: "Revenue×margin" }, fields: PE_REV_FIELDS },
+    { key: "segment", label: { zh: "分业务", en: "By segment" }, fields: PE_REV_FIELDS },
   ],
   compute(vals, ctx) {
-    const shares = ctx.shares;
-    if (!posFinite(shares)) return null;
-    const { revenue, n, targetPE } = vals;
-    const g = vals.growth / 100; // % 转小数
-    const netMargin = vals.netMargin / 100; // % 转小数
-    if (![revenue, n, vals.growth, vals.netMargin, targetPE].every(finite)) return null;
-    const futRev = revenue * Math.pow(1 + g, n);
-    const eps = (futRev * netMargin) / shares;
+    const mode = vals._mode === "segment" ? "revenue" : (vals._mode || "revenue");
+    const { n, targetPE } = vals;
+    if (![n, vals.growth, targetPE].every(finite)) return null;
+    const g = vals.growth / 100;
+    if (mode === "eps") {
+      if (!finite(vals.eps)) return null;
+      return vals.eps * Math.pow(1 + g, n) * targetPE;
+    }
+    if (!posFinite(ctx.shares)) return null;
+    if (mode === "netIncome") {
+      if (!finite(vals.netIncome)) return null;
+      const futNi = vals.netIncome * Math.pow(1 + g, n);
+      return (futNi / ctx.shares) * targetPE;
+    }
+    if (![vals.revenue, vals.netMargin].every(finite)) return null;
+    const futRev = vals.revenue * Math.pow(1 + g, n);
+    const eps = (futRev * (vals.netMargin / 100)) / ctx.shares;
     return eps * targetPE;
   },
   breakdown(vals, ctx) {
-    const { revenue, n, targetPE } = vals;
-    const futRev = (finite(revenue) && finite(n) && finite(vals.growth)) ? revenue * Math.pow(1 + vals.growth / 100, n) : null;
+    const mode = vals._mode === "segment" ? "revenue" : (vals._mode || "revenue");
+    const { n, targetPE } = vals;
+    const peRow = { key: "pe", label: { zh: "目标 PE", en: "Target P/E" }, value: finite(targetPE) ? targetPE : null, kind: "mult" };
+    const pow = (base) => (finite(base) && finite(n) && finite(vals.growth)) ? base * Math.pow(1 + vals.growth / 100, n) : null;
+    if (mode === "eps") {
+      return [{ key: "futEps", label: { zh: "预期 EPS", en: "Projected EPS" }, value: pow(vals.eps), kind: "num" }, peRow];
+    }
+    if (mode === "netIncome") {
+      const futNi = pow(vals.netIncome);
+      const eps = (futNi !== null && posFinite(ctx.shares)) ? futNi / ctx.shares : null;
+      return [{ key: "futNi", label: { zh: "预期净利润", en: "Projected net income" }, value: futNi, kind: "money" }, { key: "eps", label: { zh: "隐含 EPS", en: "Implied EPS" }, value: eps, kind: "num" }, peRow];
+    }
+    const futRev = pow(vals.revenue);
     const futNi = (futRev !== null && finite(vals.netMargin)) ? futRev * (vals.netMargin / 100) : null;
-    return [
-      { key: "futRev", label: { zh: "预期营收（n年后）", en: "Projected revenue" }, value: futRev, kind: "money" },
-      { key: "futNi", label: { zh: "预期净利润", en: "Projected net income" }, value: futNi, kind: "money" },
-      { key: "pe", label: { zh: "目标 PE", en: "Target P/E" }, value: finite(targetPE) ? targetPE : null, kind: "mult" },
-    ];
+    return [{ key: "futRev", label: { zh: "预期营收（n年后）", en: "Projected revenue" }, value: futRev, kind: "money" }, { key: "futNi", label: { zh: "预期净利润", en: "Projected net income" }, value: futNi, kind: "money" }, peRow];
   },
 };
 
