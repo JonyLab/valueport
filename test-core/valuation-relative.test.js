@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RELATIVE } from "../public/shared/valuation/relative.js";
+import { runModel, modeFields } from "../public/shared/valuation/index.js";
 
 const model = (key) => RELATIVE.find((m) => m.key === key);
 
@@ -125,5 +126,13 @@ describe("PE modes", () => {
     expect(PE.breakdown({ _mode: "eps", eps: 2, n: 5, growth: 10, targetPE: 20 }, ctx).map((r) => r.key)).toEqual(["futEps", "pe"]);
     expect(PE.breakdown({ _mode: "netIncome", netIncome: 150, n: 5, growth: 10, targetPE: 20 }, ctx).map((r) => r.key)).toEqual(["futNi", "eps", "pe"]);
     expect(PE.breakdown({ revenue: 1000, n: 5, growth: 10, netMargin: 15, targetPE: 20 }, ctx).map((r) => r.key)).toEqual(["futRev", "futNi", "pe"]);
+  });
+  it("runModel 按 _mode 取字段并注入,算出区间", () => {
+    const r = runModel(PE, { _mode: "netIncome", netIncome: 150, n: 5, growth: { c: 8, o: 12 }, targetPE: { c: 18, o: 22 } }, { shares: 100 });
+    expect(r.low).toBeGreaterThan(0); expect(r.high).toBeGreaterThan(r.low);
+  });
+  it("modeFields 取对应口径字段", () => {
+    expect(modeFields(PE, "eps").map((f) => f.k)).toEqual(["eps", "n", "growth", "targetPE"]);
+    expect(modeFields(PE, "segment").map((f) => f.k)).toEqual(["revenue", "n", "growth", "netMargin", "targetPE"]);
   });
 });
