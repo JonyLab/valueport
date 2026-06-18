@@ -102,6 +102,19 @@ describe("validateItem with valuations", () => {
     expect(r.ok).toBe(true);
     expect(r.value.valuations[0].derivations).toEqual({});
   });
+  it("keeps a segments object on the card", () => {
+    const c2 = { id: "v1", method: "pe", inputs: {},
+      segments: { enabled: true, rows: [{ name: "A", revenue: 120e8, growth: { c: 5, o: 9 }, netMargin: { c: 18, o: 20 } }] },
+      low: 100, high: 200 };
+    const r = validateItem({ ...base, valuations: [c2] });
+    expect(r.ok).toBe(true);
+    expect(r.value.valuations[0].segments.enabled).toBe(true);
+    expect(r.value.valuations[0].segments.rows).toHaveLength(1);
+  });
+  it("coerces a non-object segments to {}", () => {
+    const c2 = { id: "v1", method: "pe", inputs: {}, segments: "nope", low: 100, high: 200 };
+    expect(validateItem({ ...base, valuations: [c2] }).value.valuations[0].segments).toEqual({});
+  });
 });
 
 describe("rowToItem with valuations", () => {
