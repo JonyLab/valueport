@@ -308,16 +308,26 @@
   .vc-seg-head{display:flex;align-items:center;justify-content:space-between}
   .vc-seg-title{font-size:13px;font-weight:600;color:#31679b}
   .vc-seg-togglab{font-size:12px;color:var(--ink-soft);display:inline-flex;align-items:center;gap:4px;cursor:pointer}
-  .vc-seg-body{margin-top:10px;display:grid;gap:8px}
-  .vc-seg-rows{display:grid;gap:6px}
-  .vc-seg-row{display:grid;grid-template-columns:1.4fr 1.4fr 1fr 1fr 1fr 1fr auto;gap:6px;align-items:center}
-  .vc-seg-colhead{font-size:11px;color:var(--ink-mute)}
-  .vc-seg-cell{min-width:0}
-  .vc-seg-cell .vc-input{width:100%}
-  .vc-seg-del{appearance:none;background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:12px}
+  .vc-seg-body{margin-top:10px;display:grid;gap:10px}
   .vc-seg-add{appearance:none;background:none;border:1px dashed var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--ink-soft);cursor:pointer;width:fit-content}
-  .vc-seg-sum{font-family:var(--mono);font-size:12px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .vc-seg-sum{font-family:var(--mono);font-size:12px;color:var(--ink-soft);font-variant-numeric:tabular-nums;line-height:1.6}
   .vc-driven .vc-input{background:var(--accent);color:var(--ink-mute)}
+  /* 卡片式分部 */
+  .vc-segcards{display:grid;gap:10px}
+  .vc-segcard{position:relative;border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:#fff}
+  .vc-segcard-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;padding-right:18px}
+  .vc-segcard-head .vc-seg-name{flex:1;min-width:0;font-weight:600;font-size:13.5px;border:1px solid transparent;background:var(--accent);border-radius:6px;padding:5px 8px}
+  .vc-segcard-head .vc-seg-name:focus{background:#fff;border-color:var(--ring-border);outline:none}
+  .vc-segcard-share{font-size:12px;color:var(--ink-mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .vc-segcard-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .vc-segcard-grid .vc-seg-rev{grid-column:1 / -1}
+  .vc-segfield{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .vc-segfield-lab{font-size:11px;color:var(--ink-mute)}
+  .vc-segfield-co{display:flex;gap:6px}
+  .vc-segfield-co .vc-input{width:100%;min-width:0}
+  .vc-segcard-foot{margin-top:10px;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;min-height:14px}
+  .vc-segcard-del{position:absolute;top:8px;right:10px;appearance:none;background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:13px;line-height:1}
+  .vc-segcard-del:hover{color:var(--red)}
   .vc-card{background:#fff;border:1px solid var(--border);border-radius:4px;padding:22px;margin-bottom:16px}
   .vc-card-head{font-family:var(--font);font-weight:600;font-size:16px;color:#31679b;margin-bottom:16px}
   /* 前提：堆叠 标签 + 输入 */
