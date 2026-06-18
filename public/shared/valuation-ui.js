@@ -9,6 +9,7 @@
  */
 import { MODELS, runModel } from "/shared/valuation/index.js";
 import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/shared/field-meta.js";
+import { derivationForMeta } from "/shared/valuation/derivations.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -66,12 +67,21 @@ function initialFor(field, ctx) {
   return v;
 }
 
-export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, refData, verdict, onDone, onCancel }) {
+export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, initialDerivations, refData, verdict, onDone, onCancel }) {
   const L = TX[lang] || TX.zh;
   const tx = (k) => L[k];
   // 新增时不替用户预选方法（activeIdx = -1，显示占位）；编辑时沿用原方法
   let activeIdx = MODELS.findIndex((m) => m.key === initialMethod);
   let lastLow = null, lastHigh = null, lastForm = {};
+  const derivations = (initialDerivations && typeof initialDerivations === "object") ? JSON.parse(JSON.stringify(initialDerivations)) : {};
+  const round2 = (n) => Math.round(n * 100) / 100;
+  // 仅保留当前模型字段的推导,存档时用
+  function currentDerivations() {
+    const model = MODELS[activeIdx]; if (!model) return {};
+    const keys = new Set((model.fields || []).map((f) => f.k));
+    const out = {}; for (const k in derivations) if (keys.has(k)) out[k] = derivations[k];
+    return out;
+  }
 
   mount.innerHTML = "";
   const root = el("div", "vc");
@@ -134,7 +144,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const submitBtn = el("button", "vc-submit"); submitBtn.type = "button"; submitBtn.textContent = tx("submit"); submitBtn.disabled = true;
   submitBtn.addEventListener("click", () => {
     if (lastLow === null || lastHigh === null || !isFinite(lastLow) || !isFinite(lastHigh)) return;
-    onDone({ method: MODELS[activeIdx].key, inputs: lastForm, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
+    onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
   });
   side.appendChild(submitBtn);
 
@@ -269,6 +279,51 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     }
     return row;
   }
+  // 「▾ 推导」折叠 + 子面板;写回 inC/inO 并维护 derivations[field.k]
+  function derivToggleText(open) { return (open ? "▴ " : "▾ ") + (lang === "zh" ? "推导" : "Derive"); }
+  function buildDerivation(field, deriv, inC, inO, recompute) {
+    const wrap = el("div", "vc-deriv"); wrap.style.gridColumn = "1 / -1";
+    const toggle = el("button", "vc-deriv-toggle", { type: "button" });
+    const bodyBox = el("div", "vc-deriv-body");
+    let open = false;
+    const sync = () => { toggle.textContent = derivToggleText(open); bodyBox.style.display = open ? "" : "none"; };
+    toggle.addEventListener("click", () => { open = !open; sync(); });
+    wrap.append(toggle, bodyBox);
+    if (deriv.shape === "sum") buildSumPanel(field, deriv, inC, inO, recompute, bodyBox);
+    else buildAnchorPanel(field, inC, inO, recompute, bodyBox);
+    if (derivations[field.k]) open = true; // 有存档默认展开
+    sync();
+    return wrap;
+  }
+  function buildSumPanel(field, deriv, inC, inO, recompute, bodyBox) {
+    const comps = deriv.componentsFor(field.meta);
+    const saved = (derivations[field.k] && derivations[field.k].parts) || {};
+    const rows = comps.map((comp) => {
+      const r = el("div", "vc-arow");
+      const lab = el("div", "vc-label");
+      const span = el("span"); span.textContent = (comp.label && comp.label[lang]) || comp.key; lab.appendChild(span);
+      if (comp.unit === "%") { const u = el("span", "vc-unit"); u.textContent = "%"; lab.appendChild(u); }
+      const sc = saved[comp.key] || {};
+      const ic = makeInput(sc.c ?? comp.default), io = makeInput(sc.o ?? comp.default);
+      ic.addEventListener("input", apply); io.addEventListener("input", apply);
+      r.append(lab, ic, io); bodyBox.appendChild(r);
+      return { comp, ic, io };
+    });
+    const out = el("div", "vc-deriv-out"); bodyBox.appendChild(out);
+    const read = (which) => { const p = {}; rows.forEach(({ comp, ic, io }) => { const s = (which === "c" ? ic : io).value; p[comp.key] = s !== "" ? Number(s) : NaN; }); return p; };
+    function apply() {
+      const vc = deriv.compute(read("c"), { meta: field.meta });
+      const vo = deriv.compute(read("o"), { meta: field.meta });
+      const parts = {}; rows.forEach(({ comp, ic, io }) => { parts[comp.key] = { c: ic.value !== "" ? Number(ic.value) : "", o: io.value !== "" ? Number(io.value) : "" }; });
+      derivations[field.k] = { method: deriv.id, parts };
+      inC.value = Number.isFinite(vc) ? String(round2(vc)) : "";
+      inO.value = Number.isFinite(vo) ? String(round2(vo)) : "";
+      out.textContent = `= ${tx("conservative")} ${fmt(vc, tx("dash"))} / ${tx("optimistic")} ${fmt(vo, tx("dash"))}`;
+      recompute();
+    }
+    if (derivations[field.k]) apply(); // 还原存档:回填字段 + 展示
+  }
+  function buildAnchorPanel(field, inC, inO, recompute, bodyBox) { /* Task 4 实现 */ }
   function singleInit(field) {
     if (initialInputs && Object.prototype.hasOwnProperty.call(initialInputs, field.k)) {
       const v = initialInputs[field.k];
@@ -377,11 +432,26 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         const init = dualInit(field);
         const inC = makeInput(init.c), inO = makeInput(init.o);
         readers.push({ field, getVal: () => ({ c: inC.value !== "" ? Number(inC.value) : NaN, o: inO.value !== "" ? Number(inO.value) : NaN }) });
-        inC.addEventListener("input", recompute); inO.addEventListener("input", recompute);
+        const deriv = derivationForMeta(field.meta);
+        let derivEl = null;
+        // 手动改字段两格 ⇒ 解除该字段推导,就地复位面板(与卡片选区间的解除一致)
+        const onEdit = () => {
+          if (deriv && derivations[field.k]) {
+            delete derivations[field.k];
+            if (derivEl) { derivEl.remove(); derivEl = buildDerivation(field, deriv, inC, inO, recompute); arow.appendChild(derivEl); }
+          }
+          recompute();
+        };
+        inC.addEventListener("input", onEdit); inO.addEventListener("input", onEdit);
         arow.append(lab, inC, inO);
-        const refRow = buildRefRow(field, (v) => { inC.value = String(v); inO.value = String(v); recompute(); }, (lo, hi) => { inC.value = String(lo); inO.value = String(hi); recompute(); });
-        if (refRow) { refRow.style.gridColumn = "2 / -1"; arow.appendChild(refRow); }
+        // 锚点型:参考筹码进推导面板;其余:筹码照旧在字段下
+        const anchorType = deriv && deriv.shape === "anchor";
+        if (!anchorType) {
+          const refRow = buildRefRow(field, (v) => { inC.value = String(v); inO.value = String(v); recompute(); }, (lo, hi) => { inC.value = String(lo); inO.value = String(hi); recompute(); });
+          if (refRow) { refRow.style.gridColumn = "2 / -1"; arow.appendChild(refRow); }
+        }
         if (guideRow) { guideRow.style.gridColumn = "1 / -1"; arow.appendChild(guideRow); }
+        if (deriv) { derivEl = buildDerivation(field, deriv, inC, inO, recompute); arow.appendChild(derivEl); }
         card.appendChild(arow);
       });
       formWrap.appendChild(card);
