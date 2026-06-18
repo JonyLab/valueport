@@ -10,6 +10,7 @@
 import { MODELS, runModel } from "/shared/valuation/index.js";
 import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/shared/field-meta.js";
 import { derivationForMeta } from "/shared/valuation/derivations.js";
+import { aggregateSegments } from "/shared/valuation/segments.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -67,13 +68,15 @@ function initialFor(field, ctx) {
   return v;
 }
 
-export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, initialDerivations, refData, verdict, onDone, onCancel }) {
+export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, initialDerivations, initialSegments, refData, verdict, onDone, onCancel }) {
   const L = TX[lang] || TX.zh;
   const tx = (k) => L[k];
   // 新增时不替用户预选方法（activeIdx = -1，显示占位）；编辑时沿用原方法
   let activeIdx = MODELS.findIndex((m) => m.key === initialMethod);
   let lastLow = null, lastHigh = null, lastForm = {};
   const derivations = (initialDerivations && typeof initialDerivations === "object") ? JSON.parse(JSON.stringify(initialDerivations)) : {};
+  const segments = (initialSegments && typeof initialSegments === "object" && Array.isArray(initialSegments.rows))
+    ? JSON.parse(JSON.stringify(initialSegments)) : { enabled: false, rows: [] };
   const round2 = (n) => Math.round(n * 100) / 100;
   // 仅保留当前模型字段的推导,存档时用
   function currentDerivations() {
@@ -144,7 +147,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const submitBtn = el("button", "vc-submit"); submitBtn.type = "button"; submitBtn.textContent = tx("submit"); submitBtn.disabled = true;
   submitBtn.addEventListener("click", () => {
     if (lastLow === null || lastHigh === null || !isFinite(lastLow) || !isFinite(lastHigh)) return;
-    onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
+    onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), segments, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
   });
   side.appendChild(submitBtn);
 
@@ -365,6 +368,81 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const n = parseMoney(inp.value); return Number.isFinite(n) ? n : NaN;
   }
 
+  function segNum(inp) { return inp.value !== "" ? Number(inp.value) : NaN; }
+  // PE 分部加总区:开关 + 分部表,驱动 revenue/growth/netMargin 三字段
+  function buildSegmentSection(fieldEls, recompute) {
+    const wrap = el("div", "vc-seg");
+    const head = el("div", "vc-seg-head");
+    const title = el("span", "vc-seg-title"); title.textContent = lang === "zh" ? "分部加总" : "Segment build-up";
+    const toggle = el("input", "vc-seg-toggle", { type: "checkbox" });
+    const togLab = el("label", "vc-seg-togglab"); togLab.append(toggle, document.createTextNode(lang === "zh" ? " 启用" : " On"));
+    head.append(title, togLab);
+    const body = el("div", "vc-seg-body");
+    const table = el("div", "vc-seg-rows");
+    const addBtn = el("button", "vc-seg-add", { type: "button" }); addBtn.textContent = lang === "zh" ? "＋ 添加分部" : "＋ Add segment";
+    const summary = el("div", "vc-seg-sum");
+    body.append(table, addBtn, summary);
+    wrap.append(head, body);
+
+    let rowEls = [];
+    const heads = lang === "zh" ? ["业务", "当前营收", "增速·保守", "增速·乐观", "净利率·保守", "净利率·乐观", ""] : ["Segment", "Revenue", "g·cons", "g·opt", "margin·cons", "margin·opt", ""];
+    const colHead = el("div", "vc-seg-row vc-seg-colhead");
+    heads.forEach((t) => { const c = el("div", "vc-seg-cell"); c.textContent = t; colHead.appendChild(c); });
+    table.appendChild(colHead);
+
+    const collect = () => rowEls.map((r) => ({ name: r.name.value, revenue: moneyVal(r.rev), growth: { c: segNum(r.gc), o: segNum(r.go) }, netMargin: { c: segNum(r.mc), o: segNum(r.mo) } }));
+
+    function setDriven(on) {
+      if (fieldEls.revenue) fieldEls.revenue.input.readOnly = on;
+      if (fieldEls.growth) { fieldEls.growth.c.readOnly = on; fieldEls.growth.o.readOnly = on; const d = fieldEls.growth.arow.querySelector(".vc-deriv"); if (d) d.style.display = on ? "none" : ""; }
+      if (fieldEls.netMargin) { fieldEls.netMargin.c.readOnly = on; fieldEls.netMargin.o.readOnly = on; }
+      [fieldEls.revenue, fieldEls.growth, fieldEls.netMargin].forEach((fe) => { if (fe && fe.arow) fe.arow.classList.toggle("vc-driven", on); if (fe && fe.fld) fe.fld.classList.toggle("vc-driven", on); });
+    }
+
+    function recomputeSeg() {
+      segments.rows = collect();
+      const n = fieldEls.n ? segNum(fieldEls.n.input) : NaN;
+      const agg = aggregateSegments(segments.rows, n);
+      if (agg) {
+        if (fieldEls.revenue) { fieldEls.revenue.input.value = fmtMoney(agg.revenue); fieldEls.revenue.input.dataset.raw = String(agg.revenue); }
+        if (fieldEls.growth) { fieldEls.growth.c.value = String(round2(agg.growth.c)); fieldEls.growth.o.value = String(round2(agg.growth.o)); }
+        if (fieldEls.netMargin) { fieldEls.netMargin.c.value = String(round2(agg.netMargin.c)); fieldEls.netMargin.o.value = String(round2(agg.netMargin.o)); }
+        if (derivations.growth) delete derivations.growth;
+        summary.textContent = lang === "zh"
+          ? `合计营收 ${fmtMoney(agg.revenue)} · 合计净利 E 保守 ${fmtMoney(agg.futNi.c)} / 乐观 ${fmtMoney(agg.futNi.o)}`
+          : `Total rev ${fmtMoney(agg.revenue)} · E cons ${fmtMoney(agg.futNi.c)} / opt ${fmtMoney(agg.futNi.o)}`;
+      } else {
+        summary.textContent = lang === "zh" ? "填写分部:当前营收 + 增速 + 净利率(并先填预测年数)" : "Add segments: revenue + growth + margin (set forecast years first)";
+      }
+      recompute();
+    }
+
+    function makeRow(seed) {
+      const r = el("div", "vc-seg-row");
+      const name = el("input", "vc-input vc-seg-name", { type: "text" }); name.placeholder = lang === "zh" ? "业务名" : "Segment"; if (seed && seed.name) name.value = seed.name;
+      const rev = makeMoneyInput(seed && Number.isFinite(Number(seed.revenue)) ? Number(seed.revenue) : "");
+      const gc = makeInput(seed && seed.growth ? seed.growth.c : ""), go = makeInput(seed && seed.growth ? seed.growth.o : "");
+      const mc = makeInput(seed && seed.netMargin ? seed.netMargin.c : ""), mo = makeInput(seed && seed.netMargin ? seed.netMargin.o : "");
+      const del = el("button", "vc-seg-del", { type: "button" }); del.textContent = "✕";
+      const cell = (inp) => { const c = el("div", "vc-seg-cell"); c.appendChild(inp); return c; };
+      [name, rev, gc, go, mc, mo].forEach((inp) => inp.addEventListener("input", recomputeSeg));
+      r.append(cell(name), cell(rev), cell(gc), cell(go), cell(mc), cell(mo), del);
+      const rec = { name, rev, gc, go, mc, mo, el: r };
+      del.addEventListener("click", () => { rowEls = rowEls.filter((x) => x !== rec); r.remove(); recomputeSeg(); });
+      table.appendChild(r); rowEls.push(rec); return rec;
+    }
+
+    addBtn.addEventListener("click", () => { makeRow(); recomputeSeg(); });
+    if (fieldEls.n) fieldEls.n.input.addEventListener("input", () => { if (segments.enabled) recomputeSeg(); });
+
+    function setEnabled(on) { segments.enabled = on; toggle.checked = on; body.style.display = on ? "" : "none"; setDriven(on); if (on) recomputeSeg(); else recompute(); }
+    toggle.addEventListener("change", () => setEnabled(toggle.checked));
+
+    if (segments.rows && segments.rows.length) segments.rows.forEach((row) => makeRow(row));
+    setEnabled(!!segments.enabled);
+    return wrap;
+  }
+
   function renderForm() {
     formWrap.innerHTML = "";
     // 未选方法：显示提示、清空结果，不预填任何模型
@@ -386,6 +464,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const singles = fields.filter((f) => f.col !== "dual");
     const duals = fields.filter((f) => f.col === "dual");
     const recompute = () => compute(buildForm(readers));
+    const fieldEls = {};
 
     // Inputs（前提）卡：堆叠 标签 + 输入
     if (singles.length) {
@@ -400,6 +479,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         readers.push({ field, getVal: money ? () => moneyVal(input) : () => input.value !== "" ? Number(input.value) : NaN });
         input.addEventListener("input", recompute);
         fld.append(lab, input);
+        fieldEls[field.k] = { input, fld };
         const refRow = buildRefRow(field, (v) => { if (money) { input.value = fmtMoney(v); input.dataset.raw = String(v); } else input.value = String(v); recompute(); });
         if (refRow) fld.appendChild(refRow);
         // money 字段：最新财年（实线）+ 近4季 TTM/最新季报（虚线），点击回填，明确标注
@@ -452,6 +532,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         };
         inC.addEventListener("input", onEdit); inO.addEventListener("input", onEdit);
         arow.append(lab, inC, inO);
+        fieldEls[field.k] = { c: inC, o: inO, arow };
         // 锚点型:参考筹码进推导面板;其余:筹码照旧在字段下
         const anchorType = deriv && deriv.shape === "anchor";
         if (!anchorType) {
@@ -463,6 +544,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         card.appendChild(arow);
       });
       formWrap.appendChild(card);
+    }
+    if (model.key === "pe") {
+      const segSection = buildSegmentSection(fieldEls, recompute);
+      formWrap.insertBefore(segSection, formWrap.firstChild);
     }
     recompute();
   }
