@@ -7,7 +7,7 @@
  *   onDone({ method, inputs, low, high, note })  —— 点 Submit、且低~高有效时触发
  *   verdict(low, high) → { text, cls } | null     —— 由宿主提供（结果卡判定行）
  */
-import { MODELS, runModel } from "/shared/valuation/index.js";
+import { MODELS, runModel, modeFields } from "/shared/valuation/index.js";
 import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/shared/field-meta.js";
 import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
@@ -74,6 +74,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // 新增时不替用户预选方法（activeIdx = -1，显示占位）；编辑时沿用原方法
   let activeIdx = MODELS.findIndex((m) => m.key === initialMethod);
   let lastLow = null, lastHigh = null, lastForm = {};
+  let currentMode = null;
   const derivations = (initialDerivations && typeof initialDerivations === "object") ? JSON.parse(JSON.stringify(initialDerivations)) : {};
   const segments = (initialSegments && typeof initialSegments === "object" && Array.isArray(initialSegments.rows))
     ? JSON.parse(JSON.stringify(initialSegments)) : { enabled: false, rows: [] };
@@ -81,7 +82,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // 仅保留当前模型字段的推导,存档时用
   function currentDerivations() {
     const model = MODELS[activeIdx]; if (!model) return {};
-    const keys = new Set((model.fields || []).map((f) => f.k));
+    const keys = new Set(modeFields(model, currentMode).map((f) => f.k));
     const out = {}; for (const k in derivations) if (keys.has(k)) out[k] = derivations[k];
     return out;
   }
@@ -115,7 +116,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     select.appendChild(og);
   });
   select.value = activeIdx >= 0 ? String(activeIdx) : "-1";
-  select.addEventListener("change", () => { activeIdx = Number(select.value); renderForm(); });
+  select.addEventListener("change", () => { activeIdx = Number(select.value); currentMode = null; renderForm(); });
   mblock.append(mlabel, select);
   main.appendChild(mblock);
 
@@ -147,18 +148,20 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const submitBtn = el("button", "vc-submit"); submitBtn.type = "button"; submitBtn.textContent = tx("submit"); submitBtn.disabled = true;
   submitBtn.addEventListener("click", () => {
     if (lastLow === null || lastHigh === null || !isFinite(lastLow) || !isFinite(lastHigh)) return;
-    onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), segments, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
+    const segOut = currentMode === "segment" ? { enabled: true, rows: segments.rows } : { enabled: false, rows: segments.rows || [] };
+    onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), segments: segOut, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
   });
   side.appendChild(submitBtn);
 
   // ── 计算 + 渲染结果 ──
   function consOpt(model, form) {
     const cons = {}, opt = {};
-    for (const f of model.fields) {
+    for (const f of modeFields(model, currentMode)) {
       const v = form[f.k];
       if (f.col === "dual") { cons[f.k] = v && typeof v === "object" ? v.c : NaN; opt[f.k] = v && typeof v === "object" ? v.o : NaN; }
       else { cons[f.k] = v; opt[f.k] = v; }
     }
+    if (model.modes) { cons._mode = opt._mode = currentMode; }
     return { cons, opt };
   }
   function renderBreakdown(model, form, valid) {
@@ -179,13 +182,14 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // 情景取中（保守/乐观取均）用于逐年现金流展示
   function midVals(model, form) {
     const v = {};
-    for (const f of model.fields) {
+    for (const f of modeFields(model, currentMode)) {
       const x = form[f.k];
       if (f.col === "dual") {
         const c = x && typeof x === "object" ? x.c : NaN, o = x && typeof x === "object" ? x.o : NaN;
         v[f.k] = (Number.isFinite(c) && Number.isFinite(o)) ? (c + o) / 2 : (Number.isFinite(c) ? c : o);
       } else v[f.k] = x;
     }
+    if (model.modes) v._mode = currentMode;
     return v;
   }
   // 逐年现金流明细（仅 DCF 模型；可展开；情景取中）
@@ -437,11 +441,11 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     addBtn.addEventListener("click", () => { makeRow(); recomputeSeg(); });
     if (fieldEls.n) fieldEls.n.input.addEventListener("input", () => { if (segments.enabled) recomputeSeg(); });
 
-    function setEnabled(on) { segments.enabled = on; toggle.checked = on; body.style.display = on ? "" : "none"; setDriven(on); if (on) recomputeSeg(); else recompute(); }
-    toggle.addEventListener("change", () => setEnabled(toggle.checked));
+    function setEnabled(on) { segments.enabled = on; body.style.display = on ? "" : "none"; setDriven(on); if (on) recomputeSeg(); else recompute(); }
 
-    if (segments.rows && segments.rows.length) segments.rows.forEach((row) => makeRow(row));
-    setEnabled(!!segments.enabled);
+    if (segments.rows && segments.rows.length) segments.rows.forEach((row) => makeRow(row)); else makeRow();
+    if (togLab && togLab.parentNode) togLab.parentNode.removeChild(togLab); // 口径即开关,去掉行内开关
+    setEnabled(true);
     return wrap;
   }
 
@@ -461,12 +465,29 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       return;
     }
     const model = MODELS[activeIdx];
-    const fields = model.fields || [];
+    if (model.modes) {
+      if (!currentMode || !model.modes.some((m) => m.key === currentMode)) {
+        currentMode = (initialInputs && initialInputs._mode)
+          || (initialInputs && segments && segments.enabled ? "segment" : (initialInputs ? "revenue" : (model.defaultMode || model.modes[0].key)));
+        if (!model.modes.some((m) => m.key === currentMode)) currentMode = model.modes[0].key;
+      }
+    } else { currentMode = null; }
+    const fields = modeFields(model, currentMode);
     const readers = [];
     const singles = fields.filter((f) => f.col !== "dual");
     const duals = fields.filter((f) => f.col === "dual");
     const recompute = () => compute(buildForm(readers));
     const fieldEls = {};
+    if (model.modes) {
+      const tabs = el("div", "vc-modes");
+      model.modes.forEach((mo) => {
+        const b = el("button", "vc-modetab" + (mo.key === currentMode ? " on" : ""), { type: "button" });
+        b.textContent = (mo.label && mo.label[lang]) || mo.key;
+        b.addEventListener("click", () => { if (currentMode !== mo.key) { currentMode = mo.key; renderForm(); } });
+        tabs.appendChild(b);
+      });
+      formWrap.appendChild(tabs);
+    }
 
     // Inputs（前提）卡：堆叠 标签 + 输入
     if (singles.length) {
@@ -547,14 +568,14 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       });
       formWrap.appendChild(card);
     }
-    if (model.key === "pe") {
+    if (currentMode === "segment") {
       const segSection = buildSegmentSection(fieldEls, recompute);
-      formWrap.insertBefore(segSection, formWrap.firstChild);
+      formWrap.insertBefore(segSection, formWrap.children[1] || null); // 排在 radio tab 之后、表单卡之前
     }
     recompute();
   }
 
-  function buildForm(readers) { const form = {}; readers.forEach(({ field, getVal }) => { form[field.k] = getVal(); }); return form; }
+  function buildForm(readers) { const form = {}; readers.forEach(({ field, getVal }) => { form[field.k] = getVal(); }); if (MODELS[activeIdx] && MODELS[activeIdx].modes) form._mode = currentMode; return form; }
 
   renderForm();
 }
