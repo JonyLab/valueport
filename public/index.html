@@ -296,6 +296,9 @@
   /* 卡片（Inputs / Assumptions）：白底描边圆角，蓝色标题 */
   .vc-form{max-width:none}
   .vc-empty-method{color:var(--ink-mute);font-size:13px;padding:18px 2px}
+  .vc-modes{display:flex;gap:4px;margin-bottom:14px;background:var(--accent);border-radius:8px;padding:3px;width:fit-content}
+  .vc-modetab{appearance:none;background:none;border:0;padding:6px 12px;font-size:12.5px;color:var(--ink-soft);border-radius:6px;cursor:pointer;font-weight:500}
+  .vc-modetab.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
   .vc-deriv{margin-top:8px}
   .vc-deriv-toggle{appearance:none;background:none;border:0;padding:0;cursor:pointer;font-size:12px;color:#31679b;font-weight:600}
   .vc-deriv-body{margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:6px;background:var(--card);display:grid;gap:8px}
@@ -570,7 +573,7 @@ import { verdictOf, structValid, hasFairRange, applyZoneColors, computeAnchors, 
 import { MKT_LABEL } from "/shared/market.js";
 import { t, applyI18n, toggleLang, langButtonLabel, LANG } from "/shared/i18n.js";
 import { mountValuationCalc } from "/shared/valuation-ui.js";
-import { MODELS } from "/shared/valuation/index.js";
+import { MODELS, modeFields } from "/shared/valuation/index.js";
 
 applyI18n(); // 静态文案先按当前语言渲染
 const VMSGS = {
@@ -1409,7 +1412,8 @@ function syncFairUI(item, idBlock) {
 
 // 关键假设摘要（dual 字段：标签 保守–乐观）
 function assumeSummary(model, inputs) {
-  return (model.fields || []).filter((f) => f.col === "dual").map((f) => {
+  const fields = model.modes ? modeFields(model, (inputs && inputs._mode) || model.defaultMode) : (model.fields || []);
+  return fields.filter((f) => f.col === "dual").map((f) => {
     const v = inputs[f.k]; if (!v || typeof v !== "object") return null;
     const lab = (f.label && f.label[LANG]) || f.k;
     const unit = f.unit === "%" ? "%" : "";
