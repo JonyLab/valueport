@@ -434,14 +434,6 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       recompute();
     }
 
-    // 一组「保守|乐观」字段(标签 + 两个并排输入)
-    function segField(labelText, a, b) {
-      const f = el("div", "vc-segfield");
-      const lab = el("div", "vc-segfield-lab"); lab.textContent = labelText;
-      const co = el("div", "vc-segfield-co"); co.append(a, b);
-      f.append(lab, co); return f;
-    }
-
     function makeRow(seed) {
       const card = el("div", "vc-segcard");
       const name = el("input", "vc-input vc-seg-name", { type: "text" }); name.placeholder = lang === "zh" ? "业务名" : "Segment"; if (seed && seed.name) name.value = seed.name;
@@ -450,15 +442,18 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const rev = makeMoneyInput(seed && Number.isFinite(Number(seed.revenue)) ? Number(seed.revenue) : "");
       const gc = makeInput(seed && seed.growth ? seed.growth.c : ""), go = makeInput(seed && seed.growth ? seed.growth.o : "");
       const mc = makeInput(seed && seed.netMargin ? seed.netMargin.c : ""), mo = makeInput(seed && seed.netMargin ? seed.netMargin.o : "");
-      gc.placeholder = lang === "zh" ? "保守" : "cons"; go.placeholder = lang === "zh" ? "乐观" : "opt";
-      mc.placeholder = lang === "zh" ? "保守" : "cons"; mo.placeholder = lang === "zh" ? "乐观" : "opt";
       const revF = el("div", "vc-segfield vc-seg-rev"); const revLab = el("div", "vc-segfield-lab"); revLab.textContent = lang === "zh" ? "当前营收" : "Revenue"; revF.append(revLab, rev);
-      const grid = el("div", "vc-segcard-grid");
-      grid.append(revF, segField(lang === "zh" ? "增速 %" : "Growth %", gc, go), segField(lang === "zh" ? "净利率 %" : "Margin %", mc, mo));
+      // 情景子网格:保守|乐观 作共用列头,增速/净利率 两行共用
+      const scen = el("div", "vc-segscen");
+      const hc = el("div", "vc-segscen-h"); hc.textContent = lang === "zh" ? "保守" : "Cons";
+      const ho = el("div", "vc-segscen-h"); ho.textContent = lang === "zh" ? "乐观" : "Opt";
+      const gLab = el("div", "vc-segscen-lab"); gLab.textContent = lang === "zh" ? "增速 %" : "Growth %";
+      const mLab = el("div", "vc-segscen-lab"); mLab.textContent = lang === "zh" ? "净利率 %" : "Margin %";
+      scen.append(el("div"), hc, ho, gLab, gc, go, mLab, mc, mo);
       const foot = el("div", "vc-segcard-foot");
       const del = el("button", "vc-segcard-del", { type: "button" }); del.textContent = "✕";
       [name, rev, gc, go, mc, mo].forEach((inp) => inp.addEventListener("input", recomputeSeg));
-      card.append(cardHead, grid, foot, del);
+      card.append(cardHead, revF, scen, foot, del);
       const rec = { name, rev, gc, go, mc, mo, share, foot, el: card };
       del.addEventListener("click", () => { rowEls = rowEls.filter((x) => x !== rec); card.remove(); recomputeSeg(); });
       table.appendChild(card); rowEls.push(rec); return rec;

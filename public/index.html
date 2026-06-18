@@ -319,12 +319,13 @@
   .vc-segcard-head .vc-seg-name{flex:1;min-width:0;font-weight:600;font-size:13.5px;border:1px solid transparent;background:var(--accent);border-radius:6px;padding:5px 8px}
   .vc-segcard-head .vc-seg-name:focus{background:#fff;border-color:var(--ring-border);outline:none}
   .vc-segcard-share{font-size:12px;color:var(--ink-mute);font-variant-numeric:tabular-nums;white-space:nowrap}
-  .vc-segcard-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .vc-segcard-grid .vc-seg-rev{grid-column:1 / -1}
+  .vc-segcard > .vc-segfield{margin-bottom:10px}
   .vc-segfield{display:flex;flex-direction:column;gap:4px;min-width:0}
   .vc-segfield-lab{font-size:11px;color:var(--ink-mute)}
-  .vc-segfield-co{display:flex;gap:6px}
-  .vc-segfield-co .vc-input{width:100%;min-width:0}
+  .vc-segscen{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px 8px;align-items:center}
+  .vc-segscen-h{font-size:11px;color:var(--ink-mute);text-align:center}
+  .vc-segscen-lab{font-size:11px;color:var(--ink-mute);white-space:nowrap}
+  .vc-segscen .vc-input{width:100%;min-width:0}
   .vc-segcard-foot{margin-top:10px;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;min-height:14px}
   .vc-segcard-del{position:absolute;top:8px;right:10px;appearance:none;background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:13px;line-height:1}
   .vc-segcard-del:hover{color:var(--red)}
