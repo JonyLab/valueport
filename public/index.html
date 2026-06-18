@@ -301,6 +301,20 @@
   .vc-deriv-body{margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:6px;background:var(--card);display:grid;gap:8px}
   .vc-deriv-out{font-family:var(--mono);font-size:12px;color:var(--ink-soft);font-variant-numeric:tabular-nums;padding-top:2px}
   .vc-deriv-tip{font-size:12px;color:var(--ink-mute);line-height:1.6}
+  .vc-seg{border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:16px;background:var(--card)}
+  .vc-seg-head{display:flex;align-items:center;justify-content:space-between}
+  .vc-seg-title{font-size:13px;font-weight:600;color:#31679b}
+  .vc-seg-togglab{font-size:12px;color:var(--ink-soft);display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+  .vc-seg-body{margin-top:10px;display:grid;gap:8px}
+  .vc-seg-rows{display:grid;gap:6px}
+  .vc-seg-row{display:grid;grid-template-columns:1.4fr 1.4fr 1fr 1fr 1fr 1fr auto;gap:6px;align-items:center}
+  .vc-seg-colhead{font-size:11px;color:var(--ink-mute)}
+  .vc-seg-cell{min-width:0}
+  .vc-seg-cell .vc-input{width:100%}
+  .vc-seg-del{appearance:none;background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:12px}
+  .vc-seg-add{appearance:none;background:none;border:1px dashed var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--ink-soft);cursor:pointer;width:fit-content}
+  .vc-seg-sum{font-family:var(--mono);font-size:12px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .vc-driven .vc-input{background:var(--accent);color:var(--ink-mute)}
   .vc-card{background:#fff;border:1px solid var(--border);border-radius:4px;padding:22px;margin-bottom:16px}
   .vc-card-head{font-family:var(--font);font-weight:600;font-size:16px;color:#31679b;margin-bottom:16px}
   /* 前提：堆叠 标签 + 输入 */
@@ -1569,6 +1583,7 @@ function renderValuationPanel(item, panel, idBlock) {
       initialMethod: card ? card.method : undefined,
       initialInputs: card ? card.inputs : undefined,
       initialDerivations: card ? card.derivations : undefined,
+      initialSegments: card ? card.segments : undefined,
       initialNote: card ? card.note : undefined,
       refData: {
         financials: (item._financials && item._financials.annual && item._financials.annual.financials) || null,
@@ -1578,14 +1593,14 @@ function renderValuationPanel(item, panel, idBlock) {
       },
       verdict: (low, high) => { const vv = verdictOf({ ...item.cfg, fairLow: low, fairHigh: high }, VMSGS); return { text: vv.text, cls: vv.cls }; },
       onCancel: () => finishValEdit(),
-      onDone: ({ method, inputs, low, high, note, derivations }) => {
+      onDone: ({ method, inputs, low, high, note, derivations, segments }) => {
         const c = item.cfg; // 实时读取
         if (!Array.isArray(c.valuations)) c.valuations = [];
         if (card) {
-          Object.assign(card, { method, inputs, low, high, note, derivations, updatedAt: new Date().toISOString() });
+          Object.assign(card, { method, inputs, low, high, note, derivations, segments, updatedAt: new Date().toISOString() });
           if (c.selectedValuationId === card.id) selectValuation(item, card, idBlock);
         } else {
-          const fresh = { id: newValuationId(), method, inputs, low, high, note, derivations, updatedAt: new Date().toISOString() };
+          const fresh = { id: newValuationId(), method, inputs, low, high, note, derivations, segments, updatedAt: new Date().toISOString() };
           c.valuations.push(fresh);
           if (!c.selectedValuationId) selectValuation(item, fresh, idBlock); // 首张/无选中时自动设为合理区间
         }
