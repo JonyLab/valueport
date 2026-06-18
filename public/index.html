@@ -312,21 +312,23 @@
   .vc-seg-add{appearance:none;background:none;border:1px dashed var(--border);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--ink-soft);cursor:pointer;width:fit-content}
   .vc-seg-sum{font-family:var(--mono);font-size:12px;color:var(--ink-soft);font-variant-numeric:tabular-nums;line-height:1.6}
   .vc-driven .vc-input{background:var(--accent);color:var(--ink-mute)}
-  /* 紧凑卡片式分部:每分部两行 */
+  /* 紧凑卡片式分部:meta 一行 + 共用保守/乐观列头的小网格(占比/E 在右) */
   .vc-segcards{display:grid;gap:8px}
-  .vc-segcard{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:#fff;display:grid;gap:7px}
+  .vc-segcard{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:#fff;display:grid;gap:8px}
   .vc-segc-top{display:flex;align-items:center;gap:8px}
   .vc-segc-top .vc-seg-name{flex:1;min-width:60px;font-weight:600;font-size:13px;border:1px solid transparent;background:var(--accent);border-radius:6px;padding:5px 8px}
   .vc-segc-top .vc-seg-name:focus{background:#fff;border-color:var(--ring-border);outline:none}
-  .vc-segc-top .vc-money{width:128px;flex:none}
-  .vc-segc-share{font-size:12px;color:var(--ink-mute);font-variant-numeric:tabular-nums;white-space:nowrap}
-  .vc-segc-del{appearance:none;background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:13px;line-height:1;padding:2px}
+  .vc-segc-top .vc-money{width:140px;flex:none}
+  .vc-segc-del{appearance:none;background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:13px;line-height:1;padding:2px;margin-left:auto}
   .vc-segc-del:hover{color:var(--red)}
-  .vc-segc-bot{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-  .vc-segc-grp{display:flex;align-items:center;gap:5px}
-  .vc-segc-grp > span{font-size:11px;color:var(--ink-mute);white-space:nowrap}
-  .vc-segc-bot .vc-input{width:54px;flex:none;text-align:center}
-  .vc-segc-e{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .vc-segc-mid{display:flex;align-items:flex-start;gap:16px}
+  .vc-segscen{display:grid;grid-template-columns:auto 56px 56px;gap:5px 8px;align-items:center}
+  .vc-segscen-h{font-size:11px;color:var(--ink-mute);text-align:center}
+  .vc-segscen-lab{font-size:11px;color:var(--ink-mute);white-space:nowrap}
+  .vc-segscen .vc-input{width:56px;min-width:0;text-align:center}
+  .vc-segc-meta{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right;padding-top:14px}
+  .vc-segc-share{font-size:13px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .vc-segc-e{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
   .vc-segcard-foot{margin-top:10px;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;min-height:14px}
   .vc-segcard-del{position:absolute;top:8px;right:10px;appearance:none;background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:13px;line-height:1}
   .vc-segcard-del:hover{color:var(--red)}

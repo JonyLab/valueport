@@ -438,19 +438,25 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const card = el("div", "vc-segcard");
       const name = el("input", "vc-input vc-seg-name", { type: "text" }); name.placeholder = lang === "zh" ? "业务名" : "Segment"; if (seed && seed.name) name.value = seed.name;
       const rev = makeMoneyInput(seed && Number.isFinite(Number(seed.revenue)) ? Number(seed.revenue) : ""); rev.placeholder = lang === "zh" ? "营收" : "Rev";
-      const share = el("span", "vc-segc-share");
       const del = el("button", "vc-segc-del", { type: "button" }); del.textContent = "✕";
-      const top = el("div", "vc-segc-top"); top.append(name, rev, share, del);
+      const top = el("div", "vc-segc-top"); top.append(name, rev, del);
       const gc = makeInput(seed && seed.growth ? seed.growth.c : ""), go = makeInput(seed && seed.growth ? seed.growth.o : "");
       const mc = makeInput(seed && seed.netMargin ? seed.netMargin.c : ""), mo = makeInput(seed && seed.netMargin ? seed.netMargin.o : "");
       gc.placeholder = lang === "zh" ? "保守" : "cons"; go.placeholder = lang === "zh" ? "乐观" : "opt";
       mc.placeholder = lang === "zh" ? "保守" : "cons"; mo.placeholder = lang === "zh" ? "乐观" : "opt";
-      // 第二行:增速[保守][乐观] · 净利率[保守][乐观] · E(保守/乐观 靠左右位置约定)
-      const grp = (labelTxt, a, b) => { const g = el("div", "vc-segc-grp"); const l = el("span"); l.textContent = labelTxt; g.append(l, a, b); return g; };
+      // 小网格:保守|乐观 共用列头,增速/净利率 两行共用;占比 + E 放网格右侧
+      const scen = el("div", "vc-segscen");
+      const hc = el("div", "vc-segscen-h"); hc.textContent = lang === "zh" ? "保守" : "Cons";
+      const ho = el("div", "vc-segscen-h"); ho.textContent = lang === "zh" ? "乐观" : "Opt";
+      const gLab = el("div", "vc-segscen-lab"); gLab.textContent = lang === "zh" ? "增速 %" : "Growth %";
+      const mLab = el("div", "vc-segscen-lab"); mLab.textContent = lang === "zh" ? "净利率 %" : "Margin %";
+      scen.append(el("div"), hc, ho, gLab, gc, go, mLab, mc, mo);
+      const share = el("span", "vc-segc-share");
       const foot = el("span", "vc-segc-e");
-      const bot = el("div", "vc-segc-bot"); bot.append(grp(lang === "zh" ? "增速" : "g", gc, go), grp(lang === "zh" ? "净利率" : "margin", mc, mo), foot);
+      const meta = el("div", "vc-segc-meta"); meta.append(share, foot);
+      const mid = el("div", "vc-segc-mid"); mid.append(scen, meta);
       [name, rev, gc, go, mc, mo].forEach((inp) => inp.addEventListener("input", recomputeSeg));
-      card.append(top, bot);
+      card.append(top, mid);
       const rec = { name, rev, gc, go, mc, mo, share, foot, el: card };
       del.addEventListener("click", () => { rowEls = rowEls.filter((x) => x !== rec); card.remove(); recomputeSeg(); });
       table.appendChild(card); rowEls.push(rec); return rec;
