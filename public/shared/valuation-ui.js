@@ -382,10 +382,11 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const togLab = el("label", "vc-seg-togglab"); togLab.append(toggle, document.createTextNode(lang === "zh" ? " 启用" : " On"));
     head.append(title, togLab);
     const body = el("div", "vc-seg-body");
+    const hero = el("div", "vc-seg-hero");
     const table = el("div", "vc-segcards");
     const addBtn = el("button", "vc-seg-add", { type: "button" }); addBtn.textContent = lang === "zh" ? "＋ 添加分部" : "＋ Add segment";
     const summary = el("div", "vc-seg-sum");
-    body.append(table, addBtn, summary);
+    body.append(hero, table, addBtn, summary);
     wrap.append(head, body);
 
     let rowEls = [];
@@ -424,10 +425,14 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         if (fieldEls.growth) { fieldEls.growth.c.value = String(round2(agg.growth.c)); fieldEls.growth.o.value = String(round2(agg.growth.o)); }
         if (fieldEls.netMargin) { fieldEls.netMargin.c.value = String(round2(agg.netMargin.c)); fieldEls.netMargin.o.value = String(round2(agg.netMargin.o)); }
         if (derivations.growth) delete derivations.growth;
+        hero.textContent = lang === "zh"
+          ? `合计未来净利 E  ${fmtMoney(agg.futNi.c)} ~ ${fmtMoney(agg.futNi.o)}`
+          : `Total future NI  ${fmtMoney(agg.futNi.c)} ~ ${fmtMoney(agg.futNi.o)}`;
         summary.textContent = lang === "zh"
-          ? `合计营收 ${fmtMoney(agg.revenue)} · 合计净利 E 保守 ${fmtMoney(agg.futNi.c)} / 乐观 ${fmtMoney(agg.futNi.o)} · 隐含增速 ${round2(agg.growth.c)}–${round2(agg.growth.o)}%`
-          : `Total rev ${fmtMoney(agg.revenue)} · E cons ${fmtMoney(agg.futNi.c)} / opt ${fmtMoney(agg.futNi.o)} · implied g ${round2(agg.growth.c)}–${round2(agg.growth.o)}%`;
+          ? `合计营收 ${fmtMoney(agg.revenue)} · 隐含增速 ${round2(agg.growth.c)}–${round2(agg.growth.o)}%`
+          : `Total rev ${fmtMoney(agg.revenue)} · implied g ${round2(agg.growth.c)}–${round2(agg.growth.o)}%`;
       } else {
+        hero.textContent = "";
         summary.textContent = lang === "zh" ? "填写分部:当前营收 + 增速 + 净利率(并先填预测年数)" : "Add segments: revenue + growth + margin (set forecast years first)";
       }
       refreshCards(rows);
@@ -502,6 +507,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const duals = fields.filter((f) => f.col === "dual");
     const recompute = () => compute(buildForm(readers));
     const fieldEls = {};
+    let singlesCard = null, dualsCard = null;
     if (model.modes) {
       const tabs = el("div", "vc-modes");
       model.modes.forEach((mo) => {
@@ -515,7 +521,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
 
     // Inputs（前提）卡：堆叠 标签 + 输入
     if (singles.length) {
-      const card = el("div", "vc-card");
+      const card = el("div", "vc-card"); singlesCard = card;
       const h = el("div", "vc-card-head"); h.textContent = tx("facts"); card.appendChild(h);
       singles.forEach((field) => {
         const fld = el("div", "vc-fld");
@@ -555,7 +561,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
 
     // Assumptions（情景假设）卡：每个假设各自成行（字段内输入↔参考紧、字段间留白），列对齐
     if (duals.length) {
-      const card = el("div", "vc-card");
+      const card = el("div", "vc-card"); dualsCard = card;
       const h = el("div", "vc-card-head"); h.textContent = tx("assume"); card.appendChild(h);
       const hr = el("div", "vc-arow vc-arow-head");
       const cc = el("div", "vc-chead"); cc.textContent = tx("conservative");
@@ -593,8 +599,22 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       formWrap.appendChild(card);
     }
     if (currentMode === "segment") {
+      // 重排:整体参数(预测年数 + 目标PE)单独成卡置顶;营收/增速/净利率由分部表驱动 → 原前提/情景假设卡隐藏(仍持有隐藏输入喂模型)
+      const gcard = el("div", "vc-card");
+      const gh = el("div", "vc-card-head"); gh.textContent = lang === "zh" ? "整体参数" : "Overall"; gcard.appendChild(gh);
+      if (fieldEls.n && fieldEls.n.fld) gcard.appendChild(fieldEls.n.fld);
+      if (fieldEls.targetPE && fieldEls.targetPE.arow) {
+        const hr = el("div", "vc-arow vc-arow-head");
+        const cc = el("div", "vc-chead"); cc.textContent = tx("conservative");
+        const co = el("div", "vc-chead"); co.textContent = tx("optimistic");
+        hr.append(el("div"), cc, co);
+        gcard.append(hr, fieldEls.targetPE.arow);
+      }
+      if (singlesCard) singlesCard.style.display = "none";
+      if (dualsCard) dualsCard.style.display = "none";
       const segSection = buildSegmentSection(fieldEls, recompute);
-      formWrap.insertBefore(segSection, formWrap.children[1] || null); // 排在 radio tab 之后、表单卡之前
+      formWrap.insertBefore(gcard, formWrap.children[1] || null); // tabs 之后
+      formWrap.insertBefore(segSection, gcard.nextSibling);       // 整体参数之后
     }
     recompute();
   }
