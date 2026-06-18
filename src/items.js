@@ -15,6 +15,7 @@ function validateValuations(raw) {
     if (!(low > 0) || !(high > low)) return { ok: false };
     out.push({ id: card.id, method: card.method, inputs: card.inputs, low, high,
       note: typeof card.note === "string" ? card.note.slice(0, 2000) : "",
+      derivations: (card.derivations && typeof card.derivations === "object" && !Array.isArray(card.derivations)) ? card.derivations : {},
       updatedAt: typeof card.updatedAt === "string" ? card.updatedAt : "" });
   }
   return { ok: true, value: out };

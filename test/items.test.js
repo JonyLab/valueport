@@ -88,6 +88,20 @@ describe("validateItem with valuations", () => {
     const long = validateItem({ ...base, valuations: [{ ...card, note: "x".repeat(3000) }] });
     expect(long.value.valuations[0].note).toHaveLength(2000);
   });
+  it("keeps a derivations object on the card", () => {
+    const card = { id: "v1", method: "fcff", inputs: { wacc: { c: 9, o: 8 } },
+      derivations: { wacc: { method: "capm", parts: { rf: { c: 3, o: 3 }, beta: { c: 1, o: 1 }, erp: { c: 5, o: 5 } } } },
+      low: 100, high: 200 };
+    const r = validateItem({ ...base, valuations: [card], selectedValuationId: "v1" });
+    expect(r.ok).toBe(true);
+    expect(r.value.valuations[0].derivations.wacc.method).toBe("capm");
+  });
+  it("coerces a non-object derivations to {}", () => {
+    const card = { id: "v1", method: "fcff", inputs: {}, derivations: "nope", low: 100, high: 200 };
+    const r = validateItem({ ...base, valuations: [card] });
+    expect(r.ok).toBe(true);
+    expect(r.value.valuations[0].derivations).toEqual({});
+  });
 });
 
 describe("rowToItem with valuations", () => {
