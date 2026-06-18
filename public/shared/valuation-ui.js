@@ -393,10 +393,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const collect = () => rowEls.map((r) => ({ name: r.name.value, revenue: moneyVal(r.rev), growth: { c: segNum(r.gc), o: segNum(r.go) }, netMargin: { c: segNum(r.mc), o: segNum(r.mo) } }));
 
     function setDriven(on) {
-      if (fieldEls.revenue) fieldEls.revenue.input.readOnly = on;
-      if (fieldEls.growth) { fieldEls.growth.c.readOnly = on; fieldEls.growth.o.readOnly = on; const d = fieldEls.growth.arow.querySelector(".vc-deriv"); if (d) d.style.display = on ? "none" : ""; }
-      if (fieldEls.netMargin) { fieldEls.netMargin.c.readOnly = on; fieldEls.netMargin.o.readOnly = on; }
-      [fieldEls.revenue, fieldEls.growth, fieldEls.netMargin].forEach((fe) => { if (fe && fe.arow) fe.arow.classList.toggle("vc-driven", on); if (fe && fe.fld) fe.fld.classList.toggle("vc-driven", on); });
+      // 分部开启时,三字段由分部表算出,作为输入多余 → 整行隐藏(数值仍写入、照常喂 runModel)
+      [fieldEls.revenue, fieldEls.growth, fieldEls.netMargin].forEach((fe) => {
+        if (!fe) return;
+        const row = fe.fld || fe.arow;
+        if (row) row.style.display = on ? "none" : "";
+      });
     }
 
     function recomputeSeg() {
@@ -409,8 +411,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         if (fieldEls.netMargin) { fieldEls.netMargin.c.value = String(round2(agg.netMargin.c)); fieldEls.netMargin.o.value = String(round2(agg.netMargin.o)); }
         if (derivations.growth) delete derivations.growth;
         summary.textContent = lang === "zh"
-          ? `合计营收 ${fmtMoney(agg.revenue)} · 合计净利 E 保守 ${fmtMoney(agg.futNi.c)} / 乐观 ${fmtMoney(agg.futNi.o)}`
-          : `Total rev ${fmtMoney(agg.revenue)} · E cons ${fmtMoney(agg.futNi.c)} / opt ${fmtMoney(agg.futNi.o)}`;
+          ? `合计营收 ${fmtMoney(agg.revenue)} · 合计净利 E 保守 ${fmtMoney(agg.futNi.c)} / 乐观 ${fmtMoney(agg.futNi.o)} · 隐含增速 ${round2(agg.growth.c)}–${round2(agg.growth.o)}% · 净利率 ${round2(agg.netMargin.c)}–${round2(agg.netMargin.o)}%`
+          : `Total rev ${fmtMoney(agg.revenue)} · E cons ${fmtMoney(agg.futNi.c)} / opt ${fmtMoney(agg.futNi.o)} · implied g ${round2(agg.growth.c)}–${round2(agg.growth.o)}% · margin ${round2(agg.netMargin.c)}–${round2(agg.netMargin.o)}%`;
       } else {
         summary.textContent = lang === "zh" ? "填写分部:当前营收 + 增速 + 净利率(并先填预测年数)" : "Add segments: revenue + growth + margin (set forecast years first)";
       }
