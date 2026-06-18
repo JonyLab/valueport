@@ -323,7 +323,15 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     }
     if (derivations[field.k]) apply(); // 还原存档:回填字段 + 展示
   }
-  function buildAnchorPanel(field, inC, inO, recompute, bodyBox) { /* Task 4 实现 */ }
+  function buildAnchorPanel(field, inC, inO, recompute, bodyBox) {
+    const tip = el("div", "vc-deriv-tip");
+    tip.textContent = lang === "zh" ? "锚定当前 / 自身历史 / 行业中位,定保守与乐观目标。" : "Anchor to current / own history / industry median; set conservative & optimistic targets.";
+    bodyBox.appendChild(tip);
+    const refRow = buildRefRow(field,
+      (v) => { inC.value = String(v); inO.value = String(v); recompute(); },
+      (lo, hi) => { inC.value = String(lo); inO.value = String(hi); recompute(); });
+    if (refRow) bodyBox.appendChild(refRow);
+  }
   function singleInit(field) {
     if (initialInputs && Object.prototype.hasOwnProperty.call(initialInputs, field.k)) {
       const v = initialInputs[field.k];
