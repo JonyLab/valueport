@@ -8,13 +8,13 @@
 <style>
   /* ===== zed.dev 风：暖白纸张 + 衬线标题 + 蓝灰强调 ===== */
   :root{
-    --bg:#f3f4f6; --card:#fafafb;
+    --bg:#ffffff; --card:#ffffff;
     --ink:#1b1a17; --ink-soft:#57534a; --ink-mute:#8a857a;
     --border:#dadde2; --accent:#eceef1;
     --ring:rgba(46,64,102,.22); --ring-border:#5a6886;
     --divider:#dadde2; --track:#eceef1; --track-edge:#e2e4e8;
-    --shadow:0 1px 2px rgba(28,30,38,.05);
-    --sh:4px 4px 0 rgba(46,84,180,.06),-4px -4px 0 rgba(46,84,180,.05);
+    --shadow:none;
+    --sh:none;
   }
   h1{font-family:var(--serif);font-weight:400;letter-spacing:-.025em}
   .eyebrow{color:var(--ink-mute)}
@@ -88,16 +88,15 @@
   /* 三档按钮：填充 primary / 描边 .btn / 纯文字 .ghost；带边框或背景的都有底缘内阴影（zed 键帽厚度） */
   .btn{height:36px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;letter-spacing:-.01em;
     border:1px solid var(--border);border-radius:var(--r-sm);background:#fff;color:var(--ink);
-    font-size:13.5px;font-weight:500;box-shadow:inset 0 -2px 0 rgba(60,50,25,.05);
+    font-size:13.5px;font-weight:500;
     transition:background .15s,border-color .15s,box-shadow .1s,transform .05s}
   .btn:hover{background:var(--accent);border-color:var(--track-edge)}
-  .btn:active{transform:translateY(.5px);box-shadow:inset 0 -1px 0 rgba(60,50,25,.05)}
+  .btn:active{transform:translateY(.5px)}
   .btn:focus-visible{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
-  /* primary = 填充键帽（更深的底缘内阴影） */
-  .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff;
-    box-shadow:inset 0 -2px 0 rgba(0,0,0,.24),0 1px 2px rgba(60,50,25,.12)}
+  /* primary = 填充（扁平,无投影） */
+  .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
   .btn.primary:hover{background:#2a2723}
-  .btn.primary:active{box-shadow:inset 0 -1px 0 rgba(0,0,0,.24)}
+  .btn.primary:active{transform:translateY(1px)}
   /* ghost = 纯文字（无边框无底色，无键帽），低权重动作 */
   .btn.ghost{background:none;border-color:transparent;box-shadow:none;color:var(--ink-soft)}
   .btn.ghost:hover{background:var(--accent);border-color:transparent;color:var(--ink)}
@@ -119,7 +118,7 @@
     height:36px;font-size:14px;font-weight:500;color:var(--ink);font-family:var(--mono);
     font-variant-numeric:tabular-nums;
     border:1px solid var(--border);border-radius:var(--r-sm);padding:0 12px;width:100%;
-    background:#fff;outline:none;box-shadow:0 1px 2px rgba(0,0,0,.03);
+    background:#fff;outline:none;
     transition:border-color .15s,box-shadow .15s}
   .field textarea{height:auto;min-height:76px;padding:8px 12px;resize:vertical;line-height:1.55;font-family:var(--font);font-size:13.5px}
   .field input:focus,.field textarea:focus{border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
@@ -157,7 +156,7 @@
   .combo{position:relative}
   .combo-list{position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:230px;
     background:#fff;border:1px solid var(--border);border-radius:var(--r-md);
-    box-shadow:0 4px 16px rgba(60,50,25,.10),0 1px 2px rgba(60,50,25,.06);z-index:30;
+    z-index:30;
     max-height:236px;overflow:auto;padding:4px}
   .combo-opt{display:flex;gap:8px;align-items:baseline;padding:8px 10px;border-radius:var(--r-sm);cursor:pointer;font-size:13px}
   .combo-opt:hover,.combo-opt.act{background:var(--accent)}
@@ -184,7 +183,7 @@
   .overlay.hidden{display:none}
   /* zed.dev：方角卡 + 实线分隔的「头/体/脚」三段 */
   .modal{margin:auto;width:min(440px,calc(100vw - 32px));background:#fff;border:1px solid var(--border);
-    border-radius:var(--r-lg);box-shadow:var(--sh),0 10px 34px rgba(20,22,35,.16);padding:0 18px 0;max-height:88vh;overflow:auto;overscroll-behavior:none}
+    border-radius:var(--r-lg);padding:0 18px 0;max-height:88vh;overflow:auto;overscroll-behavior:none}
   .modal-head{display:flex;align-items:center;justify-content:space-between;
     margin:0 -18px 16px;padding:15px 18px 13px;border-bottom:1px solid var(--divider)}
   .modal-title{font-size:15px;font-weight:600;font-family:var(--mono)}
@@ -336,7 +335,7 @@
   .vc-empty-method{color:var(--ink-mute);font-size:13px;padding:18px 2px}
   .vc-modes{display:flex;gap:4px;margin-bottom:14px;background:var(--accent);border-radius:var(--r-lg);padding:3px;width:fit-content}
   .vc-modetab{appearance:none;background:none;border:0;padding:6px 12px;font-size:12.5px;color:var(--ink-soft);border-radius:var(--r-md);cursor:pointer;font-weight:500}
-  .vc-modetab.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .vc-modetab.on{background:#fff;color:var(--ink);font-weight:600}
   .vc-deriv{margin-top:8px}
   .vc-deriv-toggle{appearance:none;background:none;border:0;padding:0;cursor:pointer;font-size:12px;color:var(--cta);font-weight:600}
   .vc-deriv-body{margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:var(--r-md);background:var(--card);display:grid;gap:8px}
@@ -483,7 +482,7 @@
   .fd-heroj.good{color:var(--green)} .fd-heroj.bad{color:var(--red)}
   .fd-chart{width:100%;display:block}
   .fd-chartwrap{position:relative}
-  .fd-tip{position:absolute;top:2px;pointer-events:none;background:var(--ink);color:#fff;border-radius:var(--r-md);padding:6px 9px;font-size:11.5px;font-family:var(--mono);white-space:nowrap;z-index:5;box-shadow:0 2px 10px rgba(0,0,0,.16)}
+  .fd-tip{position:absolute;top:2px;pointer-events:none;background:var(--ink);color:#fff;border-radius:var(--r-md);padding:6px 9px;font-size:11.5px;font-family:var(--mono);white-space:nowrap;z-index:5}
   .fd-tipyr{font-weight:600;margin-bottom:3px;opacity:.65;font-size:10.5px;letter-spacing:.02em}
   .fd-tiprow{display:flex;justify-content:space-between;gap:16px;line-height:1.55}
   .fd-tipk{color:#d8d4cc} .fd-tipk i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}

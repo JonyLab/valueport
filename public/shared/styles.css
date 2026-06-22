@@ -1,8 +1,8 @@
   @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,300;0,400;0,500;0,600;1,500;1,600;1,700&display=swap");
   /* zed.dev 风：暖白纸张 + Plex Serif 衬线标题 + 等宽数字 + 克制蓝灰强调 */
   :root{
-    --bg:#f3f4f6;            /* 页面背景（冷浅灰,与卡片/填充同色相） */
-    --card:#fafafb;          /* 中性白面板 */
+    --bg:#ffffff;            /* 页面背景（白） */
+    --card:#ffffff;          /* 白面板（靠描边区分,无投影） */
     --ink:#1b1a17;           /* 近黑 */
     --ink-soft:#57534a;      /* 石板 */
     --ink-mute:#8a857a;      /* 中性灰 */
@@ -18,9 +18,9 @@
     --cta:#31679b; --cta-hover:#2b5a87; --cta-soft:#f2f6fb; --cta-line:#cfddec;
     /* 圆角规范(zed 紧致:控件 4 / 中卡 6 / 大面板 8,不超过 8) */
     --r-sm:4px; --r-md:6px; --r-lg:8px;
-    --shadow:0 1px 2px rgba(28,30,38,.05);
+    --shadow:none;
     /* zed 招牌「硬边偏移投影」（克制版：双向硬偏移、淡蓝、零模糊） */
-    --sh:4px 4px 0 rgba(46,84,180,.06),-4px -4px 0 rgba(46,84,180,.05);
+    --sh:none;
     /* 聚焦环（克制蓝灰，全站统一） */
     --ring:rgba(46,64,102,.22);
     --ring-border:#5a6886;
@@ -81,16 +81,14 @@
     appearance:none;border:1px solid var(--border);background:#fff;color:var(--ink);
     font-family:var(--font);font-size:13.5px;font-weight:500;letter-spacing:-.01em;
     padding:8px 14px;border-radius:var(--r-sm);cursor:pointer;white-space:nowrap;
-    box-shadow:inset 0 -2px 0 rgba(60,50,25,.05);
     transition:background .15s,border-color .15s,box-shadow .1s,transform .05s;
   }
   .btn:hover{background:var(--track);border-color:var(--track-edge)}
-  .btn:active{transform:translateY(.5px);box-shadow:inset 0 -1px 0 rgba(60,50,25,.05)}
+  .btn:active{transform:translateY(.5px)}
   .btn:focus-visible{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
-  .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff;
-    box-shadow:inset 0 -2px 0 rgba(0,0,0,.24),0 1px 2px rgba(60,50,25,.12)}
+  .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
   .btn.primary:hover{background:#2a2723}
-  .btn.primary:active{box-shadow:inset 0 -1px 0 rgba(0,0,0,.24);transform:translateY(1px)}
+  .btn.primary:active{transform:translateY(1px)}
   .btn.ghost{background:none;border-color:transparent;box-shadow:none;color:var(--ink-soft)}
   .btn.ghost:hover{background:var(--track);border-color:transparent;color:var(--ink)}
   .kbd{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;
@@ -142,7 +140,7 @@
   .combo-list{
     position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:230px;
     background:#fff;border:1px solid #dfe3ea;border-radius:var(--r-lg);
-    box-shadow:0 8px 28px rgba(20,30,50,.14);z-index:30;
+    z-index:30;
     max-height:236px;overflow:auto;padding:4px;
   }
   .combo-opt{display:flex;gap:8px;align-items:baseline;padding:7px 9px;border-radius:var(--r-md);cursor:pointer;font-size:12.5px}
