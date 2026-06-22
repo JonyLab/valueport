@@ -99,7 +99,9 @@ app.get("/api/financials", async (c) => {
   const latest = pickLatestAnnual(financials);
   if (Number.isFinite(deducted)) latest.deductedNetIncome = deducted;
   if (Number.isFinite(adjEps)) latest.adjustedEps = adjEps;
-  c.header("Cache-Control", "public, max-age=86400");
+  // 仅缓存成功结果;失败/空响应不长期缓存,避免一次瞬时失败把基本面钉死 24 小时
+  const ok = financials && (financials.IS || financials.BS || financials.CF);
+  c.header("Cache-Control", ok ? "public, max-age=86400" : "no-store");
   return c.json({ financials, latest, valuationRefs });
 });
 app.get("/api/hints", async (c) => {
