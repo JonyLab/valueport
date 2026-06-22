@@ -1607,10 +1607,17 @@ function renderFundamentalsPanel(item, panel) {
         s.appendChild(lg);
       } else { s.appendChild(fdChartWrap(fdBars(NI, false, 168), NI.map((d) => d.year), [{ label: zh ? "净利润" : "Net income", data: NI, color: "var(--ink-soft)", fmt: (v) => fdMoney(v, cur) }])); }
       const niMin = Math.min(...NI.map((x) => x.value)), niMax = Math.max(...NI.map((x) => x.value));
+      // FCF vs 净利润 关系按累计比值如实描述(不再写死"长期低于")
+      let fcfClause = "";
+      if (FCF.length && Number.isFinite(ratio)) fcfClause = zh
+        ? (ratio >= 1.1 ? "，自由现金流累计高于净利润、现金质量好" : ratio >= 0.8 ? "，自由现金流与净利润大致相当" : ratio >= 0.4 ? "，自由现金流低于净利润" : "，自由现金流远低于净利润、偏重资本")
+        : (ratio >= 1.1 ? "; FCF exceeds net income — strong cash quality" : ratio >= 0.8 ? "; FCF roughly tracks net income" : ratio >= 0.4 ? "; FCF runs below net income" : "; FCF far below net income — capital-heavy");
+      // 仅在有亏损年(真·周期/困境)时提示用正常化口径
+      const normTail = niMin < 0 ? (zh ? "——含亏损年,别用任一单年,看穿越周期的正常化口径" : " — has loss years; judge on a normalized, through-cycle basis") : "";
       const co = document.createElement("div"); co.className = "fd-callout";
       co.innerHTML = zh
-        ? `近 ${NI.length} 年净利润在 <b>${fdMoney(niMin, cur)} ~ ${fdMoney(niMax, cur)}</b> 间波动${FCF.length ? "，自由现金流长期低于净利润——别用任一单年,看穿越周期的正常化口径" : ""}。`
-        : `Net income over ${NI.length}y ranged <b>${fdMoney(niMin, cur)} ~ ${fdMoney(niMax, cur)}</b>${FCF.length ? "; FCF runs below net income — judge on a normalized, through-cycle basis" : ""}.`;
+        ? `近 ${NI.length} 年净利润在 <b>${fdMoney(niMin, cur)} ~ ${fdMoney(niMax, cur)}</b> 间波动${fcfClause}${normTail}。`
+        : `Net income over ${NI.length}y ranged <b>${fdMoney(niMin, cur)} ~ ${fdMoney(niMax, cur)}</b>${fcfClause}${normTail}.`;
       s.appendChild(co);
     }
 
