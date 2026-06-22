@@ -301,6 +301,16 @@
   .vge-ctas .vge-cta{margin-top:0}
   .vge-cta-alt{background:#fff;color:#31679b;border-color:#cfddec}
   .vge-cta-alt:hover{background:#f2f6fb;border-color:#31679b}
+  /* 估值研究空态：图标 + 标题 + 说明 + 主行动 */
+  .vempty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:52px 24px 44px}
+  .vempty-icon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:var(--accent);border:1px solid var(--border);color:var(--ink-soft);margin-bottom:18px}
+  .vempty-icon svg{width:26px;height:26px}
+  .vempty-title{font-size:16px;font-weight:600;color:var(--ink);letter-spacing:-.01em}
+  .vempty-sub{font-size:13px;line-height:1.65;color:var(--ink-mute);max-width:392px;margin:8px 0 20px}
+  .vempty-cta{padding:9px 22px;font-size:13px;font-weight:600;color:#fff;background:#31679b;border:1px solid transparent;border-radius:8px;cursor:pointer}
+  .vempty-cta:hover{background:#2b5a87}
+  .vempty-link{margin-top:13px;font-size:12.5px;color:var(--ink-mute);text-decoration:underline;text-underline-offset:2px}
+  .vempty-link:hover{color:var(--ink-soft)}
   .vge-method{margin-top:6px;font-size:12px;color:var(--ink-mute);text-decoration:underline;text-underline-offset:2px}
   .vge-method:hover{color:var(--ink-soft)}
   .vd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--divider);margin-bottom:18px;position:sticky;top:0;background:var(--bg);z-index:3;padding-top:22px}
@@ -1819,18 +1829,37 @@ function renderValuationPanel(item, panel, idBlock) {
 
   function showList() {
     panel.innerHTML = "";
+    const cards = item.cfg.valuations || [];
+    // 真正空态（无卡片且未直接设定区间）：用图标 + 标题 + 说明 + 主行动,而不是一排"—"摘要
+    if (!cards.length && !hasFairRange(item.cfg)) { panel.appendChild(emptyValuations()); return; }
+
     const summary = document.createElement("div");
     fillRows(summary, valuationRows(item));
     panel.appendChild(summary);
 
     const list = document.createElement("div"); list.className = "vcards";
-    (item.cfg.valuations || []).forEach((card) => list.appendChild(cardEl(card)));
+    cards.forEach((card) => list.appendChild(cardEl(card)));
     panel.appendChild(list);
 
     const add = document.createElement("button"); add.className = "vcard-add"; add.type = "button";
     add.textContent = LANG === "zh" ? "＋ 添加估值" : "＋ Add valuation";
     add.addEventListener("click", () => showEditor(null));
     panel.appendChild(add);
+  }
+
+  function emptyValuations() {
+    const zh = LANG === "zh";
+    const box = document.createElement("div"); box.className = "vempty";
+    box.innerHTML = `<div class="vempty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="21" x2="5" y2="13"/><line x1="12" y1="21" x2="12" y2="8"/><line x1="19" y1="21" x2="19" y2="4"/></svg></div>`
+      + `<div class="vempty-title">${zh ? "还没有估值" : "No valuations yet"}</div>`
+      + `<div class="vempty-sub">${zh ? "用 PE、DCF、股息等方法添加一张估值卡片，推导内在价值。设为合理区间后，左侧钟摆会据此判定贵贱。" : "Add a valuation (PE, DCF, dividend…) to derive intrinsic value. Mark one as the fair range and the pendulum reflects it."}</div>`;
+    const cta = document.createElement("button"); cta.type = "button"; cta.className = "vempty-cta";
+    cta.textContent = zh ? "添加估值" : "Add valuation";
+    cta.addEventListener("click", () => showEditor(null));
+    const link = document.createElement("a"); link.className = "vempty-link"; link.href = "/valuation";
+    link.textContent = (zh ? "常见估值方法" : "Valuation methods") + " →";
+    box.append(cta, link);
+    return box;
   }
 
   function cardEl(card) {
