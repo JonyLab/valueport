@@ -266,6 +266,17 @@
   .vd-verdict.v-under{color:var(--green)} .vd-verdict.v-over{color:var(--red)} .vd-verdict.v-fair{color:var(--ink-mute)}
   .vd-gauge{flex:none;width:340px}
   .vd-gauge svg{display:block;width:100%;height:auto;overflow:visible}
+  /* 详情页两栏：左 身份+钟摆，右 tabs */
+  .vd-cols{display:grid;grid-template-columns:300px minmax(0,1fr);border-top:1px solid var(--divider)}
+  .vd-side{border-right:1px solid var(--divider)}
+  .vd-idcard{padding:22px 24px 22px 0;border-bottom:1px solid var(--divider)}
+  .vd-pendcard{padding:20px 24px 26px 0}
+  .vd-pendlab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);font-weight:600;margin-bottom:14px}
+  .vd-side .vd-gauge{width:100%}
+  .vd-intro{font-size:12.5px;line-height:1.65;color:var(--ink-soft);margin-top:16px}
+  .vd-intro-empty{color:var(--ink-mute);font-style:italic;opacity:.75}
+  .vd-main{min-width:0;padding:22px 0 0 28px}
+  @media (max-width:760px){ .vd-cols{grid-template-columns:1fr} .vd-side{border-right:none;border-bottom:1px solid var(--divider)} .vd-idcard{padding-right:0} .vd-pendcard{padding-right:0} .vd-main{padding:20px 0 0} }
   .vge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:180px;padding:28px 22px;border:1px dashed var(--border);border-radius:10px;background:var(--card);text-align:center}
   .vge-bar{width:188px;height:14px;margin-bottom:2px;border:1px solid var(--border);border-radius:2px;
     background-image:repeating-linear-gradient(45deg,rgba(120,128,142,.16) 0,rgba(120,128,142,.16) 1px,transparent 1px,transparent 6px)}
@@ -1379,21 +1390,24 @@ function renderDetail(item) {
     backRow.appendChild(edit);
   }
 
-  const top = document.createElement("div"); top.className = "vd-top";
-  const idBlock = document.createElement("div");
+  const idBlock = document.createElement("div"); idBlock.className = "vd-idcard";
   const v = verdictOf(c, VMSGS);
   idBlock.innerHTML = `<div class="vd-id"><span class="vd-name"></span><span class="vd-code"></span></div>
-    <div class="vd-meta"></div><div class="vd-price"></div><div class="vd-verdict ${v.cls}"></div>`;
+    <div class="vd-meta"></div><div class="vd-price"></div><div class="vd-verdict ${v.cls}"></div>
+    <div class="vd-intro vd-intro-empty"></div>`;
   idBlock.querySelector(".vd-name").textContent = displayName(item);
   idBlock.querySelector(".vd-code").textContent = (c.ticker || "").toUpperCase();
   idBlock.querySelector(".vd-meta").textContent = [s.exchange, s.currency].filter(Boolean).join(" · ");
   idBlock.querySelector(".vd-price").textContent = c.price > 0 ? VMSGS.px(c.price) : "—";
   idBlock.querySelector(".vd-verdict").textContent = v.text;
+  idBlock.querySelector(".vd-intro").textContent = LANG === "zh" ? "业务简介待补充" : "Company profile — coming soon";
+
   const gwrap = document.createElement("div"); gwrap.className = "vd-gauge";
   detailGwrap = gwrap; detailIdBlock = idBlock;
-  top.append(idBlock, gwrap);
-
-  const divider = document.createElement("div"); divider.className = "vd-divider"; divider.setAttribute("aria-hidden", "true");
+  const pendCard = document.createElement("div"); pendCard.className = "vd-pendcard";
+  const pendLab = document.createElement("div"); pendLab.className = "vd-pendlab"; pendLab.textContent = LANG === "zh" ? "估值钟摆" : "Valuation pendulum";
+  pendCard.append(pendLab, gwrap);
+  const side = document.createElement("div"); side.className = "vd-side"; side.append(idBlock, pendCard);
 
   const tabsNav = document.createElement("div"); tabsNav.className = "vd-tabs";
   const panels = document.createElement("div");
@@ -1415,7 +1429,9 @@ function renderDetail(item) {
   loadFinancials(item, "annual"); // 预取年报，供计算器预填
   loadFinancials(item, "quarter"); // 预取季报，供「最新季 / 近4季 TTM」参考
 
-  viewDetail.append(backRow, top, divider, tabsNav, panels);
+  const main = document.createElement("div"); main.className = "vd-main"; main.append(tabsNav, panels);
+  const cols = document.createElement("div"); cols.className = "vd-cols"; cols.append(side, main);
+  viewDetail.append(backRow, cols);
   mountDetailPendulum(item);               // 已设区间→钟摆；未设→占位卡片
 }
 
