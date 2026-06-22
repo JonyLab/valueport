@@ -2,19 +2,19 @@
   /* zed.dev 风：暖白纸张 + Plex Serif 衬线标题 + 等宽数字 + 克制蓝灰强调 */
   :root{
     --bg:#f4f4f2;            /* 页面背景（中性近白） */
-    --card:#faf9f4;          /* 略亮的暖白面板 */
-    --ink:#1b1a17;           /* 暖近黑 */
-    --ink-soft:#57534a;      /* 暖石板 */
-    --ink-mute:#8a857a;      /* 暖灰 */
-    --track:#ece8de;         /* 暖色填充（hover / 分段控件底）保持暖 */
-    --track-edge:#e0dccf;
+    --card:#fafafb;          /* 中性白面板 */
+    --ink:#1b1a17;           /* 近黑 */
+    --ink-soft:#57534a;      /* 石板 */
+    --ink-mute:#8a857a;      /* 中性灰 */
+    --track:#eceef1;         /* 冷浅灰填充（hover / 分段控件底）*/
+    --track-edge:#e2e4e8;
     /* zed 真实做法：暖纸 + 冷中性灰线条；线/描边走 offgray 冷灰 */
     --divider:#dadde2;       /* 冷发丝线（zed default-border） */
     --border:#dadde2;        /* 控件描边 */
     --hub:#1b1a17;
     --green:#1f8f54;
     --red:#c64141;
-    --shadow:0 1px 2px rgba(60,50,25,.05);
+    --shadow:0 1px 2px rgba(28,30,38,.05);
     /* zed 招牌「硬边偏移投影」（克制版：双向硬偏移、淡蓝、零模糊） */
     --sh:4px 4px 0 rgba(46,84,180,.06),-4px -4px 0 rgba(46,84,180,.05);
     /* 聚焦环（克制蓝灰，全站统一） */
