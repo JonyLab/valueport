@@ -275,8 +275,18 @@
   .vd-side .vd-gauge{width:100%}
   .vd-intro{font-size:12.5px;line-height:1.65;color:var(--ink-soft);margin-top:16px}
   .vd-intro-empty{color:var(--ink-mute);font-style:italic;opacity:.75}
-  .vd-main{min-width:0;padding:22px 0 0 28px}
-  @media (max-width:760px){ .vd-cols{grid-template-columns:1fr} .vd-side{border-right:none;border-bottom:1px solid var(--divider)} .vd-idcard{padding-right:0} .vd-pendcard{padding-right:0} .vd-main{padding:20px 0 0} }
+  .vd-main{min-width:0;padding:0 0 24px 28px}
+  /* 桌面端：锁定窗口滚动,右栏独立滚动,tab 吸顶;左栏定高自滚 */
+  @media (min-width:761px){
+    body.vd-mode{overflow:hidden}
+    body.vd-mode .page{height:100vh;min-height:0}
+    body.vd-mode .frame-foot{display:none}
+    body.vd-mode .view-detail{flex:1 1 auto;min-height:0;overflow:hidden;padding-bottom:0;display:flex;flex-direction:column}
+    body.vd-mode .vd-cols{flex:1 1 auto;min-height:0}
+    body.vd-mode .vd-side{overflow-y:auto}
+    body.vd-mode .vd-main{overflow-y:auto}
+  }
+  @media (max-width:760px){ .vd-cols{grid-template-columns:1fr} .vd-side{border-right:none;border-bottom:1px solid var(--divider)} .vd-idcard{padding-right:0} .vd-pendcard{padding-right:0} .vd-main{padding:0 0 24px} }
   .vge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:180px;padding:28px 22px;border:1px dashed var(--border);border-radius:10px;background:var(--card);text-align:center}
   .vge-bar{width:188px;height:14px;margin-bottom:2px;border:1px solid var(--border);border-radius:2px;
     background-image:repeating-linear-gradient(45deg,rgba(120,128,142,.16) 0,rgba(120,128,142,.16) 1px,transparent 1px,transparent 6px)}
@@ -286,7 +296,7 @@
   .vge-cta:hover{background:#2b5a87}
   .vge-method{margin-top:6px;font-size:12px;color:var(--ink-mute);text-decoration:underline;text-underline-offset:2px}
   .vge-method:hover{color:var(--ink-soft)}
-  .vd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--divider);margin-bottom:18px}
+  .vd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--divider);margin-bottom:18px;position:sticky;top:0;background:var(--bg);z-index:3;padding-top:22px}
   .vd-tab{height:40px;padding:0 14px;border:0;background:none;cursor:pointer;font-family:var(--font);font-size:13.5px;font-weight:500;color:var(--ink-mute);border-bottom:2px solid transparent;margin-bottom:-1px}
   .vd-tab:hover{color:var(--ink)}
   .vd-tab.on{color:var(--ink);border-bottom-color:var(--ink)}
@@ -1338,6 +1348,7 @@ function showView(v) { // "list" | "settings" | "detail" | "valedit"
   viewSettings.classList.toggle("hidden", !isSettings);
   viewDetail.classList.toggle("hidden", !isDetail);
   viewValEdit.classList.toggle("hidden", !isValEdit);
+  document.body.classList.toggle("vd-mode", isDetail); // 详情页锁窗口滚动,右栏独立滚 + tab 吸顶
   document.querySelectorAll(".nav-tab").forEach((x) => x.classList.toggle("on", x.dataset.view === "board" && (isList || isDetail || isValEdit)));
   btnSettings.classList.toggle("on", isSettings);
 }
