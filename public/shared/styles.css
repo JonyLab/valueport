@@ -14,6 +14,10 @@
     --hub:#1b1a17;
     --green:#1f8f54;
     --red:#c64141;
+    /* 高亮 / 行动蓝(原硬编码 #31679b 一族,提为 token) */
+    --cta:#31679b; --cta-hover:#2b5a87; --cta-soft:#f2f6fb; --cta-line:#cfddec;
+    /* 圆角规范(zed 紧致:控件 4 / 中卡 6 / 大面板 8,不超过 8) */
+    --r-sm:4px; --r-md:6px; --r-lg:8px;
     --shadow:0 1px 2px rgba(28,30,38,.05);
     /* zed 招牌「硬边偏移投影」（克制版：双向硬偏移、淡蓝、零模糊） */
     --sh:4px 4px 0 rgba(46,84,180,.06),-4px -4px 0 rgba(46,84,180,.05);
@@ -49,7 +53,7 @@
   .layout{display:grid;grid-template-columns:1.45fr 1fr;gap:24px;align-items:start}
 
   /* ---- charts column: one continuous card, no dividers ---- */
-  .charts{background:var(--card);border-radius:22px;box-shadow:var(--shadow);padding:18px 28px 8px}
+  .charts{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:18px 28px 8px}
   .chart-item{padding:18px 0 6px}
   .chart-item svg{display:block;width:100%;height:auto;overflow:visible}
   /* 现价 = 英雄数字（中性墨色、等宽、大）；判定 = 次级语义色小字 */
@@ -63,7 +67,7 @@
 
   /* ---- config column ---- */
   .config{
-    background:var(--card);border-radius:22px;box-shadow:var(--shadow);
+    background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);
     padding:22px 22px 18px;
     position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;
   }
@@ -73,7 +77,7 @@
   .btn{
     appearance:none;border:1px solid var(--border);background:#fff;color:var(--ink);
     font-family:var(--font);font-size:13.5px;font-weight:500;letter-spacing:-.01em;
-    padding:8px 14px;border-radius:4px;cursor:pointer;white-space:nowrap;
+    padding:8px 14px;border-radius:var(--r-sm);cursor:pointer;white-space:nowrap;
     box-shadow:inset 0 -2px 0 rgba(60,50,25,.05);
     transition:background .15s,border-color .15s,box-shadow .1s,transform .05s;
   }
@@ -96,7 +100,7 @@
   .quote-status{font-size:12px;color:var(--ink-mute);font-family:var(--mono)}
   .quote-status.err{color:var(--red)}
   .quote-note{font-size:11.5px;color:var(--ink-mute);line-height:1.6;margin:6px 0 4px}
-  .quote-note code{font-family:var(--mono);background:#f3f5f8;padding:1px 4px;border-radius:4px}
+  .quote-note code{font-family:var(--mono);background:#f3f5f8;padding:1px 4px;border-radius:var(--r-sm)}
 
   .cfg-block{padding:16px 0 14px;border-bottom:1px solid #eef0f3}
   .cfg-block:last-of-type{border-bottom:0}
@@ -104,7 +108,7 @@
   .cfg-name{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.02em}
   .btn-del{
     appearance:none;border:0;background:none;color:var(--ink-mute);
-    font-size:12.5px;cursor:pointer;padding:4px 6px;border-radius:6px;font-family:var(--font);
+    font-size:12.5px;cursor:pointer;padding:4px 6px;border-radius:var(--r-md);font-family:var(--font);
   }
   .btn-del:hover{color:var(--red);background:#fbeaea}
   .cfg-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -113,7 +117,7 @@
   .f-lab{font-size:11px;color:var(--ink-soft);font-weight:500}
   .field input{
     font-family:var(--mono);font-size:13.5px;font-weight:600;color:var(--ink);
-    border:1px solid var(--border);border-radius:5px;padding:7px 9px;width:100%;
+    border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 9px;width:100%;
     background:#fff;outline:none;transition:border-color .15s, box-shadow .15s;
   }
   .field input:focus{border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
@@ -123,7 +127,7 @@
   .chips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
   .chip{
     appearance:none;font-family:var(--mono);font-size:11px;font-weight:600;
-    padding:3px 9px;border-radius:5px;border:1px solid var(--border);
+    padding:3px 9px;border-radius:var(--r-sm);border:1px solid var(--border);
     background:#fff;color:var(--ink-soft);cursor:pointer;
     transition:background .12s,color .12s,border-color .12s;
   }
@@ -134,15 +138,15 @@
   .combo{position:relative}
   .combo-list{
     position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:230px;
-    background:#fff;border:1px solid #dfe3ea;border-radius:10px;
+    background:#fff;border:1px solid #dfe3ea;border-radius:var(--r-lg);
     box-shadow:0 8px 28px rgba(20,30,50,.14);z-index:30;
     max-height:236px;overflow:auto;padding:4px;
   }
-  .combo-opt{display:flex;gap:8px;align-items:baseline;padding:7px 9px;border-radius:7px;cursor:pointer;font-size:12.5px}
+  .combo-opt{display:flex;gap:8px;align-items:baseline;padding:7px 9px;border-radius:var(--r-md);cursor:pointer;font-size:12.5px}
   .combo-opt:hover,.combo-opt.act{background:#f3f6fb}
   .combo-opt .c-code{font-family:var(--mono);font-weight:700}
   .combo-opt .c-name{color:var(--ink-soft);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .combo-opt .c-mkt{font-size:10.5px;color:var(--ink-mute);background:#f1f3f6;padding:1px 6px;border-radius:999px;white-space:nowrap}
+  .combo-opt .c-mkt{font-size:10.5px;color:var(--ink-mute);background:#f1f3f6;padding:1px 6px;border-radius:var(--r-sm);white-space:nowrap}
 
   @media (max-width:880px){
     .layout{grid-template-columns:1fr}
