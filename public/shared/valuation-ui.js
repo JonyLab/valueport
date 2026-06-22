@@ -562,6 +562,15 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
             fld.appendChild(mrow);
           }
         }
+        // 调整后 EPS(Finnhub,仅美股):EPS 字段的额外可选筹码,剔非经常项的 normalized 口径,仅供参考
+        if (!money && field.meta === "eps" && Number.isFinite(ctx.adjustedEps)) {
+          const mrow = el("div", "vc-ref");
+          const b = el("button", "vc-refchip"); b.type = "button";
+          b.textContent = `${lang === "zh" ? "调整后·TTM" : "Adj·TTM"} ≈ ${ctx.adjustedEps.toFixed(2)}`;
+          b.title = lang === "zh" ? "Finnhub 标准化 EPS(剔非经常项),非公司官方 Non-GAAP,仅参考" : "Finnhub normalized EPS (excl. extraordinary items); not company Non-GAAP — reference only";
+          b.addEventListener("click", () => { input.value = String(ctx.adjustedEps); recompute(); });
+          mrow.appendChild(b); fld.appendChild(mrow);
+        }
         if (guideRow) fld.appendChild(guideRow);
         card.appendChild(fld);
       });
