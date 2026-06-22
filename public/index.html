@@ -432,6 +432,47 @@
   .fin-table td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--border);font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
   .fin-table td.fin-name{text-align:left;font-family:var(--font);color:var(--ink-soft);white-space:normal}
   .fin-table tr:hover td{background:var(--card)}
+  /* 基本面 tab：客观体检（英雄数字 + 10 年趋势） */
+  .fd-sec{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .fd-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .fd-num{font-family:var(--mono);font-size:11px;color:var(--ink-mute);flex:none}
+  .fd-title{font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+  .fd-title .sub{font-weight:400;color:var(--ink-mute);font-size:12px;margin-left:5px}
+  .fd-hero{margin-left:auto;text-align:right}
+  .fd-herov{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+  .fd-herov .u{font-size:11px;color:var(--ink-mute);font-weight:400;margin-left:1px}
+  .fd-heroj{font-size:11.5px;margin-top:1px;color:var(--ink-mute)}
+  .fd-heroj.good{color:var(--green)} .fd-heroj.bad{color:var(--red)}
+  .fd-chart{width:100%;display:block}
+  .fd-bar{fill:var(--ink-soft);fill-opacity:.42}
+  .fd-bar.neg{fill:var(--red);fill-opacity:.5}
+  .fd-bar.good{fill:var(--green);fill-opacity:.5}
+  .fd-line{fill:none;stroke:var(--green);stroke-width:2}
+  .fd-dot{fill:var(--green)}
+  .fd-ldot{fill:var(--ink-soft)}
+  .fd-zero{stroke:var(--track-edge);stroke-width:1}
+  .fd-axt{font-size:10px;fill:var(--ink-mute);font-family:var(--mono)}
+  .fd-spark{fill:none;stroke:var(--ink-soft);stroke-width:1.6}
+  .fd-spark0{stroke:var(--track-edge);stroke-width:1}
+  .fd-legend{display:flex;gap:16px;margin-top:9px;font-size:11.5px;color:var(--ink-mute);flex-wrap:wrap;align-items:center}
+  .fd-legend i{display:inline-block;vertical-align:middle;margin-right:5px}
+  .fd-legend .swb{width:11px;height:9px;border-radius:1px}
+  .fd-legend .swl{width:18px;border-top:2px solid var(--green)}
+  .fd-callout{margin-top:11px;font-size:12px;color:var(--ink-soft);background:var(--accent);border:1px solid var(--border);border-radius:8px;padding:9px 12px;line-height:1.55}
+  .fd-callout b{color:var(--ink)}
+  .fd-mgrid{display:grid;grid-template-columns:repeat(4,1fr)}
+  .fd-mcell{padding:2px 14px;border-left:1px solid var(--divider)}
+  .fd-mcell:first-child{border-left:none}
+  .fd-mlab{font-size:12px;color:var(--ink-soft);font-weight:600}
+  .fd-spwrap{margin:7px 0 5px}
+  .fd-mval{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--ink)}
+  .fd-mval .u{font-size:10.5px;color:var(--ink-mute);font-weight:400}
+  .fd-mtr{font-size:10.5px;margin-top:1px;color:var(--ink-mute)}
+  .fd-stats{display:flex;gap:24px;flex-wrap:wrap;margin-top:10px}
+  .fd-stat{font-size:12px;color:var(--ink-mute)}
+  .fd-stat b{display:block;font-family:var(--mono);color:var(--ink);font-weight:600;font-size:14px;margin-bottom:1px}
+  .fd-empty{color:var(--ink-mute);font-size:13px;padding:8px 0}
+  @media(max-width:680px){.fd-mgrid{grid-template-columns:repeat(2,1fr);row-gap:16px}.fd-mcell:nth-child(3){border-left:none}}
   @media (max-width:680px){ .view-detail{padding:24px 16px 28px} .vd-divider{margin:0 -16px 22px} .vd-top{flex-direction:column;align-items:flex-start} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} .vc-sheet{grid-template-columns:minmax(0,1fr) 1fr 1fr} .vc-mglabel{width:auto} }
   .view-settings{max-width:640px;margin:0 auto;padding-top:4px}
   .set-title{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.01em;margin:8px 0 18px}
@@ -1294,19 +1335,6 @@ function fmtBig(n, currency) {
   for (const [s, base] of [["T", 1e12], ["B", 1e9], ["M", 1e6], ["K", 1e3]]) if (n >= base) return (n / base).toFixed(2) + s;
   return String(Math.round(n));
 }
-function fundamentalsRows(item) {
-  const s = item.statics || {}, price = item.cfg.price || 0, rows = [];
-  const epsTtm = parseFloat(s.epsTtm), bps = parseFloat(s.bps), div = parseFloat(s.dividendYield), shares = Number(s.totalShares) || 0;
-  if (shares > 0 && price > 0) rows.push([t("d_market_cap"), fmtBig(shares * price, s.currency)]);
-  if (price > 0 && epsTtm > 0) rows.push([t("d_pe_ttm"), (price / epsTtm).toFixed(2)]);
-  if (price > 0 && bps > 0) rows.push([t("d_pb"), (price / bps).toFixed(2)]);
-  if (div > 0) rows.push([t("d_div_yield"), div.toFixed(2) + "%"]);
-  if (epsTtm > 0) rows.push([t("d_eps_ttm"), epsTtm.toFixed(2)]);
-  if (bps > 0) rows.push([t("d_bps"), bps.toFixed(2)]);
-  if (s.exchange) rows.push([t("d_exchange"), s.exchange]);
-  if (s.currency) rows.push([t("d_currency"), s.currency]);
-  return rows;
-}
 function valuationRows(item) {
   const c = item.cfg, a = computeAnchors(c), rows = [];
   rows.push([t("d_fair_range"), (c.fairLow || "—") + " – " + (c.fairHigh || "—")]);
@@ -1375,15 +1403,189 @@ function renderDetail(item) {
     tabsNav.appendChild(b); panels.appendChild(p); tabEls.push(b); panelEls.push(p);
   });
   renderValuationPanel(item, panelEls[0], idBlock); // 估值研究置顶为默认 tab
-  const fr = fundamentalsRows(item);
-  if (fr.length) fillRows(panelEls[1], fr);
-  else { const e = document.createElement("div"); e.className = "vd-empty"; e.textContent = t("d_no_fundamentals"); panelEls[1].appendChild(e); }
+  renderFundamentalsPanel(item, panelEls[1]);       // 基本面：4 节客观体检
   renderFinancialsPanel(item, panelEls[2]);
   loadFinancials(item, "annual"); // 预取年报，供计算器预填
   loadFinancials(item, "quarter"); // 预取季报，供「最新季 / 近4季 TTM」参考
 
   viewDetail.append(backRow, top, divider, tabsNav, panels);
   mountDetailPendulum(item);               // 已设区间→钟摆；未设→占位卡片
+}
+
+// ===== 基本面 tab：客观体检（4 节，纯前端，读 10 年年报 financials）=====
+const FD_NS = "http://www.w3.org/2000/svg";
+function fdEl(tag, attrs, text) { const e = document.createElementNS(FD_NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
+// 某科目按「年份升序」的 {year,value}（财报数组最新在前，需反转）
+function fdSeries(financials, kind, field) {
+  const a = financials && financials[kind] && financials[kind].find((x) => x.field === field);
+  if (!a || !a.values) return [];
+  return a.values.map((v) => ({ year: v.year, value: v.value })).filter((v) => Number.isFinite(v.value)).reverse();
+}
+function fdMoney(n, cur) { return Number.isFinite(n) ? (n < 0 ? "−" : "") + fmtBig(Math.abs(n), cur) : "—"; }
+const fdLast = (s) => (s.length ? s[s.length - 1].value : NaN);
+// 按年份对齐两序列做逐年比值/运算，返回 {year,value} 升序
+function fdDerive(base, by, fn) {
+  return base.map((x) => { const m = by.find((y) => y.year === x.year); const v = m ? fn(x.value, m.value) : null; return Number.isFinite(v) ? { year: x.year, value: v } : null; }).filter(Boolean);
+}
+// 净利润柱(亏损年红) + FCF 折线(绿)
+function fdBarLine(bars, line) {
+  const W = 800, H = 168, PADX = 6, PADB = 20, PADT = 12;
+  const svg = fdEl("svg", { class: "fd-chart", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", height: H });
+  const vals = bars.map((b) => b.value).concat(line.map((l) => l.value), [0]);
+  const mx = Math.max(...vals), mn = Math.min(...vals), y0 = PADT, y1 = H - PADB, Y = (v) => y1 - (v - mn) / ((mx - mn) || 1) * (y1 - y0);
+  const n = bars.length, gap = (W - PADX * 2) / n, bw = gap * 0.5;
+  svg.appendChild(fdEl("line", { class: "fd-zero", x1: PADX, x2: W - PADX, y1: Y(0), y2: Y(0) }));
+  bars.forEach((b, i) => {
+    const cx = PADX + gap * i + gap / 2, top = Y(Math.max(b.value, 0)), bot = Y(Math.min(b.value, 0));
+    svg.appendChild(fdEl("rect", { class: "fd-bar" + (b.value < 0 ? " neg" : ""), x: cx - bw / 2, y: top, width: bw, height: Math.max(bot - top, 1), rx: 1 }));
+    svg.appendChild(fdEl("text", { class: "fd-axt", x: cx, y: H - 6, "text-anchor": "middle" }, String(b.year).slice(2)));
+  });
+  svg.appendChild(fdEl("polyline", { class: "fd-line", points: line.map((l, i) => `${PADX + gap * i + gap / 2},${Y(l.value)}`).join(" ") }));
+  line.forEach((l, i) => svg.appendChild(fdEl("circle", { class: "fd-dot", cx: PADX + gap * i + gap / 2, cy: Y(l.value), r: 2.4 })));
+  return svg;
+}
+// 单序列柱图（净负债：负=净现金可标 good）
+function fdBars(series, negIsGood, h) {
+  const W = 800, H = h || 120, PADX = 6, PADB = 20, PADT = 12;
+  const svg = fdEl("svg", { class: "fd-chart", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", height: H });
+  const vals = series.map((s) => s.value).concat([0]);
+  const mx = Math.max(...vals), mn = Math.min(...vals), y0 = PADT, y1 = H - PADB, Y = (v) => y1 - (v - mn) / ((mx - mn) || 1) * (y1 - y0);
+  const n = series.length, gap = (W - PADX * 2) / n, bw = gap * 0.5;
+  svg.appendChild(fdEl("line", { class: "fd-zero", x1: PADX, x2: W - PADX, y1: Y(0), y2: Y(0) }));
+  series.forEach((s, i) => {
+    const cx = PADX + gap * i + gap / 2, top = Y(Math.max(s.value, 0)), bot = Y(Math.min(s.value, 0));
+    const cls = s.value < 0 ? (negIsGood ? " good" : " neg") : "";
+    svg.appendChild(fdEl("rect", { class: "fd-bar" + cls, x: cx - bw / 2, y: top, width: bw, height: Math.max(bot - top, 1), rx: 1 }));
+    svg.appendChild(fdEl("text", { class: "fd-axt", x: cx, y: H - 6, "text-anchor": "middle" }, String(s.year).slice(2)));
+  });
+  return svg;
+}
+// 折线（流通股数等，留白居中）
+function fdLineChart(series, h) {
+  const W = 800, H = h || 120, PADX = 6, PADB = 20, PADT = 14;
+  const svg = fdEl("svg", { class: "fd-chart", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", height: H });
+  const vals = series.map((s) => s.value), mx = Math.max(...vals), mn = Math.min(...vals);
+  const pad = (mx - mn) * 0.4 || Math.abs(mx) * 0.1 || 1, lo = mn - pad, hi = mx + pad;
+  const y0 = PADT, y1 = H - PADB, Y = (v) => y1 - (v - lo) / ((hi - lo) || 1) * (y1 - y0);
+  const n = series.length, gap = (W - PADX * 2) / n;
+  svg.appendChild(fdEl("polyline", { class: "fd-spark", points: series.map((s, i) => `${PADX + gap * i + gap / 2},${Y(s.value)}`).join(" "), "stroke-width": 2 }));
+  series.forEach((s, i) => { svg.appendChild(fdEl("circle", { class: "fd-ldot", cx: PADX + gap * i + gap / 2, cy: Y(s.value), r: 2.2 })); svg.appendChild(fdEl("text", { class: "fd-axt", x: PADX + gap * i + gap / 2, y: H - 6, "text-anchor": "middle" }, String(s.year).slice(2))); });
+  return svg;
+}
+// 网格里的迷你折线
+function fdSpark(series) {
+  const W = 120, H = 30, svg = fdEl("svg", { width: "100%", height: 30, viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none" });
+  const vals = series.map((s) => s.value), mx = Math.max(...vals, 0), mn = Math.min(...vals, 0), Y = (v) => 28 - (v - mn) / ((mx - mn) || 1) * 26;
+  if (mn < 0 && mx > 0) svg.appendChild(fdEl("line", { class: "fd-spark0", x1: 0, x2: W, y1: Y(0), y2: Y(0) }));
+  svg.appendChild(fdEl("polyline", { class: "fd-spark", points: series.map((s, i) => `${i / ((series.length - 1) || 1) * W},${Y(s.value)}`).join(" ") }));
+  return svg;
+}
+const fdRange = (s) => { const v = s.map((x) => x.value); return `${Math.min(...v).toFixed(0)}% → ${Math.max(...v).toFixed(0)}%`; };
+
+// 基本面面板：01 盈利与现金 / 02 回报与利润率 / 03 资产负债表 / 04 资本配置
+function renderFundamentalsPanel(item, panel) {
+  panel.innerHTML = `<div class="fd-empty">${t("d_loading")}</div>`;
+  const cur = (item.statics && item.statics.currency) || "";
+  loadFinancials(item, "annual").then(({ financials }) => {
+    panel.innerHTML = "";
+    if (!financials || !financials.IS) { panel.innerHTML = `<div class="fd-empty">${t("d_no_fundamentals")}</div>`; return; }
+    const zh = LANG === "zh";
+    const sec = (n, title, sub, heroV, heroJ, heroCls) => {
+      const s = document.createElement("div"); s.className = "fd-sec";
+      const h = document.createElement("div"); h.className = "fd-head";
+      h.innerHTML = `<span class="fd-num">${n}</span><span class="fd-title">${title}${sub ? `<span class="sub">· ${sub}</span>` : ""}</span>`
+        + (heroV ? `<span class="fd-hero"><span class="fd-herov">${heroV}</span><div class="fd-heroj ${heroCls || ""}">${heroJ || ""}</div></span>` : "");
+      s.appendChild(h); panel.appendChild(s); return s;
+    };
+    const NI = fdSeries(financials, "IS", "NetProfit");
+    const FCF = fdSeries(financials, "CF", "NetFreeCashFlow");
+    const REV = fdSeries(financials, "IS", "OperatingRevenue");
+
+    // 01 盈利与现金
+    if (NI.length) {
+      const fcfM = FCF.filter((f) => NI.find((y) => y.year === f.year)), niM = NI.filter((x) => FCF.find((y) => y.year === x.year));
+      const sumNI = niM.reduce((a, b) => a + b.value, 0), sumF = fcfM.reduce((a, b) => a + b.value, 0);
+      const ratio = sumNI ? sumF / sumNI : NaN;
+      let hj = "", hc = "";
+      if (Number.isFinite(ratio)) { if (ratio >= 0.8) { hj = zh ? "现金扎实" : "Cash-backed"; hc = "good"; } else if (ratio >= 0.4) { hj = zh ? "现金 < 账面利润" : "Cash < earnings"; } else { hj = zh ? "FCF 远低于利润 · 重资本" : "FCF ≪ earnings"; hc = "bad"; } }
+      const s = sec("01", zh ? "盈利与现金" : "Earnings & cash", "", Number.isFinite(ratio) ? `${ratio.toFixed(2)}<span class="u">×</span>` : "—", (zh ? "近 " + niM.length + " 年累计 FCF/净利 · " : niM.length + "y cum. FCF/NI · ") + hj, hc);
+      if (FCF.length) {
+        s.appendChild(fdBarLine(NI, FCF));
+        const lg = document.createElement("div"); lg.className = "fd-legend";
+        lg.innerHTML = `<span><i class="swb" style="background:var(--ink-soft);opacity:.5"></i>${zh ? "净利润" : "Net income"}</span>`
+          + `<span><i class="swb" style="background:var(--red);opacity:.55"></i>${zh ? "亏损年" : "Loss yr"}</span>`
+          + `<span><i class="swl"></i>${zh ? "自由现金流" : "Free cash flow"}</span>`;
+        s.appendChild(lg);
+      } else { s.appendChild(fdBars(NI, false, 168)); }
+      const niMin = Math.min(...NI.map((x) => x.value)), niMax = Math.max(...NI.map((x) => x.value));
+      const co = document.createElement("div"); co.className = "fd-callout";
+      co.innerHTML = zh
+        ? `近 ${NI.length} 年净利润在 <b>${fdMoney(niMin, cur)} ~ ${fdMoney(niMax, cur)}</b> 间波动${FCF.length ? "，自由现金流长期低于净利润——别用任一单年,看穿越周期的正常化口径" : ""}。`
+        : `Net income over ${NI.length}y ranged <b>${fdMoney(niMin, cur)} ~ ${fdMoney(niMax, cur)}</b>${FCF.length ? "; FCF runs below net income — judge on a normalized, through-cycle basis" : ""}.`;
+      s.appendChild(co);
+    }
+
+    // 02 回报与利润率
+    const ROE = fdSeries(financials, "IS", "ROE"), GM = fdSeries(financials, "IS", "GrossMgn"), NM = fdSeries(financials, "IS", "NetProfitMargin"), TA = fdSeries(financials, "BS", "TotalAssets");
+    const ROA = fdDerive(NI, TA, (ni, ta) => (ta ? ni / ta * 100 : null));
+    const metrics = [
+      { lab: "ROE", s: ROE }, { lab: "ROA", s: ROA },
+      { lab: zh ? "毛利率" : "Gross margin", s: GM }, { lab: zh ? "净利率" : "Net margin", s: NM },
+    ].filter((m) => m.s.length);
+    if (metrics.length) {
+      const roeLast = fdLast(ROE), roeVals = ROE.map((x) => x.value);
+      const volatile = ROE.length && (Math.max(...roeVals) - Math.min(...roeVals) > 25);
+      const s = sec("02", zh ? "回报与利润率" : "Returns & margins", zh ? "护城河代理" : "moat proxy",
+        Number.isFinite(roeLast) ? `${roeLast.toFixed(1)}<span class="u">%</span>` : "—",
+        zh ? (volatile ? "ROE 强周期,非稳定高回报" : "ROE 当期") : (volatile ? "ROE highly cyclical" : "ROE latest"), "");
+      const grid = document.createElement("div"); grid.className = "fd-mgrid";
+      metrics.forEach((m) => {
+        const c = document.createElement("div"); c.className = "fd-mcell"; const last = fdLast(m.s);
+        c.innerHTML = `<div class="fd-mlab">${m.lab}</div><div class="fd-spwrap"></div><div class="fd-mval">${Number.isFinite(last) ? last.toFixed(1) : "—"}<span class="u">%</span></div><div class="fd-mtr">${fdRange(m.s)}</div>`;
+        c.querySelector(".fd-spwrap").appendChild(fdSpark(m.s)); grid.appendChild(c);
+      });
+      s.appendChild(grid);
+    }
+
+    // 03 资产负债表
+    const ND = fdSeries(financials, "BS", "NetDebt"), TL = fdSeries(financials, "BS", "TotalLiability"), LV = fdSeries(financials, "BS", "Leverage"), OI = fdSeries(financials, "IS", "OperatingIncome");
+    if (ND.length) {
+      const ndLast = fdLast(ND), oiLast = fdLast(OI);
+      const ndOi = (Number.isFinite(ndLast) && Number.isFinite(oiLast) && oiLast > 0) ? ndLast / oiLast : NaN;
+      let hj = "", hc = "", heroV;
+      if (ndLast <= 0) { hj = zh ? "净现金 · 无偿债压力" : "Net cash"; hc = "good"; heroV = zh ? "净现金" : "Net cash"; }
+      else { heroV = Number.isFinite(ndOi) ? `${ndOi.toFixed(1)}<span class="u">×</span>` : fdMoney(ndLast, cur);
+        if (Number.isFinite(ndOi)) { if (ndOi < 1) { hj = zh ? "杠杆低 · 扛得住周期" : "Low leverage"; hc = "good"; } else if (ndOi < 3) { hj = zh ? "杠杆温和" : "Moderate leverage"; } else { hj = zh ? "杠杆偏高" : "Elevated leverage"; hc = "bad"; } } }
+      const s = sec("03", zh ? "资产负债表" : "Balance sheet", zh ? "先排雷" : "survival first", heroV, (ndLast > 0 && Number.isFinite(ndOi) ? (zh ? "净负债/营业利润 · " : "NetDebt/EBIT · ") : "") + hj, hc);
+      s.appendChild(fdBars(ND, true));
+      const stats = document.createElement("div"); stats.className = "fd-stats";
+      const debtAssets = (TL.length && TA.length && fdLast(TA)) ? fdLast(TL) / fdLast(TA) * 100 : NaN;
+      stats.innerHTML = `<span class="fd-stat"><b>${fdMoney(ndLast, cur)}</b>${zh ? "净负债" : "Net debt"}</span>`
+        + (Number.isFinite(debtAssets) ? `<span class="fd-stat"><b>${debtAssets.toFixed(0)}%</b>${zh ? "资产负债率" : "Debt / assets"}</span>` : "")
+        + (LV.length ? `<span class="fd-stat"><b>${fdLast(LV).toFixed(2)}×</b>${zh ? "权益乘数" : "Equity mult."}</span>` : "");
+      s.appendChild(stats);
+    }
+
+    // 04 资本配置
+    const EPS = fdSeries(financials, "IS", "EPS"), CAP = fdSeries(financials, "CF", "CapEx"), OCFC = fdSeries(financials, "CF", "OCFCoverage");
+    const SH = fdDerive(NI, EPS, (ni, eps) => (eps ? ni / eps : null));
+    if (SH.length > 1) {
+      const first = SH[0].value, last = SH[SH.length - 1].value;
+      let hj = "", hc = "";
+      if (last < first * 0.97) { hj = zh ? "十年净回购" : "Net buyback"; hc = "good"; }
+      else if (last > first * 1.03) { hj = zh ? "持续稀释" : "Diluting"; hc = "bad"; }
+      else { hj = zh ? "股本基本平稳" : "Roughly flat"; }
+      const s = sec("04", zh ? "资本配置" : "Capital allocation", zh ? "钱去哪了" : "where cash goes",
+        `${(last / 1e9).toFixed(2)}<span class="u">B</span>`, (zh ? "流通股数 · " : "Shares · ") + hj, hc);
+      s.appendChild(fdLineChart(SH));
+      const stats = document.createElement("div"); stats.className = "fd-stats";
+      const capInt = (CAP.length && REV.length && fdLast(REV)) ? Math.abs(fdLast(CAP)) / fdLast(REV) * 100 : NaN;
+      stats.innerHTML = (Number.isFinite(capInt) ? `<span class="fd-stat"><b>${capInt.toFixed(0)}%</b>${zh ? "capex / 营收" : "capex / rev"}</span>` : "")
+        + (OCFC.length ? `<span class="fd-stat"><b>${fdLast(OCFC).toFixed(0)}%</b>${zh ? "经营现金流覆盖" : "OCF coverage"}</span>` : "")
+        + (FCF.length ? `<span class="fd-stat"><b>${fdMoney(fdLast(FCF), cur)}</b>${zh ? "最新自由现金流" : "Latest FCF"}</span>` : "");
+      s.appendChild(stats);
+    }
+  });
 }
 
 // 估值研究面板：摘要 + 估值卡片列表 ⇄ 卡片编辑器。idBlock 用于联动刷新顶部判定。
