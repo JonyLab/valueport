@@ -284,7 +284,7 @@
     body.vd-mode{overflow:hidden}
     body.vd-mode .page{height:100vh;min-height:0}
     body.vd-mode .frame-foot{display:none}
-    body.vd-mode .view-detail{flex:1 1 auto;min-height:0;overflow:hidden;padding-bottom:0;display:flex;flex-direction:column}
+    body.vd-mode #viewDetail{flex:1 1 auto;min-height:0;overflow:hidden;padding-bottom:0;display:flex;flex-direction:column} /* 限定 #viewDetail:否则同样带 .view-detail 类的编辑器会被 display:flex 顶掉 .hidden 而泄漏显示 */
     body.vd-mode .vd-cols{flex:1 1 auto;min-height:0}
     body.vd-mode .vd-side{overflow-y:auto}
     body.vd-mode .vd-main{overflow-y:auto}
