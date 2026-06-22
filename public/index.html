@@ -295,8 +295,12 @@
     background-image:repeating-linear-gradient(45deg,rgba(120,128,142,.16) 0,rgba(120,128,142,.16) 1px,transparent 1px,transparent 6px)}
   .vge-title{font-size:13px;font-weight:600;color:var(--ink)}
   .vge-sub{font-size:12px;line-height:1.6;color:var(--ink-mute);max-width:250px}
-  .vge-cta{margin-top:4px;padding:7px 16px;font-size:12.5px;font-weight:600;color:#fff;background:#31679b;border:none;border-radius:7px;cursor:pointer}
+  .vge-cta{margin-top:4px;padding:7px 16px;font-size:12.5px;font-weight:600;color:#fff;background:#31679b;border:1px solid transparent;border-radius:7px;cursor:pointer}
   .vge-cta:hover{background:#2b5a87}
+  .vge-ctas{display:flex;gap:10px;margin-top:6px}
+  .vge-ctas .vge-cta{margin-top:0}
+  .vge-cta-alt{background:#fff;color:#31679b;border-color:#cfddec}
+  .vge-cta-alt:hover{background:#f2f6fb;border-color:#31679b}
   .vge-method{margin-top:6px;font-size:12px;color:var(--ink-mute);text-decoration:underline;text-underline-offset:2px}
   .vge-method:hover{color:var(--ink-soft)}
   .vd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--divider);margin-bottom:18px;position:sticky;top:0;background:var(--bg);z-index:3;padding-top:22px}
@@ -1292,7 +1296,7 @@ const viewValEdit = document.getElementById("viewValEdit");
 const pageHeadEl = document.querySelector(".page-head");
 const boardDividerEl = document.getElementById("boardDivider");
 const btnSettings = document.getElementById("btnSettings");
-let detailGauge = null, detailItem = null, detailGwrap = null, detailIdBlock = null, detailValRefresh = null;
+let detailGauge = null, detailItem = null, detailGwrap = null, detailIdBlock = null, detailValRefresh = null, detailAddValuation = null;
 
 // 详情页钟摆区：已设区间→渲染完整钟摆；未设→占位卡片（直接填或加估值卡片）
 function mountDetailPendulum(item) {
@@ -1323,11 +1327,16 @@ function buildValPlaceholder(item) {
   sub.textContent = LANG === "zh"
     ? "直接填写合理价值区间，或在「估值研究」里添加估值卡片并设为合理区间。"
     : "Enter a fair-value range directly, or add a valuation card under Valuation and mark it as the fair range.";
-  const cta = document.createElement("button"); cta.type = "button"; cta.className = "vge-cta";
-  cta.textContent = LANG === "zh" ? "设定内在价值" : "Set fair value";
-  cta.addEventListener("click", () => openItemModal(item, false));
+  const ctas = document.createElement("div"); ctas.className = "vge-ctas";
+  const direct = document.createElement("button"); direct.type = "button"; direct.className = "vge-cta";
+  direct.textContent = LANG === "zh" ? "直接设定" : "Set directly";
+  direct.addEventListener("click", () => openItemModal(item, false));
+  const addv = document.createElement("button"); addv.type = "button"; addv.className = "vge-cta vge-cta-alt";
+  addv.textContent = LANG === "zh" ? "添加估值" : "Add valuation";
+  addv.addEventListener("click", () => { if (detailAddValuation) detailAddValuation(); });
+  ctas.append(direct, addv);
   const method = document.createElement("a"); method.className = "vge-method"; method.href = "/valuation"; method.textContent = t("d_method");
-  box.append(bar, title, sub, cta, method);
+  box.append(bar, title, sub, ctas, method);
   return box;
 }
 
@@ -1806,6 +1815,7 @@ function renderValuationPanel(item, panel, idBlock) {
   // 注意：不要捕获 item.cfg —— 行情刷新会重建该对象，捕获会读到旧引用（选中态丢失）。
   panel.innerHTML = "";
   detailValRefresh = () => showList(); // 供外部（标的编辑保存后）刷新摘要
+  detailAddValuation = () => showEditor(null); // 供占位卡「添加估值」按钮直接打开编辑器
 
   function showList() {
     panel.innerHTML = "";
