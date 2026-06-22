@@ -539,17 +539,26 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         if (money && refData) {
           const an = moneyAnnualRef(field.meta, refData, lang);
           const mq = moneyQuarterRef(field.meta, refData, lang);
-          if (an || mq) {
+          // 扣非净利润(东财,仅 A 股):作为净利润字段的额外可选筹码,不替换普通净利润
+          const deducted = field.meta === "netIncome" && Number.isFinite(ctx.deductedNetIncome) ? ctx.deductedNetIncome : null;
+          if (an || mq || deducted !== null) {
             const mrow = el("div", "vc-ref");
+            const fill = (val) => { input.value = fmtMoney(val); input.dataset.raw = String(val); recompute(); };
             const addChip = (ref, q) => {
               if (!ref) return;
               const b = el("button", "vc-refchip" + (q ? " vc-refq" : "")); b.type = "button";
               b.textContent = `${ref.label} ≈ ${fmtMoney(ref.value)}`;
-              b.addEventListener("click", () => { input.value = fmtMoney(ref.value); input.dataset.raw = String(ref.value); recompute(); });
+              b.addEventListener("click", () => fill(ref.value));
               mrow.appendChild(b);
             };
             addChip(an, false);
             addChip(mq, true);
+            if (deducted !== null) {
+              const b = el("button", "vc-refchip"); b.type = "button";
+              b.textContent = `${lang === "zh" ? "扣非" : "Recurring"} ≈ ${fmtMoney(deducted)}`;
+              b.addEventListener("click", () => fill(deducted));
+              mrow.appendChild(b);
+            }
             fld.appendChild(mrow);
           }
         }

@@ -4,6 +4,7 @@ import { signToken, verifyToken } from "./auth.js";
 import { validateItem, rowToItem } from "./items.js";
 import { parseTencentQuotes, parseTencentHints } from "./quotes.js";
 import { fetchLongbridgeQuotes, fetchLongbridgeNames, fetchLongbridgeFinancials, pickLatestAnnual, fetchValuationRefs } from "./longbridge.js";
+import { fetchDeductedNetIncome } from "./eastmoney.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
@@ -77,19 +78,26 @@ app.get("/api/financials", async (c) => {
   const isAnnual = c.req.query("period") !== "quarter";
   const report = isAnnual ? "af" : "qf";
   const haveCreds = c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN;
-  let financials = null, valuationRefs = null;
+  let financials = null, valuationRefs = null, deducted = null;
   if (symbol && haveCreds) {
     try {
       if (isAnnual) {
-        const [f, vr] = await Promise.all([fetchLongbridgeFinancials(c.env, symbol, report), fetchValuationRefs(c.env, symbol)]);
-        financials = f; valuationRefs = vr;
+        // 扣非来自东财(免费、无鉴权,仅 A 股),与长桥并行拉取;任一失败不影响其余
+        const [f, vr, dni] = await Promise.all([
+          fetchLongbridgeFinancials(c.env, symbol, report),
+          fetchValuationRefs(c.env, symbol),
+          fetchDeductedNetIncome(symbol),
+        ]);
+        financials = f; valuationRefs = vr; deducted = dni;
       } else {
         financials = await fetchLongbridgeFinancials(c.env, symbol, report);
       }
     } catch (e) { console.error("financials failed:", e && e.message); financials = null; }
   }
+  const latest = pickLatestAnnual(financials);
+  if (Number.isFinite(deducted)) latest.deductedNetIncome = deducted;
   c.header("Cache-Control", "public, max-age=86400");
-  return c.json({ financials, latest: pickLatestAnnual(financials), valuationRefs });
+  return c.json({ financials, latest, valuationRefs });
 });
 app.get("/api/hints", async (c) => {
   const q = c.req.query("q") || "";

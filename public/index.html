@@ -1395,6 +1395,7 @@ function valuationCtx(item) {
     shares: Number(s.totalShares) || 0, dividendYield: parseFloat(s.dividendYield) || NaN, mos: c.mos || 0, ext: c.ext || 0,
     revenue: Number.isFinite(latest.revenue) ? latest.revenue : undefined,
     netIncome: Number.isFinite(latest.netIncome) ? latest.netIncome : undefined,
+    deductedNetIncome: Number.isFinite(latest.deductedNetIncome) ? latest.deductedNetIncome : undefined,
     netDebt: Number.isFinite(latest.netDebt) ? latest.netDebt : undefined,
     fcf: Number.isFinite(latest.fcf) ? latest.fcf : undefined };
 }
