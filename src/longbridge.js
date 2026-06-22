@@ -69,7 +69,12 @@ export function pickLatestAnnual(financials) {
     const v = a && a.values && a.values[0] && a.values[0].value;
     return Number.isFinite(v) ? v : null;
   };
-  return { revenue: pick("IS", "OperatingRevenue"), netIncome: pick("IS", "NetProfit"), netDebt: pick("BS", "NetDebt"), fcf: pick("CF", "NetFreeCashFlow") };
+  const yearOf = (kind, field) => {
+    const a = financials && financials[kind] && financials[kind].find((x) => x.field === field);
+    const y = a && a.values && a.values[0] && a.values[0].year;
+    return Number.isFinite(y) ? y : null;
+  };
+  return { revenue: pick("IS", "OperatingRevenue"), netIncome: pick("IS", "NetProfit"), netDebt: pick("BS", "NetDebt"), fcf: pick("CF", "NetFreeCashFlow"), year: yearOf("IS", "NetProfit") };
 }
 
 // 签名 GET（沿用 getOtp 的 canonical 规则；query 须按 key 字母序，签名与 URL 用同一字符串）

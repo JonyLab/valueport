@@ -526,6 +526,18 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       singles.forEach((field) => {
         const fld = el("div", "vc-fld");
         const { lab, guideRow } = buildLabel(field, "vc-flabel");
+        // 起点盈利口径标签:净利润/营收=最新年报(带财年), EPS=TTM —— 切模式时基数会换,显式标出避免误判
+        const PERIOD_META = { netIncome: "annual", revenue: "annual", eps: "ttm" };
+        const per = PERIOD_META[field.meta];
+        if (per) {
+          const tag = el("span", "vc-period");
+          tag.textContent = per === "ttm" ? "TTM"
+            : (Number.isFinite(ctx.annualYear) ? `${lang === "zh" ? "年报 FY" : "FY"}${ctx.annualYear}` : (lang === "zh" ? "年报" : "Annual"));
+          tag.title = per === "ttm"
+            ? (lang === "zh" ? "默认取滚动 12 个月(TTM)" : "Defaults to trailing twelve months")
+            : (lang === "zh" ? "默认取最新年报口径" : "Defaults to latest annual report");
+          lab.insertBefore(tag, lab.firstChild ? lab.firstChild.nextSibling : null);
+        }
         const money = MONEY_METAS.has(field.meta);
         const input = money ? makeMoneyInput(singleInit(field)) : makeInput(singleInit(field));
         if (!money && field.hint && field.hint[lang]) input.placeholder = field.hint[lang];

@@ -348,6 +348,7 @@
   .vc-chead{font-size:11px;color:var(--ink-mute);letter-spacing:.02em;padding-left:2px}
   .vc-label{font-size:13px;color:var(--ink-soft);min-width:0;display:flex;align-items:center}
   .vc-unit{color:var(--ink-mute);margin-left:3px}
+  .vc-period{margin-left:8px;font-size:10.5px;font-weight:500;color:var(--ink-mute);border:1px solid var(--border);border-radius:4px;padding:1px 6px;letter-spacing:.03em;line-height:1.6;font-family:var(--mono);white-space:nowrap}
   /* 输入：描边盒 */
   .vc-input{height:36px;padding:0 12px;width:100%;border:1px solid var(--border);border-radius:4px;background:#fff;font-family:var(--mono);font-size:13.5px;color:var(--ink);font-variant-numeric:tabular-nums;box-sizing:border-box;box-shadow:var(--shadow);-moz-appearance:textfield;appearance:textfield}
   .vc-input::-webkit-outer-spin-button,.vc-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
@@ -1398,7 +1399,8 @@ function valuationCtx(item) {
     deductedNetIncome: Number.isFinite(latest.deductedNetIncome) ? latest.deductedNetIncome : undefined,
     adjustedEps: Number.isFinite(latest.adjustedEps) ? latest.adjustedEps : undefined,
     netDebt: Number.isFinite(latest.netDebt) ? latest.netDebt : undefined,
-    fcf: Number.isFinite(latest.fcf) ? latest.fcf : undefined };
+    fcf: Number.isFinite(latest.fcf) ? latest.fcf : undefined,
+    annualYear: Number.isFinite(latest.year) ? latest.year : undefined };
 }
 
 // 把某卡设为合理区间：写 fair 区间 + 选中 id，刷新钟摆/顶部判定/列表行，并保存。

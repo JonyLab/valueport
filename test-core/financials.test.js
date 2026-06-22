@@ -36,8 +36,9 @@ describe("pickLatestAnnual", () => {
     expect(latest.revenue).toBeCloseTo(416161000000, 0);
     expect(latest.netIncome).toBeCloseTo(112010000000, 0);
     expect(typeof latest.netDebt).toBe("number");
+    expect(latest.year).toBe(2025);
   });
   it("returns all-null for null financials", () => {
-    expect(pickLatestAnnual(null)).toEqual({ revenue: null, netIncome: null, netDebt: null, fcf: null });
+    expect(pickLatestAnnual(null)).toEqual({ revenue: null, netIncome: null, netDebt: null, fcf: null, year: null });
   });
 });
