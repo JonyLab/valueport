@@ -562,14 +562,23 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
             fld.appendChild(mrow);
           }
         }
-        // 调整后 EPS(Finnhub,仅美股):EPS 字段的额外可选筹码,剔非经常项的 normalized 口径,仅供参考
+        // 美股 EPS:报告口径(调整前,长桥)与调整后(Finnhub 标准化,剔非经常项)并排,均可点回填,默认仍取报告口径
         if (!money && field.meta === "eps" && Number.isFinite(ctx.adjustedEps)) {
           const mrow = el("div", "vc-ref");
-          const b = el("button", "vc-refchip"); b.type = "button";
-          b.textContent = `${lang === "zh" ? "调整后·TTM" : "Adj·TTM"} ≈ ${ctx.adjustedEps.toFixed(2)}`;
-          b.title = lang === "zh" ? "Finnhub 标准化 EPS(剔非经常项),非公司官方 Non-GAAP,仅参考" : "Finnhub normalized EPS (excl. extraordinary items); not company Non-GAAP — reference only";
-          b.addEventListener("click", () => { input.value = String(ctx.adjustedEps); recompute(); });
-          mrow.appendChild(b); fld.appendChild(mrow);
+          const addEpsChip = (label, val, title) => {
+            const b = el("button", "vc-refchip"); b.type = "button";
+            b.textContent = `${label} ≈ ${val.toFixed(2)}`;
+            if (title) b.title = title;
+            b.addEventListener("click", () => { input.value = String(val); recompute(); });
+            mrow.appendChild(b);
+          };
+          if (Number.isFinite(ctx.epsTtm)) addEpsChip(
+            lang === "zh" ? "报告·TTM" : "Reported·TTM", ctx.epsTtm,
+            lang === "zh" ? "长桥报告口径 EPS(TTM,调整前)" : "Reported EPS (TTM), as filed");
+          addEpsChip(
+            lang === "zh" ? "调整后·TTM" : "Adj·TTM", ctx.adjustedEps,
+            lang === "zh" ? "Finnhub 标准化 EPS(剔非经常项),非公司官方 Non-GAAP,仅参考" : "Finnhub normalized EPS (excl. extraordinary items); not company Non-GAAP — reference only");
+          fld.appendChild(mrow);
         }
         if (guideRow) fld.appendChild(guideRow);
         card.appendChild(fld);
