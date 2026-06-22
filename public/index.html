@@ -289,15 +289,15 @@
     body.vd-mode .vd-main{overflow-y:auto}
   }
   @media (max-width:760px){ .vd-cols{grid-template-columns:1fr} .vd-side{border-right:none;border-bottom:1px solid var(--divider)} .vd-side .vd-backrow{padding-left:16px;padding-right:16px} .vd-idcard{padding-left:16px;padding-right:16px} .vd-pendcard{padding-left:16px;padding-right:16px} .vd-main{padding:0 16px 24px} }
-  .vge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:180px;padding:20px 8px;text-align:center}
+  .vge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:180px;padding:20px 0;text-align:center}
   .vge-bar{width:188px;height:14px;margin-bottom:2px;border:1px solid var(--border);border-radius:2px;
     background-image:repeating-linear-gradient(45deg,rgba(120,128,142,.16) 0,rgba(120,128,142,.16) 1px,transparent 1px,transparent 6px)}
   .vge-title{font-size:13px;font-weight:600;color:var(--ink)}
   .vge-sub{font-size:12px;line-height:1.6;color:var(--ink-mute);max-width:250px}
-  .vge-cta{margin-top:4px;padding:7px 16px;font-size:12.5px;font-weight:600;color:#fff;background:var(--cta);border:1px solid transparent;border-radius:var(--r-md);cursor:pointer}
+  .vge-cta{margin-top:4px;padding:7px 14px;font-size:12.5px;font-weight:600;color:#fff;background:var(--cta);border:1px solid transparent;border-radius:var(--r-md);cursor:pointer;white-space:nowrap}
   .vge-cta:hover{background:var(--cta-hover)}
   .vge-ctas{display:flex;gap:10px;margin-top:6px}
-  .vge-ctas .vge-cta{margin-top:0}
+  .vge-ctas .vge-cta{margin-top:0;flex:0 0 auto}
   .vge-cta-alt{background:#fff;color:var(--cta);border-color:var(--cta-line)}
   .vge-cta-alt:hover{background:var(--cta-soft);border-color:var(--cta)}
   /* 估值研究空态：图标 + 标题 + 说明 + 主行动 */
@@ -1661,11 +1661,12 @@ function renderFundamentalsPanel(item, panel) {
     const EQ = fdDerive(TA, TL, (ta, tl) => ta - tl);
     const SH = fdDerive(EQ, BPS, (eq, bps) => (bps ? eq / bps : null));
     if (SH.length > 1) {
-      const first = SH[0].value, last = SH[SH.length - 1].value;
+      // 按「近年趋势」判断(约 5 年前 vs 最新),避免十年前一次性增发把长期平稳误判为持续稀释
+      const last = SH[SH.length - 1].value, ref = SH[Math.max(0, SH.length - 5)].value;
       let hj = "", hc = "";
-      if (last < first * 0.97) { hj = zh ? "十年净回购" : "Net buyback"; hc = "good"; }
-      else if (last > first * 1.03) { hj = zh ? "持续稀释" : "Diluting"; hc = "bad"; }
-      else { hj = zh ? "股本基本平稳" : "Roughly flat"; }
+      if (last < ref * 0.97) { hj = zh ? "近年回购" : "Buyback"; hc = "good"; }
+      else if (last > ref * 1.03) { hj = zh ? "近年稀释" : "Diluting"; hc = "bad"; }
+      else { hj = zh ? "股本平稳" : "Roughly flat"; }
       const s = sec("04", zh ? "资本配置" : "Capital allocation", zh ? "钱去哪了" : "where cash goes",
         `${(last / 1e9).toFixed(2)}<span class="u">B</span>`, (zh ? "流通股数 · " : "Shares · ") + hj, hc);
       s.appendChild(fdChartWrap(fdLineChart(SH), SH.map((d) => d.year), [{ label: zh ? "流通股数" : "Shares", data: SH, color: "var(--ink-soft)", fmt: (v) => (v / 1e9).toFixed(2) + "B" }]));
