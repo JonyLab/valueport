@@ -269,7 +269,8 @@
   /* 详情页两栏：左 身份+钟摆，右 tabs */
   .vd-cols{display:grid;grid-template-columns:300px minmax(0,1fr);border-top:1px solid var(--divider)}
   .vd-side{border-right:1px solid var(--divider)}
-  .vd-idcard{padding:22px 24px 22px 0;border-bottom:1px solid var(--divider)}
+  .vd-side .vd-backrow{padding:16px 24px 0 0;margin-bottom:16px}
+  .vd-idcard{padding:0 24px 22px 0;border-bottom:1px solid var(--divider)}
   .vd-pendcard{padding:20px 24px 26px 0}
   .vd-pendlab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);font-weight:600;margin-bottom:14px}
   .vd-side .vd-gauge{width:100%}
@@ -1419,7 +1420,7 @@ function renderDetail(item) {
   const pendCard = document.createElement("div"); pendCard.className = "vd-pendcard";
   const pendLab = document.createElement("div"); pendLab.className = "vd-pendlab"; pendLab.textContent = LANG === "zh" ? "估值钟摆" : "Valuation pendulum";
   pendCard.append(pendLab, gwrap);
-  const side = document.createElement("div"); side.className = "vd-side"; side.append(idBlock, pendCard);
+  const side = document.createElement("div"); side.className = "vd-side"; side.append(backRow, idBlock, pendCard);
 
   const tabsNav = document.createElement("div"); tabsNav.className = "vd-tabs";
   const panels = document.createElement("div");
@@ -1443,7 +1444,7 @@ function renderDetail(item) {
 
   const main = document.createElement("div"); main.className = "vd-main"; main.append(tabsNav, panels);
   const cols = document.createElement("div"); cols.className = "vd-cols"; cols.append(side, main);
-  viewDetail.append(backRow, cols);
+  viewDetail.append(cols);
   mountDetailPendulum(item);               // 已设区间→钟摆；未设→占位卡片
 }
 
