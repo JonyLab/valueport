@@ -248,7 +248,7 @@
 
   /* ===== 设置视图 ===== */
   /* ===== 标的详情视图（宽度与看板内容一致：满栏 + 与 page-head 相同的 28px 边距） ===== */
-  .view-detail{padding:28px 28px 36px}
+  .view-detail{padding:0}
   .vd-backrow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
   .vd-back{display:inline-flex;align-items:center;font-size:13.5px;color:var(--ink-soft);text-decoration:none}
   .vd-back:hover{color:var(--ink)}
@@ -269,14 +269,14 @@
   /* 详情页两栏：左 身份+钟摆，右 tabs */
   .vd-cols{display:grid;grid-template-columns:300px minmax(0,1fr);border-top:1px solid var(--divider)}
   .vd-side{border-right:1px solid var(--divider)}
-  .vd-side .vd-backrow{padding:16px 24px 0 0;margin-bottom:16px}
-  .vd-idcard{padding:0 24px 22px 0;border-bottom:1px solid var(--divider)}
-  .vd-pendcard{padding:22px 12px 26px 0}
+  .vd-side .vd-backrow{padding:16px 24px 0 28px;margin-bottom:16px}
+  .vd-idcard{padding:0 24px 22px 28px;border-bottom:1px solid var(--divider)}
+  .vd-pendcard{padding:22px 12px 26px 28px}
   .vd-pendlab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-mute);font-weight:600;margin-bottom:14px}
   .vd-side .vd-gauge{width:100%}
   .vd-intro{font-size:12.5px;line-height:1.65;color:var(--ink-soft);margin-top:16px}
   .vd-intro-empty{color:var(--ink-mute);font-style:italic;opacity:.75}
-  .vd-main{min-width:0;padding:0 0 24px 28px}
+  .vd-main{min-width:0;padding:0 28px 24px 28px}
   body.vd-mode .topnav{display:none} /* 详情页不要网站 header(用返回导航) */
   /* 桌面端：锁定窗口滚动,右栏独立滚动,tab 吸顶;左栏定高自滚 */
   @media (min-width:761px){
@@ -288,7 +288,7 @@
     body.vd-mode .vd-side{overflow-y:auto}
     body.vd-mode .vd-main{overflow-y:auto}
   }
-  @media (max-width:760px){ .vd-cols{grid-template-columns:1fr} .vd-side{border-right:none;border-bottom:1px solid var(--divider)} .vd-idcard{padding-right:0} .vd-pendcard{padding-right:0} .vd-main{padding:0 0 24px} }
+  @media (max-width:760px){ .vd-cols{grid-template-columns:1fr} .vd-side{border-right:none;border-bottom:1px solid var(--divider)} .vd-side .vd-backrow{padding-left:16px;padding-right:16px} .vd-idcard{padding-left:16px;padding-right:16px} .vd-pendcard{padding-left:16px;padding-right:16px} .vd-main{padding:0 16px 24px} }
   .vge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:180px;padding:28px 22px;border:1px dashed var(--border);border-radius:10px;background:var(--card);text-align:center}
   .vge-bar{width:188px;height:14px;margin-bottom:2px;border:1px solid var(--border);border-radius:2px;
     background-image:repeating-linear-gradient(45deg,rgba(120,128,142,.16) 0,rgba(120,128,142,.16) 1px,transparent 1px,transparent 6px)}
@@ -503,7 +503,7 @@
   .fd-stat b{display:block;font-family:var(--mono);color:var(--ink);font-weight:600;font-size:14px;margin-bottom:1px}
   .fd-empty{color:var(--ink-mute);font-size:13px;padding:8px 0}
   @media(max-width:680px){.fd-mgrid{grid-template-columns:repeat(2,1fr);row-gap:16px}.fd-mcell:nth-child(3){border-left:none}}
-  @media (max-width:680px){ .view-detail{padding:24px 16px 28px} .vd-divider{margin:0 -16px 22px} .vd-top{flex-direction:column;align-items:flex-start} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} .vc-sheet{grid-template-columns:minmax(0,1fr) 1fr 1fr} .vc-mglabel{width:auto} }
+  @media (max-width:680px){ .view-detail{padding:0} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} .vc-sheet{grid-template-columns:minmax(0,1fr) 1fr 1fr} .vc-mglabel{width:auto} }
   .view-settings{max-width:640px;margin:0 auto;padding-top:4px}
   .set-title{font-family:var(--serif);font-weight:500;font-size:24px;letter-spacing:-.01em;margin:8px 0 18px}
   .cfg-block{padding:16px 0 14px;border-bottom:1px solid var(--border)}
@@ -1302,6 +1302,11 @@ function mountDetailPendulum(item) {
     detailGauge = new Gauge(detailGwrap);
     detailGauge.set(item.cfg, false);
     if (item.cfg.price > 0) detailGauge.swingIn();
+    // 视觉裁剪：把 viewBox 收紧到实际绘制内容,去掉体块周围空白,让钟摆视觉更大(原 viewBox 约 1/4 是留白)
+    const svg = detailGwrap.querySelector("svg");
+    if (svg) requestAnimationFrame(() => {
+      try { const b = svg.getBBox(); if (b.width && b.height) { const m = 8; svg.setAttribute("viewBox", `${b.x - m} ${b.y - m} ${b.width + 2 * m} ${b.height + 2 * m}`); } } catch {}
+    });
   } else {
     detailGwrap.appendChild(buildValPlaceholder(item));
   }
