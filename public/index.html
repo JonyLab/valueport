@@ -1451,8 +1451,8 @@ function renderDetail(item) {
   const tabsNav = document.createElement("div"); tabsNav.className = "vd-tabs";
   const panels = document.createElement("div");
   const defs = [
-    { label: t("d_tab_valuation") },
     { label: t("d_tab_fundamentals") },
+    { label: t("d_tab_valuation") },
     { label: t("d_tab_financials") },
   ];
   const tabEls = [], panelEls = [];
@@ -1462,8 +1462,8 @@ function renderDetail(item) {
     b.addEventListener("click", () => { tabEls.forEach((x) => x.classList.remove("on")); panelEls.forEach((x) => x.classList.remove("on")); b.classList.add("on"); p.classList.add("on"); });
     tabsNav.appendChild(b); panels.appendChild(p); tabEls.push(b); panelEls.push(p);
   });
-  renderValuationPanel(item, panelEls[0], idBlock); // 估值研究置顶为默认 tab
-  renderFundamentalsPanel(item, panelEls[1]);       // 基本面：4 节客观体检
+  renderFundamentalsPanel(item, panelEls[0]);        // 基本面：默认 tab（4 节客观体检）
+  renderValuationPanel(item, panelEls[1], idBlock);  // 估值研究：第二 tab
   renderFinancialsPanel(item, panelEls[2]);
   loadFinancials(item, "annual"); // 预取年报，供计算器预填
   loadFinancials(item, "quarter"); // 预取季报，供「最新季 / 近4季 TTM」参考
