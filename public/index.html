@@ -488,9 +488,9 @@
   .fd-tipk{color:#d8d4cc} .fd-tipk i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
   .fd-tiprow b{color:#fff;font-weight:600}
   .fd-hoverline{position:absolute;top:0;bottom:18px;width:1px;background:var(--ink-mute);opacity:.45;pointer-events:none;z-index:4}
-  .fd-bar{fill:var(--chart-1);fill-opacity:.5}
-  .fd-bar.neg{fill:var(--chart-neg);fill-opacity:.55}
-  .fd-bar.good{fill:var(--chart-2);fill-opacity:.55}
+  .fd-bar{fill:var(--chart-1)}
+  .fd-bar.neg{fill:var(--chart-neg)}
+  .fd-bar.good{fill:var(--chart-2)}
   .fd-line{fill:none;stroke:var(--chart-2);stroke-width:2}
   .fd-dot{fill:var(--chart-2)}
   .fd-ldot{fill:var(--chart-1)}
@@ -1601,8 +1601,8 @@ function renderFundamentalsPanel(item, panel) {
           { label: zh ? "自由现金流" : "Free cash flow", data: FCF, color: "var(--chart-2)", fmt: (v) => fdMoney(v, cur) },
         ]));
         const lg = document.createElement("div"); lg.className = "fd-legend";
-        lg.innerHTML = `<span><i class="swb" style="background:var(--chart-1);opacity:.5"></i>${zh ? "净利润" : "Net income"}</span>`
-          + `<span><i class="swb" style="background:var(--chart-neg);opacity:.55"></i>${zh ? "亏损年" : "Loss yr"}</span>`
+        lg.innerHTML = `<span><i class="swb" style="background:var(--chart-1)"></i>${zh ? "净利润" : "Net income"}</span>`
+          + `<span><i class="swb" style="background:var(--chart-neg)"></i>${zh ? "亏损年" : "Loss yr"}</span>`
           + `<span><i class="swl"></i>${zh ? "自由现金流" : "Free cash flow"}</span>`;
         s.appendChild(lg);
       } else { s.appendChild(fdChartWrap(fdBars(NI, false, 168), NI.map((d) => d.year), [{ label: zh ? "净利润" : "Net income", data: NI, color: "var(--chart-1)", fmt: (v) => fdMoney(v, cur) }])); }
