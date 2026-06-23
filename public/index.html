@@ -1773,15 +1773,22 @@ function syncFairUI(item, idBlock) {
   saveItem(item);
 }
 
-// 关键假设摘要（dual 字段：标签 保守–乐观）
+// 关键假设摘要：先列单值「(高)增长年数」(它框定后面增速的适用区间)，再列 dual 字段（保守–乐观）
 function assumeSummary(model, inputs) {
   const fields = model.modes ? modeFields(model, (inputs && inputs._mode) || model.defaultMode) : (model.fields || []);
-  return fields.filter((f) => f.col === "dual").map((f) => {
-    const v = inputs[f.k]; if (!v || typeof v !== "object") return null;
+  const parts = [];
+  const nf = fields.find((f) => f.k === "n"), nv = nf && inputs.n;
+  if (nf && nv != null && nv !== "") {
+    const lab = (nf.label && nf.label[LANG]) || "n";
+    parts.push(LANG === "zh" ? `${lab} ${nv} 年` : `${lab} ${nv}`);
+  }
+  fields.filter((f) => f.col === "dual").forEach((f) => {
+    const v = inputs[f.k]; if (!v || typeof v !== "object") return;
     const lab = (f.label && f.label[LANG]) || f.k;
     const unit = f.unit === "%" ? "%" : "";
-    return `${lab} ${v.c}–${v.o}${unit}`;
-  }).filter(Boolean).join(" · ");
+    parts.push(`${lab} ${v.c}–${v.o}${unit}`);
+  });
+  return parts.join(" · ");
 }
 
 // 按需取财报（按 period 在 item 上内存缓存本会话）。返回 { financials, latest }。
