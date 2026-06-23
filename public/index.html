@@ -743,7 +743,7 @@ function animatePriceIn(item) {
   const to = item.cfg.price;
   if (!px || !(to > 0)) return;
   if (REDUCE) { px.textContent = VMSGS.px(to); return; }
-  const lambda = 0.9, cutoff = 0.012, t0 = performance.now();
+  const lambda = 2.2, cutoff = 0.012, t0 = performance.now(); // λ=2.2 → 收敛约 2s(ln(1/cutoff)/λ)
   px.textContent = VMSGS.px(0);
   const step = (now) => {
     const env = Math.exp(-lambda * (now - t0) / 1000); // 1→0，随钟摆摆幅一起衰减
