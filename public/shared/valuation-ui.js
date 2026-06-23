@@ -199,12 +199,15 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     let s; try { s = model.schedule(midVals(model, form), ctx); } catch { return; }
     if (!s || !Array.isArray(s.rows) || !s.rows.length) return;
     const fmtCf = (n) => s.kind === "money" ? (Number.isFinite(n) ? fmtMoney(n) : "—") : (Number.isFinite(n) ? n.toFixed(2) : "—");
-    const title = lang === "zh" ? "逐年现金流（情景取中）" : "Year-by-year cash flow (mid)";
+    // DDM 折现的是股息,不是现金流
+    const isDiv = model.key === "ddm";
+    const flowZh = isDiv ? "股息" : "现金流", flowEn = isDiv ? "Dividend" : "Cash flow";
+    const title = lang === "zh" ? `逐年${flowZh}（情景取中）` : `Year-by-year ${flowEn.toLowerCase()} (mid)`;
     const toggle = el("button", "vc-sched-toggle"); toggle.type = "button"; toggle.textContent = title + " ▾";
     const body = el("div", "vc-sched-body"); body.style.display = "none";
     const tbl = el("table", "vc-sched-table");
     const head = el("tr");
-    (lang === "zh" ? ["年", "现金流", "现值"] : ["Yr", "Cash flow", "PV"]).forEach((h) => { const th = el("th"); th.textContent = h; head.appendChild(th); });
+    (lang === "zh" ? ["年", flowZh, "现值"] : ["Yr", flowEn, "PV"]).forEach((h) => { const th = el("th"); th.textContent = h; head.appendChild(th); });
     tbl.appendChild(head);
     let sumPv = 0;
     const addRow = (cls, c0, c1, c2) => { const tr = el("tr", cls); [c0, c1, c2].forEach((c) => { const td = el("td"); td.textContent = c; tr.appendChild(td); }); tbl.appendChild(tr); };

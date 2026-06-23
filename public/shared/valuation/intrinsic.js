@@ -149,7 +149,7 @@ const FCFE = {
     },
     { k: "growth", label: { zh: "净利润增速", en: "Net income growth" }, col: "dual", unit: "%", default: 10, meta: "niGrowth" },
     { k: "reinvestRate", label: { zh: "股权再投资率", en: "Equity reinvestment rate" }, col: "dual", unit: "%", default: 40, hint: { zh: "占净利润的比例", en: "As % of net income" }, meta: "reinvest" },
-    { k: "costOfEquity", label: { zh: "股权成本", en: "Cost of equity" }, col: "dual", unit: "%", default: 9, meta: "costOfEquity" },
+    { k: "costOfEquity", label: { zh: "要求回报率", en: "Required return" }, col: "dual", unit: "%", default: 9, meta: "costOfEquity" },
     { k: "n", label: { zh: "高增长年数", en: "High-growth years" }, col: "single", unit: "", prefill: (ctx) => 10, default: 10, meta: "growthYears" },
     { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5, meta: "termGrowth" },
   ],
@@ -238,7 +238,7 @@ const DDM = {
     },
     { k: "growth", label: { zh: "股利增速", en: "Dividend growth" }, col: "dual", unit: "%", default: 10, meta: "divGrowth" },
     { k: "n", label: { zh: "高增长年数", en: "High-growth years" }, col: "single", unit: "", prefill: (ctx) => 5, default: 5, meta: "growthYears" },
-    { k: "costOfEquity", label: { zh: "股权成本", en: "Cost of equity" }, col: "dual", unit: "%", default: 9, meta: "costOfEquity" },
+    { k: "costOfEquity", label: { zh: "要求回报率", en: "Required return" }, col: "dual", unit: "%", default: 9, meta: "costOfEquity" },
     { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5, meta: "termGrowth" },
   ],
   compute(vals, ctx) {
