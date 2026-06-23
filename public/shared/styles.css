@@ -14,8 +14,8 @@
     --hub:#1b1a17;
     --green:#1f8f54;
     --red:#c64141;
-    /* 基本面图表配色:IBM Carbon 数据可视化(青/蓝-50、teal-50、red-50) */
-    --chart-1:#1192e8; --chart-2:#009d9a; --chart-neg:#fa4d56;
+    /* 基本面图表配色:IBM Carbon 分类序列(purple70 / cyan50 / red50,相邻色相拉开对比) */
+    --chart-1:#6929c4; --chart-2:#1192e8; --chart-neg:#fa4d56;
     /* 高亮 / 行动蓝(原硬编码 #31679b 一族,提为 token) */
     --cta:#31679b; --cta-hover:#2b5a87; --cta-soft:#f2f6fb; --cta-line:#cfddec;
     /* 圆角规范(zed 紧致:控件 4 / 中卡 6 / 大面板 8,不超过 8) */
