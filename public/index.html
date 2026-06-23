@@ -1381,7 +1381,7 @@ function showView(v) { // "list" | "settings" | "detail" | "valedit"
 }
 function showList() { showView("list"); }
 function showSettings() { showView("settings"); }
-function showDetail(item) { renderDetail(item); showView("detail"); window.scrollTo(0, 0); }
+function showDetail(item, initialTab) { renderDetail(item, initialTab); showView("detail"); window.scrollTo(0, 0); }
 
 // 大数字格式：按货币用 亿/万亿（CNY/HKD）或 K/M/B/T
 function fmtBig(n, currency) {
@@ -1411,7 +1411,7 @@ function fillRows(container, rows) {
   });
   container.appendChild(grid);
 }
-function renderDetail(item) {
+function renderDetail(item, initialTab = 0) {
   const c = item.cfg, s = item.statics || {};
   viewDetail.innerHTML = "";
   if (detailGauge) { detailGauge.destroy && detailGauge.destroy(); detailGauge = null; }
@@ -1456,8 +1456,8 @@ function renderDetail(item) {
   ];
   const tabEls = [], panelEls = [];
   defs.forEach((d, i) => {
-    const b = document.createElement("button"); b.className = "vd-tab" + (i === 0 ? " on" : ""); b.textContent = d.label;
-    const p = document.createElement("div"); p.className = "vd-panel" + (i === 0 ? " on" : "");
+    const b = document.createElement("button"); b.className = "vd-tab" + (i === initialTab ? " on" : ""); b.textContent = d.label;
+    const p = document.createElement("div"); p.className = "vd-panel" + (i === initialTab ? " on" : "");
     b.addEventListener("click", () => { tabEls.forEach((x) => x.classList.remove("on")); panelEls.forEach((x) => x.classList.remove("on")); b.classList.add("on"); p.classList.add("on"); });
     tabsNav.appendChild(b); panels.appendChild(p); tabEls.push(b); panelEls.push(p);
   });
@@ -1971,7 +1971,7 @@ function route() {
   if (item && owner) showDetail(item); else showList();
 }
 window.addEventListener("popstate", () => {
-  if (valEditReturn) { const it = valEditReturn; valEditReturn = null; showDetail(it); return; } // 退出编辑器→回详情
+  if (valEditReturn) { const it = valEditReturn; valEditReturn = null; showDetail(it, 1); return; } // 退出编辑器→回详情（停在估值研究 tab）
   route();
 });
 
