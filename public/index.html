@@ -1679,7 +1679,17 @@ function renderFundamentalsPanel(item, panel) {
       s.appendChild(fdChartWrap(fdLineChart(SH), SH.map((d) => d.year), [{ label: zh ? "流通股数" : "Shares", data: SH, color: "var(--chart-1)", fmt: (v) => (v / 1e9).toFixed(2) + "B" }]));
       const stats = document.createElement("div"); stats.className = "fd-stats";
       const capInt = (CAP.length && REV.length && fdLast(REV)) ? Math.abs(fdLast(CAP)) / fdLast(REV) * 100 : NaN;
-      stats.innerHTML = (Number.isFinite(capInt) ? `<span class="fd-stat"><b>${capInt.toFixed(0)}%</b>${zh ? "capex / 营收" : "capex / rev"}</span>` : "")
+      // 派息（return to shareholders）：仅当有股息时补充。每股股利来自静态信息(实为金额)，股息率/分红率为派生
+      const dps = parseFloat((item.statics || {}).dividendYield), epsT = parseFloat((item.statics || {}).epsTtm), px = item.cfg.price;
+      const divYield = (Number.isFinite(dps) && px > 0) ? dps / px * 100 : NaN;
+      const payout = (Number.isFinite(dps) && Number.isFinite(epsT) && epsT > 0) ? dps / epsT * 100 : NaN;
+      const divChips = (Number.isFinite(dps) && dps > 0)
+        ? `<span class="fd-stat"><b>${dps.toFixed(2)}${cur ? " " + cur : ""}</b>${zh ? "每股股利" : "DPS"}</span>`
+          + (Number.isFinite(divYield) ? `<span class="fd-stat"><b>${divYield.toFixed(2)}%</b>${zh ? "股息率" : "Div yield"}</span>` : "")
+          + (Number.isFinite(payout) ? `<span class="fd-stat"><b>${payout.toFixed(0)}%</b>${zh ? "分红率" : "Payout"}</span>` : "")
+        : "";
+      stats.innerHTML = divChips
+        + (Number.isFinite(capInt) ? `<span class="fd-stat"><b>${capInt.toFixed(0)}%</b>${zh ? "capex / 营收" : "capex / rev"}</span>` : "")
         + (OCFC.length ? `<span class="fd-stat"><b>${fdLast(OCFC).toFixed(0)}%</b>${zh ? "经营现金流覆盖" : "OCF coverage"}</span>` : "")
         + (FCF.length ? `<span class="fd-stat"><b>${fdMoney(fdLast(FCF), cur)}</b>${zh ? "最新自由现金流" : "Latest FCF"}</span>` : "");
       s.appendChild(stats);
