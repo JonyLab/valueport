@@ -6,6 +6,7 @@ import { parseTencentQuotes, parseTencentHints } from "./quotes.js";
 import { fetchLongbridgeQuotes, fetchLongbridgeNames, fetchLongbridgeFinancials, pickLatestAnnual, fetchValuationRefs } from "./longbridge.js";
 import { fetchDeductedNetIncome } from "./eastmoney.js";
 import { fetchAdjustedEps } from "./finnhub.js";
+import { fetchDividendHistory } from "./dividends.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
@@ -79,18 +80,19 @@ app.get("/api/financials", async (c) => {
   const isAnnual = c.req.query("period") !== "quarter";
   const report = isAnnual ? "af" : "qf";
   const haveCreds = c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN;
-  let financials = null, valuationRefs = null, deducted = null, adjEps = null;
+  let financials = null, valuationRefs = null, deducted = null, adjEps = null, dividends = null;
   if (symbol && haveCreds) {
     try {
       if (isAnnual) {
-        // 扣非(东财·A股)、调整后EPS(Finnhub·美股)均与长桥并行拉取;免费、各自失败不影响其余
-        const [f, vr, dni, aeps] = await Promise.all([
+        // 扣非(东财·A股)、调整后EPS(Finnhub·美股)、逐年派息(东财·全市场)均与长桥并行拉取;免费、各自失败不影响其余
+        const [f, vr, dni, aeps, div] = await Promise.all([
           fetchLongbridgeFinancials(c.env, symbol, report),
           fetchValuationRefs(c.env, symbol),
           fetchDeductedNetIncome(symbol),
           fetchAdjustedEps(c.env, symbol),
+          fetchDividendHistory(symbol),
         ]);
-        financials = f; valuationRefs = vr; deducted = dni; adjEps = aeps;
+        financials = f; valuationRefs = vr; deducted = dni; adjEps = aeps; dividends = div;
       } else {
         financials = await fetchLongbridgeFinancials(c.env, symbol, report);
       }
@@ -102,7 +104,7 @@ app.get("/api/financials", async (c) => {
   // 仅缓存成功结果;失败/空响应不长期缓存,避免一次瞬时失败把基本面钉死 24 小时
   const ok = financials && (financials.IS || financials.BS || financials.CF);
   c.header("Cache-Control", ok ? "public, max-age=86400" : "no-store");
-  return c.json({ financials, latest, valuationRefs });
+  return c.json({ financials, latest, valuationRefs, dividends });
 });
 app.get("/api/hints", async (c) => {
   const q = c.req.query("q") || "";

@@ -1572,7 +1572,7 @@ function fdChartWrap(svg, years, series, opts) {
 function renderFundamentalsPanel(item, panel) {
   panel.innerHTML = `<div class="fd-empty">${t("d_loading")}</div>`;
   const cur = (item.statics && item.statics.currency) || "";
-  loadFinancials(item, "annual").then(({ financials }) => {
+  loadFinancials(item, "annual").then(({ financials, dividends }) => {
     panel.innerHTML = "";
     if (!financials || !financials.IS) { panel.innerHTML = `<div class="fd-empty">${t("d_no_fundamentals")}</div>`; return; }
     const zh = LANG === "zh";
@@ -1679,20 +1679,53 @@ function renderFundamentalsPanel(item, panel) {
       s.appendChild(fdChartWrap(fdLineChart(SH), SH.map((d) => d.year), [{ label: zh ? "流通股数" : "Shares", data: SH, color: "var(--chart-1)", fmt: (v) => (v / 1e9).toFixed(2) + "B" }]));
       const stats = document.createElement("div"); stats.className = "fd-stats";
       const capInt = (CAP.length && REV.length && fdLast(REV)) ? Math.abs(fdLast(CAP)) / fdLast(REV) * 100 : NaN;
-      // 派息（return to shareholders）：仅当有股息时补充。每股股利来自静态信息(实为金额)，股息率/分红率为派生
-      const dps = parseFloat((item.statics || {}).dividendYield), epsT = parseFloat((item.statics || {}).epsTtm), px = item.cfg.price;
-      const divYield = (Number.isFinite(dps) && px > 0) ? dps / px * 100 : NaN;
-      const payout = (Number.isFinite(dps) && Number.isFinite(epsT) && epsT > 0) ? dps / epsT * 100 : NaN;
-      const divChips = (Number.isFinite(dps) && dps > 0)
-        ? `<span class="fd-stat"><b>${dps.toFixed(2)}${cur ? " " + cur : ""}</b>${zh ? "每股股利" : "DPS"}</span>`
-          + (Number.isFinite(divYield) ? `<span class="fd-stat"><b>${divYield.toFixed(2)}%</b>${zh ? "股息率" : "Div yield"}</span>` : "")
-          + (Number.isFinite(payout) ? `<span class="fd-stat"><b>${payout.toFixed(0)}%</b>${zh ? "分红率" : "Payout"}</span>` : "")
-        : "";
-      stats.innerHTML = divChips
-        + (Number.isFinite(capInt) ? `<span class="fd-stat"><b>${capInt.toFixed(0)}%</b>${zh ? "capex / 营收" : "capex / rev"}</span>` : "")
+      stats.innerHTML = (Number.isFinite(capInt) ? `<span class="fd-stat"><b>${capInt.toFixed(0)}%</b>${zh ? "capex / 营收" : "capex / rev"}</span>` : "")
         + (OCFC.length ? `<span class="fd-stat"><b>${fdLast(OCFC).toFixed(0)}%</b>${zh ? "经营现金流覆盖" : "OCF coverage"}</span>` : "")
         + (FCF.length ? `<span class="fd-stat"><b>${fdMoney(fdLast(FCF), cur)}</b>${zh ? "最新自由现金流" : "Latest FCF"}</span>` : "");
       s.appendChild(stats);
+    }
+
+    // 05 股东回报：逐年每股现金分红（东财全市场）+ 连续派息年数 + 股息率/分红率
+    const dps0 = parseFloat((item.statics || {}).dividendYield), epsT0 = parseFloat((item.statics || {}).epsTtm), px0 = item.cfg.price;
+    const divHist = (dividends && Array.isArray(dividends.years) && dividends.years.length) ? dividends : null;
+    if (divHist || (Number.isFinite(dps0) && dps0 > 0)) {
+      const dcur = (divHist && dividends.currency) || cur;
+      const dseries = divHist ? dividends.years.slice(-10).map((y) => ({ year: y.year, value: y.perShare })) : [];
+      // 连续派息年数：从最新年份往回，逐年（year=前一年-1 且 >0）计数
+      let streak = 0;
+      if (divHist) { const ys = dividends.years; let prev = null; for (let i = ys.length - 1; i >= 0; i--) { if (ys[i].perShare > 0 && (prev === null || ys[i].year === prev - 1)) { streak++; prev = ys[i].year; } else break; } }
+      // 每股股利：优先用历史最新一期，回退 statics
+      const dpsLatest = divHist ? dividends.years[dividends.years.length - 1].perShare : dps0;
+      const divYield = (Number.isFinite(dpsLatest) && px0 > 0) ? dpsLatest / px0 * 100 : NaN;
+      const payout = (Number.isFinite(dpsLatest) && Number.isFinite(epsT0) && epsT0 > 0) ? dpsLatest / epsT0 * 100 : NaN;
+      const heroV = divHist ? `${streak}<span class="u">${zh ? "年" : "y"}</span>` : `${dpsLatest.toFixed(2)}<span class="u"> ${dcur}</span>`;
+      const heroJ = divHist ? (zh ? "连续派息" : "Consecutive payouts") : (zh ? "每股股利 · 仅最新一期" : "DPS · latest only");
+      const s = sec("05", zh ? "股东回报" : "Shareholder returns", zh ? "分红连续性" : "dividend track record", heroV, heroJ, divHist ? "good" : "");
+      if (dseries.length) {
+        s.appendChild(fdChartWrap(fdBars(dseries, false, 150), dseries.map((d) => d.year), [
+          { label: zh ? "每股股利" : "DPS", data: dseries, color: "var(--chart-1)", fmt: (v) => v.toFixed(2) + " " + dcur },
+        ]));
+      }
+      const stats = document.createElement("div"); stats.className = "fd-stats";
+      stats.innerHTML = `<span class="fd-stat"><b>${Number.isFinite(dpsLatest) ? dpsLatest.toFixed(2) : "—"} ${dcur}</b>${zh ? "每股股利" : "DPS"}</span>`
+        + (Number.isFinite(divYield) ? `<span class="fd-stat"><b>${divYield.toFixed(2)}%</b>${zh ? "股息率" : "Div yield"}</span>` : "")
+        + (Number.isFinite(payout) ? `<span class="fd-stat"><b>${payout.toFixed(0)}%</b>${zh ? "分红率" : "Payout"}</span>` : "");
+      s.appendChild(stats);
+      if (divHist && dseries.length) {
+        const co = document.createElement("div"); co.className = "fd-callout";
+        const first = dseries[0], last = dseries[dseries.length - 1];
+        // 期间存在 >45% 的同比骤降(拆股口径断裂 或 真·大幅减派)→ 平滑年化会误导,不报 CAGR
+        const hasBreak = dseries.some((d, i) => i > 0 && dseries[i - 1].value > 0 && d.value / dseries[i - 1].value < 0.55);
+        const cagr = (!hasBreak && first.value > 0 && last.value > 0 && last.year > first.year) ? (Math.pow(last.value / first.value, 1 / (last.year - first.year)) - 1) * 100 : NaN;
+        co.innerHTML = zh
+          ? (Number.isFinite(cagr)
+              ? `近 ${dseries.length} 年每股股利 <b>${first.value.toFixed(2)} → ${last.value.toFixed(2)} ${dcur}</b>,年化 ${cagr >= 0 ? "+" : ""}${cagr.toFixed(1)}%。${streak >= 5 ? "连续派息记录稳定。" : ""}`
+              : `近 ${dseries.length} 年逐年每股股利如上,最新 <b>${last.value.toFixed(2)} ${dcur}</b>。期间口径有断裂(拆股或大幅减派),不宜直接比较前后绝对额;原始金额未做复权。`)
+          : (Number.isFinite(cagr)
+              ? `DPS over ${dseries.length}y: <b>${first.value.toFixed(2)} → ${last.value.toFixed(2)} ${dcur}</b>, ${cagr >= 0 ? "+" : ""}${cagr.toFixed(1)}% CAGR.`
+              : `Annual DPS above; latest <b>${last.value.toFixed(2)} ${dcur}</b>. A break in the series (split or large cut) makes cross-period comparison unreliable; raw amounts, not split-adjusted.`);
+        s.appendChild(co);
+      }
     }
   });
 }
