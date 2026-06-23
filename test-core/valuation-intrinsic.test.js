@@ -86,9 +86,10 @@ describe("DDM (2-stage)", () => {
     expect(ddm.compute(vals, { shares: 0 })).toBeNull();
   });
 
-  it("prefills dps from price * dividendYield / 100", () => {
+  it("prefills dps directly from dividendYield (实为每股股利金额)", () => {
     const f = ddm.fields.find((x) => x.k === "dps");
-    expect(f.prefill({ price: 100, dividendYield: 3 })).toBeCloseTo(3, 6);
-    expect(f.prefill({ price: NaN, dividendYield: 3 })).toBe("");
+    expect(f.prefill({ price: 100, dividendYield: 1.28 })).toBeCloseTo(1.28, 6);
+    expect(f.prefill({ price: NaN, dividendYield: 1.28 })).toBeCloseTo(1.28, 6); // 不再依赖 price
+    expect(f.prefill({ dividendYield: NaN })).toBe("");
   });
 });

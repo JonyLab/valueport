@@ -229,9 +229,9 @@ const DDM = {
       label: { zh: "每股股利", en: "Dividend per share" },
       col: "single",
       unit: "",
-      // 预填 = 价格 × 股息率(%) / 100（不可用时返回 ""）
+      // 预填 = 每股股利金额。注:ctx.dividendYield 实为长桥静态字段「每股股利」(金额,非收益率%),直接用作 dps
       prefill: (ctx) => {
-        const v = (ctx && ctx.price) * (ctx && ctx.dividendYield) / 100;
+        const v = ctx && ctx.dividendYield;
         return Number.isFinite(v) ? v : "";
       },
       meta: "dps",
