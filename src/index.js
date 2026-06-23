@@ -103,7 +103,10 @@ app.get("/api/financials", async (c) => {
   if (Number.isFinite(adjEps)) latest.adjustedEps = adjEps;
   // 仅缓存成功结果;失败/空响应不长期缓存,避免一次瞬时失败把基本面钉死 24 小时
   const ok = financials && (financials.IS || financials.BS || financials.CF);
-  c.header("Cache-Control", ok ? "public, max-age=86400" : "no-store");
+  // 派息支持的市场但本次没取到(东财瞬时失败)→ 缩短缓存,避免把派息钉死 24h,约 1h 后自愈
+  const divMissing = isAnnual && /^(sh|sz|bj|hk|us)/i.test(symbol) && !dividends;
+  const maxAge = !ok ? 0 : (divMissing ? 3600 : 86400);
+  c.header("Cache-Control", maxAge ? `public, max-age=${maxAge}` : "no-store");
   return c.json({ financials, latest, valuationRefs, dividends });
 });
 app.get("/api/hints", async (c) => {
