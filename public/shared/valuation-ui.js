@@ -502,13 +502,14 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const ah = el("div", "vc-seg-head"); const at = el("span", "vc-seg-title"); at.textContent = lang === "zh" ? "资产 / 分部（SOTP）" : "Assets / segments (SOTP)"; ah.appendChild(at);
     const hint = el("div", "vc-asset-hint");
     hint.textContent = lang === "zh"
-      ? "在产矿：权益年产量 ×（商品价 − 完全成本）×（1 − 税率）× 年金系数（寿命, WACC），无永续。固定值包用于锂等业务或已折算的未开发期权现值。"
-      : "Mine: equity output ×(price − unit cost)×(1 − tax)× annuity(life, WACC), no perpetuity. Fixed pack for lithium etc. or a precomputed option PV.";
+      ? "在产矿：年产量×(商品价−完全成本)×(1−税率)×年金系数(寿命,WACC)，无永续。固定值包：锂等业务直接填现值。期权：未开发储量用 Black-Scholes 实时估值(随商品价变动)。"
+      : "Mine: output×(price−cost)×(1−tax)×annuity(life,WACC), no perpetuity. Fixed pack: direct PV (e.g. lithium). Option: undeveloped reserves via Black-Scholes.";
     const table = el("div", "vc-segcards");
     const btns = el("div", "vc-asset-btns");
     const addMine = el("button", "vc-seg-add", { type: "button" }); addMine.textContent = lang === "zh" ? "＋ 在产矿" : "＋ Mine";
     const addFixed = el("button", "vc-seg-add", { type: "button" }); addFixed.textContent = lang === "zh" ? "＋ 固定值包" : "＋ Fixed pack";
-    btns.append(addMine, addFixed);
+    const addOption = el("button", "vc-seg-add", { type: "button" }); addOption.textContent = lang === "zh" ? "＋ 期权(未开发)" : "＋ Option";
+    btns.append(addMine, addFixed, addOption);
     const summary = el("div", "vc-seg-sum");
     assetBox.append(ah, hint, table, btns, summary);
     wrap.append(priceBox, assetBox);
@@ -520,7 +521,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
 
     function usedCommodities() {
       const set = new Set();
-      collect().forEach((a) => { if (a.type === "mine" && a.commodity) set.add(a.commodity); });
+      collect().forEach((a) => { if ((a.type === "mine" || a.type === "option") && a.commodity) set.add(a.commodity); });
       return [...set];
     }
     function readPrices() {
@@ -618,10 +619,50 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       table.appendChild(card); rowEls.push(rec); return rec;
     }
 
-    function makeRow(seed) { return (seed && seed.type === "fixed") ? makeFixedRow(seed) : makeMineRow(seed); }
+    // 未开发储量实物期权（Black–Scholes 自动重塑）
+    function makeOptionRow(seed) {
+      const card = el("div", "vc-segcard");
+      const name = el("input", "vc-input vc-seg-name", { type: "text" }); name.placeholder = lang === "zh" ? "未开发储量期权" : "Undeveloped option"; if (seed && seed.name) name.value = seed.name;
+      const sel = el("select", "vc-input vc-asset-com");
+      Object.keys(COMMODITIES).forEach((k) => { const o = document.createElement("option"); o.value = k; o.textContent = COMMODITIES[k].label[lang]; sel.appendChild(o); });
+      sel.value = (seed && seed.commodity) || "copper";
+      const tag = el("span", "vc-asset-tag"); tag.textContent = "B-S";
+      const del = el("button", "vc-segc-del", { type: "button" }); del.textContent = "✕";
+      const top = el("div", "vc-segc-top"); top.append(name, sel, tag, del);
+      const comDef = () => COMMODITIES[sel.value];
+      // 行1：储量 + 单位边际成本
+      const r1 = el("div", "vc-asset-row");
+      const reserves = makeInput(seed && Number.isFinite(Number(seed.reserves)) ? seed.reserves : ""); reserves.placeholder = lang === "zh" ? "储量" : "Reserves";
+      const rU = el("span", "vc-asset-u");
+      const mc = makeInput(seed && Number.isFinite(Number(seed.marginalCost)) ? seed.marginalCost : ""); mc.placeholder = lang === "zh" ? "单位边际成本" : "Unit cost";
+      const mcU = el("span", "vc-asset-u");
+      r1.append(reserves, rU, mc, mcU);
+      // 行2：开发成本现值 + 波动率
+      const r2 = el("div", "vc-asset-row");
+      const dev = makeMoneyInput(seed && Number.isFinite(Number(seed.devCost)) ? Number(seed.devCost) : ""); dev.placeholder = lang === "zh" ? "开发成本现值" : "Dev cost PV";
+      const sig = makeInput(seed && Number.isFinite(Number(seed.sigma)) ? seed.sigma : 30); sig.placeholder = "σ"; const sigU = el("span", "vc-asset-u"); sigU.textContent = lang === "zh" ? "% 波动率" : "% vol";
+      r2.append(dev, sig, sigU);
+      // 行3：放弃年限 + 无风险利率 + 重置值
+      const r3 = el("div", "vc-asset-row");
+      const yrs = makeInput(seed && Number.isFinite(Number(seed.years)) ? seed.years : 10); yrs.placeholder = "T"; const yU = el("span", "vc-asset-u"); yU.textContent = lang === "zh" ? "年" : "yr";
+      const rf = makeInput(seed && Number.isFinite(Number(seed.rf)) ? seed.rf : 3); rf.placeholder = "rf"; const rfU = el("span", "vc-asset-u"); rfU.textContent = lang === "zh" ? "% 无风险" : "% rf";
+      const reset = el("span", "vc-asset-pv");
+      r3.append(yrs, yU, rf, rfU, reset);
+      const syncU = () => { const d = comDef(); rU.textContent = d.outUnit[lang]; mcU.textContent = d.priceUnit[lang]; };
+      syncU();
+      [name, reserves, mc, dev, sig, yrs, rf].forEach((inp) => inp.addEventListener("input", refresh));
+      sel.addEventListener("change", () => { syncU(); refresh(); });
+      card.append(top, r1, r2, r3);
+      const rec = { el: card, setReset: (t) => { reset.textContent = t; }, collect: () => ({ type: "option", name: name.value, commodity: sel.value, reserves: segNum(reserves), marginalCost: segNum(mc), devCost: moneyVal(dev), sigma: segNum(sig), years: segNum(yrs), rf: segNum(rf), annualCf: NaN }) };
+      del.addEventListener("click", () => delRow(rec));
+      table.appendChild(card); rowEls.push(rec); return rec;
+    }
+
+    function makeRow(seed) { return (seed && seed.type === "fixed") ? makeFixedRow(seed) : (seed && seed.type === "option") ? makeOptionRow(seed) : makeMineRow(seed); }
 
     addMine.addEventListener("click", () => { makeMineRow(); refresh(); });
     addFixed.addEventListener("click", () => { makeFixedRow(); refresh(); });
+    addOption.addEventListener("click", () => { makeOptionRow(); refresh(); });
     const seedRows = (assetState.rows && assetState.rows.length) ? assetState.rows
       : [{ type: "mine", name: lang === "zh" ? "主力矿" : "Main mine", commodity: "copper", output: "", unitCost: "", life: 20 }];
     seedRows.forEach((row) => makeRow(row));

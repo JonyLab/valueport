@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { annuityFactor, assetResetValue, navPerShare, COMMODITIES, RESOURCE } from "../public/shared/valuation/resource.js";
+import { annuityFactor, assetResetValue, navPerShare, normCdf, blackScholesCall, optionValue, COMMODITIES, RESOURCE } from "../public/shared/valuation/resource.js";
 import { MODELS } from "../public/shared/valuation/index.js";
 
 const nav = RESOURCE[0];
@@ -70,6 +70,33 @@ describe("navPerShare + run (SOTP sum − net debt)", () => {
   });
   it("run() null when shares invalid", () => {
     expect(nav.run(form, { shares: 0 }).low).toBeNull();
+  });
+});
+
+describe("Black–Scholes 未开发储量期权 (natres.xls)", () => {
+  it("normCdf matches known values", () => {
+    expect(normCdf(0)).toBeCloseTo(0.5, 4);
+    expect(normCdf(1.1312)).toBeCloseTo(0.8710, 3);
+    expect(normCdf(0.18254)).toBeCloseTo(0.5724, 3);
+  });
+  it("reproduces natres.xls option value ≈ 472,622", () => {
+    // S=125万, K=100万, T=10, σ=0.3, rf=0.08, y=0.04
+    const v = blackScholesCall(1.25e6, 1e6, 10, 0.3, 0.08, 0.04);
+    expect(v).toBeCloseTo(472622, -3); // 误差<500
+  });
+  it("NaN when out-of-the-money (S<=0) or bad inputs", () => {
+    expect(Number.isNaN(blackScholesCall(0, 1e6, 10, 0.3, 0.08, 0))).toBe(true);
+    expect(Number.isNaN(blackScholesCall(1e6, 1e6, 10, 0, 0.08, 0))).toBe(true);
+  });
+  it("optionValue derives S from macro price; rises with commodity price", () => {
+    const opt = { type: "option", commodity: "copper", reserves: 50, marginalCost: 30000, devCost: 2e10, sigma: 30, years: 10, rf: 3, annualCf: 0 };
+    const lo = optionValue(opt, () => 70000), hi = optionValue(opt, () => 90000);
+    expect(lo).toBeGreaterThan(0);
+    expect(hi).toBeGreaterThan(lo); // 价高 → 期权更值钱
+  });
+  it("assetResetValue dispatches option type", () => {
+    const opt = { type: "option", commodity: "gold", reserves: 100, marginalCost: 200, devCost: 1e10, sigma: 35, years: 8, rf: 3, annualCf: 0 };
+    expect(assetResetValue(opt, () => 700, 7, 25)).toBeCloseTo(optionValue(opt, () => 700), 6);
   });
 });
 

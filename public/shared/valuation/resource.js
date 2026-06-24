@@ -26,11 +26,47 @@ export function annuityFactor(L, wPct) {
   return (1 - Math.pow(1 + w, -L)) / w;
 }
 
+// 标准正态分布 CDF（Abramowitz–Stegun 7.1.26，精度 ~7e-8）
+export function normCdf(x) {
+  if (!isNum(x)) return NaN;
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989422804014327 * Math.exp(-x * x / 2);
+  const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return x >= 0 ? 1 - p : p;
+}
+
+// 含连续股息率 y 的 Black–Scholes 看涨期权（natres 未开发储量实物期权）。
+// Call = S·e^(−yT)·N(d1) − K·e^(−rfT)·N(d2)
+export function blackScholesCall(S, K, T, sigma, rf, y) {
+  if (!(S > 0) || !(K > 0) || !(T > 0) || !(sigma > 0)) return NaN;
+  const yy = isNum(y) ? y : 0, r = isNum(rf) ? rf : 0;
+  const sT = sigma * Math.sqrt(T);
+  const d1 = (Math.log(S / K) + (r - yy + sigma * sigma / 2) * T) / sT;
+  const d2 = d1 - sT;
+  return S * Math.exp(-yy * T) * normCdf(d1) - K * Math.exp(-r * T) * normCdf(d2);
+}
+
+// 未开发储量期权资产 → 期权现值。S=储量×(商品价−单位边际成本)；K=开发成本；
+// y=开发后年现金流/S（等待的代价）。商品价取自宏观，故期权也随价位变动。
+export function optionValue(asset, priceOf) {
+  const com = COMMODITIES[asset && asset.commodity];
+  if (!com) return NaN;
+  const price = Number(priceOf ? priceOf(asset.commodity) : NaN);
+  const reserves = Number(asset.reserves), mc = Number(asset.marginalCost), K = Number(asset.devCost);
+  const sigma = Number(asset.sigma) / 100, T = Number(asset.years), rf = Number(asset.rf) / 100, cf = Number(asset.annualCf);
+  if (!isNum(price) || !isNum(reserves) || !isNum(mc) || !isNum(K)) return NaN;
+  const S = reserves * com.toBase * (price - mc);
+  if (!(S > 0)) return NaN; // 现价低于边际成本：本简化模型不估（natres 同样要求 S>0）
+  const y = (isNum(cf) && cf > 0) ? cf / S : 0;
+  return blackScholesCall(S, K, T, sigma, rf, y);
+}
+
 // 单资产重置价值。priceOf(commodity)→当前情景商品价；wPct 折现率；taxPct 税率。
-// type==="fixed" → 直接用 value（固定值包，对价格/折现不敏感）。
+// type==="fixed" → 直接用 value；type==="option" → B-S 期权现值（忽略 wPct/tax，用期权自身参数）。
 export function assetResetValue(asset, priceOf, wPct, taxPct) {
   if (!asset) return NaN;
   if (asset.type === "fixed") { const v = Number(asset.value); return isNum(v) ? v : NaN; }
+  if (asset.type === "option") return optionValue(asset, priceOf);
   const com = COMMODITIES[asset.commodity];
   if (!com) return NaN;
   const price = Number(priceOf ? priceOf(asset.commodity) : NaN);
@@ -113,7 +149,7 @@ const NAVSOTP = {
     let maxL = 0;
     const mines = [];
     for (const a of vals.assets) {
-      if (!a || a.type === "fixed") continue;
+      if (!a || a.type !== "mine") continue; // 仅在产矿有逐年现金流；固定值包/期权不计入明细
       const com = COMMODITIES[a.commodity]; if (!com) continue;
       const price = Number(priceOf(a.commodity)), cost = Number(a.unitCost), output = Number(a.output), L = Math.floor(Number(a.life));
       if (!isNum(price) || !isNum(cost) || !isNum(output) || !isPos(L)) continue;
