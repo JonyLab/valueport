@@ -11,7 +11,7 @@ import { MODELS, runModel, modeFields } from "/shared/valuation/index.js";
 import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/shared/field-meta.js";
 import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
-import { assetPV } from "/shared/valuation/resource.js";
+import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -79,8 +79,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const derivations = (initialDerivations && typeof initialDerivations === "object") ? JSON.parse(JSON.stringify(initialDerivations)) : {};
   const segments = (initialSegments && typeof initialSegments === "object" && Array.isArray(initialSegments.rows))
     ? JSON.parse(JSON.stringify(initialSegments)) : { enabled: false, rows: [] };
-  // 资源股 NAV/SOTP 的资产明细（随 inputs.assets 持久化，不另设字段）
+  // 资源股 NAV/SOTP 的资产明细 + 宏观商品价（随 inputs.assets / inputs.prices 持久化）
   let assetState = { rows: (initialInputs && Array.isArray(initialInputs.assets)) ? JSON.parse(JSON.stringify(initialInputs.assets)) : null };
+  let priceState = (initialInputs && initialInputs.prices && typeof initialInputs.prices === "object") ? JSON.parse(JSON.stringify(initialInputs.prices)) : {};
   const round2 = (n) => Math.round(n * 100) / 100;
   // 仅保留当前模型字段的推导,存档时用
   function currentDerivations() {
@@ -166,6 +167,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     }
     if (model.modes) { cons._mode = opt._mode = currentMode; }
     if (form.assets) { cons.assets = opt.assets = form.assets; } // 资产型模型：明细/摘要需要资产数组
+    if (form.prices) { cons.prices = opt.prices = form.prices; }
     return { cons, opt };
   }
   function renderBreakdown(model, form, valid) {
@@ -195,6 +197,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     }
     if (model.modes) v._mode = currentMode;
     if (form.assets) v.assets = form.assets;
+    if (form.prices) v.prices = form.prices;
     return v;
   }
   // 逐年现金流明细（仅 DCF 模型；可展开；情景取中）
@@ -486,73 +489,141 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     return wrap;
   }
 
-  // 资源股 NAV/SOTP 资产表：每资产一行(年现金流 + 可采年限 + 增速保守/乐观)→ 有限寿命 DCF 求和
-  function buildAssetSection(getDiscountMid, recompute) {
-    const wrap = el("div", "vc-seg");
-    const head = el("div", "vc-seg-head");
-    const title = el("span", "vc-seg-title"); title.textContent = lang === "zh" ? "资产 / 分部（SOTP）" : "Assets / segments (SOTP)";
-    head.appendChild(title);
+  // 资源股 NAV/SOTP：宏观商品价（保守/乐观，自动跟随在产矿出现）+ 资产表（在产矿 / 固定值包）
+  function buildResourceSection(getMacro, recompute) {
+    const wrap = el("div");
+    // ── 宏观商品价 ──
+    const priceBox = el("div", "vc-seg");
+    const ph = el("div", "vc-seg-head"); const pt = el("span", "vc-seg-title"); pt.textContent = lang === "zh" ? "宏观商品价（保守 / 乐观）" : "Commodity prices (cons / opt)"; ph.appendChild(pt);
+    const priceRows = el("div", "vc-pricerows");
+    priceBox.append(ph, priceRows);
+    // ── 资产表 ──
+    const assetBox = el("div", "vc-seg");
+    const ah = el("div", "vc-seg-head"); const at = el("span", "vc-seg-title"); at.textContent = lang === "zh" ? "资产 / 分部（SOTP）" : "Assets / segments (SOTP)"; ah.appendChild(at);
     const hint = el("div", "vc-asset-hint");
     hint.textContent = lang === "zh"
-      ? "每个矿/资产一行：填穿越周期的正常化年现金流、可采年限（替代永续）、增速或衰减。各资产现值加总 − 净负债 = 股权 NAV。"
-      : "One row per mine/asset: normalized mid-cycle annual cash flow, reserve life (replaces perpetuity), growth/decline. Σ asset PV − net debt = equity NAV.";
+      ? "在产矿：权益年产量 ×（商品价 − 完全成本）×（1 − 税率）× 年金系数（寿命, WACC），无永续。固定值包用于锂等业务或已折算的未开发期权现值。"
+      : "Mine: equity output ×(price − unit cost)×(1 − tax)× annuity(life, WACC), no perpetuity. Fixed pack for lithium etc. or a precomputed option PV.";
     const table = el("div", "vc-segcards");
-    const addBtn = el("button", "vc-seg-add", { type: "button" }); addBtn.textContent = lang === "zh" ? "＋ 添加资产" : "＋ Add asset";
+    const btns = el("div", "vc-asset-btns");
+    const addMine = el("button", "vc-seg-add", { type: "button" }); addMine.textContent = lang === "zh" ? "＋ 在产矿" : "＋ Mine";
+    const addFixed = el("button", "vc-seg-add", { type: "button" }); addFixed.textContent = lang === "zh" ? "＋ 固定值包" : "＋ Fixed pack";
+    btns.append(addMine, addFixed);
     const summary = el("div", "vc-seg-sum");
-    wrap.append(head, hint, table, addBtn, summary);
+    assetBox.append(ah, hint, table, btns, summary);
+    wrap.append(priceBox, assetBox);
 
     let rowEls = [];
-    const collect = () => rowEls.map((r) => ({ name: r.name.value, cf: moneyVal(r.cf), L: segNum(r.L), growth: { c: segNum(r.gc), o: segNum(r.go) } }));
+    const priceInputs = {}; // commodity -> {c, o}
+    let lastUsedKey = null;  // 商品集合指纹，未变则不重建价格输入（保住焦点与已填值）
+    const collect = () => rowEls.map((r) => r.collect());
+
+    function usedCommodities() {
+      const set = new Set();
+      collect().forEach((a) => { if (a.type === "mine" && a.commodity) set.add(a.commodity); });
+      return [...set];
+    }
+    function readPrices() {
+      const out = {};
+      Object.keys(priceInputs).forEach((com) => { const p = priceInputs[com]; out[com] = { c: p.c.value !== "" ? Number(p.c.value) : NaN, o: p.o.value !== "" ? Number(p.o.value) : NaN }; });
+      priceState = out;
+    }
+    function syncPrices() {
+      const used = usedCommodities();
+      const key = used.slice().sort().join(",");
+      if (key === lastUsedKey) return; // 商品集合未变 → 不重建 DOM（避免输入时丢焦点/丢值）
+      if (Object.keys(priceInputs).length) readPrices(); // 重建前先把现有输入存进 priceState
+      lastUsedKey = key;
+      Object.keys(priceInputs).forEach((k) => delete priceInputs[k]);
+      priceRows.innerHTML = "";
+      if (!used.length) { const e = el("div", "vc-asset-hint"); e.textContent = lang === "zh" ? "下方添加在产矿后，这里出现对应商品的长期基准价。" : "Add a mine below; its commodity price appears here."; priceRows.appendChild(e); return; }
+      const hdr = el("div", "vc-price-row vc-price-hdr"); hdr.append(el("span"), (() => { const s = el("span"); s.textContent = lang === "zh" ? "保守" : "Cons"; return s; })(), (() => { const s = el("span"); s.textContent = lang === "zh" ? "乐观" : "Opt"; return s; })()); priceRows.appendChild(hdr);
+      used.forEach((com) => {
+        const def = COMMODITIES[com]; const cur = (priceState && priceState[com]) || def.price;
+        const row = el("div", "vc-price-row");
+        const lab = el("span", "vc-price-lab"); lab.textContent = `${def.label[lang]} ${def.priceUnit[lang]}`;
+        const ic = makeInput(Number.isFinite(Number(cur.c)) ? cur.c : def.price.c), io = makeInput(Number.isFinite(Number(cur.o)) ? cur.o : def.price.o);
+        ic.addEventListener("input", () => { readPrices(); refresh(); }); io.addEventListener("input", () => { readPrices(); refresh(); });
+        priceInputs[com] = { c: ic, o: io };
+        row.append(lab, ic, io); priceRows.appendChild(row);
+      });
+      readPrices();
+    }
 
     function refresh() {
-      const rows = collect();
-      assetState.rows = rows;
-      const r = getDiscountMid();
-      let sumPV = 0, n = 0;
-      rowEls.forEach((rec, i) => {
-        const x = rows[i];
-        const gm = (Number.isFinite(x.growth.c) && Number.isFinite(x.growth.o)) ? (x.growth.c + x.growth.o) / 2 : (Number.isFinite(x.growth.c) ? x.growth.c : x.growth.o);
-        const pv = (Number.isFinite(x.cf) && x.L > 0 && Number.isFinite(gm) && Number.isFinite(r)) ? assetPV(x.cf, x.L, gm / 100, r / 100) : NaN;
-        rec.pv.textContent = Number.isFinite(pv) ? (lang === "zh" ? `现值≈${fmtMoney(pv)}` : `PV≈${fmtMoney(pv)}`) : "";
-        if (Number.isFinite(pv)) { sumPV += pv; n++; }
+      assetState.rows = collect();
+      syncPrices();
+      const { wMid, tax } = getMacro();
+      const priceOf = (com) => { const p = priceState[com]; if (p && Number.isFinite(p.c) && Number.isFinite(p.o)) return (p.c + p.o) / 2; const d = COMMODITIES[com] && COMMODITIES[com].price; return d ? (d.c + d.o) / 2 : NaN; };
+      let sum = 0, n = 0;
+      rowEls.forEach((r) => {
+        const a = r.collect();
+        const v = assetResetValue(a, priceOf, wMid, tax);
+        r.setReset(Number.isFinite(v) ? (lang === "zh" ? `重置值≈${fmtMoney(v)}` : `≈${fmtMoney(v)}`) : "");
+        if (Number.isFinite(v)) { sum += v; n++; }
       });
       summary.textContent = n
-        ? (lang === "zh" ? `${n} 项资产 · 现值合计≈${fmtMoney(sumPV)}（折现率取中 ${Number.isFinite(r) ? r.toFixed(1) : "—"}%）` : `${n} assets · ΣPV≈${fmtMoney(sumPV)} (mid rate ${Number.isFinite(r) ? r.toFixed(1) : "—"}%)`)
-        : (lang === "zh" ? "添加资产：年现金流 + 可采年限 + 增速" : "Add assets: cash flow + reserve life + growth");
+        ? (lang === "zh" ? `${n} 项资产 · 重置现值合计≈${fmtMoney(sum)}（价取中 · WACC ${Number.isFinite(wMid) ? wMid.toFixed(1) : "—"}%）` : `${n} assets · Σ≈${fmtMoney(sum)} (mid price · WACC ${Number.isFinite(wMid) ? wMid.toFixed(1) : "—"}%)`)
+        : (lang === "zh" ? "添加资产：在产矿（产量/成本/寿命）或固定值包" : "Add a mine (output/cost/life) or a fixed pack");
       recompute();
     }
 
-    function makeRow(seed) {
+    function delRow(rec) { rowEls = rowEls.filter((x) => x !== rec); rec.el.remove(); refresh(); }
+
+    function makeMineRow(seed) {
       const card = el("div", "vc-segcard");
-      const name = el("input", "vc-input vc-seg-name", { type: "text" }); name.placeholder = lang === "zh" ? "资产名" : "Asset"; if (seed && seed.name) name.value = seed.name;
-      const cf = makeMoneyInput(seed && Number.isFinite(Number(seed.cf)) ? Number(seed.cf) : ""); cf.placeholder = lang === "zh" ? "年现金流" : "Annual CF";
+      const name = el("input", "vc-input vc-seg-name", { type: "text" }); name.placeholder = lang === "zh" ? "矿名" : "Mine"; if (seed && seed.name) name.value = seed.name;
+      const sel = el("select", "vc-input vc-asset-com");
+      Object.keys(COMMODITIES).forEach((k) => { const o = document.createElement("option"); o.value = k; o.textContent = COMMODITIES[k].label[lang]; sel.appendChild(o); });
+      sel.value = (seed && seed.commodity) || "copper";
       const del = el("button", "vc-segc-del", { type: "button" }); del.textContent = "✕";
-      const top = el("div", "vc-segc-top"); top.append(name, cf, del);
-      // 可采年限 + 该资产现值
-      const metaRow = el("div", "vc-asset-row");
-      const lLab = el("span"); lLab.textContent = lang === "zh" ? "可采年限" : "Reserve life";
-      const L = makeInput(seed && Number.isFinite(Number(seed.L)) ? Number(seed.L) : 15);
-      const yr = el("span"); yr.textContent = lang === "zh" ? "年" : "yr";
-      const pv = el("span", "vc-asset-pv");
-      metaRow.append(lLab, L, yr, pv);
-      // 增速 保守|乐观
-      const gc = makeInput(seed && seed.growth ? seed.growth.c : 0), go = makeInput(seed && seed.growth ? seed.growth.o : 3);
-      gc.placeholder = lang === "zh" ? "保守" : "cons"; go.placeholder = lang === "zh" ? "乐观" : "opt";
-      const scen = el("div", "vc-segscen");
-      const hc = el("div", "vc-segscen-h"); hc.textContent = lang === "zh" ? "保守" : "Cons";
-      const ho = el("div", "vc-segscen-h"); ho.textContent = lang === "zh" ? "乐观" : "Opt";
-      const gLab = el("div", "vc-segscen-lab"); gLab.textContent = lang === "zh" ? "增速/衰减 %" : "Growth %";
-      scen.append(el("div"), hc, ho, gLab, gc, go);
-      [name, cf, L, gc, go].forEach((inp) => inp.addEventListener("input", refresh));
-      card.append(top, metaRow, scen);
-      const rec = { name, cf, L, gc, go, pv, el: card };
-      del.addEventListener("click", () => { rowEls = rowEls.filter((x) => x !== rec); card.remove(); refresh(); });
+      const top = el("div", "vc-segc-top"); top.append(name, sel, del);
+      const comDef = () => COMMODITIES[sel.value];
+      // 产量 + 完全成本
+      const row1 = el("div", "vc-asset-row");
+      const out = makeInput(seed && Number.isFinite(Number(seed.output)) ? seed.output : ""); out.placeholder = lang === "zh" ? "权益年产量" : "Output";
+      const outU = el("span", "vc-asset-u"); const cost = makeInput(seed && Number.isFinite(Number(seed.unitCost)) ? seed.unitCost : ""); cost.placeholder = lang === "zh" ? "完全成本" : "Unit cost";
+      const costU = el("span", "vc-asset-u");
+      row1.append(out, outU, cost, costU);
+      // 寿命 + 重置值
+      const row2 = el("div", "vc-asset-row");
+      const life = makeInput(seed && Number.isFinite(Number(seed.life)) ? seed.life : 20); life.placeholder = lang === "zh" ? "寿命" : "Life";
+      const lifeU = el("span"); lifeU.textContent = lang === "zh" ? "年寿命" : "yr life";
+      const reset = el("span", "vc-asset-pv");
+      row2.append(life, lifeU, reset);
+      const syncU = () => { const d = comDef(); outU.textContent = d.outUnit[lang]; costU.textContent = d.priceUnit[lang]; };
+      syncU();
+      [name, out, cost, life].forEach((inp) => inp.addEventListener("input", refresh));
+      sel.addEventListener("change", () => { syncU(); refresh(); });
+      card.append(top, row1, row2);
+      const rec = { el: card, setReset: (t) => { reset.textContent = t; }, collect: () => ({ type: "mine", name: name.value, commodity: sel.value, output: segNum(out), unitCost: segNum(cost), life: segNum(life) }) };
+      del.addEventListener("click", () => delRow(rec));
       table.appendChild(card); rowEls.push(rec); return rec;
     }
 
-    addBtn.addEventListener("click", () => { makeRow(); refresh(); });
+    function makeFixedRow(seed) {
+      const card = el("div", "vc-segcard");
+      const name = el("input", "vc-input vc-seg-name", { type: "text" }); name.placeholder = lang === "zh" ? "资产包名（如 锂板块 / 未开发期权）" : "Fixed pack"; if (seed && seed.name) name.value = seed.name;
+      const tag = el("span", "vc-asset-tag"); tag.textContent = lang === "zh" ? "固定值" : "Fixed";
+      const del = el("button", "vc-segc-del", { type: "button" }); del.textContent = "✕";
+      const top = el("div", "vc-segc-top"); top.append(name, tag, del);
+      const row = el("div", "vc-asset-row");
+      const val = makeMoneyInput(seed && Number.isFinite(Number(seed.value)) ? Number(seed.value) : ""); val.placeholder = lang === "zh" ? "现值" : "Value";
+      const reset = el("span", "vc-asset-pv");
+      row.append(val, reset);
+      [name, val].forEach((inp) => inp.addEventListener("input", refresh));
+      card.append(top, row);
+      const rec = { el: card, setReset: (t) => { reset.textContent = t; }, collect: () => ({ type: "fixed", name: name.value, value: moneyVal(val) }) };
+      del.addEventListener("click", () => delRow(rec));
+      table.appendChild(card); rowEls.push(rec); return rec;
+    }
+
+    function makeRow(seed) { return (seed && seed.type === "fixed") ? makeFixedRow(seed) : makeMineRow(seed); }
+
+    addMine.addEventListener("click", () => { makeMineRow(); refresh(); });
+    addFixed.addEventListener("click", () => { makeFixedRow(); refresh(); });
     const seedRows = (assetState.rows && assetState.rows.length) ? assetState.rows
-      : [{ name: lang === "zh" ? "主资产" : "Main asset", cf: Number.isFinite(ctx.fcf) ? ctx.fcf : "", L: 15, growth: { c: 0, o: 3 } }];
+      : [{ type: "mine", name: lang === "zh" ? "主力矿" : "Main mine", commodity: "copper", output: "", unitCost: "", life: 20 }];
     seedRows.forEach((row) => makeRow(row));
     refresh();
     wrap._refresh = refresh;
@@ -737,20 +808,25 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       formWrap.insertBefore(segSection, gcard.nextSibling);       // 整体参数之后
     }
     if (model.assetModel) {
-      const getDiscountMid = () => {
-        const d = fieldEls.discount; if (!d) return NaN;
-        const c = d.c.value !== "" ? Number(d.c.value) : NaN, o = d.o.value !== "" ? Number(d.o.value) : NaN;
-        return (Number.isFinite(c) && Number.isFinite(o)) ? (c + o) / 2 : (Number.isFinite(c) ? c : o);
+      const getMacro = () => {
+        const d = fieldEls.wacc, t = fieldEls.taxRate;
+        const wc = d && d.c.value !== "" ? Number(d.c.value) : NaN, wo = d && d.o.value !== "" ? Number(d.o.value) : NaN;
+        const wMid = (Number.isFinite(wc) && Number.isFinite(wo)) ? (wc + wo) / 2 : (Number.isFinite(wc) ? wc : wo);
+        const tax = t && t.input.value !== "" ? Number(t.input.value) : NaN;
+        return { wMid, tax };
       };
-      const assetSection = buildAssetSection(getDiscountMid, recompute);
-      formWrap.appendChild(assetSection);
-      // 折现率改动 → 同步刷新各资产现值显示
-      if (fieldEls.discount && assetSection._refresh) [fieldEls.discount.c, fieldEls.discount.o].forEach((i) => i.addEventListener("input", assetSection._refresh));
+      const section = buildResourceSection(getMacro, recompute);
+      formWrap.appendChild(section);
+      // WACC / 税率改动 → 同步刷新各资产重置值显示
+      const macroInputs = [];
+      if (fieldEls.wacc) macroInputs.push(fieldEls.wacc.c, fieldEls.wacc.o);
+      if (fieldEls.taxRate) macroInputs.push(fieldEls.taxRate.input);
+      if (section._refresh) macroInputs.forEach((i) => i.addEventListener("input", section._refresh));
     }
     recompute();
   }
 
-  function buildForm(readers) { const form = {}; readers.forEach(({ field, getVal }) => { form[field.k] = getVal(); }); if (MODELS[activeIdx] && MODELS[activeIdx].modes) form._mode = currentMode; if (MODELS[activeIdx] && MODELS[activeIdx].assetModel && assetState.rows) form.assets = assetState.rows; return form; }
+  function buildForm(readers) { const form = {}; readers.forEach(({ field, getVal }) => { form[field.k] = getVal(); }); if (MODELS[activeIdx] && MODELS[activeIdx].modes) form._mode = currentMode; if (MODELS[activeIdx] && MODELS[activeIdx].assetModel) { if (assetState.rows) form.assets = assetState.rows; form.prices = priceState; } return form; }
 
   renderForm();
 }

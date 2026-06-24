@@ -370,11 +370,21 @@
   .vc-segcard-foot{margin-top:10px;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;min-height:14px}
   .vc-segcard-del{position:absolute;top:8px;right:10px;appearance:none;background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:13px;line-height:1}
   .vc-segcard-del:hover{color:var(--red)}
-  /* 资源股 NAV/SOTP 资产表 */
+  /* 资源股 NAV/SOTP 资产表 + 宏观商品价 */
   .vc-asset-hint{font-size:11.5px;color:var(--ink-mute);line-height:1.55;margin:6px 0 2px}
-  .vc-asset-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-mute)}
-  .vc-asset-row .vc-input{width:64px;min-width:0;text-align:center}
+  .vc-asset-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-mute);flex-wrap:wrap}
+  .vc-asset-row .vc-input{width:84px;min-width:0;text-align:right}
+  .vc-asset-u{font-size:11px;color:var(--ink-mute);white-space:nowrap}
   .vc-asset-pv{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .vc-asset-btns{display:flex;gap:8px}
+  .vc-asset-com{width:auto;min-width:72px;padding:5px 8px}
+  .vc-asset-tag{font-size:10.5px;color:var(--ink-mute);background:var(--accent);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap}
+  .vc-pricerows{margin-top:10px;display:grid;gap:7px}
+  .vc-price-row{display:grid;grid-template-columns:1fr 84px 84px;gap:8px;align-items:center}
+  .vc-price-lab{font-size:12px;color:var(--ink-soft)}
+  .vc-price-row .vc-input{width:84px;text-align:right}
+  .vc-price-hdr span{font-size:11px;color:var(--ink-mute);text-align:center}
+  .vc-price-hdr span:first-child{text-align:left}
   .vc-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-sm);padding:22px;margin-bottom:16px}
   .vc-card-head{font-family:var(--font);font-weight:600;font-size:16px;color:var(--cta);margin-bottom:16px}
   /* 前提：堆叠 标签 + 输入 */
