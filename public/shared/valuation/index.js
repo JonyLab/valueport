@@ -5,9 +5,10 @@
  */
 import { INTRINSIC } from "./intrinsic.js";
 import { RELATIVE } from "./relative.js";
+import { RESOURCE } from "./resource.js";
 
 // 列表顺序即 UI 方法选择条的顺序。
-export const MODELS = [...INTRINSIC, ...RELATIVE];
+export const MODELS = [...INTRINSIC, ...RESOURCE, ...RELATIVE];
 
 // 取某模型在某口径下的字段;无 modes 的模型回退到 model.fields。
 export function modeFields(model, mode) {
@@ -25,6 +26,8 @@ export function modeFields(model, mode) {
  * @returns {{low:Number|null, high:Number|null}}
  */
 export function runModel(model, form, ctx) {
+  // 自跑型模型（如 NAV/SOTP：每资产各自增速、求和后取区间）自带 run()，跳过通用 cons/opt 拆分。
+  if (typeof model.run === "function") return model.run(form, ctx) || { low: null, high: null };
   const cons = {};
   const opt = {};
   const fields = model.modes ? modeFields(model, form._mode || model.defaultMode) : model.fields;

@@ -11,6 +11,7 @@ import { MODELS, runModel, modeFields } from "/shared/valuation/index.js";
 import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/shared/field-meta.js";
 import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
+import { assetPV } from "/shared/valuation/resource.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -78,6 +79,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const derivations = (initialDerivations && typeof initialDerivations === "object") ? JSON.parse(JSON.stringify(initialDerivations)) : {};
   const segments = (initialSegments && typeof initialSegments === "object" && Array.isArray(initialSegments.rows))
     ? JSON.parse(JSON.stringify(initialSegments)) : { enabled: false, rows: [] };
+  // 资源股 NAV/SOTP 的资产明细（随 inputs.assets 持久化，不另设字段）
+  let assetState = { rows: (initialInputs && Array.isArray(initialInputs.assets)) ? JSON.parse(JSON.stringify(initialInputs.assets)) : null };
   const round2 = (n) => Math.round(n * 100) / 100;
   // 仅保留当前模型字段的推导,存档时用
   function currentDerivations() {
@@ -162,6 +165,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       else { cons[f.k] = v; opt[f.k] = v; }
     }
     if (model.modes) { cons._mode = opt._mode = currentMode; }
+    if (form.assets) { cons.assets = opt.assets = form.assets; } // 资产型模型：明细/摘要需要资产数组
     return { cons, opt };
   }
   function renderBreakdown(model, form, valid) {
@@ -190,6 +194,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       } else v[f.k] = x;
     }
     if (model.modes) v._mode = currentMode;
+    if (form.assets) v.assets = form.assets;
     return v;
   }
   // 逐年现金流明细（仅 DCF 模型；可展开；情景取中）
@@ -481,6 +486,79 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     return wrap;
   }
 
+  // 资源股 NAV/SOTP 资产表：每资产一行(年现金流 + 可采年限 + 增速保守/乐观)→ 有限寿命 DCF 求和
+  function buildAssetSection(getDiscountMid, recompute) {
+    const wrap = el("div", "vc-seg");
+    const head = el("div", "vc-seg-head");
+    const title = el("span", "vc-seg-title"); title.textContent = lang === "zh" ? "资产 / 分部（SOTP）" : "Assets / segments (SOTP)";
+    head.appendChild(title);
+    const hint = el("div", "vc-asset-hint");
+    hint.textContent = lang === "zh"
+      ? "每个矿/资产一行：填穿越周期的正常化年现金流、可采年限（替代永续）、增速或衰减。各资产现值加总 − 净负债 = 股权 NAV。"
+      : "One row per mine/asset: normalized mid-cycle annual cash flow, reserve life (replaces perpetuity), growth/decline. Σ asset PV − net debt = equity NAV.";
+    const table = el("div", "vc-segcards");
+    const addBtn = el("button", "vc-seg-add", { type: "button" }); addBtn.textContent = lang === "zh" ? "＋ 添加资产" : "＋ Add asset";
+    const summary = el("div", "vc-seg-sum");
+    wrap.append(head, hint, table, addBtn, summary);
+
+    let rowEls = [];
+    const collect = () => rowEls.map((r) => ({ name: r.name.value, cf: moneyVal(r.cf), L: segNum(r.L), growth: { c: segNum(r.gc), o: segNum(r.go) } }));
+
+    function refresh() {
+      const rows = collect();
+      assetState.rows = rows;
+      const r = getDiscountMid();
+      let sumPV = 0, n = 0;
+      rowEls.forEach((rec, i) => {
+        const x = rows[i];
+        const gm = (Number.isFinite(x.growth.c) && Number.isFinite(x.growth.o)) ? (x.growth.c + x.growth.o) / 2 : (Number.isFinite(x.growth.c) ? x.growth.c : x.growth.o);
+        const pv = (Number.isFinite(x.cf) && x.L > 0 && Number.isFinite(gm) && Number.isFinite(r)) ? assetPV(x.cf, x.L, gm / 100, r / 100) : NaN;
+        rec.pv.textContent = Number.isFinite(pv) ? (lang === "zh" ? `现值≈${fmtMoney(pv)}` : `PV≈${fmtMoney(pv)}`) : "";
+        if (Number.isFinite(pv)) { sumPV += pv; n++; }
+      });
+      summary.textContent = n
+        ? (lang === "zh" ? `${n} 项资产 · 现值合计≈${fmtMoney(sumPV)}（折现率取中 ${Number.isFinite(r) ? r.toFixed(1) : "—"}%）` : `${n} assets · ΣPV≈${fmtMoney(sumPV)} (mid rate ${Number.isFinite(r) ? r.toFixed(1) : "—"}%)`)
+        : (lang === "zh" ? "添加资产：年现金流 + 可采年限 + 增速" : "Add assets: cash flow + reserve life + growth");
+      recompute();
+    }
+
+    function makeRow(seed) {
+      const card = el("div", "vc-segcard");
+      const name = el("input", "vc-input vc-seg-name", { type: "text" }); name.placeholder = lang === "zh" ? "资产名" : "Asset"; if (seed && seed.name) name.value = seed.name;
+      const cf = makeMoneyInput(seed && Number.isFinite(Number(seed.cf)) ? Number(seed.cf) : ""); cf.placeholder = lang === "zh" ? "年现金流" : "Annual CF";
+      const del = el("button", "vc-segc-del", { type: "button" }); del.textContent = "✕";
+      const top = el("div", "vc-segc-top"); top.append(name, cf, del);
+      // 可采年限 + 该资产现值
+      const metaRow = el("div", "vc-asset-row");
+      const lLab = el("span"); lLab.textContent = lang === "zh" ? "可采年限" : "Reserve life";
+      const L = makeInput(seed && Number.isFinite(Number(seed.L)) ? Number(seed.L) : 15);
+      const yr = el("span"); yr.textContent = lang === "zh" ? "年" : "yr";
+      const pv = el("span", "vc-asset-pv");
+      metaRow.append(lLab, L, yr, pv);
+      // 增速 保守|乐观
+      const gc = makeInput(seed && seed.growth ? seed.growth.c : 0), go = makeInput(seed && seed.growth ? seed.growth.o : 3);
+      gc.placeholder = lang === "zh" ? "保守" : "cons"; go.placeholder = lang === "zh" ? "乐观" : "opt";
+      const scen = el("div", "vc-segscen");
+      const hc = el("div", "vc-segscen-h"); hc.textContent = lang === "zh" ? "保守" : "Cons";
+      const ho = el("div", "vc-segscen-h"); ho.textContent = lang === "zh" ? "乐观" : "Opt";
+      const gLab = el("div", "vc-segscen-lab"); gLab.textContent = lang === "zh" ? "增速/衰减 %" : "Growth %";
+      scen.append(el("div"), hc, ho, gLab, gc, go);
+      [name, cf, L, gc, go].forEach((inp) => inp.addEventListener("input", refresh));
+      card.append(top, metaRow, scen);
+      const rec = { name, cf, L, gc, go, pv, el: card };
+      del.addEventListener("click", () => { rowEls = rowEls.filter((x) => x !== rec); card.remove(); refresh(); });
+      table.appendChild(card); rowEls.push(rec); return rec;
+    }
+
+    addBtn.addEventListener("click", () => { makeRow(); refresh(); });
+    const seedRows = (assetState.rows && assetState.rows.length) ? assetState.rows
+      : [{ name: lang === "zh" ? "主资产" : "Main asset", cf: Number.isFinite(ctx.fcf) ? ctx.fcf : "", L: 15, growth: { c: 0, o: 3 } }];
+    seedRows.forEach((row) => makeRow(row));
+    refresh();
+    wrap._refresh = refresh;
+    return wrap;
+  }
+
   function renderForm() {
     formWrap.innerHTML = "";
     // 未选方法：显示提示、清空结果，不预填任何模型
@@ -658,10 +736,21 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       formWrap.insertBefore(gcard, formWrap.children[1] || null); // tabs 之后
       formWrap.insertBefore(segSection, gcard.nextSibling);       // 整体参数之后
     }
+    if (model.assetModel) {
+      const getDiscountMid = () => {
+        const d = fieldEls.discount; if (!d) return NaN;
+        const c = d.c.value !== "" ? Number(d.c.value) : NaN, o = d.o.value !== "" ? Number(d.o.value) : NaN;
+        return (Number.isFinite(c) && Number.isFinite(o)) ? (c + o) / 2 : (Number.isFinite(c) ? c : o);
+      };
+      const assetSection = buildAssetSection(getDiscountMid, recompute);
+      formWrap.appendChild(assetSection);
+      // 折现率改动 → 同步刷新各资产现值显示
+      if (fieldEls.discount && assetSection._refresh) [fieldEls.discount.c, fieldEls.discount.o].forEach((i) => i.addEventListener("input", assetSection._refresh));
+    }
     recompute();
   }
 
-  function buildForm(readers) { const form = {}; readers.forEach(({ field, getVal }) => { form[field.k] = getVal(); }); if (MODELS[activeIdx] && MODELS[activeIdx].modes) form._mode = currentMode; return form; }
+  function buildForm(readers) { const form = {}; readers.forEach(({ field, getVal }) => { form[field.k] = getVal(); }); if (MODELS[activeIdx] && MODELS[activeIdx].modes) form._mode = currentMode; if (MODELS[activeIdx] && MODELS[activeIdx].assetModel && assetState.rows) form.assets = assetState.rows; return form; }
 
   renderForm();
 }

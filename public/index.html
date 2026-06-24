@@ -370,6 +370,11 @@
   .vc-segcard-foot{margin-top:10px;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;min-height:14px}
   .vc-segcard-del{position:absolute;top:8px;right:10px;appearance:none;background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:13px;line-height:1}
   .vc-segcard-del:hover{color:var(--red)}
+  /* 资源股 NAV/SOTP 资产表 */
+  .vc-asset-hint{font-size:11.5px;color:var(--ink-mute);line-height:1.55;margin:6px 0 2px}
+  .vc-asset-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-mute)}
+  .vc-asset-row .vc-input{width:64px;min-width:0;text-align:center}
+  .vc-asset-pv{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
   .vc-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-sm);padding:22px;margin-bottom:16px}
   .vc-card-head{font-family:var(--font);font-weight:600;font-size:16px;color:var(--cta);margin-bottom:16px}
   /* 前提：堆叠 标签 + 输入 */
@@ -1777,6 +1782,11 @@ function syncFairUI(item, idBlock) {
 function assumeSummary(model, inputs) {
   const fields = model.modes ? modeFields(model, (inputs && inputs._mode) || model.defaultMode) : (model.fields || []);
   const parts = [];
+  // 资源股 NAV/SOTP：先报资产数（资产明细在 inputs.assets，不是 dual 字段）
+  if (model.assetModel && Array.isArray(inputs.assets)) {
+    const n = inputs.assets.filter((a) => a && Number.isFinite(Number(a.cf)) && Number(a.L) > 0).length;
+    if (n) parts.push(LANG === "zh" ? `${n} 项资产` : `${n} assets`);
+  }
   const nf = fields.find((f) => f.k === "n"), nv = nf && inputs.n;
   if (nf && nv != null && nv !== "") {
     const lab = (nf.label && nf.label[LANG]) || "n";
