@@ -207,7 +207,9 @@
   @media (max-width:860px){
     .vc{grid-template-columns:1fr}
     .vc-main{padding-right:0;border-right:0}
-    .vc-side{position:sticky;top:auto;bottom:0;background:var(--bg);border-top:1px solid var(--divider);margin:0 -28px;padding:12px 28px 14px}
+    /* 窄屏：右栏(结果卡+备注+提交)顺排在表单下方，不再做底部吸附条（含备注时吸附会过高） */
+    .vc-side{position:static;padding-left:0;margin-top:20px;border-top:1px solid var(--divider);padding-top:20px}
+    .vc-singles-grid{grid-template-columns:1fr}
   }
 
   /* ===== 顶部导航条（zed top nav：左 tabs 下划线 / 右 图标动作；底部标尺线 + 「+」节点）===== */
@@ -354,7 +356,7 @@
   .vc-segcards{display:grid;gap:8px}
   .vc-segcard{border:1px solid var(--border);border-radius:var(--r-lg);padding:8px 10px;background:#fff;display:grid;gap:8px}
   .vc-segc-top{display:flex;align-items:center;gap:8px}
-  .vc-segc-top .vc-seg-name{flex:1;min-width:60px;font-weight:600;font-size:13px;border:1px solid transparent;background:var(--accent);border-radius:var(--r-md);padding:5px 8px}
+  .vc-segc-top .vc-seg-name{flex:1 1 auto;min-width:120px;font-weight:600;font-size:13px;border:1px solid transparent;background:var(--accent);border-radius:var(--r-md);padding:5px 8px}
   .vc-segc-top .vc-seg-name:focus{background:#fff;border-color:var(--ring-border);outline:none}
   .vc-segc-top .vc-money{width:140px;flex:none}
   .vc-segc-del{appearance:none;background:none;border:0;color:var(--ink-mute);cursor:pointer;font-size:13px;line-height:1;padding:2px;margin-left:auto}
@@ -377,7 +379,7 @@
   .vc-asset-u{font-size:11px;color:var(--ink-mute);white-space:nowrap}
   .vc-asset-pv{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
   .vc-asset-btns{display:flex;gap:8px}
-  .vc-asset-com{width:auto;min-width:72px;padding:5px 8px}
+  .vc-segc-top .vc-asset-com{flex:0 0 auto;width:auto;min-width:80px;max-width:120px;padding:5px 8px}
   .vc-asset-tag{font-size:10.5px;color:var(--ink-mute);background:var(--accent);border-radius:var(--r-sm);padding:2px 7px;white-space:nowrap}
   .vc-pricerows{margin-top:10px;display:grid;gap:7px}
   .vc-price-row{display:grid;grid-template-columns:1fr 84px 84px;gap:8px;align-items:center}
@@ -385,15 +387,19 @@
   .vc-price-row .vc-input{width:84px;text-align:right}
   .vc-price-hdr span{font-size:11px;color:var(--ink-mute);text-align:center}
   .vc-price-hdr span:first-child{text-align:left}
-  .vc-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-sm);padding:22px;margin-bottom:16px}
-  .vc-card-head{font-family:var(--font);font-weight:600;font-size:16px;color:var(--cta);margin-bottom:16px}
+  .vc-card{background:#fff;border:1px solid var(--border);border-radius:var(--r-sm);padding:18px;margin-bottom:14px}
+  .vc-card-head{font-family:var(--font);font-weight:600;font-size:16px;color:var(--cta);margin-bottom:14px}
+  /* 「前提」单值字段两列网格,避免每个标量输入独占整行 */
+  .vc-singles-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px}
+  .vc-singles-grid .vc-card-head{grid-column:1/-1;margin-bottom:2px}
+  .vc-singles-grid .vc-fld{margin-bottom:0;min-width:0}
   /* 前提：堆叠 标签 + 输入 */
   .vc-fld{margin-bottom:14px}
   .vc-fld:last-child{margin-bottom:0}
   .vc-flabel{font-size:13px;color:var(--ink);margin-bottom:6px;display:flex;align-items:center}
   /* 情景假设：每个假设各自成行；行内 输入↔参考 紧、行间留白；各行列对齐 */
   .vc-assume{}
-  .vc-arow{display:grid;grid-template-columns:minmax(0,1.1fr) 1fr 1fr;gap:6px 12px;align-items:center;margin-bottom:18px}
+  .vc-arow{display:grid;grid-template-columns:minmax(0,1fr) 116px 116px;gap:6px 14px;align-items:center;margin-bottom:14px}
   .vc-arow:last-child{margin-bottom:0}
   .vc-arow-head{margin-bottom:4px}
   .vc-arow .vc-ref,.vc-arow .vc-guide{margin-top:0}

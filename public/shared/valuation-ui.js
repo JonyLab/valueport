@@ -127,15 +127,14 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const formWrap = el("div", "vc-form");
   main.appendChild(formWrap);
 
-  // ── 备注 ──
+  // ── 备注（放右栏，填补结果卡下方空白、与提交同列）──
   const noteWrap = el("div", "vc-note");
   const noteLabel = el("div", "vc-note-label"); noteLabel.textContent = tx("note");
   const noteInput = el("textarea", "vc-note-input"); noteInput.placeholder = tx("notePh");
   if (initialNote) noteInput.value = initialNote;
   noteWrap.append(noteLabel, noteInput);
-  main.appendChild(noteWrap);
 
-  // ── 右栏：结果卡 + Submit ──
+  // ── 右栏：结果卡 + 备注 + Submit ──
   const rcard = el("div", "vc-rcard");
   const rtop = el("div", "vc-rcard-top");
   const nums = el("div", "vc-rnums");
@@ -148,6 +147,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const schedMount = el("div", "vc-sched");
   rcard.append(rtop, bdMount, schedMount);
   side.appendChild(rcard);
+  side.appendChild(noteWrap);
 
   const submitBtn = el("button", "vc-submit"); submitBtn.type = "button"; submitBtn.textContent = tx("submit"); submitBtn.disabled = true;
   submitBtn.addEventListener("click", () => {
@@ -714,7 +714,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
 
     // Inputs（前提）卡：堆叠 标签 + 输入
     if (singles.length) {
-      const card = el("div", "vc-card"); singlesCard = card;
+      const card = el("div", "vc-card" + (singles.length > 1 ? " vc-singles-grid" : "")); singlesCard = card;
       const h = el("div", "vc-card-head"); h.textContent = tx("facts"); card.appendChild(h);
       singles.forEach((field) => {
         const fld = el("div", "vc-fld");
