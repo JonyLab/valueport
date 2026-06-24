@@ -10,6 +10,45 @@ import { RESOURCE } from "./resource.js";
 // 列表顺序即 UI 方法选择条的顺序。
 export const MODELS = [...INTRINSIC, ...RESOURCE, ...RELATIVE];
 
+// UI 展示分组按「估值口径」组织，不等同于模型内部 group。
+export const METHOD_MENU_GROUPS = [
+  {
+    key: "cashflow",
+    title: { zh: "现金流折现", en: "Cash-flow discounting" },
+    methods: [
+      { key: "fcff", title: { zh: "FCFF 经营现金流", en: "FCFF operating cash flow" }, subtitle: { zh: "从收入、利润率、资本效率推导企业价值。", en: "Derives enterprise value from revenue, margins, and capital efficiency." } },
+      { key: "fcf", title: { zh: "DCF 自由现金流", en: "DCF free cash flow" }, subtitle: { zh: "直接用自由现金流折现，适合现金流较稳定公司。", en: "Discounts free cash flow directly for steadier cash-flow businesses." } },
+      { key: "fcfe", title: { zh: "FCFE 股权现金流", en: "FCFE equity cash flow" }, subtitle: { zh: "从净利润与再投资推导股东可得现金流。", en: "Estimates cash flow available to equity from earnings and reinvestment." } },
+      { key: "ddm", title: { zh: "DDM 股息折现", en: "DDM dividend discount" }, subtitle: { zh: "适合稳定分红、股息可预测的公司。", en: "Best for companies with stable, predictable dividends." } },
+    ],
+  },
+  {
+    key: "asset",
+    title: { zh: "资产重估", en: "Asset revaluation" },
+    methods: [
+      { key: "navsotp", title: { zh: "资源股 NAV / SOTP", en: "Resource NAV / SOTP" }, subtitle: { zh: "按资产包、商品价格和折现率拆开估算净资产价值。", en: "Values asset packages with commodity prices and discount rates." } },
+    ],
+  },
+  {
+    key: "multiple",
+    title: { zh: "倍数反推", en: "Multiple-implied value" },
+    methods: [
+      { key: "pe", title: { zh: "P/E 市盈率", en: "P/E earnings multiple" }, subtitle: { zh: "用盈利增长与目标 PE 推导合理股价。", en: "Uses earnings growth and a target P/E to infer fair price." } },
+      { key: "peg", title: { zh: "PEG 成长校准", en: "PEG growth calibration" }, subtitle: { zh: "用增长率校准 PE，适合成长股粗筛。", en: "Calibrates P/E by growth for quick growth-stock screening." } },
+      { key: "pb", title: { zh: "P/B 市净率", en: "P/B book multiple" }, subtitle: { zh: "适合银行、保险或其他资产型公司。", en: "Useful for banks, insurers, and asset-heavy companies." } },
+      { key: "ps", title: { zh: "P/S 市销率", en: "P/S sales multiple" }, subtitle: { zh: "适合利润暂不稳定但收入可比的公司。", en: "Works when revenue is comparable but margins are not yet steady." } },
+      { key: "evebitda", title: { zh: "EV/EBITDA 企业倍数", en: "EV/EBITDA enterprise multiple" }, subtitle: { zh: "用企业价值口径比较经营资产。", en: "Compares operating assets on an enterprise-value basis." } },
+    ],
+  },
+];
+
+const METHOD_META = new Map(METHOD_MENU_GROUPS.flatMap((group) => group.methods.map((method) => [method.key, method])));
+
+export function methodMenuMeta(model) {
+  if (!model) return null;
+  return METHOD_META.get(model.key) || null;
+}
+
 // 取某模型在某口径下的字段;无 modes 的模型回退到 model.fields。
 export function modeFields(model, mode) {
   if (!model.modes) return model.fields || [];

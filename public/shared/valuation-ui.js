@@ -7,7 +7,7 @@
  *   onDone({ method, inputs, low, high, note })  —— 点 Submit、且低~高有效时触发
  *   verdict(low, high) → { text, cls } | null     —— 由宿主提供（结果卡判定行）
  */
-import { MODELS, runModel, modeFields } from "/shared/valuation/index.js";
+import { METHOD_MENU_GROUPS, MODELS, methodMenuMeta, runModel, modeFields } from "/shared/valuation/index.js";
 import { midpointForm, scheduleSeries, sensitivityMatrix } from "/shared/valuation/workbench.js";
 import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/shared/field-meta.js";
 import { derivationForMeta } from "/shared/valuation/derivations.js";
@@ -69,12 +69,19 @@ function initialFor(field, ctx) {
   if (blank && field.default !== undefined) v = field.default;
   return v;
 }
+function textFor(obj, lang, fallback = "") {
+  return (obj && (obj[lang] || obj.zh || obj.en)) || fallback;
+}
+function modelTitle(model, lang) {
+  const meta = methodMenuMeta(model);
+  return textFor(meta && meta.title, lang, (model && model.label && model.label[lang]) || (model && model.key) || "");
+}
 
 export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, initialDerivations, initialSegments, refData, verdict, onDone, onCancel }) {
   const L = TX[lang] || TX.zh;
   const tx = (k) => L[k];
-  // 新增时不替用户预选方法（activeIdx = -1，显示占位）；编辑时沿用原方法
-  let activeIdx = MODELS.findIndex((m) => m.key === initialMethod);
+  // 新增默认用 PE；编辑时沿用原方法。
+  let activeIdx = MODELS.findIndex((m) => m.key === (initialMethod || "pe"));
   let lastLow = null, lastHigh = null, lastForm = {};
   let currentMode = null;
   const derivations = (initialDerivations && typeof initialDerivations === "object") ? JSON.parse(JSON.stringify(initialDerivations)) : {};
@@ -93,9 +100,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   }
 
   mount.innerHTML = "";
+  mount.classList.add("vc-mount");
   const root = el("div", "vc vc-workbench");
   const top = el("div", "vc-top");
-  const methodTitle = el("div", "vc-method-title");
+  const methodTitle = el("button", "vc-method-title", { type: "button" });
   const shell = el("div", "vc-shell");
   const inputPanel = el("div", "vc-input-panel");
   const resultsPanel = el("div", "vc-results-panel");
@@ -112,42 +120,73 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   root.append(top, shell);
   mount.appendChild(root);
 
-  // ── 估值方法（卡片外，独立标签 + 下拉）──
-  const mblock = el("div", "vc-mblock");
-  const mlabel = el("div", "vc-mlabel"); mlabel.textContent = tx("method");
-  const select = el("select", "vc-select");
-  // 占位项：未选方法时显示，不出现在展开列表里（hidden+disabled）
-  const ph = document.createElement("option");
-  ph.value = "-1"; ph.disabled = true; ph.hidden = true;
-  ph.textContent = lang === "zh" ? "请选择估值方法…" : "Choose a method…";
-  select.appendChild(ph);
-  [["intrinsic", MODELS.filter((m) => m.group === "intrinsic")],
-   ["relative", MODELS.filter((m) => m.group === "relative")]].forEach(([gk, models]) => {
-    if (!models.length) return;
-    const og = document.createElement("optgroup"); og.label = gk === "intrinsic" ? (lang === "zh" ? "内在价值" : "Intrinsic") : (lang === "zh" ? "相对估值" : "Relative");
-    models.forEach((model) => {
-      const o = document.createElement("option");
-      o.value = String(MODELS.indexOf(model));
-      o.textContent = (model.label && model.label[lang]) || model.key;
-      og.appendChild(o);
+  // ── 估值方法：标题即切换器 ──
+  const picker = el("div", "vc-method-picker vc-method-title-picker");
+  const pickerBtn = methodTitle;
+  const pickerText = el("span", "vc-method-title-text");
+  const pickerIcon = el("span", "vc-method-chevron");
+  pickerIcon.textContent = "⌄";
+  pickerBtn.append(pickerText, pickerIcon);
+  const menu = el("div", "vc-method-menu");
+  menu.hidden = true;
+  menu.setAttribute("role", "listbox");
+  picker.append(pickerBtn, menu);
+  const titleText = activeIdx >= 0 ? modelTitle(MODELS[activeIdx], lang) : (lang === "zh" ? "添加估值" : "Add valuation");
+  pickerText.textContent = titleText;
+  function updatePickerLabel() {
+    pickerText.textContent = activeIdx >= 0 ? modelTitle(MODELS[activeIdx], lang) : (lang === "zh" ? "请选择估值方法…" : "Choose a method…");
+  }
+  function setMenuOpen(open) {
+    menu.hidden = !open;
+    picker.classList.toggle("open", open);
+    pickerBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function selectMethod(idx) {
+    activeIdx = idx;
+    currentMode = null;
+    updatePickerLabel();
+    setMenuOpen(false);
+    renderForm();
+  }
+  function buildMethodMenu() {
+    menu.innerHTML = "";
+    const byKey = new Map(MODELS.map((model, idx) => [model.key, { model, idx }]));
+    METHOD_MENU_GROUPS.forEach((group) => {
+      const available = group.methods.map((method) => ({ method, entry: byKey.get(method.key) })).filter((item) => item.entry);
+      if (!available.length) return;
+      const section = el("div", "vc-method-section");
+      const head = el("div", "vc-method-section-title");
+      head.textContent = textFor(group.title, lang, group.key);
+      section.appendChild(head);
+      available.forEach(({ method, entry }) => {
+        const option = el("button", "vc-method-option", { type: "button" });
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", entry.idx === activeIdx ? "true" : "false");
+        const title = el("span", "vc-method-option-title");
+        title.textContent = textFor(method.title, lang, modelTitle(entry.model, lang));
+        const sub = el("span", "vc-method-option-subtitle");
+        sub.textContent = textFor(method.subtitle, lang, "");
+        option.append(title, sub);
+        option.addEventListener("click", () => selectMethod(entry.idx));
+        section.appendChild(option);
+      });
+      menu.appendChild(section);
     });
-    select.appendChild(og);
-  });
-  select.value = activeIdx >= 0 ? String(activeIdx) : "-1";
-  select.addEventListener("change", () => { activeIdx = Number(select.value); currentMode = null; renderForm(); });
-  const titleText = activeIdx >= 0
-    ? ((MODELS[activeIdx].label && MODELS[activeIdx].label[lang]) || MODELS[activeIdx].key)
-    : (lang === "zh" ? "添加估值" : "Add valuation");
-  methodTitle.textContent = titleText;
-  mblock.append(mlabel, select);
-  top.append(methodTitle, mblock);
+  }
+  pickerBtn.setAttribute("aria-haspopup", "listbox");
+  pickerBtn.addEventListener("click", () => setMenuOpen(menu.hidden));
+  document.addEventListener("click", (event) => { if (!picker.contains(event.target)) setMenuOpen(false); });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") setMenuOpen(false); });
+  buildMethodMenu();
+  updatePickerLabel();
+  top.append(picker);
 
   const panelHead = el("div", "vc-panel-head");
   panelHead.textContent = "Inputs";
   const formWrap = el("div", "vc-form");
   inputBody.append(panelHead, formWrap);
 
-  // ── 备注（放右栏，填补结果卡下方空白、与提交同列）──
+  // ── 备注（跟随 Inputs 内容滚动，不吸底）──
   const noteWrap = el("div", "vc-note");
   const noteLabel = el("div", "vc-note-label"); noteLabel.textContent = tx("note");
   const noteInput = el("textarea", "vc-note-input"); noteInput.placeholder = tx("notePh");
@@ -174,7 +213,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const segOut = currentMode === "segment" ? { enabled: true, rows: segments.rows } : { enabled: false, rows: segments.rows || [] };
     onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), segments: segOut, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
   });
-  inputFooter.append(noteWrap, submitBtn);
+  inputFooter.append(submitBtn);
 
   // ── 计算 + 渲染结果 ──
   function consOpt(model, form) {
@@ -772,7 +811,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     formWrap.innerHTML = "";
     // 未选方法：显示提示、清空结果，不预填任何模型
     if (activeIdx < 0) {
-      methodTitle.textContent = lang === "zh" ? "添加估值" : "Add valuation";
+      pickerText.textContent = lang === "zh" ? "添加估值" : "Add valuation";
+      buildMethodMenu();
+      updatePickerLabel();
       const hint = el("div", "vc-empty-method");
       hint.textContent = lang === "zh" ? "请先选择一个估值方法" : "Pick a valuation method to begin";
       formWrap.appendChild(hint);
@@ -787,7 +828,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       return;
     }
     const model = MODELS[activeIdx];
-    methodTitle.textContent = (model.label && model.label[lang]) || model.key;
+    pickerText.textContent = modelTitle(model, lang);
+    buildMethodMenu();
+    updatePickerLabel();
     if (model.modes) {
       if (!currentMode || !model.modes.some((m) => m.key === currentMode)) {
         currentMode = (initialInputs && initialInputs._mode)
@@ -965,6 +1008,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       if (fieldEls.taxRate) macroInputs.push(fieldEls.taxRate.input);
       if (section._refresh) macroInputs.forEach((i) => i.addEventListener("input", section._refresh));
     }
+    formWrap.appendChild(noteWrap);
     recompute();
   }
 
