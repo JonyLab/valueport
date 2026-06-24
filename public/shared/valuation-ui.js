@@ -8,6 +8,7 @@
  *   verdict(low, high) → { text, cls } | null     —— 由宿主提供（结果卡判定行）
  */
 import { MODELS, runModel, modeFields } from "/shared/valuation/index.js";
+import { midpointForm, scheduleSeries, sensitivityMatrix } from "/shared/valuation/workbench.js";
 import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/shared/field-meta.js";
 import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
@@ -92,10 +93,23 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   }
 
   mount.innerHTML = "";
-  const root = el("div", "vc");
-  const main = el("div", "vc-main");
-  const side = el("div", "vc-side");
-  root.append(main, side);
+  const root = el("div", "vc vc-workbench");
+  const top = el("div", "vc-top");
+  const methodTitle = el("div", "vc-method-title");
+  const shell = el("div", "vc-shell");
+  const inputPanel = el("div", "vc-input-panel");
+  const resultsPanel = el("div", "vc-results-panel");
+  const inputBody = el("div", "vc-input-body");
+  const inputFooter = el("div", "vc-input-footer");
+  const summaryCard = el("section", "vc-result-card vc-summary-card");
+  const vizGrid = el("div", "vc-viz-grid");
+  const chartCard = el("section", "vc-result-card vc-chart-card");
+  const sensitivityCard = el("section", "vc-result-card vc-sens-card");
+  inputPanel.append(inputBody, inputFooter);
+  resultsPanel.append(summaryCard, vizGrid);
+  vizGrid.append(chartCard, sensitivityCard);
+  shell.append(inputPanel, resultsPanel);
+  root.append(top, shell);
   mount.appendChild(root);
 
   // ── 估值方法（卡片外，独立标签 + 下拉）──
@@ -121,11 +135,17 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   });
   select.value = activeIdx >= 0 ? String(activeIdx) : "-1";
   select.addEventListener("change", () => { activeIdx = Number(select.value); currentMode = null; renderForm(); });
+  const titleText = activeIdx >= 0
+    ? ((MODELS[activeIdx].label && MODELS[activeIdx].label[lang]) || MODELS[activeIdx].key)
+    : (lang === "zh" ? "添加估值" : "Add valuation");
+  methodTitle.textContent = titleText;
   mblock.append(mlabel, select);
-  main.appendChild(mblock);
+  top.append(methodTitle, mblock);
 
+  const panelHead = el("div", "vc-panel-head");
+  panelHead.textContent = "Inputs";
   const formWrap = el("div", "vc-form");
-  main.appendChild(formWrap);
+  inputBody.append(panelHead, formWrap);
 
   // ── 备注（放右栏，填补结果卡下方空白、与提交同列）──
   const noteWrap = el("div", "vc-note");
@@ -134,20 +154,19 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   if (initialNote) noteInput.value = initialNote;
   noteWrap.append(noteLabel, noteInput);
 
-  // ── 右栏：结果卡 + 备注 + Submit ──
-  const rcard = el("div", "vc-rcard");
-  const rtop = el("div", "vc-rcard-top");
+  // ── 结果区：摘要 + 图表 + 敏感性 ──
+  const summaryHead = el("div", "vc-card-title");
+  summaryHead.textContent = lang === "zh" ? "估值摘要" : "Valuation Summary";
+  const summaryLabel = el("div", "vc-summary-label");
+  summaryLabel.textContent = lang === "zh" ? "合理价值区间" : "Fair value range";
   const nums = el("div", "vc-rnums");
   const outLow = el("span", "vc-rlow"), outDash = el("span", "vc-rdash"), outHigh = el("span", "vc-rhigh");
   outDash.textContent = "–";
   nums.append(outLow, outDash, outHigh);
   const verdictEl = el("div", "vc-rverdict");
-  rtop.append(nums, verdictEl);
-  const bdMount = el("div", "vc-rcard-rows");
+  const bdMount = el("div", "vc-summary-metrics");
   const schedMount = el("div", "vc-sched");
-  rcard.append(rtop, bdMount, schedMount);
-  side.appendChild(rcard);
-  side.appendChild(noteWrap);
+  summaryCard.append(summaryHead, summaryLabel, nums, verdictEl, bdMount, schedMount);
 
   const submitBtn = el("button", "vc-submit"); submitBtn.type = "button"; submitBtn.textContent = tx("submit"); submitBtn.disabled = true;
   submitBtn.addEventListener("click", () => {
@@ -155,7 +174,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const segOut = currentMode === "segment" ? { enabled: true, rows: segments.rows } : { enabled: false, rows: segments.rows || [] };
     onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), segments: segOut, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
   });
-  side.appendChild(submitBtn);
+  inputFooter.append(noteWrap, submitBtn);
 
   // ── 计算 + 渲染结果 ──
   function consOpt(model, form) {
@@ -227,6 +246,82 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     toggle.addEventListener("click", () => { const open = body.style.display === "none"; body.style.display = open ? "" : "none"; toggle.textContent = title + (open ? " ▴" : " ▾"); });
     schedMount.append(toggle, body);
   }
+  function renderChart(model, form, valid) {
+    chartCard.innerHTML = "";
+    chartCard.style.display = "none";
+    if (!valid || typeof model.schedule !== "function") return;
+    let schedule = null;
+    try { schedule = model.schedule(midpointForm(model, currentMode, form), ctx); } catch { schedule = null; }
+    const series = scheduleSeries(schedule);
+    if (!series.length) return;
+
+    chartCard.style.display = "";
+    const title = el("div", "vc-card-title");
+    title.textContent = model.key === "ddm"
+      ? (lang === "zh" ? "逐年股息" : "Dividend year by year")
+      : (lang === "zh" ? "逐年现金流" : "Cash flow year by year");
+    chartCard.append(title, lineChart(series));
+  }
+  function lineChart(series) {
+    const wrap = el("div", "vc-chart-wrap");
+    const w = 640, h = 260, pad = 34;
+    const vals = series.map((p) => p.value);
+    const min = Math.min(0, ...vals);
+    const max = Math.max(...vals);
+    const span = max - min || 1;
+    const x = (i) => pad + (series.length === 1 ? 0 : i * (w - pad * 2) / (series.length - 1));
+    const y = (v) => h - pad - ((v - min) / span) * (h - pad * 2);
+    const pts = series.map((p, i) => `${x(i)},${y(p.value)}`).join(" ");
+    const area = `${pad},${h - pad} ${pts} ${x(series.length - 1)},${h - pad}`;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    svg.setAttribute("class", "vc-chart");
+    svg.innerHTML = `
+      <polyline class="vc-chart-area" points="${area}"></polyline>
+      <polyline class="vc-chart-line" points="${pts}"></polyline>
+      ${series.map((p, i) => `<circle class="vc-chart-dot" cx="${x(i)}" cy="${y(p.value)}" r="3"></circle>`).join("")}
+      ${series.map((p, i) => `<text class="vc-chart-x" x="${x(i)}" y="${h - 10}" text-anchor="middle">${p.label}</text>`).join("")}
+    `;
+    wrap.appendChild(svg);
+    return wrap;
+  }
+  function renderSensitivity(model, form, valid) {
+    sensitivityCard.innerHTML = "";
+    sensitivityCard.style.display = "none";
+    if (!valid) return;
+    const matrix = sensitivityMatrix({ model, mode: currentMode, form, ctx, run: runModel, lang });
+    if (!matrix) return;
+
+    sensitivityCard.style.display = "";
+    const title = el("div", "vc-card-title");
+    title.textContent = lang === "zh" ? "敏感性分析" : "Sensitivity analysis";
+    const table = el("div", "vc-sens-table");
+    const head = el("div", "vc-sens-row vc-sens-head");
+    const corner = el("div", "vc-sens-axis");
+    corner.textContent = matrix.x.label;
+    head.appendChild(corner);
+    matrix.columns.forEach((col) => {
+      const cell = el("div", "vc-sens-hcell");
+      cell.textContent = col.label;
+      head.appendChild(cell);
+    });
+    table.appendChild(head);
+    matrix.rows.forEach((row) => {
+      const tr = el("div", "vc-sens-row");
+      const yLab = el("div", "vc-sens-y");
+      yLab.textContent = row.label;
+      tr.appendChild(yLab);
+      row.cells.forEach((cell) => {
+        const td = el("div", "vc-sens-cell" + (cell.center ? " center" : ""));
+        td.textContent = cell.value === null ? "—" : fmt(cell.value, tx("dash"));
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+    const yTitle = el("div", "vc-sens-ytitle");
+    yTitle.textContent = matrix.y.label;
+    sensitivityCard.append(title, yTitle, table);
+  }
   function compute(formData) {
     lastForm = formData;
     const model = MODELS[activeIdx];
@@ -244,6 +339,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     verdictEl.style.display = v ? "" : "none";
     renderBreakdown(model, formData, valid);
     renderSchedule(model, formData, valid);
+    renderChart(model, formData, valid);
+    renderSensitivity(model, formData, valid);
     submitBtn.disabled = !valid;
   }
 
@@ -675,6 +772,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     formWrap.innerHTML = "";
     // 未选方法：显示提示、清空结果，不预填任何模型
     if (activeIdx < 0) {
+      methodTitle.textContent = lang === "zh" ? "添加估值" : "Add valuation";
       const hint = el("div", "vc-empty-method");
       hint.textContent = lang === "zh" ? "请先选择一个估值方法" : "Pick a valuation method to begin";
       formWrap.appendChild(hint);
@@ -683,10 +781,13 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       outLow.textContent = dash; outHigh.textContent = dash; outDash.style.opacity = ".35";
       verdictEl.textContent = ""; verdictEl.style.display = "none";
       bdMount.innerHTML = ""; schedMount.innerHTML = "";
+      chartCard.style.display = "none";
+      sensitivityCard.style.display = "none";
       submitBtn.disabled = true;
       return;
     }
     const model = MODELS[activeIdx];
+    methodTitle.textContent = (model.label && model.label[lang]) || model.key;
     if (model.modes) {
       if (!currentMode || !model.modes.some((m) => m.key === currentMode)) {
         currentMode = (initialInputs && initialInputs._mode)
