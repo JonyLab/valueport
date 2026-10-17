@@ -1685,7 +1685,7 @@ function niceStep(raw) {
   const e = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / e;
   return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e;
 }
-function renderDetail(item, initialTab = 0) {
+function renderDetail(item, initialTab = "val") {
   const c = item.cfg, s = item.statics || {};
   viewDetail.innerHTML = "";
   if (detailGauge) { detailGauge.destroy && detailGauge.destroy(); detailGauge = null; }
@@ -1724,21 +1724,24 @@ function renderDetail(item, initialTab = 0) {
 
   const tabsNav = document.createElement("div"); tabsNav.className = "vd-tabs";
   const panels = document.createElement("div");
+  // 估值研究排第一（默认 tab）：这是价值投资工具的主线；基本面与财报是它的依据
   const defs = [
-    { label: t("d_tab_fundamentals"), kind: "fund" },
     { label: t("d_tab_valuation"), kind: "val" },
+    { label: t("d_tab_fundamentals"), kind: "fund" },
     { label: t("d_tab_financials"), kind: "fin" },
   ];
   const tabEls = [], panelEls = [];
   defs.forEach((d, i) => {
-    const b = document.createElement("button"); b.className = "vd-tab" + (i === initialTab ? " on" : ""); b.textContent = d.label;
-    const p = document.createElement("div"); p.className = "vd-panel p-" + d.kind + (i === initialTab ? " on" : "");
+    const on = d.kind === initialTab;
+    const b = document.createElement("button"); b.className = "vd-tab" + (on ? " on" : ""); b.textContent = d.label;
+    const p = document.createElement("div"); p.className = "vd-panel p-" + d.kind + (on ? " on" : "");
     b.addEventListener("click", () => { tabEls.forEach((x) => x.classList.remove("on")); panelEls.forEach((x) => x.classList.remove("on")); b.classList.add("on"); p.classList.add("on"); });
     tabsNav.appendChild(b); panels.appendChild(p); tabEls.push(b); panelEls.push(p);
   });
-  renderFundamentalsPanel(item, panelEls[0]);        // 基本面：默认 tab（4 节客观体检）
-  renderValuationPanel(item, panelEls[1], idBlock);  // 估值研究：第二 tab
-  renderFinancialsPanel(item, panelEls[2]);
+  const panelOf = (kind) => panelEls[defs.findIndex((d) => d.kind === kind)];
+  renderValuationPanel(item, panelOf("val"), idBlock);
+  renderFundamentalsPanel(item, panelOf("fund"));
+  renderFinancialsPanel(item, panelOf("fin"));
   loadFinancials(item, "annual"); // 预取年报，供计算器预填
   loadFinancials(item, "quarter"); // 预取季报，供「最新季 / 近4季 TTM」参考
   // tabs 直接放在背景上，不再包一层大卡；各 tab 里的分节自己就是卡片（避免卡片套卡片）
@@ -2556,7 +2559,7 @@ function route() {
   if (item && owner) showDetail(item); else showList();
 }
 window.addEventListener("popstate", () => {
-  if (valEditReturn) { const it = valEditReturn; valEditReturn = null; showDetail(it, 1); return; } // 退出编辑器→回详情（停在估值研究 tab）
+  if (valEditReturn) { const it = valEditReturn; valEditReturn = null; showDetail(it, "val"); return; } // 退出编辑器→回详情（停在估值研究 tab）
   route();
 });
 
