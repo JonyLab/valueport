@@ -139,7 +139,9 @@
   .vd-back{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border-radius:var(--r-pill);
     background:rgba(255,255,255,.6);border:1px solid var(--card-edge);font-size:13.5px;color:var(--ink-soft);text-decoration:none}
   .vd-back:hover{color:var(--ink);background:#fff}
-  .vd-edit{background:rgba(255,255,255,.6) !important}
+  .vd-pendhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .vd-pendedit{display:inline-flex;align-items:center;gap:5px;background:var(--track) !important;color:var(--ink-soft) !important}
+  .vd-pendedit:hover{background:var(--track-edge) !important;color:var(--ink) !important}
   .vd-backrow-right{display:flex;align-items:center;gap:8px}
   .ve-head-right{margin-left:auto}
   /* 身份区 */
@@ -1688,18 +1690,12 @@ function renderDetail(item, initialTab = 0) {
   if (detailGauge) { detailGauge.destroy && detailGauge.destroy(); detailGauge = null; }
   detailItem = item;
 
-  // 顶栏：返回 / 编辑
+  // 顶栏：返回 / 语言（「编辑」挪进了侧栏钟摆卡的标题栏：区间、安全边际、泡沫阈值都是钟摆的设定）
   const backRow = document.createElement("div"); backRow.className = "vd-backrow";
   const back = document.createElement("a"); back.className = "vd-back"; back.href = "/b/" + boardSlug; back.replaceChildren(ri("arrow-left-line"), document.createTextNode(t("d_back")));
   back.addEventListener("click", (e) => { e.preventDefault(); history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList(); });
   backRow.appendChild(back);
   const rightGroup = document.createElement("div"); rightGroup.className = "vd-backrow-right";
-  if (owner) {
-    const edit = document.createElement("button"); edit.type = "button"; edit.className = "btn sm vd-edit";
-    edit.textContent = t("b_edit");
-    edit.addEventListener("click", () => openItemModal(item, false));
-    rightGroup.appendChild(edit);
-  }
   mountLangMenu(rightGroup);
   backRow.appendChild(rightGroup);
 
@@ -1755,7 +1751,15 @@ function renderDetail(item, initialTab = 0) {
   const pendLab = document.createElement("div"); pendLab.className = "vd-cardtitle"; pendLab.textContent = LANG === "zh" ? "估值钟摆" : "Valuation pendulum";
   const pendSub = document.createElement("div"); pendSub.className = "vd-cardsub";
   pendSub.textContent = LANG === "zh" ? "现价落在你设定的五个估值区间中的哪一段" : "Where the price sits across your five valuation zones";
-  pendCard.append(pendLab, pendSub, gwrap);
+  const pendHead = document.createElement("div"); pendHead.className = "vd-pendhead"; pendHead.appendChild(pendLab);
+  if (owner) {
+    const edit = document.createElement("button"); edit.type = "button"; edit.className = "btn sm vd-pendedit";
+    edit.append(ri("pencil-line"), document.createTextNode(t("b_edit")));
+    edit.title = LANG === "zh" ? "合理区间、安全边际、泡沫阈值" : "Fair range, margin of safety, bubble threshold";
+    edit.addEventListener("click", () => openItemModal(item, false));
+    pendHead.appendChild(edit);
+  }
+  pendCard.append(pendHead, pendSub, gwrap);
   const peers = document.createElement("section"); peers.className = "vd-card vd-peers";
   renderPeers(item, peers);
   const side = document.createElement("aside"); side.className = "vd-side"; side.append(pendCard, peers);
