@@ -531,14 +531,28 @@
   .vc-ai.on{transform:none}
   .vc-ai[hidden]{display:none}
   .vc-workbench{transition:margin-right .22s cubic-bezier(.22,1,.36,1)}
-  @media (min-width:1300px){ body.vc-ai-open .vc-workbench{margin-right:420px} }
+  /* 抽屉占右侧 410 + 16 + 12 间隙；内容区最宽 1600 居中，宽屏时右侧本来就有空白 → 只让出真正重叠的那部分，够宽就不让 */
+  @media (min-width:1300px){ body.vc-ai-open .vc-workbench{margin-right:max(0px,calc(438px - clamp(16px,3vw,44px) - (100vw - min(100vw,1600px)) / 2))} }
   .vc-ai-head{display:flex;align-items:center;gap:12px;padding:18px 16px 14px 20px;border-bottom:1px dashed var(--border)}
   .vc-ai-badge{flex:none;width:36px;height:36px;border-radius:50%;background:var(--dark);color:var(--sun);display:flex;align-items:center;justify-content:center;font-size:17px}
   .vc-ai-titles{flex:1;min-width:0}
   .vc-ai-title{font-size:16px;font-weight:500}
-  .vc-ai-sub{font-size:12px;color:var(--ink-mute);margin-top:2px}
-  .vc-ai-setlink{color:var(--ink-soft);text-decoration:underline;text-underline-offset:2px}
-  .vc-ai-setlink:hover{color:var(--ink)}
+  .vc-ai-modelwrap{position:relative;margin-top:3px}
+  .vc-ai-model{display:inline-flex;align-items:center;gap:2px;max-width:100%;height:24px;padding:0 6px 0 9px;margin-left:-2px;border:0;border-radius:var(--r-pill);background:var(--track);
+    cursor:pointer;font-family:var(--font);font-size:12px;color:var(--ink-soft)}
+  .vc-ai-model span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vc-ai-model:hover{background:var(--track-edge);color:var(--ink)}
+  .vc-ai-mmenu{position:absolute;top:calc(100% + 6px);left:-2px;z-index:5;display:flex;flex-direction:column;gap:1px;width:300px;max-height:60vh;overflow:auto;padding:6px;background:#fff;border-radius:var(--r-md);
+    box-shadow:0 1px 2px rgba(60,50,20,.06),0 16px 36px -14px rgba(60,50,20,.35)}
+  .vc-ai-mmenu[hidden]{display:none}
+  .vc-ai-mgroup{padding:8px 10px 4px;font-size:11.5px;color:var(--ink-mute)}
+  .vc-ai-mmenu button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 10px;border:0;border-radius:var(--r-sm);background:none;cursor:pointer;font-family:var(--font);text-align:left}
+  .vc-ai-mmenu button:hover{background:var(--track)}
+  .vc-ai-mmenu button.on{background:rgba(246,207,74,.28)}
+  .vc-ai-mname{font-size:13.5px;color:var(--ink)}
+  .vc-ai-mmodel{font-size:11px;color:var(--ink-mute);font-family:var(--mono);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vc-ai-manage{display:block;margin-top:4px;padding:9px 10px 6px;border-top:1px dashed var(--border);font-size:12.5px;color:var(--ink-soft);text-decoration:none}
+  .vc-ai-manage:hover{color:var(--ink);text-decoration:underline}
   .vc-ai-iconbtn{background:var(--track) !important}
   .vc-ai-iconbtn:hover{background:var(--track-edge) !important}
   .vc-ai-log{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:18px 18px 8px;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin}
@@ -789,12 +803,21 @@
   .cfg-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
   .cfg-name{font-size:17px;font-weight:400}
   /* AI 模型设置 */
+  .ai-intro{margin:0 0 12px}
+  .ai-mlist{display:flex;flex-direction:column;gap:8px}
+  .ai-mrow{display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
+  .ai-mid{flex:1;min-width:0}
+  .ai-mname{display:flex;align-items:center;gap:8px;font-size:14.5px}
+  .ai-mmeta{margin-top:3px;font-size:12px;color:var(--ink-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ai-inuse{font-size:11px;color:var(--sun-ink);background:var(--sun);border-radius:var(--r-pill);padding:1px 8px}
+  .ai-form{padding:16px;border-radius:var(--r-md);background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 1px var(--divider)}
+  .pf-add-lite{width:100%;margin-top:10px;height:40px;border:1.5px dashed rgba(29,29,27,.2);border-radius:var(--r-pill);background:none;cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink-soft)}
+  .pf-add-lite:hover{color:var(--ink);border-color:rgba(29,29,27,.35)}
   .ai-provs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
   .ai-prov{height:34px;padding:0 14px;border:0;border-radius:var(--r-pill);background:var(--track);cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink-soft)}
   .ai-prov:hover{background:var(--track-edge);color:var(--ink)}
   .ai-prov.on{background:var(--dark);color:#fff}
   .ai-fields{margin-bottom:4px}
-  .ai-select{height:42px;padding:0 12px;border:0;border-radius:var(--r-sm);background:var(--track);font-family:var(--font);font-size:14px;color:var(--ink)}
   .ai-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
   .ai-result{font-size:12.5px;color:var(--ink-mute)}
   .ai-result.ok{color:var(--green)} .ai-result.bad{color:var(--red)}
@@ -2940,96 +2963,110 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
 });
 
 /* ---------- 主人模式初始化 ---------- */
-// ---------- AI 模型设置（每个用户自己的；Key 加密保存，接口不返回明文） ----------
-const AI_PROVIDERS = [
-  ["default", { zh: "站点默认", en: "Site default" }],
-  ["workers-ai", { zh: "Workers AI", en: "Workers AI" }],
-  ["openai", { zh: "OpenAI 兼容", en: "OpenAI-compatible" }],
-  ["anthropic", { zh: "Anthropic", en: "Anthropic" }],
-];
+// ---------- AI 模型（设置页只管配置；在 AI 面板里切换用哪个） ----------
+// 站点默认与 Workers AI 模型不用配置；这里增删改自己的 OpenAI 兼容 / Anthropic 模型（Key 加密保存，接口不返回明文）
 async function initAiSettings() {
   const zh = LANG === "zh", T = (a, b) => (zh ? a : b);
-  document.getElementById("aiCfgName").textContent = T("AI 模型", "AI model");
+  document.getElementById("aiCfgName").textContent = T("AI 模型", "AI models");
   const body = document.getElementById("aiCfgBody"), saveEl = document.getElementById("aiSave");
-  let info;
-  try { info = await fetch("/api/my/ai/settings").then((r) => r.json()); } catch { body.textContent = T("加载失败", "Failed to load"); return; }
-  const st = { ...info.settings };
   const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-  const wmLabel = (id) => (info.workersModels.find((m) => m.id === id) || { label: id }).label;
-  const siteLabel = info.site.provider === "workers-ai" ? `Workers AI · ${wmLabel(info.site.model)}` : `${info.site.provider} · ${info.site.model}`;
+  const setState = (cls, text) => { saveEl.className = "save-state " + (cls || ""); saveEl.textContent = text || ""; };
+  const KIND = { openai: T("OpenAI 兼容", "OpenAI-compatible"), anthropic: "Anthropic" };
+  let info = null, editing = null; // editing: null | "new" | 模型 id
+  async function refresh() {
+    try { info = await fetch("/api/my/ai/models").then((r) => r.json()); } catch { body.textContent = T("加载失败", "Failed to load"); return; }
+    draw();
+  }
   function draw() {
     body.innerHTML = "";
-    const seg = mk("div", "ai-provs");
-    for (const [k, lab] of AI_PROVIDERS) {
-      const b = mk("button", "ai-prov" + (st.provider === k ? " on" : ""), lab[LANG] || lab.zh); b.type = "button";
-      b.addEventListener("click", () => { if (st.provider === k) return; st.provider = k; st.model = ""; st.baseUrl = ""; st.apiKey = undefined; draw(); });
-      seg.appendChild(b);
+    const others = info.workers.filter((w) => !(info.site.provider === "workers-ai" && w.model === info.site.model)).map((w) => w.name); // 和站点默认同一个的不重复列
+    body.appendChild(mk("p", "quote-note ai-intro", T(`不用配置就能用：站点默认（${info.site.name}）和 ${others.join("、")}。下面添加你自己的模型，之后在 AI 面板顶部切换用哪个。`,
+      `Ready without setup: the site default (${info.site.name}) and ${others.join(", ")}. Add your own models below, then switch between them at the top of the AI panel.`)));
+    const list = mk("div", "ai-mlist");
+    for (const m of info.custom) {
+      if (editing === m.id) { list.appendChild(form(m)); continue; }
+      const row = mk("div", "ai-mrow");
+      const id = mk("div", "ai-mid");
+      id.append(mk("div", "ai-mname", m.name), mk("div", "ai-mmeta", `${KIND[m.kind] || m.kind} · ${m.model}${m.baseUrl ? " · " + m.baseUrl.replace(/^https:\/\//, "") : ""} · Key ${m.keyHint || "••••"}`));
+      if (info.active === m.id) id.firstChild.appendChild(mk("span", "ai-inuse", T("使用中", "In use")));
+      const edit = mk("button", "btn sm", T("编辑", "Edit")); edit.type = "button"; edit.addEventListener("click", () => { editing = m.id; draw(); });
+      const del = mk("button", "btn sm ghost", T("删除", "Delete")); del.type = "button";
+      del.addEventListener("click", async () => {
+        if (!confirm(T(`删除「${m.name}」？`, `Delete "${m.name}"?`))) return;
+        await fetch("/api/my/ai/models/" + m.id.slice(2), { method: "DELETE" }); setState("ok", T("已删除", "Deleted")); refresh();
+      });
+      row.append(id, edit, del); list.appendChild(row);
     }
-    body.appendChild(seg);
-    const grid = mk("div", "cfg-grid ai-fields");
+    if (editing === "new") list.appendChild(form(null));
+    body.appendChild(list);
+    if (editing === null) {
+      const add = mk("button", "pf-add-lite"); add.type = "button"; add.textContent = T("＋ 添加模型", "+ Add a model");
+      add.addEventListener("click", () => { editing = "new"; draw(); });
+      body.appendChild(add);
+    }
+  }
+  // 新增 / 编辑表单：协议、名称、接口地址、模型、Key + 测试连接 / 保存 / 取消
+  function form(m) {
+    const st = m ? { provider: m.kind, name: m.name, model: m.model, baseUrl: m.baseUrl } : { provider: "openai", name: "", model: "", baseUrl: "" };
+    const box = mk("div", "ai-form");
+    const segs = mk("div", "ai-provs");
+    const grid = mk("div", "cfg-grid ai-fields"), note = mk("p", "quote-note");
+    let keyIn = null;
     const field = (label, key, { ph = "", type = "text", full = false } = {}) => {
       const l = mk("label", "field" + (full ? " full" : "")); l.appendChild(mk("span", "f-lab", label));
       const i = mk("input", "plain"); i.type = type; i.autocomplete = "off"; i.spellcheck = false; i.placeholder = ph;
-      if (key !== "apiKey") i.value = st[key] || ""; else if (st.apiKey) i.value = st.apiKey;
-      i.addEventListener("input", () => { st[key] = i.value; });
+      if (key) { i.value = st[key] || ""; i.addEventListener("input", () => { st[key] = i.value; }); }
       l.appendChild(i); grid.appendChild(l); return i;
     };
-    const keyPh = info.settings.provider === st.provider && info.settings.hasKey ? T(`已保存 ${info.settings.keyHint}，留空则沿用`, `Saved ${info.settings.keyHint}; leave blank to keep`) : "sk-…";
-    let note = "";
-    if (st.provider === "default") note = T(`使用站点默认：${siteLabel}。每人每天 100 次。`, `Uses the site default: ${siteLabel}. 100 requests per day.`);
-    else if (st.provider === "workers-ai") {
-      const l = mk("label", "field full"); l.appendChild(mk("span", "f-lab", T("模型", "Model")));
-      const sel = mk("select", "ai-select");
-      for (const m of info.workersModels) { const o = mk("option", "", m.label); o.value = m.id; if ((st.model || info.workersModels[0].id) === m.id) o.selected = true; sel.appendChild(o); }
-      st.model = sel.value; sel.addEventListener("change", () => { st.model = sel.value; });
-      l.appendChild(sel); grid.appendChild(l);
-      note = T("Cloudflare 的开源模型，不用 Key；和站点默认共用每天 100 次的额度。", "Open models on Cloudflare, no key needed; shares the 100-per-day site quota.");
-    } else if (st.provider === "openai") {
-      field(T("接口地址", "Base URL"), "baseUrl", { ph: "https://api.openai.com/v1", full: true });
-      field(T("模型", "Model"), "model", { ph: "gpt-4o-mini" });
-      field("API Key", "apiKey", { ph: keyPh, type: "password" });
-      note = T("任何兼容 OpenAI /chat/completions 的服务都可以（OpenAI、DeepSeek、通义、Kimi、OpenRouter 等），接口地址填到 /v1 这一级。", "Any service compatible with OpenAI /chat/completions (OpenAI, DeepSeek, OpenRouter, …); the base URL ends at /v1.");
-    } else {
-      field(T("模型", "Model"), "model", { ph: "claude-sonnet-5-5" });
-      field("API Key", "apiKey", { ph: keyPh, type: "password" });
-      field(T("接口地址（可选）", "Base URL (optional)"), "baseUrl", { ph: "https://api.anthropic.com", full: true });
-      note = T("Anthropic Messages API；接口地址留空即官方地址。", "Anthropic Messages API; leave the base URL blank for the official endpoint.");
+    const fields = () => {
+      grid.innerHTML = "";
+      segs.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.k === st.provider));
+      field(T("名称", "Name"), "name", { ph: st.provider === "openai" ? "DeepSeek" : "Claude" });
+      field(T("模型", "Model"), "model", { ph: st.provider === "openai" ? "deepseek-chat" : "claude-sonnet-5-5" });
+      field(st.provider === "openai" ? T("接口地址", "Base URL") : T("接口地址（可选）", "Base URL (optional)"), "baseUrl", { ph: st.provider === "openai" ? "https://api.deepseek.com/v1" : "https://api.anthropic.com", full: true });
+      keyIn = field("API Key", null, { ph: m && m.kind === st.provider ? T(`已保存 ${m.keyHint}，留空则沿用`, `Saved ${m.keyHint}; leave blank to keep`) : "sk-…", type: "password", full: true });
+      note.textContent = (st.provider === "openai"
+        ? T("任何兼容 OpenAI /chat/completions 的服务都可以（OpenAI、DeepSeek、通义、Kimi、OpenRouter 等），接口地址填到 /v1 这一级。", "Any OpenAI /chat/completions-compatible service (OpenAI, DeepSeek, OpenRouter, …); the base URL ends at /v1.")
+        : T("Anthropic Messages API；接口地址留空即官方地址。", "Anthropic Messages API; leave the base URL blank for the official endpoint."))
+        + T(" Key 加密保存，只用于你自己的 AI 请求，不会再显示明文；用自己的 Key 不占站点每日额度，费用由该服务商按用量计。", " The key is stored encrypted, used only for your requests and never shown again; it doesn't count toward the site quota and is billed by that provider.");
+    };
+    for (const [k, lab] of Object.entries(KIND)) {
+      const b = mk("button", "ai-prov", lab); b.type = "button"; b.dataset.k = k;
+      b.addEventListener("click", () => { if (st.provider !== k) { st.provider = k; fields(); } });
+      segs.appendChild(b);
     }
-    if (grid.children.length) body.appendChild(grid);
-    if (st.provider === "openai" || st.provider === "anthropic") note += T(" Key 加密保存，只用于你自己的 AI 请求，接口不会返回明文；用自己的 Key 不占站点每日额度，费用由该服务商按用量计。", " The key is stored encrypted, used only for your own requests and never shown again; your own key doesn't count toward the site quota and is billed by that provider.");
-    body.appendChild(mk("p", "quote-note", note));
-    const acts = mk("div", "ai-acts");
-    const result = mk("span", "ai-result");
+    fields();
+    const acts = mk("div", "ai-acts"), result = mk("span", "ai-result");
+    const payload = () => ({ provider: st.provider, name: st.name || "", model: st.model || "", baseUrl: st.baseUrl || "", ...(keyIn.value ? { apiKey: keyIn.value } : {}), ...(m ? { id: m.id } : {}) });
     const test = mk("button", "btn", T("测试连接", "Test connection")); test.type = "button";
-    const save = mk("button", "btn primary", T("保存", "Save")); save.type = "button";
-    const payload = () => ({ provider: st.provider, model: st.model || "", baseUrl: st.baseUrl || "", ...(st.apiKey ? { apiKey: st.apiKey } : {}) });
     test.addEventListener("click", async () => {
       test.disabled = true; result.className = "ai-result"; result.textContent = T("测试中…", "Testing…");
       try {
-        const r = await fetch("/api/my/ai/settings/test", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload()) });
+        const r = await fetch("/api/my/ai/models/test", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload()) });
         const j = await r.json().catch(() => ({}));
-        if (r.ok && j.ok) { result.className = "ai-result ok"; result.textContent = T(`连接成功 · ${j.model} · ${j.ms} ms`, `Connected · ${j.model} · ${j.ms} ms`); }
+        if (r.ok && j.ok) { result.className = "ai-result ok"; result.textContent = T(`连接成功 · ${j.ms} ms`, `Connected · ${j.ms} ms`); }
         else { result.className = "ai-result bad"; result.textContent = T("连接失败：", "Failed: ") + (j.error || r.status); }
       } catch { result.className = "ai-result bad"; result.textContent = T("网络错误", "Network error"); }
       finally { test.disabled = false; }
     });
+    const save = mk("button", "btn primary", T("保存", "Save")); save.type = "button";
     save.addEventListener("click", async () => {
       save.disabled = true; setState("", T("保存中…", "Saving…"));
       try {
-        const r = await fetch("/api/my/ai/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(payload()) });
+        const { id, ...bodyData } = payload();
+        const r = await fetch(m ? "/api/my/ai/models/" + m.id.slice(2) : "/api/my/ai/models", { method: m ? "PUT" : "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(bodyData) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) { setState("err", T("保存失败：", "Save failed: ") + (j.error || r.status)); return; }
-        info = await fetch("/api/my/ai/settings").then((x) => x.json());
-        Object.assign(st, info.settings); st.apiKey = undefined;
-        setState("ok", T("已保存", "Saved")); draw();
+        setState("ok", T("已保存，可在 AI 面板顶部切换使用", "Saved — switch to it at the top of the AI panel")); editing = null; refresh();
       } catch { setState("err", T("网络错误", "Network error")); }
       finally { save.disabled = false; }
     });
-    acts.append(test, save, result);
-    body.appendChild(acts);
+    const cancel = mk("button", "btn ghost", T("取消", "Cancel")); cancel.type = "button"; cancel.addEventListener("click", () => { editing = null; draw(); });
+    acts.append(test, save, cancel, result);
+    box.append(segs, grid, note, acts);
+    return box;
   }
-  function setState(cls, text) { saveEl.className = "save-state " + (cls || ""); saveEl.textContent = text || ""; }
-  draw();
+  refresh();
 }
 
 function initOwner(settings) {

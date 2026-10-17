@@ -44,19 +44,47 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   const head = el("div", "vc-ai-head");
   const badge = el("div", "vc-ai-badge"); badge.appendChild(ri("sparkling-2-fill"));
   const titles = el("div", "vc-ai-titles");
-  const sub = el("div", "vc-ai-sub", T.sub);
-  titles.append(el("div", "vc-ai-title", T.title), sub);
-  // 副标题换成当前模型 + 「设置」（新标签打开，不打断正在编辑的估值）
-  fetch("/api/my/ai/settings").then((r) => (r.ok ? r.json() : null)).then((j) => {
-    if (!j) return;
-    const st = j.settings, wm = (id) => (j.workersModels.find((m) => m.id === id) || { label: id }).label;
-    const name = st.provider === "default" ? (j.site.provider === "workers-ai" ? wm(j.site.model) : j.site.model) : st.provider === "workers-ai" ? wm(st.model) : st.model;
-    const slug = (location.pathname.match(/^\/b\/([^/]+)/) || [])[1];
-    sub.textContent = (lang === "zh" ? "模型：" : "Model: ") + name + " · ";
-    const a = document.createElement("a"); a.className = "vc-ai-setlink"; a.textContent = lang === "zh" ? "更换" : "Change";
-    a.href = slug ? `/b/${slug}#ai` : "#"; a.target = "_blank"; a.rel = "noopener";
-    sub.appendChild(a);
-  }).catch(() => {});
+  // 副标题位置放模型切换：显示当前模型，点开在已配置好的模型里切换（配置在设置页）
+  const modelWrap = el("div", "vc-ai-modelwrap");
+  const modelBtn = el("button", "vc-ai-model"); modelBtn.type = "button"; modelBtn.setAttribute("aria-haspopup", "menu");
+  const modelName = el("span", "", T.sub); modelBtn.append(modelName, ri("arrow-down-s-line"));
+  const modelMenu = el("div", "vc-ai-mmenu"); modelMenu.setAttribute("role", "menu"); modelMenu.hidden = true;
+  modelWrap.append(modelBtn, modelMenu);
+  titles.append(el("div", "vc-ai-title", T.title), modelWrap);
+  let models = null;
+  const slug = (location.pathname.match(/^\/b\/([^/]+)/) || [])[1];
+  function drawModels() {
+    const all = [models.site, ...models.workers, ...models.custom];
+    const cur = all.find((m) => m.id === models.active) || models.site;
+    modelName.textContent = (lang === "zh" ? "模型：" : "Model: ") + cur.name;
+    modelMenu.innerHTML = "";
+    const group = (label, items) => {
+      if (!items.length) return;
+      modelMenu.appendChild(el("div", "vc-ai-mgroup", label));
+      for (const m of items) {
+        const b = el("button", m.id === models.active ? "on" : ""); b.type = "button"; b.setAttribute("role", "menuitemradio");
+        b.append(el("span", "vc-ai-mname", m.name), el("span", "vc-ai-mmodel", m.kind === "site" ? (lang === "zh" ? "站点默认" : "Site default") : m.model));
+        b.addEventListener("click", async () => {
+          modelMenu.hidden = true;
+          if (m.id === models.active) return;
+          const r = await fetch("/api/my/ai/active", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: m.id }) }).catch(() => null);
+          if (r && r.ok) { models.active = m.id; drawModels(); }
+        });
+        modelMenu.appendChild(b);
+      }
+    };
+    group(lang === "zh" ? "站点默认" : "Site default", [models.site]);
+    group("Workers AI", models.workers.filter((w) => w.model !== (models.site.provider === "workers-ai" ? models.site.model : "")));
+    group(lang === "zh" ? "我的模型" : "My models", models.custom);
+    const manage = document.createElement("a"); manage.className = "vc-ai-manage";
+    manage.textContent = models.custom.length ? (lang === "zh" ? "管理模型…" : "Manage models…") : (lang === "zh" ? "添加自己的模型（OpenAI 兼容 / Anthropic）…" : "Add your own model…");
+    manage.href = slug ? `/b/${slug}#ai` : "#"; manage.target = "_blank"; manage.rel = "noopener"; // 新标签打开设置，不打断正在编辑的估值
+    modelMenu.appendChild(manage);
+  }
+  const loadModels = () => fetch("/api/my/ai/models").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) { models = j; drawModels(); } }).catch(() => {});
+  loadModels();
+  modelBtn.addEventListener("click", (e) => { e.stopPropagation(); if (!models) return; if (modelMenu.hidden) loadModels(); modelMenu.hidden = !modelMenu.hidden; });
+  document.addEventListener("click", (e) => { if (!modelWrap.contains(e.target)) modelMenu.hidden = true; });
   const clearBtn = el("button", "btn icon sm vc-ai-iconbtn"); clearBtn.type = "button"; clearBtn.title = T.clear; clearBtn.setAttribute("aria-label", T.clear); clearBtn.appendChild(ri("delete-bin-6-line"));
   const closeBtn = el("button", "btn icon sm vc-ai-iconbtn"); closeBtn.type = "button"; closeBtn.setAttribute("aria-label", T.close); closeBtn.appendChild(ri("close-line"));
   head.append(badge, titles, clearBtn, closeBtn);

@@ -3,7 +3,7 @@
 //
 import { encryptJson, decryptJson } from "./crypto.js";
 
-// 模型服务：用户可在设置页选自己的（ai_settings 表，见 userAi()）；没设置就用站点默认（wrangler.toml [vars] / secret）：
+// 模型服务：用户在设置页配置自己的模型（ai_models 表）、在 AI 面板里切换（见 userAi()）；没选就用站点默认（wrangler.toml [vars] / secret）：
 //   AI_PROVIDER  workers-ai（默认，用 [ai] 绑定，无需 Key）| openai（OpenAI 兼容协议）| anthropic
 //   AI_MODEL     模型名；不填按协议取默认
 //   AI_BASE_URL  openai / anthropic 协议的接口地址（可指向任意兼容服务）
@@ -268,32 +268,29 @@ export function parseReview(text, fields) {
   return { overall: obj.overall, summary: typeof obj.summary === "string" ? obj.summary.slice(0, 400) : "", checks };
 }
 
-// ── 用户自己的模型设置 ──
-// Workers AI 可选的模型（不用 Key，走站点的 Workers AI 额度）
+// ── 用户的模型：设置页只管「配置了哪些」（ai_models 表，可多条），AI 面板里切「用哪个」（settings 内部键 _ai_active）──
+// 不用配置就能选的：站点默认（"default"）+ 几个 Workers AI 模型（"wa:<模型 id>"，走站点的 Workers AI 额度）
+// 用户自己加的 OpenAI 兼容 / Anthropic 模型：id 为 "m:<行 id>"，Key 用 CREDENTIALS_KEY 加密，接口永不返回明文
 export const WORKERS_MODELS = [
   { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", label: "Llama 3.3 70B" },
   { id: "@cf/meta/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout 17B" },
   { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", label: "Mistral Small 3.1 24B" },
 ];
 const MODEL_RE = /^[\w@.:\/-]{1,100}$/;
+const MAX_MODELS = 10;
 function cleanBaseUrl(raw) {
   let u; try { u = new URL(String(raw || "").trim()); } catch { return null; }
   if (u.protocol !== "https:" || u.username || u.password || String(raw).length > 300) return null;
   return u.toString().replace(/\/+$/, "");
 }
-// → { error } | { value: { provider, model, baseUrl, apiKey } }；apiKey: undefined = 沿用已存的
-export function validateAiSettings(b) {
+// 新增 / 修改一个自定义模型 → { error } | { value: { provider, name, model, baseUrl, apiKey } }；apiKey 不传 = 沿用已存的
+export function validateModel(b) {
   if (!b || typeof b !== "object") return { error: "bad body" };
   const provider = b.provider;
-  if (provider === "default") return { value: { provider } };
-  if (!["workers-ai", "openai", "anthropic"].includes(provider)) return { error: "bad provider" };
+  if (provider !== "openai" && provider !== "anthropic") return { error: "provider must be openai or anthropic" };
   const model = typeof b.model === "string" ? b.model.trim() : "";
-  if (provider === "workers-ai") {
-    const m = model || WORKERS_MODELS[0].id;
-    if (!WORKERS_MODELS.some((x) => x.id === m)) return { error: "unsupported Workers AI model" };
-    return { value: { provider, model: m, baseUrl: "", apiKey: "" } };
-  }
   if (!MODEL_RE.test(model)) return { error: "model required" };
+  const name = (typeof b.name === "string" ? b.name.trim() : "").slice(0, 40) || model;
   let baseUrl = "";
   if (b.baseUrl || provider === "openai") { baseUrl = cleanBaseUrl(b.baseUrl); if (!baseUrl) return { error: "base URL must be https" }; }
   let apiKey;
@@ -301,20 +298,31 @@ export function validateAiSettings(b) {
     if (typeof b.apiKey !== "string" || b.apiKey.length > 500 || /\s/.test(b.apiKey.trim())) return { error: "bad api key" };
     apiKey = b.apiKey.trim();
   }
-  return { value: { provider, model, baseUrl, apiKey } };
+  return { value: { provider, name, model, baseUrl, apiKey } };
 }
-async function readAiRow(env, uid) {
-  try { return await env.DB.prepare("SELECT * FROM ai_settings WHERE user_id=?").bind(uid).first(); } catch { return null; } // 线上还没跑迁移时当作没设置
+async function listModelRows(env, uid) {
+  try { const { results } = await env.DB.prepare("SELECT * FROM ai_models WHERE user_id=? ORDER BY id ASC").bind(uid).all(); return results || []; }
+  catch { return []; } // 线上还没跑迁移时当作没有自定义模型
 }
-// 当前用户实际用的配置；own = 用的是自己的 Key（不占站点每日额度）
-export async function userAi(env, uid) {
-  const row = await readAiRow(env, uid);
-  if (!row) return { cfg: aiConfig(env), own: false };
-  if (row.provider === "workers-ai") return { cfg: { provider: "workers-ai", model: row.model || WORKERS_MODELS[0].id, baseUrl: "", apiKey: "" }, own: false };
-  const { apiKey } = row.key_enc ? await decryptJson(env.CREDENTIALS_KEY, row.key_enc) : { apiKey: "" };
-  return { cfg: { provider: row.provider, model: row.model, baseUrl: row.base_url || DEFAULTS[row.provider].baseUrl, apiKey }, own: true };
+async function readActive(env, uid) {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE user_id=? AND key='_ai_active'").bind(uid).first();
+  return row && typeof row.value === "string" ? row.value : "default";
 }
 const keyHint = (k) => (k && k.length > 4 ? "…" + k.slice(-4) : "");
+const rowCfg = async (env, r) => ({ provider: r.provider, model: r.model, baseUrl: r.base_url || DEFAULTS[r.provider].baseUrl, apiKey: (await decryptJson(env.CREDENTIALS_KEY, r.key_enc)).apiKey });
+// 当前用户实际用的配置；own = 用的是自己的 Key（不占站点每日额度）。选中的模型被删了就回到站点默认
+export async function userAi(env, uid) {
+  const active = await readActive(env, uid);
+  if (active.startsWith("wa:")) {
+    const m = WORKERS_MODELS.find((x) => x.id === active.slice(3));
+    if (m) return { cfg: { provider: "workers-ai", model: m.id, baseUrl: "", apiKey: "" }, own: false, active };
+  }
+  if (active.startsWith("m:")) {
+    const r = (await listModelRows(env, uid)).find((x) => String(x.id) === active.slice(2));
+    if (r) return { cfg: await rowCfg(env, r), own: true, active };
+  }
+  return { cfg: aiConfig(env), own: false, active: "default" };
+}
 
 // 每人每天的对话次数上限（防刷；计数存在 settings 表的内部键，不在 SETTING_KEYS 白名单里，不会返回给前端）
 export const DAILY_LIMIT = 100;
@@ -338,50 +346,76 @@ export function registerAi(app, { chat = chatComplete } = {}) {
     try { return { text: await chat(c.env, system, messages, undefined, u.cfg) }; }
     catch (e) { return { res: c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502) }; }
   }
-  app.get("/api/my/ai/settings", async (c) => {
-    const row = await readAiRow(c.env, c.get("uid"));
-    let hint = "";
-    if (row && row.key_enc) { try { hint = keyHint((await decryptJson(c.env.CREDENTIALS_KEY, row.key_enc)).apiKey); } catch { hint = ""; } }
+  // 可选模型列表 + 当前选中（AI 面板的切换器和设置页都用）
+  app.get("/api/my/ai/models", async (c) => {
+    const uid = c.get("uid");
+    const rows = await listModelRows(c.env, uid);
+    const u = await userAi(c.env, uid).catch(() => ({ active: "default" }));
     const site = aiConfig(c.env);
+    const wm = (id) => (WORKERS_MODELS.find((m) => m.id === id) || { label: id }).label;
+    const custom = [];
+    for (const r of rows) {
+      let hint = ""; try { hint = keyHint((await decryptJson(c.env.CREDENTIALS_KEY, r.key_enc)).apiKey); } catch { hint = ""; }
+      custom.push({ id: "m:" + r.id, kind: r.provider, name: r.name, model: r.model, baseUrl: r.base_url, keyHint: hint });
+    }
     c.header("Cache-Control", "no-store");
     return c.json({
-      settings: row ? { provider: row.provider, model: row.model, baseUrl: row.base_url, hasKey: !!row.key_enc, keyHint: hint } : { provider: "default", model: "", baseUrl: "", hasKey: false, keyHint: "" },
-      site: { provider: site.provider, model: site.model },
-      workersModels: WORKERS_MODELS,
+      active: u.active,
+      site: { id: "default", kind: "site", provider: site.provider, model: site.model, name: site.provider === "workers-ai" ? wm(site.model) : site.model },
+      workers: WORKERS_MODELS.map((m) => ({ id: "wa:" + m.id, kind: "workers-ai", name: m.label, model: m.id })),
+      custom,
     });
   });
-  // 合并出要保存 / 测试的配置：没填新 Key 时沿用已存的（仅限同一协议）
-  async function mergeSettings(c, value) {
-    const row = await readAiRow(c.env, c.get("uid"));
-    let apiKey = value.apiKey;
-    if (apiKey === undefined && row && row.provider === value.provider && row.key_enc) apiKey = (await decryptJson(c.env.CREDENTIALS_KEY, row.key_enc)).apiKey;
-    if ((value.provider === "openai" || value.provider === "anthropic") && !apiKey) return { error: "api key required" };
-    return { cfg: { provider: value.provider, model: value.model, baseUrl: value.baseUrl || (DEFAULTS[value.provider] && DEFAULTS[value.provider].baseUrl) || "", apiKey: apiKey || "" } };
-  }
-  app.put("/api/my/ai/settings", async (c) => {
-    const v = validateAiSettings(await c.req.json().catch(() => null));
+  // 切换当前用的模型
+  app.put("/api/my/ai/active", async (c) => {
+    const uid = c.get("uid"), b = await c.req.json().catch(() => ({}));
+    const id = typeof b.id === "string" ? b.id : "";
+    const ok = id === "default" || (id.startsWith("wa:") && WORKERS_MODELS.some((m) => "wa:" + m.id === id))
+      || (id.startsWith("m:") && (await listModelRows(c.env, uid)).some((r) => "m:" + r.id === id));
+    if (!ok) return c.json({ error: "unknown model" }, 400);
+    await c.env.DB.prepare("INSERT INTO settings (user_id,key,value) VALUES (?, '_ai_active', ?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value").bind(uid, id).run();
+    return c.json({ ok: true, active: id });
+  });
+  app.post("/api/my/ai/models", async (c) => {
+    const uid = c.get("uid"), v = validateModel(await c.req.json().catch(() => null));
     if (v.error) return c.json({ error: v.error }, 400);
-    const uid = c.get("uid");
-    if (v.value.provider === "default") { await c.env.DB.prepare("DELETE FROM ai_settings WHERE user_id=?").bind(uid).run(); return c.json({ ok: true }); }
-    let m; try { m = await mergeSettings(c, v.value); } catch { return c.json({ error: "saved key unreadable, enter it again" }, 400); }
-    if (m.error) return c.json({ error: m.error }, 400);
-    const enc = m.cfg.apiKey ? await encryptJson(c.env.CREDENTIALS_KEY, { apiKey: m.cfg.apiKey }) : null;
-    await c.env.DB.prepare("INSERT INTO ai_settings (user_id, provider, model, base_url, key_enc, updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET provider=excluded.provider, model=excluded.model, base_url=excluded.base_url, key_enc=excluded.key_enc, updated_at=excluded.updated_at")
-      .bind(uid, m.cfg.provider, m.cfg.model, v.value.baseUrl || "", enc, new Date().toISOString()).run();
+    if (!v.value.apiKey) return c.json({ error: "api key required" }, 400);
+    if ((await listModelRows(c.env, uid)).length >= MAX_MODELS) return c.json({ error: `at most ${MAX_MODELS} models` }, 400);
+    const enc = await encryptJson(c.env.CREDENTIALS_KEY, { apiKey: v.value.apiKey });
+    const r = await c.env.DB.prepare("INSERT INTO ai_models (user_id, provider, name, model, base_url, key_enc, created_at) VALUES (?,?,?,?,?,?,?)")
+      .bind(uid, v.value.provider, v.value.name, v.value.model, v.value.baseUrl, enc, new Date().toISOString()).run();
+    return c.json({ ok: true, id: "m:" + r.meta.last_row_id }, 201);
+  });
+  const ownRow = async (c) => (await listModelRows(c.env, c.get("uid"))).find((r) => String(r.id) === c.req.param("id")) || null;
+  app.put("/api/my/ai/models/:id", async (c) => {
+    const row = await ownRow(c);
+    if (!row) return c.json({ error: "not found" }, 404);
+    const v = validateModel(await c.req.json().catch(() => null));
+    if (v.error) return c.json({ error: v.error }, 400);
+    if (!v.value.apiKey && v.value.provider !== row.provider) return c.json({ error: "api key required when changing provider" }, 400);
+    const enc = v.value.apiKey ? await encryptJson(c.env.CREDENTIALS_KEY, { apiKey: v.value.apiKey }) : row.key_enc;
+    await c.env.DB.prepare("UPDATE ai_models SET provider=?, name=?, model=?, base_url=?, key_enc=? WHERE id=? AND user_id=?")
+      .bind(v.value.provider, v.value.name, v.value.model, v.value.baseUrl, enc, row.id, c.get("uid")).run();
     return c.json({ ok: true });
   });
-  // 测试连接：用表单里（还没保存）的配置发一条最小请求
-  app.post("/api/my/ai/settings/test", async (c) => {
-    const v = validateAiSettings(await c.req.json().catch(() => null));
+  app.delete("/api/my/ai/models/:id", async (c) => {
+    const row = await ownRow(c);
+    if (!row) return c.json({ error: "not found" }, 404);
+    await c.env.DB.prepare("DELETE FROM ai_models WHERE id=? AND user_id=?").bind(row.id, c.get("uid")).run();
+    return c.json({ ok: true }); // 正在用的被删了：userAi() 自动回到站点默认
+  });
+  // 测试连接：用表单里（可能还没保存）的配置发一条最小请求；编辑已有模型时不填 Key 就用已存的
+  app.post("/api/my/ai/models/test", async (c) => {
+    const b = await c.req.json().catch(() => null);
+    const v = validateModel(b);
     if (v.error) return c.json({ error: v.error }, 400);
-    let cfg, own = false;
-    if (v.value.provider === "default") cfg = aiConfig(c.env);
-    else {
-      let m; try { m = await mergeSettings(c, v.value); } catch { return c.json({ error: "saved key unreadable, enter it again" }, 400); }
-      if (m.error) return c.json({ error: m.error }, 400);
-      cfg = m.cfg; own = cfg.provider !== "workers-ai";
+    let apiKey = v.value.apiKey;
+    if (!apiKey && b && typeof b.id === "string" && b.id.startsWith("m:")) {
+      const r = (await listModelRows(c.env, c.get("uid"))).find((x) => "m:" + x.id === b.id);
+      if (r) { try { apiKey = (await decryptJson(c.env.CREDENTIALS_KEY, r.key_enc)).apiKey; } catch { apiKey = ""; } }
     }
-    if (!own && !(await takeQuota(c.env, c.get("uid")))) return c.json({ error: "daily_limit" }, 429);
+    if (!apiKey) return c.json({ error: "api key required" }, 400);
+    const cfg = { provider: v.value.provider, model: v.value.model, baseUrl: v.value.baseUrl || DEFAULTS[v.value.provider].baseUrl, apiKey };
     const t0 = Date.now();
     try {
       const text = await chat(c.env, "You are a connectivity check. Reply with exactly: OK", [{ role: "user", content: "ping" }], undefined, cfg);

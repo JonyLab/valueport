@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { env, SELF, fetchMock } from "cloudflare:test";
-import { validateAiSettings, aiConfig, chatComplete, validateChat, buildSystemPrompt, parseSuggestion, validateMethodReq, parsePicks } from "../src/ai.js";
+import { validateModel, aiConfig, chatComplete, validateChat, buildSystemPrompt, parseSuggestion, validateMethodReq, parsePicks } from "../src/ai.js";
 
 beforeAll(async () => {
   const ddl = [
     `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, pass_hash TEXT NOT NULL, pass_salt TEXT NOT NULL, board_slug TEXT NOT NULL UNIQUE, board_name TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS settings (user_id INTEGER NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (user_id, key))`,
-    `CREATE TABLE IF NOT EXISTS ai_settings (user_id INTEGER PRIMARY KEY, provider TEXT NOT NULL, model TEXT NOT NULL DEFAULT '', base_url TEXT NOT NULL DEFAULT '', key_enc TEXT, updated_at TEXT NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS ai_models (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, provider TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', model TEXT NOT NULL, base_url TEXT NOT NULL DEFAULT '', key_enc TEXT NOT NULL, created_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS activation_codes (code TEXT PRIMARY KEY, used_by INTEGER, created_at TEXT NOT NULL, used_at TEXT)`,
   ];
   for (const q of ddl) await env.DB.prepare(q).run();
@@ -185,30 +185,38 @@ describe("AI review", () => {
   });
 });
 
-describe("per-user AI settings", () => {
-  const S = (ck, method, body, path = "/api/my/ai/settings") => SELF.fetch("https://x" + path, { method, headers: { ...J, cookie: ck }, body: body ? JSON.stringify(body) : undefined });
+describe("per-user AI models", () => {
+  const R = (ck, method, path, body) => SELF.fetch("https://x" + path, { method, headers: { ...J, cookie: ck }, body: body ? JSON.stringify(body) : undefined });
   it("validates provider, model, https base URL and key", () => {
-    expect(validateAiSettings({ provider: "default" }).value).toEqual({ provider: "default" });
-    expect(validateAiSettings({ provider: "workers-ai", model: "@cf/evil/model" }).error).toBeTruthy();
-    expect(validateAiSettings({ provider: "workers-ai" }).value.model).toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
-    expect(validateAiSettings({ provider: "openai", model: "gpt-x", baseUrl: "http://insecure.test/v1", apiKey: "k" }).error).toMatch(/https/);
-    expect(validateAiSettings({ provider: "openai", model: "gpt-x", baseUrl: "https://u:p@x.test/v1", apiKey: "k" }).error).toMatch(/https/);
-    expect(validateAiSettings({ provider: "anthropic", model: "", apiKey: "k" }).error).toMatch(/model/);
-    expect(validateAiSettings({ provider: "anthropic", model: "claude-x", apiKey: "a b" }).error).toMatch(/key/);
-    expect(validateAiSettings({ provider: "openai", model: "m", baseUrl: "https://x.test/v1/", apiKey: " sk-1 " }).value).toEqual({ provider: "openai", model: "m", baseUrl: "https://x.test/v1", apiKey: "sk-1" });
+    expect(validateModel({ provider: "workers-ai", model: "x" }).error).toBeTruthy();
+    expect(validateModel({ provider: "openai", model: "gpt-x", baseUrl: "http://insecure.test/v1", apiKey: "k" }).error).toMatch(/https/);
+    expect(validateModel({ provider: "openai", model: "gpt-x", baseUrl: "https://u:p@x.test/v1", apiKey: "k" }).error).toMatch(/https/);
+    expect(validateModel({ provider: "anthropic", model: "", apiKey: "k" }).error).toMatch(/model/);
+    expect(validateModel({ provider: "anthropic", model: "claude-x", apiKey: "a b" }).error).toMatch(/key/);
+    expect(validateModel({ provider: "openai", name: " DeepSeek ", model: "m", baseUrl: "https://x.test/v1/", apiKey: " sk-1 " }).value)
+      .toEqual({ provider: "openai", name: "DeepSeek", model: "m", baseUrl: "https://x.test/v1", apiKey: "sk-1" });
   });
-  it("stores the key encrypted, never returns it, uses it for chats and skips the site quota", async () => {
-    const ck = await userCookie("aiset1");
-    expect((await (await S(ck, "GET")).json()).settings.provider).toBe("default");
-    expect((await S(ck, "PUT", { provider: "openai", model: "my-model", baseUrl: "https://user-llm.test/v1" })).status).toBe(400); // 没有 Key
-    expect((await S(ck, "PUT", { provider: "openai", model: "my-model", baseUrl: "https://user-llm.test/v1", apiKey: "sk-user-9876" })).status).toBe(200);
-    const g = await (await S(ck, "GET")).json();
-    expect(JSON.stringify(g)).not.toContain("sk-user-9876");
-    expect(g.settings).toMatchObject({ provider: "openai", model: "my-model", baseUrl: "https://user-llm.test/v1", hasKey: true, keyHint: "…9876" });
-    const uid = (await env.DB.prepare("SELECT id FROM users WHERE username='aiset1'").first()).id;
-    expect((await env.DB.prepare("SELECT key_enc FROM ai_settings WHERE user_id=?").bind(uid).first()).key_enc).not.toContain("9876");
-    // 改模型不重填 Key：沿用已存的
-    expect((await S(ck, "PUT", { provider: "openai", model: "my-model-2", baseUrl: "https://user-llm.test/v1" })).status).toBe(200);
+  it("lists built-in options, saves custom models encrypted, switches the active one and skips the site quota on own keys", async () => {
+    const ck = await userCookie("aimod1");
+    let list = await (await R(ck, "GET", "/api/my/ai/models")).json();
+    expect(list.active).toBe("default");
+    expect(list.workers.map((w) => w.id)).toContain("wa:@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+    expect(list.custom).toEqual([]);
+    expect((await R(ck, "POST", "/api/my/ai/models", { provider: "openai", model: "m", baseUrl: "https://user-llm.test/v1" })).status).toBe(400); // 没 Key
+    const created = await (await R(ck, "POST", "/api/my/ai/models", { provider: "openai", name: "我的模型", model: "my-model", baseUrl: "https://user-llm.test/v1", apiKey: "sk-user-9876" })).json();
+    expect(created.id).toMatch(/^m:\d+$/);
+    list = await (await R(ck, "GET", "/api/my/ai/models")).json();
+    expect(JSON.stringify(list)).not.toContain("sk-user-9876");
+    expect(list.custom[0]).toMatchObject({ id: created.id, kind: "openai", name: "我的模型", model: "my-model", keyHint: "…9876" });
+    const uid = (await env.DB.prepare("SELECT id FROM users WHERE username='aimod1'").first()).id;
+    expect((await env.DB.prepare("SELECT key_enc FROM ai_models WHERE user_id=?").bind(uid).first()).key_enc).not.toContain("9876");
+    // 改模型名不重填 Key
+    const rowId = created.id.slice(2);
+    expect((await R(ck, "PUT", "/api/my/ai/models/" + rowId, { provider: "openai", name: "我的模型", model: "my-model-2", baseUrl: "https://user-llm.test/v1" })).status).toBe(200);
+    // 切换：只能切到存在的选项
+    expect((await R(ck, "PUT", "/api/my/ai/active", { id: "m:99999" })).status).toBe(400);
+    expect((await R(ck, "PUT", "/api/my/ai/active", { id: created.id })).status).toBe(200);
+    expect((await (await R(ck, "GET", "/api/my/ai/models")).json()).active).toBe(created.id);
     // 站点额度用完也不影响自己的 Key
     await env.DB.prepare("INSERT INTO settings (user_id,key,value) VALUES (?, '_ai_usage', ?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value").bind(uid, new Date().toISOString().slice(0, 10) + ":100").run();
     let sent = null;
@@ -218,19 +226,24 @@ describe("per-user AI settings", () => {
     expect(r.status).toBe(200);
     expect((await r.json()).reply).toBe("好的。"); // 去掉推理模型的 <think>
     expect(sent.model).toBe("my-model-2");
-    // 恢复站点默认
-    expect((await S(ck, "PUT", { provider: "default" })).status).toBe(200);
-    expect((await (await S(ck, "GET")).json()).settings.provider).toBe("default");
-    expect((await post(ck, { messages: [{ role: "user", content: "hi" }], context: CONTEXT })).status).toBe(429); // 回到站点额度
+    // 别人看不到、改不了、删不掉
+    const other = await userCookie("aimod2");
+    expect((await (await R(other, "GET", "/api/my/ai/models")).json()).custom).toEqual([]);
+    expect((await R(other, "DELETE", "/api/my/ai/models/" + rowId)).status).toBe(404);
+    expect((await R(other, "PUT", "/api/my/ai/active", { id: created.id })).status).toBe(400);
+    // 删掉正在用的：回到站点默认（额度已用完 → 429）
+    expect((await R(ck, "DELETE", "/api/my/ai/models/" + rowId)).status).toBe(200);
+    expect((await (await R(ck, "GET", "/api/my/ai/models")).json()).active).toBe("default");
+    expect((await post(ck, { messages: [{ role: "user", content: "hi" }], context: CONTEXT })).status).toBe(429);
   });
   it("tests a connection without saving it", async () => {
-    const ck = await userCookie("aiset2");
+    const ck = await userCookie("aimod3");
     fetchMock.get("https://try-llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, { choices: [{ message: { content: "OK" } }] });
-    const ok = await (await S(ck, "POST", { provider: "openai", model: "m1", baseUrl: "https://try-llm.test/v1", apiKey: "sk-t" }, "/api/my/ai/settings/test")).json();
+    const ok = await (await R(ck, "POST", "/api/my/ai/models/test", { provider: "openai", model: "m1", baseUrl: "https://try-llm.test/v1", apiKey: "sk-t" })).json();
     expect(ok).toMatchObject({ ok: true, reply: "OK", model: "m1" });
     fetchMock.get("https://try-llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(401, { error: { message: "invalid api key" } });
-    const bad = await (await S(ck, "POST", { provider: "openai", model: "m1", baseUrl: "https://try-llm.test/v1", apiKey: "sk-t" }, "/api/my/ai/settings/test")).json();
+    const bad = await (await R(ck, "POST", "/api/my/ai/models/test", { provider: "openai", model: "m1", baseUrl: "https://try-llm.test/v1", apiKey: "sk-t" })).json();
     expect(bad).toEqual({ ok: false, error: "invalid api key" });
-    expect((await (await S(ck, "GET")).json()).settings.provider).toBe("default"); // 测试不会保存
+    expect((await (await R(ck, "GET", "/api/my/ai/models")).json()).custom).toEqual([]); // 测试不会保存
   });
 });
