@@ -697,35 +697,48 @@
   .fd-tipk{color:#d8d4cc} .fd-tipk i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
   .fd-tiprow b{color:#fff;font-weight:600}
   .fd-hoverline{position:absolute;top:0;bottom:18px;width:1px;background:var(--ink-mute);opacity:.45;pointer-events:none;z-index:4}
-  .fd-bar{fill:var(--chart-1)}
-  .fd-bar.neg{fill:var(--chart-neg)}
-  .fd-bar.good{fill:var(--chart-2)}
-  .fd-line{fill:none;stroke:var(--chart-2);stroke-width:2}
-  .fd-dot{fill:var(--chart-2)}
-  .fd-ldot{fill:var(--chart-1)}
-  .fd-zero{stroke:var(--track-edge);stroke-width:1}
-  .fd-axt{font-size:10px;fill:var(--ink-mute);font-family:var(--mono)}
-  .fd-spark{fill:none;stroke:var(--chart-1);stroke-width:1.6}
+  /* HTML 图表：网格线 + 刻度、圆角柱、白圈圆点、年份轴 */
+  .fd-plot{position:relative;padding-left:52px}
+  .fd-plot-area{position:relative}
+  .fd-grid{position:absolute;left:-52px;right:0;height:0;border-top:1px dashed rgba(29,29,27,.09)}
+  .fd-grid.zero{border-top:1px solid rgba(29,29,27,.2)}
+  .fd-gridlab{position:absolute;left:0;top:-7px;width:46px;text-align:right;font-size:10.5px;line-height:14px;color:var(--ink-mute);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+  .fd-cols{position:absolute;inset:0;display:flex}
+  .fd-col{position:relative;flex:1;display:flex;justify-content:center}
+  .fd-bar2{position:absolute;width:52%;max-width:46px;border-radius:7px 7px 2px 2px;background:var(--chart-1);transition:opacity .15s}
+  .fd-bar2.down{border-radius:2px 2px 7px 7px}
+  .fd-bar2.neg{background:var(--chart-neg)}
+  .fd-bar2.good{background:var(--chart-2)}
+  .fd-plot-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+  .fd-line2{fill:none;stroke:var(--chart-2);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+  .fd-line2.ink{stroke:var(--chart-1);stroke-width:2}
+  .fd-area{fill:rgba(42,42,41,.06);stroke:none}
+  .fd-pdot{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:var(--chart-2);box-shadow:0 0 0 2px #fff;pointer-events:none}
+  .fd-pdot.ink{background:var(--chart-1)}
+  .fd-axis{display:flex;height:22px;align-items:flex-end;font-size:11px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .fd-axis span{flex:1;text-align:center}
+  .fd-chartwrap.plot .fd-hoverline{bottom:22px;margin-left:52px;background:var(--ink);opacity:.18;width:2px}
+  .fd-spark{fill:none;stroke:var(--chart-1);stroke-width:1.8;stroke-linejoin:round}
+  .fd-sparksvg{display:block}
   .fd-spark0{stroke:var(--track-edge);stroke-width:1}
   .fd-legend{display:flex;gap:16px;margin-top:9px;font-size:11.5px;color:var(--ink-mute);flex-wrap:wrap;align-items:center}
   .fd-legend i{display:inline-block;vertical-align:middle;margin-right:5px}
-  .fd-legend .swb{width:11px;height:9px;border-radius:1px}
-  .fd-legend .swl{width:18px;border-top:2px solid var(--chart-2)}
+  .fd-legend .swb{width:10px;height:10px;border-radius:3px}
+  .fd-legend .swl{width:18px;border-top:2.5px solid var(--chart-2);border-radius:2px}
   .fd-callout{margin-top:12px;font-size:12.5px;color:var(--ink-soft);background:rgba(246,207,74,.18);border:0;border-radius:var(--r-md);padding:10px 14px;line-height:1.55}
   .fd-callout b{color:var(--ink)}
-  .fd-mgrid{display:grid;grid-template-columns:repeat(4,1fr)}
-  .fd-mcell{padding:2px 14px;border-left:1px dashed var(--border)}
-  .fd-mcell:first-child{border-left:none}
-  .fd-mlab{font-size:12px;color:var(--ink-soft);font-weight:600}
-  .fd-spwrap{margin:7px 0 5px}
-  .fd-mval{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--ink)}
-  .fd-mval .u{font-size:10.5px;color:var(--ink-mute);font-weight:400}
+  .fd-mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .fd-mcell{padding:14px 16px 12px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
+  .fd-mlab{font-size:12.5px;color:var(--ink-soft)}
+  .fd-spwrap{margin:10px 0 8px}
+  .fd-mval{font-size:22px;font-weight:400;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+  .fd-mval .u{font-size:12px;color:var(--ink-mute);font-weight:400;margin-left:1px}
   .fd-mtr{font-size:10.5px;margin-top:1px;color:var(--ink-mute)}
   .fd-stats{display:flex;gap:24px;flex-wrap:wrap;margin-top:10px}
   .fd-stat{font-size:12px;color:var(--ink-mute)}
-  .fd-stat b{display:block;font-family:var(--mono);color:var(--ink);font-weight:600;font-size:14px;margin-bottom:1px}
+  .fd-stat b{display:block;color:var(--ink);font-weight:400;font-size:18px;letter-spacing:-.01em;margin-bottom:2px;font-variant-numeric:tabular-nums}
   .fd-empty{color:var(--ink-mute);font-size:13px;padding:8px 0}
-  @media(max-width:680px){.fd-mgrid{grid-template-columns:repeat(2,1fr);row-gap:16px}.fd-mcell:nth-child(3){border-left:none}}
+  @media(max-width:680px){.fd-mgrid{grid-template-columns:repeat(2,1fr)}}
   @media (max-width:680px){ .view-detail{padding:0} .vd-gauge{width:100%;max-width:340px} .vd-grid{grid-template-columns:1fr} .vc-sheet{grid-template-columns:minmax(0,1fr) 1fr 1fr} .vc-mglabel{width:auto} }
   .view-settings{max-width:680px;width:100%;margin:0 auto;padding:4px 30px 18px;background:var(--card);border:1px solid var(--card-edge);border-radius:var(--r-xl);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
   .set-title{font-weight:400;font-size:34px;letter-spacing:-.02em;margin:24px 0 6px}
@@ -1890,80 +1903,91 @@ const fdLast = (s) => (s.length ? s[s.length - 1].value : NaN);
 function fdDerive(base, by, fn) {
   return base.map((x) => { const m = by.find((y) => y.year === x.year); const v = m ? fn(x.value, m.value) : null; return Number.isFinite(v) ? { year: x.year, value: v } : null; }).filter(Boolean);
 }
-// 净利润柱(亏损年红) + FCF 折线(绿)
-function fdBarLine(bars, line) {
-  const W = 800, H = 168, PADX = 6, PADB = 20, PADT = 12;
-  const svg = fdEl("svg", { class: "fd-chart", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", height: H });
-  const vals = bars.map((b) => b.value).concat(line.map((l) => l.value), [0]);
-  const mx = Math.max(...vals), mn = Math.min(...vals), y0 = PADT, y1 = H - PADB, Y = (v) => y1 - (v - mn) / ((mx - mn) || 1) * (y1 - y0);
-  const n = bars.length, gap = (W - PADX * 2) / n, bw = gap * 0.5;
-  svg.appendChild(fdEl("line", { class: "fd-zero", x1: PADX, x2: W - PADX, y1: Y(0), y2: Y(0) }));
-  bars.forEach((b, i) => {
-    const cx = PADX + gap * i + gap / 2, top = Y(Math.max(b.value, 0)), bot = Y(Math.min(b.value, 0));
-    svg.appendChild(fdEl("rect", { class: "fd-bar" + (b.value < 0 ? " neg" : ""), x: cx - bw / 2, y: top, width: bw, height: Math.max(bot - top, 1), rx: 1 }));
-    svg.appendChild(fdEl("text", { class: "fd-axt", x: cx, y: H - 6, "text-anchor": "middle" }, String(b.year).slice(2)));
-  });
-  svg.appendChild(fdEl("polyline", { class: "fd-line", points: line.map((l, i) => `${PADX + gap * i + gap / 2},${Y(l.value)}`).join(" ") }));
-  line.forEach((l, i) => svg.appendChild(fdEl("circle", { class: "fd-dot", cx: PADX + gap * i + gap / 2, cy: Y(l.value), r: 2.4 })));
-  return svg;
+// 基本面图表：柱子 / 圆点 / 年份 / 网格刻度用 HTML 画（圆角、不随宽度拉伸变形），只有折线用 SVG（线宽不随拉伸变化）
+const fdDiv = (cls, css) => { const d = document.createElement("div"); d.className = cls; if (css) d.style.cssText = css; return d; };
+function fdNiceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw || 1))); const f = raw / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
+function fdPlot({ years, bars, line, H = 168, negIsGood = false, fmt = (v) => String(v), lineOnly = false }) {
+  const n = years.length;
+  const vals = [...(bars || []).map((b) => b.value), ...(line || []).map((l) => l.value)];
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (lineOnly) { const pad = (hi - lo) * 0.35 || Math.abs(hi) * 0.1 || 1; lo -= pad; hi += pad; }
+  else { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+  const step = fdNiceStep((hi - lo) / 3 || 1);
+  if (!lineOnly) { lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step; }
+  const PADT = 8, PADB = 2, Y = (v) => PADT + (hi - v) / ((hi - lo) || 1) * (H - PADT - PADB);
+  const root = fdDiv("fd-plot"), area = fdDiv("fd-plot-area", `height:${H}px`);
+  // 网格线 + 刻度（0 线加深）
+  for (let t = Math.ceil(lo / step) * step; t <= hi + step * 1e-6; t += step) {
+    const g = fdDiv("fd-grid" + (Math.abs(t) < step * 1e-6 ? " zero" : ""), `top:${Y(t)}px`);
+    const lab = document.createElement("span"); lab.className = "fd-gridlab"; lab.textContent = Math.abs(t) < step * 1e-6 ? "0" : String(fmt(t)).replace(/\.0+(?=\D|$)/, ""); // 刻度去掉多余的 .00
+    g.appendChild(lab); area.appendChild(g);
+  }
+  if (bars) {
+    const cols = fdDiv("fd-cols");
+    bars.forEach((b) => {
+      const col = fdDiv("fd-col");
+      const v = b.value, top = Y(Math.max(v, 0)), bot = Y(Math.min(v, 0));
+      const bar = fdDiv("fd-bar2" + (v < 0 ? (negIsGood ? " good down" : " neg down") : ""), `top:${top}px;height:${Math.max(bot - top, 2)}px`);
+      col.appendChild(bar); cols.appendChild(col);
+    });
+    area.appendChild(cols);
+  }
+  if (line && line.length) {
+    const X = (i) => (i + 0.5) / n * 1000;
+    const idx = (l) => years.indexOf(l.year);
+    const pts = line.filter((l) => idx(l) >= 0).map((l) => [X(idx(l)), Y(l.value)]);
+    const svg = fdEl("svg", { class: "fd-plot-svg", viewBox: `0 0 1000 ${H}`, preserveAspectRatio: "none" });
+    if (lineOnly && pts.length) svg.appendChild(fdEl("polygon", { class: "fd-area", points: `${pts[0][0]},${H} ${pts.map((p) => p.join(",")).join(" ")} ${pts[pts.length - 1][0]},${H}` }));
+    svg.appendChild(fdEl("polyline", { class: "fd-line2" + (lineOnly ? " ink" : ""), points: pts.map((p) => p.join(",")).join(" "), "vector-effect": "non-scaling-stroke" }));
+    area.appendChild(svg);
+    pts.forEach(([x, y]) => area.appendChild(fdDiv("fd-pdot" + (lineOnly ? " ink" : ""), `left:${x / 10}%;top:${y}px`)));
+  }
+  const axis = fdDiv("fd-axis");
+  years.forEach((y) => { const sp = document.createElement("span"); sp.textContent = String(y).slice(2); axis.appendChild(sp); });
+  root.append(area, axis);
+  return root;
 }
-// 单序列柱图（净负债：负=净现金可标 good）
-function fdBars(series, negIsGood, h) {
-  const W = 800, H = h || 120, PADX = 6, PADB = 20, PADT = 12;
-  const svg = fdEl("svg", { class: "fd-chart", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", height: H });
-  const vals = series.map((s) => s.value).concat([0]);
-  const mx = Math.max(...vals), mn = Math.min(...vals), y0 = PADT, y1 = H - PADB, Y = (v) => y1 - (v - mn) / ((mx - mn) || 1) * (y1 - y0);
-  const n = series.length, gap = (W - PADX * 2) / n, bw = gap * 0.5;
-  svg.appendChild(fdEl("line", { class: "fd-zero", x1: PADX, x2: W - PADX, y1: Y(0), y2: Y(0) }));
-  series.forEach((s, i) => {
-    const cx = PADX + gap * i + gap / 2, top = Y(Math.max(s.value, 0)), bot = Y(Math.min(s.value, 0));
-    const cls = s.value < 0 ? (negIsGood ? " good" : " neg") : "";
-    svg.appendChild(fdEl("rect", { class: "fd-bar" + cls, x: cx - bw / 2, y: top, width: bw, height: Math.max(bot - top, 1), rx: 1 }));
-    svg.appendChild(fdEl("text", { class: "fd-axt", x: cx, y: H - 6, "text-anchor": "middle" }, String(s.year).slice(2)));
-  });
-  return svg;
-}
-// 折线（流通股数等，留白居中）
-function fdLineChart(series, h) {
-  const W = 800, H = h || 120, PADX = 6, PADB = 20, PADT = 14;
-  const svg = fdEl("svg", { class: "fd-chart", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", height: H });
-  const vals = series.map((s) => s.value), mx = Math.max(...vals), mn = Math.min(...vals);
-  const pad = (mx - mn) * 0.4 || Math.abs(mx) * 0.1 || 1, lo = mn - pad, hi = mx + pad;
-  const y0 = PADT, y1 = H - PADB, Y = (v) => y1 - (v - lo) / ((hi - lo) || 1) * (y1 - y0);
-  const n = series.length, gap = (W - PADX * 2) / n;
-  svg.appendChild(fdEl("polyline", { class: "fd-spark", points: series.map((s, i) => `${PADX + gap * i + gap / 2},${Y(s.value)}`).join(" "), "stroke-width": 2 }));
-  series.forEach((s, i) => { svg.appendChild(fdEl("circle", { class: "fd-ldot", cx: PADX + gap * i + gap / 2, cy: Y(s.value), r: 2.2 })); svg.appendChild(fdEl("text", { class: "fd-axt", x: PADX + gap * i + gap / 2, y: H - 6, "text-anchor": "middle" }, String(s.year).slice(2))); });
-  return svg;
-}
-// 网格里的迷你折线
+// 净利润柱（亏损年红）+ FCF 折线（暖黄）
+function fdBarLine(bars, line, fmt) { return fdPlot({ years: bars.map((b) => b.year), bars, line, H: 180, fmt }); }
+// 单序列柱图（净负债：负 = 净现金，标暖黄）
+function fdBars(series, negIsGood, h, fmt) { return fdPlot({ years: series.map((x) => x.year), bars: series, H: h || 130, negIsGood, fmt }); }
+// 折线（流通股数等）：按自身范围缩放，下方浅色面积
+function fdLineChart(series, h, fmt) { return fdPlot({ years: series.map((x) => x.year), line: series, H: h || 130, fmt, lineOnly: true }); }
+// 指标格子里的迷你折线：按自身范围缩放（不强行含 0，否则 64%→70% 这种变化会被压成一条直线），带浅色面积
 function fdSpark(series) {
-  const W = 120, H = 30, svg = fdEl("svg", { width: "100%", height: 30, viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none" });
-  const vals = series.map((s) => s.value), mx = Math.max(...vals, 0), mn = Math.min(...vals, 0), Y = (v) => 28 - (v - mn) / ((mx - mn) || 1) * 26;
-  if (mn < 0 && mx > 0) svg.appendChild(fdEl("line", { class: "fd-spark0", x1: 0, x2: W, y1: Y(0), y2: Y(0) }));
-  svg.appendChild(fdEl("polyline", { class: "fd-spark", points: series.map((s, i) => `${i / ((series.length - 1) || 1) * W},${Y(s.value)}`).join(" ") }));
+  const W = 120, H = 44, svg = fdEl("svg", { class: "fd-sparksvg", width: "100%", height: H, viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none" });
+  const vals = series.map((s) => s.value);
+  let mx = Math.max(...vals), mn = Math.min(...vals);
+  const pad = (mx - mn) * 0.25 || Math.abs(mx) * 0.1 || 1; mx += pad; mn -= pad;
+  const Y = (v) => H - 2 - (v - mn) / ((mx - mn) || 1) * (H - 4), X = (i) => i / ((series.length - 1) || 1) * W;
+  if (mn < 0 && mx > 0) svg.appendChild(fdEl("line", { class: "fd-spark0", x1: 0, x2: W, y1: Y(0), y2: Y(0), "vector-effect": "non-scaling-stroke" }));
+  const pts = series.map((s, i) => `${X(i)},${Y(s.value)}`).join(" ");
+  svg.appendChild(fdEl("polygon", { class: "fd-area", points: `0,${H} ${pts} ${W},${H}` }));
+  svg.appendChild(fdEl("polyline", { class: "fd-spark", points: pts, "vector-effect": "non-scaling-stroke" }));
   return svg;
 }
 const fdRange = (s) => { const v = s.map((x) => x.value); return `${Math.min(...v).toFixed(0)}% → ${Math.max(...v).toFixed(0)}%`; };
 // 给图表加 hover：按列定位,提示 年份 + 各序列值,并画一条竖向辅助线
 function fdChartWrap(svg, years, series, opts) {
-  const W = (opts && opts.W) || 800, PADX = (opts && opts.PADX != null) ? opts.PADX : 6, n = years.length;
-  const wrap = document.createElement("div"); wrap.className = "fd-chartwrap"; wrap.appendChild(svg);
+  const W = (opts && opts.W) || 800, PADX = (opts && opts.PADX != null) ? opts.PADX : 0, n = years.length;
+  const wrap = document.createElement("div"); wrap.className = "fd-chartwrap" + (svg.classList.contains("fd-plot") ? " plot" : ""); wrap.appendChild(svg);
   const line = document.createElement("div"); line.className = "fd-hoverline"; line.style.display = "none";
   const tip = document.createElement("div"); tip.className = "fd-tip"; tip.style.display = "none";
   wrap.appendChild(line); wrap.appendChild(tip);
   const gap = (W - PADX * 2) / n;
   const colAt = (x, rw) => { const vx = x / rw * W; return Math.max(0, Math.min(n - 1, Math.floor((vx - PADX) / gap))); };
   const show = (e) => {
+    const off = wrap.classList.contains("plot") ? 52 : 0; // HTML 图表左侧留了 52px 刻度栏
     const r = svg.getBoundingClientRect(); if (!r.width) return;
-    const col = colAt(e.clientX - r.left, r.width), yr = years[col];
+    const col = colAt(e.clientX - r.left - off, r.width - off), yr = years[col];
     tip.innerHTML = `<div class="fd-tipyr">${yr}</div>` + series.map((s) => {
       const pt = s.data.find((d) => d.year === yr);
       return `<div class="fd-tiprow"><span class="fd-tipk"><i style="background:${s.color}"></i>${s.label}</span><b>${pt ? s.fmt(pt.value) : "—"}</b></div>`;
     }).join("");
     tip.style.display = "block";
-    const cx = (PADX + gap * (col + 0.5)) / W * r.width;
+    const cx = (PADX + gap * (col + 0.5)) / W * (r.width - off);
     line.style.left = cx + "px"; line.style.display = "block";
-    const tw = tip.offsetWidth; tip.style.left = Math.max(0, Math.min(r.width - tw, cx - tw / 2)) + "px";
+    const tw = tip.offsetWidth; tip.style.left = Math.max(0, Math.min(r.width - tw, off + cx - tw / 2)) + "px";
   };
   const hide = () => { tip.style.display = "none"; line.style.display = "none"; };
   svg.addEventListener("mousemove", show); svg.addEventListener("mouseleave", hide);
@@ -1998,7 +2022,7 @@ function renderFundamentalsPanel(item, panel) {
       if (Number.isFinite(ratio)) { if (ratio >= 0.8) { hj = zh ? "现金扎实" : "Cash-backed"; hc = "good"; } else if (ratio >= 0.4) { hj = zh ? "现金 < 账面利润" : "Cash < earnings"; } else { hj = zh ? "FCF 远低于利润 · 重资本" : "FCF ≪ earnings"; hc = "bad"; } }
       const s = sec("01", zh ? "盈利与现金" : "Earnings & cash", "", Number.isFinite(ratio) ? `${ratio.toFixed(2)}<span class="u">×</span>` : "—", (zh ? "近 " + niM.length + " 年累计 FCF/净利 · " : niM.length + "y cum. FCF/NI · ") + hj, hc);
       if (FCF.length) {
-        s.appendChild(fdChartWrap(fdBarLine(NI, FCF), NI.map((d) => d.year), [
+        s.appendChild(fdChartWrap(fdBarLine(NI, FCF, (v) => fdMoney(v, cur)), NI.map((d) => d.year), [
           { label: zh ? "净利润" : "Net income", data: NI, color: "var(--chart-1)", fmt: (v) => fdMoney(v, cur) },
           { label: zh ? "自由现金流" : "Free cash flow", data: FCF, color: "var(--chart-2)", fmt: (v) => fdMoney(v, cur) },
         ]));
@@ -2007,7 +2031,7 @@ function renderFundamentalsPanel(item, panel) {
           + `<span><i class="swb" style="background:var(--chart-neg)"></i>${zh ? "亏损年" : "Loss yr"}</span>`
           + `<span><i class="swl"></i>${zh ? "自由现金流" : "Free cash flow"}</span>`;
         s.appendChild(lg);
-      } else { s.appendChild(fdChartWrap(fdBars(NI, false, 168), NI.map((d) => d.year), [{ label: zh ? "净利润" : "Net income", data: NI, color: "var(--chart-1)", fmt: (v) => fdMoney(v, cur) }])); }
+      } else { s.appendChild(fdChartWrap(fdBars(NI, false, 180, (v) => fdMoney(v, cur)), NI.map((d) => d.year), [{ label: zh ? "净利润" : "Net income", data: NI, color: "var(--chart-1)", fmt: (v) => fdMoney(v, cur) }])); }
       const niMin = Math.min(...NI.map((x) => x.value)), niMax = Math.max(...NI.map((x) => x.value));
       // FCF vs 净利润 关系按累计比值如实描述(不再写死"长期低于")
       let fcfClause = "";
@@ -2033,9 +2057,10 @@ function renderFundamentalsPanel(item, panel) {
     if (metrics.length) {
       const roeLast = fdLast(ROE), roeVals = ROE.map((x) => x.value);
       const volatile = ROE.length && (Math.max(...roeVals) - Math.min(...roeVals) > 25);
+      const heroM = Number.isFinite(roeLast) ? null : metrics[0], heroLast = heroM ? fdLast(heroM.s) : roeLast;
       const s = sec("02", zh ? "回报与利润率" : "Returns & margins", zh ? "护城河代理" : "moat proxy",
-        Number.isFinite(roeLast) ? `${roeLast.toFixed(1)}<span class="u">%</span>` : "—",
-        zh ? (volatile ? "ROE 强周期,非稳定高回报" : "ROE 当期") : (volatile ? "ROE highly cyclical" : "ROE latest"), "");
+        Number.isFinite(heroLast) ? `${heroLast.toFixed(1)}<span class="u">%</span>` : "—",
+        heroM ? (zh ? `${heroM.lab} 当期` : `${heroM.lab} latest`) : zh ? (volatile ? "ROE 强周期,非稳定高回报" : "ROE 当期") : (volatile ? "ROE highly cyclical" : "ROE latest"), "");
       const grid = document.createElement("div"); grid.className = "fd-mgrid";
       metrics.forEach((m) => {
         const c = document.createElement("div"); c.className = "fd-mcell"; const last = fdLast(m.s);
@@ -2055,7 +2080,10 @@ function renderFundamentalsPanel(item, panel) {
       else { heroV = Number.isFinite(ndOi) ? `${ndOi.toFixed(1)}<span class="u">×</span>` : fdMoney(ndLast, cur);
         if (Number.isFinite(ndOi)) { if (ndOi < 1) { hj = zh ? "杠杆低 · 扛得住周期" : "Low leverage"; hc = "good"; } else if (ndOi < 3) { hj = zh ? "杠杆温和" : "Moderate leverage"; } else { hj = zh ? "杠杆偏高" : "Elevated leverage"; hc = "bad"; } } }
       const s = sec("03", zh ? "资产负债表" : "Balance sheet", zh ? "先排雷" : "survival first", heroV, (ndLast > 0 && Number.isFinite(ndOi) ? (zh ? "净负债/营业利润 · " : "NetDebt/EBIT · ") : "") + hj, hc);
-      s.appendChild(fdChartWrap(fdBars(ND, true), ND.map((d) => d.year), [{ label: zh ? "净负债" : "Net debt", data: ND, color: "var(--chart-1)", fmt: (v) => fdMoney(v, cur) }]));
+      s.appendChild(fdChartWrap(fdBars(ND, true, 150, (v) => fdMoney(v, cur)), ND.map((d) => d.year), [{ label: zh ? "净负债" : "Net debt", data: ND, color: "var(--chart-1)", fmt: (v) => fdMoney(v, cur) }]));
+      const ndLg = document.createElement("div"); ndLg.className = "fd-legend";
+      ndLg.innerHTML = `<span><i class="swb" style="background:var(--chart-1)"></i>${zh ? "净负债" : "Net debt"}</span><span><i class="swb" style="background:var(--chart-2)"></i>${zh ? "净现金（负值）" : "Net cash (negative)"}</span>`;
+      s.appendChild(ndLg);
       const stats = document.createElement("div"); stats.className = "fd-stats";
       const debtAssets = (TL.length && TA.length && fdLast(TA)) ? fdLast(TL) / fdLast(TA) * 100 : NaN;
       stats.innerHTML = `<span class="fd-stat"><b>${fdMoney(ndLast, cur)}</b>${zh ? "净负债" : "Net debt"}</span>`
@@ -2078,7 +2106,7 @@ function renderFundamentalsPanel(item, panel) {
       else { hj = zh ? "股本平稳" : "Roughly flat"; }
       const s = sec("04", zh ? "资本配置" : "Capital allocation", zh ? "钱去哪了" : "where cash goes",
         `${(last / 1e9).toFixed(2)}<span class="u">B</span>`, (zh ? "流通股数 · " : "Shares · ") + hj, hc);
-      s.appendChild(fdChartWrap(fdLineChart(SH), SH.map((d) => d.year), [{ label: zh ? "流通股数" : "Shares", data: SH, color: "var(--chart-1)", fmt: (v) => (v / 1e9).toFixed(2) + "B" }]));
+      s.appendChild(fdChartWrap(fdLineChart(SH, 130, (v) => (v / 1e9).toFixed(2) + "B"), SH.map((d) => d.year), [{ label: zh ? "流通股数" : "Shares", data: SH, color: "var(--chart-1)", fmt: (v) => (v / 1e9).toFixed(2) + "B" }]));
       const stats = document.createElement("div"); stats.className = "fd-stats";
       const capInt = (CAP.length && REV.length && fdLast(REV)) ? Math.abs(fdLast(CAP)) / fdLast(REV) * 100 : NaN;
       stats.innerHTML = (Number.isFinite(capInt) ? `<span class="fd-stat"><b>${capInt.toFixed(0)}%</b>${zh ? "capex / 营收" : "capex / rev"}</span>` : "")
@@ -2104,7 +2132,7 @@ function renderFundamentalsPanel(item, panel) {
       const heroJ = divHist ? (zh ? "连续派息" : "Consecutive payouts") : (zh ? "每股股利 · 仅最新一期" : "DPS · latest only");
       const s = sec("05", zh ? "股东回报" : "Shareholder returns", zh ? "分红连续性" : "dividend track record", heroV, heroJ, divHist ? "good" : "");
       if (dseries.length) {
-        s.appendChild(fdChartWrap(fdBars(dseries, false, 150), dseries.map((d) => d.year), [
+        s.appendChild(fdChartWrap(fdBars(dseries, false, 150, (v) => v.toFixed(2)), dseries.map((d) => d.year), [
           { label: zh ? "每股股利" : "DPS", data: dseries, color: "var(--chart-1)", fmt: (v) => v.toFixed(2) + " " + dcur },
         ]));
       }
