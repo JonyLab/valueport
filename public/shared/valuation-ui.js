@@ -151,7 +151,59 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   pickClose.appendChild(ri("close-line"));
   pickClose.addEventListener("click", () => closePicker());
   const pickTop = el("div", "vc-picker-top"); pickTop.append(pickTitle, pickClose);
-  pickHead.append(pickTop, pickSub, pickWarn);
+  // AI 推荐方法：按公司业务与财务特征给出首选 + 交叉验证，标在对应方法卡上；结果按标的缓存在本次会话
+  const pickAi = el("div", "vc-picker-ai");
+  const pickAiBtn = el("button", "vc-picker-aibtn", { type: "button" });
+  pickAiBtn.replaceChildren(ri("sparkling-2-fill"), document.createTextNode(lang === "zh" ? "让 AI 推荐方法" : "Ask AI to recommend"));
+  const pickAiOut = el("div", "vc-picker-aiout");
+  pickAi.append(pickAiBtn, pickAiOut);
+  if (!stock || !stock.name) pickAi.hidden = true;
+  pickHead.append(pickTop, pickSub, pickWarn, pickAi);
+  let aiPicks = [];
+  const aiPickKey = () => "ai_method_" + ((stock && stock.code) || "") + "_" + lang;
+  function applyPicks() {
+    methodBar.querySelectorAll(".vc-pcard").forEach((b) => {
+      b.classList.remove("ai-pick", "ai-primary");
+      b.querySelectorAll(".vc-pcard-ai").forEach((x) => x.remove());
+      const p = aiPicks.find((x) => x.key === MODELS[Number(b.dataset.idx)].key);
+      if (!p) return;
+      b.classList.add("ai-pick"); if (p.role === "primary") b.classList.add("ai-primary");
+      const tag = el("span", "vc-pcard-ai");
+      const badge = el("span", "vc-pcard-aibadge");
+      badge.append(ri("sparkling-2-fill"), document.createTextNode(p.role === "primary" ? (lang === "zh" ? "AI 首选" : "AI pick") : (lang === "zh" ? "交叉验证" : "Cross-check")));
+      tag.appendChild(badge);
+      if (p.reason) tag.appendChild(el("span", "vc-pcard-reason")).textContent = p.reason;
+      b.appendChild(tag);
+    });
+  }
+  function showAiResult(r) {
+    aiPicks = r.picks || [];
+    pickAiOut.replaceChildren(ri("sparkling-2-fill"), document.createTextNode(r.reply || ""));
+    pickAiOut.className = "vc-picker-aiout" + (r.reply ? " on" : "");
+    pickAiBtn.hidden = true;
+    applyPicks();
+  }
+  try { const c = JSON.parse(sessionStorage.getItem(aiPickKey()) || "null"); if (c && Array.isArray(c.picks)) showAiResult(c); } catch { /* 没有缓存 */ }
+  pickAiBtn.addEventListener("click", async () => {
+    pickAiBtn.disabled = true;
+    pickAiBtn.replaceChildren(ri("loader-4-line"), document.createTextNode(lang === "zh" ? "AI 正在分析这家公司…" : "Analysing the company…"));
+    pickAiBtn.classList.add("busy");
+    const methods = METHOD_MENU_GROUPS.flatMap((g) => g.methods).filter((m) => MODELS.some((x) => x.key === m.key))
+      .map((m) => ({ key: m.key, title: textFor(m.title, lang, m.key), subtitle: textFor(m.subtitle, lang, "") }));
+    try {
+      const res = await fetch("/api/my/ai/method", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), methods }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(res.status === 429 ? (lang === "zh" ? "今天的 AI 次数已用完" : "Daily AI limit reached") : (j.detail || j.error || res.status));
+      showAiResult(j);
+      try { sessionStorage.setItem(aiPickKey(), JSON.stringify(j)); } catch { /* 存不下就算了 */ }
+    } catch (e) {
+      pickAiOut.textContent = (lang === "zh" ? "AI 暂时不可用：" : "AI unavailable: ") + (e && e.message || e);
+      pickAiOut.className = "vc-picker-aiout on error";
+      pickAiBtn.disabled = false; pickAiBtn.classList.remove("busy");
+      pickAiBtn.replaceChildren(ri("sparkling-2-fill"), document.createTextNode(lang === "zh" ? "重试" : "Retry"));
+    }
+  });
   pickerModal.append(pickHead, methodBar);
   // 关闭：还没选过方法（新增）→ 退出工作台回详情；已有方法（更换）→ 保持原方法
   function closePicker() { if (activeIdx < 0) { if (typeof onCancel === "function") onCancel(); } else showPicker(false); }
@@ -191,6 +243,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       g.append(lab, items);
       methodBar.appendChild(g);
     });
+    applyPicks();
   }
   function updatePickerLabel() {
     methodBar.querySelectorAll(".vc-pcard").forEach((b) => {
@@ -1164,6 +1217,19 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const a = fin && fin[kind] && fin[kind].find((x) => x.field === field);
     return a && Array.isArray(a.values) ? a.values.slice(0, 6).filter((x) => Number.isFinite(x.value)).map((x) => `${x.year}: ${fmtMoney(x.value)}`).join(", ") : null;
   }
+  function aiStock() {
+    return { name: (stock && stock.name) || "", code: (stock && stock.code) || "", currency: (stock && stock.currency) || "", price: finiteOr(ctx.price) };
+  }
+  function stockFacts() {
+    return {
+      price: finiteOr(ctx.price), epsTtm: finiteOr(ctx.epsTtm), adjustedEpsTtm: finiteOr(ctx.adjustedEps), bookValuePerShare: finiteOr(ctx.bps),
+      dividendPerShare: finiteOr(ctx.dividendYield), // 宿主传的 dividendYield 实为每股股息
+      sharesOutstanding: finiteOr(ctx.shares), marketCap: ctx.price > 0 && ctx.shares > 0 ? fmtMoney(ctx.price * ctx.shares) : null,
+      [`latestAnnualRevenue${ctx.annualYear ? " (FY" + ctx.annualYear + ")" : ""}`]: finiteOr(ctx.revenue), latestAnnualNetIncome: finiteOr(ctx.netIncome),
+      deductedNetIncome: finiteOr(ctx.deductedNetIncome), netDebt: finiteOr(ctx.netDebt), freeCashFlow: finiteOr(ctx.fcf),
+      revenueHistory: seriesOf("IS", "OperatingRevenue"), netIncomeHistory: seriesOf("IS", "NetProfit"), fcfHistory: seriesOf("CF", "NetFreeCashFlow"),
+    };
+  }
   function aiContext() {
     const model = MODELS[activeIdx]; if (!model) return null;
     const meta = methodMenuMeta(model);
@@ -1173,14 +1239,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         value: f.col === "dual" ? { c: finiteOr(v && v.c), o: finiteOr(v && v.o) } : finiteOr(v) };
     });
     const facts = {
-      price: finiteOr(ctx.price), epsTtm: finiteOr(ctx.epsTtm), adjustedEpsTtm: finiteOr(ctx.adjustedEps), bookValuePerShare: finiteOr(ctx.bps),
-      sharesOutstanding: finiteOr(ctx.shares), marketCap: ctx.price > 0 && ctx.shares > 0 ? fmtMoney(ctx.price * ctx.shares) : null,
-      [`latestAnnualRevenue${ctx.annualYear ? " (FY" + ctx.annualYear + ")" : ""}`]: finiteOr(ctx.revenue), latestAnnualNetIncome: finiteOr(ctx.netIncome),
-      deductedNetIncome: finiteOr(ctx.deductedNetIncome), netDebt: finiteOr(ctx.netDebt), freeCashFlow: finiteOr(ctx.fcf),
-      revenueHistory: seriesOf("IS", "OperatingRevenue"), netIncomeHistory: seriesOf("IS", "NetProfit"), fcfHistory: seriesOf("CF", "NetFreeCashFlow"),
+      ...stockFacts(),
       currentConclusion: Number.isFinite(lastLow) && Number.isFinite(lastHigh) ? `${fmt(Math.min(lastLow, lastHigh), "—")} ~ ${fmt(Math.max(lastLow, lastHigh), "—")}` : null,
     };
-    return { stock: { name: (stock && stock.name) || "", code: (stock && stock.code) || "", currency: (stock && stock.currency) || "", price: finiteOr(ctx.price) },
+    return { stock: aiStock(),
       method: { key: model.key, label: textFor(meta && meta.title, lang, modelTitle(model, lang)) }, mode: currentMode || null, fields, facts };
   }
   const ai = mountAiPanel(mount, {

@@ -142,6 +142,57 @@ export function parseSuggestion(text, fields) {
   return { reply, params: Object.keys(params).length ? params : null, reasons: Object.keys(reasons).length ? reasons : null };
 }
 
+// ── 选方法：根据公司特点推荐估值方法 ──
+export function validateMethodReq(body) {
+  if (!body || typeof body !== "object") return "bad body";
+  const { stock, methods } = body;
+  if (!stock || typeof stock !== "object" || typeof stock.name !== "string") return "stock required";
+  if (!Array.isArray(methods) || !methods.length || methods.length > 30) return "methods required";
+  for (const m of methods) if (!m || typeof m.key !== "string" || typeof m.title !== "string") return "bad method";
+  if (JSON.stringify(body).length > 20000) return "body too large";
+  return null;
+}
+export function buildMethodPrompt(body, lang) {
+  const { stock, facts, methods } = body;
+  const zh = lang !== "en";
+  const factLines = facts && typeof facts === "object"
+    ? Object.entries(facts).filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k, v]) => `- ${k}: ${v}`).join("\n") : "";
+  return [
+    "你是一位严谨的价值投资分析师。用户要给一只股票做估值，请根据这家公司的业务类型、盈利与现金流特征、分红情况，从下面的估值方法里推荐最合适的。",
+    zh ? "用中文回答。" : "Answer in English.",
+    "",
+    `标的：${stock.name}（${stock.code || ""}）　币种：${stock.currency || "未知"}　现价：${stock.price || "未知"}`,
+    "已知数据：", factLines || "（无）",
+    "",
+    "可选方法（key｜名称｜适用场景）：",
+    methods.map((m) => `- ${m.key}｜${m.title}｜${m.subtitle || ""}`).join("\n"),
+    "",
+    "规则：",
+    "1. 推荐 1 个首选方法 + 1~2 个用来交叉验证的方法，只能从上面的 key 里选。",
+    "2. 依据公司实际情况：银行保险等看账面价值；稳定高分红看股息；现金流稳定可预测用现金流折现；尚未盈利或利润波动大的成长股用市销率；资源类看资产重估。数据不足时说明假设。",
+    "3. 正文用两三句话讲清这家公司的特点和选择依据（120 字以内），不要逐项罗列方法。",
+    "4. 回复最后附一个 ```json 代码块，格式严格如下：",
+    '```json\n{"picks": [{"key": "方法key", "role": "primary", "reason": "一句话理由"}, {"key": "方法key", "role": "check", "reason": "一句话理由"}]}\n```',
+  ].join("\n");
+}
+export function parsePicks(text, methods) {
+  const re = /```(?:json)?\s*([\s\S]*?)```/gi;
+  let m, last = null;
+  while ((m = re.exec(text))) last = m;
+  if (!last) return { reply: text.trim(), picks: [] };
+  const reply = (text.slice(0, last.index) + text.slice(last.index + last[0].length)).trim();
+  let obj = null; try { obj = JSON.parse(last[1]); } catch { return { reply, picks: [] }; }
+  const keys = new Set(methods.map((x) => x.key));
+  const seen = new Set(), picks = [];
+  for (const p of (obj && Array.isArray(obj.picks) ? obj.picks : [])) {
+    if (!p || !keys.has(p.key) || seen.has(p.key)) continue;
+    seen.add(p.key);
+    picks.push({ key: p.key, role: picks.length ? "check" : "primary", reason: typeof p.reason === "string" ? p.reason.slice(0, 200) : "" });
+    if (picks.length >= 3) break;
+  }
+  return { reply, picks };
+}
+
 // 每人每天的对话次数上限（防刷；计数存在 settings 表的内部键，不在 SETTING_KEYS 白名单里，不会返回给前端）
 export const DAILY_LIMIT = 100;
 async function takeQuota(env, uid) {
@@ -169,5 +220,19 @@ export function registerAi(app, { chat = chatComplete } = {}) {
       return c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502);
     }
     return c.json(parseSuggestion(text, body.context.fields));
+  });
+  app.post("/api/my/ai/method", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const err = validateMethodReq(body);
+    if (err) return c.json({ error: err }, 400);
+    if (!(await takeQuota(c.env, c.get("uid")))) return c.json({ error: "daily_limit" }, 429);
+    const lang = body.lang === "en" ? "en" : "zh";
+    let text;
+    try {
+      text = await chat(c.env, buildMethodPrompt(body, lang), [{ role: "user", content: lang === "en" ? "Which valuation methods fit this company?" : "这家公司适合用哪些估值方法？" }]);
+    } catch (e) {
+      return c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502);
+    }
+    return c.json(parsePicks(text, body.methods));
   });
 }

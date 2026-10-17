@@ -212,7 +212,7 @@ For local dev, add `CREDENTIALS_KEY = "<base64 32 bytes>"` to `.dev.vars` and ru
 
 ## AI valuation assistant
 
-The valuation workbench has an **Ask AI** drawer: chat about the stock, and the model returns suggested inputs for the current method (conservative / optimistic, with reasons) that you preview and apply to the form with one click (undoable). The server sends the model the stock, the known financials and the current method's fields; the model replies with prose plus a ```json block, which `src/ai.js` validates against the field list. No native tool calling is needed, so any provider works.
+The method picker has **Ask AI to recommend**: the model reads the company's business and financials and marks one primary method plus one or two cross-checks on the method cards (cached per stock for the session). The valuation workbench has an **Ask AI** drawer: chat about the stock, and the model returns suggested inputs for the current method (conservative / optimistic, with reasons) that you preview and apply to the form with one click (undoable). The server sends the model the stock, the known financials and the current method's fields; the model replies with prose plus a ```json block, which `src/ai.js` validates against the field list. No native tool calling is needed, so any provider works.
 
 Provider is configured site-wide:
 
@@ -276,6 +276,7 @@ Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`
 
 | Method | Path | Description |
 |--------|------|-------------|
+| POST | `/api/my/ai/method` | `{lang, stock, facts, methods:[{key,title,subtitle}]}` → `{reply, picks:[{key, role: "primary"\|"check", reason}]}`; shares the daily limit |
 | POST | `/api/my/ai/valuation` | `{lang, messages:[{role,content}], context:{stock, method, mode, fields, facts}}` → `{reply, params, reasons}`; 429 after 100/day, 502 if the provider fails |
 
 ### Station-master (requires `pendulum_owner` cookie)

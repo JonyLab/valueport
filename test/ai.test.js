@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { env, SELF, fetchMock } from "cloudflare:test";
-import { aiConfig, chatComplete, validateChat, buildSystemPrompt, parseSuggestion } from "../src/ai.js";
+import { aiConfig, chatComplete, validateChat, buildSystemPrompt, parseSuggestion, validateMethodReq, parsePicks } from "../src/ai.js";
 
 beforeAll(async () => {
   const ddl = [
@@ -103,5 +103,28 @@ describe("POST /api/my/ai/valuation", () => {
     const uid = (await env.DB.prepare("SELECT id FROM users WHERE username='aiuser3'").first()).id;
     await env.DB.prepare("UPDATE settings SET value=? WHERE user_id=? AND key='_ai_usage'").bind(new Date().toISOString().slice(0, 10) + ":100", uid).run();
     expect((await post(ck, { messages: [{ role: "user", content: "hi" }], context: CONTEXT })).status).toBe(429);
+  });
+});
+
+const METHODS = [{ key: "pb", title: "P/B" }, { key: "ddm", title: "DDM" }, { key: "fcf", title: "DCF" }, { key: "pe", title: "P/E" }];
+describe("method recommendation", () => {
+  it("keeps known keys only, first pick is primary, at most three", () => {
+    const r = parsePicks('银行股看净资产。\n```json\n{"picks":[{"key":"nope"},{"key":"pb","role":"check","reason":"银行"},{"key":"ddm","role":"primary"},{"key":"pb"},{"key":"pe"},{"key":"fcf"}]}\n```', METHODS);
+    expect(r.reply).toBe("银行股看净资产。");
+    expect(r.picks).toEqual([{ key: "pb", role: "primary", reason: "银行" }, { key: "ddm", role: "check", reason: "" }, { key: "pe", role: "check", reason: "" }]);
+    expect(parsePicks("没有代码块", METHODS).picks).toEqual([]);
+  });
+  it("validates the request", () => {
+    expect(validateMethodReq({ stock: { name: "x" }, methods: [] })).toBeTruthy();
+    expect(validateMethodReq({ methods: METHODS })).toBeTruthy();
+    expect(validateMethodReq({ stock: { name: "招商银行" }, methods: METHODS })).toBeNull();
+  });
+  it("returns picks from the provider", async () => {
+    const ck = await userCookie("aiuser4");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" })
+      .reply(200, { choices: [{ message: { content: '银行。\n```json\n{"picks":[{"key":"pb","reason":"账面价值"}]}\n```' } }] });
+    const r = await SELF.fetch("https://x/api/my/ai/method", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify({ lang: "zh", stock: { name: "招商银行", code: "600036" }, facts: { bps: 40 }, methods: METHODS }) });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ reply: "银行。", picks: [{ key: "pb", role: "primary", reason: "账面价值" }] });
   });
 });
