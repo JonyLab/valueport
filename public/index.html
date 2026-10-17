@@ -666,7 +666,33 @@
   .vcard-verdict.v-under{color:var(--green);background:rgba(31,143,84,.12)} .vcard-verdict.v-over{color:var(--red);background:rgba(198,65,65,.10)}
   .vcard-assume{margin-top:14px;font-size:12.5px;line-height:1.6;color:var(--ink-soft)}
   .vcard-note{margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);font-size:12.5px;line-height:1.6;color:var(--ink-soft);white-space:pre-wrap;word-break:break-word}
-  .vcard-actions{margin-top:auto;padding-top:16px;display:flex;gap:6px;align-items:center}
+  .vcard-actions{margin-top:auto;padding-top:16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  /* AI 复核：按钮 + 卡内结果块 */
+  .vcard-ai{display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 13px;border:0;border-radius:var(--r-pill);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);
+    cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink)}
+  .vcard-ai i{color:var(--sun-ink);font-size:14px}
+  .vcard-ai:hover{box-shadow:inset 0 0 0 1px var(--sun),0 0 0 3px rgba(246,207,74,.25)}
+  .vcard-ai.busy{cursor:default;opacity:.8}
+  .vcard-ai.busy i{animation:vcSpin 1s linear infinite}
+  .vrev{margin-top:14px;padding:14px 16px;border-radius:var(--r-md);background:#fff;box-shadow:inset 0 0 0 1px var(--divider)}
+  .vrev.watch{box-shadow:inset 0 0 0 1px rgba(240,140,46,.45)} .vrev.broken{box-shadow:inset 0 0 0 1px rgba(198,65,65,.4)}
+  .vrev-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .vrev-badge{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 11px;border-radius:var(--r-pill);font-size:12.5px;font-weight:500}
+  .vrev-badge.hold{background:rgba(31,143,84,.12);color:var(--green)} .vrev-badge.watch{background:rgba(240,140,46,.16);color:#a4561a} .vrev-badge.broken{background:rgba(198,65,65,.1);color:var(--red)}
+  .vrev-when{font-size:11.5px;color:var(--ink-mute)}
+  .vrev-stale{margin-top:8px;font-size:12px;color:#a4561a}
+  .vrev-sum{margin-top:10px;font-size:13px;line-height:1.65;color:var(--ink)}
+  .vrev-checks{margin-top:10px;display:flex;flex-direction:column}
+  .vrev-row{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px dashed var(--border)}
+  .vrev-dot{flex:none;width:8px;height:8px;margin-top:6px;border-radius:50%}
+  .vrev-dot.ok{background:var(--green)} .vrev-dot.watch{background:#f08c2e} .vrev-dot.broken{background:var(--red)}
+  .vrev-main{min-width:0}
+  .vrev-k{font-size:12.5px;color:var(--ink)}
+  .vrev-v{margin-left:8px;font-size:11.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .vrev-why{margin-top:2px;font-size:12px;line-height:1.55;color:var(--ink-soft)}
+  .vrev-go{display:inline-flex;align-items:center;gap:4px;margin-top:10px;padding:0;border:0;background:none;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+  .vrev-err{margin-top:10px;font-size:12px;color:var(--red)}
+  .vrev-err[hidden]{display:none}
   .vcard-sel{height:34px;padding:0 15px;border:0;border-radius:var(--r-pill);background:var(--dark);cursor:pointer;font-family:var(--font);font-size:12.5px;color:#fff}
   .vcard-sel:hover{background:#000}
   .vcard-sel.on{background:var(--track);color:var(--ink-soft)}
@@ -948,6 +974,7 @@ import { t, applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
 import { mountValuationCalc } from "/shared/valuation-ui.js";
 import { MODELS, modeFields } from "/shared/valuation/index.js";
+import { verifiedFacts, latestMetrics, assumptionChecks } from "/shared/valuation/facts.js";
 
 applyI18n(); // 静态文案先按当前语言渲染
 // Remix Icon 图标（装饰性，读屏跳过）
@@ -2520,9 +2547,105 @@ function renderValuationPanel(item, panel, idBlock) {
       if (wasPicked) clearValuation(item, idBlock); else saveItem(item);
       showList();
     });
-    actions.append(sel, edit, del);
-    wrap.append(head, range, verd, sum, note, actions);
+    // AI 复核：用最新财报检查这张卡当初的假设还成不成立，结果存在卡上（card.review）
+    const rev = document.createElement("button"); rev.type = "button"; rev.className = "vcard-ai";
+    rev.replaceChildren(ri("sparkling-2-fill"), document.createTextNode(card.review ? (LANG === "zh" ? "重新复核" : "Re-review") : (LANG === "zh" ? "AI 复核" : "AI review")));
+    rev.title = LANG === "zh" ? "用最新财报检查当初的估值假设还成不成立" : "Check the assumptions against the latest reports";
+    const revErr = document.createElement("div"); revErr.className = "vrev-err"; revErr.hidden = true;
+    rev.addEventListener("click", () => runReview(card, rev, revErr));
+    actions.append(sel, rev, edit, del);
+    wrap.append(head, range, verd, sum, note);
+    if (card.review) wrap.appendChild(reviewEl(card, model));
+    wrap.append(revErr, actions);
     return wrap;
+  }
+
+  // ---- AI 复核 ----
+  const REV_MONEY = new Set(["revenue", "netIncome", "netDebt", "ebitda", "fcf"]);
+  const revFields = (model, inputs) => modeFields(model, inputs && inputs._mode).map((f) => {
+    const v = inputs ? inputs[f.k] : undefined, n = (x) => (typeof x === "number" && Number.isFinite(x) ? x : null);
+    return { k: f.k, label: (f.label && f.label[LANG]) || f.k, col: f.col, unit: f.unit || "", meta: f.meta || "", money: REV_MONEY.has(f.meta),
+      value: f.col === "dual" ? { c: n(v && v.c), o: n(v && v.o) } : n(v) };
+  });
+  const revVal = (f) => {
+    const one = (x) => (x === null || x === undefined ? "—" : f.money ? (x < 0 ? "−" : "") + fmtBig(Math.abs(x), "") : String(Math.round(x * 100) / 100)) + (x !== null && x !== undefined && f.unit === "%" ? "%" : "");
+    return f.col === "dual" ? `${one(f.value.c)} / ${one(f.value.o)}` : one(f.value);
+  };
+  async function runReview(card, btn, errEl) {
+    const model = MODELS.find((m) => m.key === card.method); if (!model) return;
+    btn.disabled = true; btn.classList.add("busy");
+    btn.replaceChildren(ri("loader-4-line"), document.createTextNode(LANG === "zh" ? "复核中…" : "Reviewing…"));
+    errEl.hidden = true;
+    try {
+      const [annual, quarter] = await Promise.all([loadFinancials(item, "annual"), loadFinancials(item, "quarter")]);
+      const c = item.cfg, st = item.statics || {};
+      const fields = revFields(model, card.inputs);
+      const body = {
+        lang: LANG,
+        stock: { name: displayName(item), code: (c.ticker || "").toUpperCase(), currency: st.currency || "", price: c.price > 0 ? c.price : null },
+        method: { key: model.key, label: model.label[LANG] || model.key },
+        valuedAt: card.updatedAt || "",
+        fields,
+        result: { low: Math.min(card.low, card.high), high: Math.max(card.low, card.high), price: c.price || null },
+        verified: verifiedFacts({ financials: annual && annual.financials, dividends: annual && annual.dividends, dps: parseFloat(st.dividendYield), lang: LANG }),
+        metrics: latestMetrics({ financials: annual && annual.financials, financialsQ: quarter && quarter.financials, valuationRefs: annual && annual.valuationRefs, valuedAt: card.updatedAt, lang: LANG }),
+        // 假设 vs 最新实际的位置由前端算好（开源模型比数字常出错），AI 只负责解释
+        comparisons: assumptionChecks({ fields, financials: annual && annual.financials, financialsQ: quarter && quarter.financials, valuationRefs: annual && annual.valuationRefs, dividends: annual && annual.dividends, lang: LANG }),
+      };
+      const r = await fetch("/api/my/ai/review", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.review) throw new Error(r.status === 429 ? (LANG === "zh" ? "今天的 AI 次数已用完" : "Daily AI limit reached") : (j.detail || (j.error === "bad_ai_output" ? (LANG === "zh" ? "AI 返回的格式不对，请重试" : "Unexpected AI output, try again") : j.error) || r.status));
+      card.review = j.review;
+      saveItem(item);
+      showList();
+    } catch (e) {
+      errEl.textContent = (LANG === "zh" ? "复核失败：" : "Review failed: ") + (e && e.message || e);
+      errEl.hidden = false;
+      btn.disabled = false; btn.classList.remove("busy");
+      btn.replaceChildren(ri("sparkling-2-fill"), document.createTextNode(LANG === "zh" ? "重试复核" : "Retry"));
+    }
+  }
+  // 复核结果：总体结论徽章 + 一句总结 + 逐项假设（状态点 · 名称 · 当初的值 · 依据），可去调整假设
+  function reviewEl(card, model) {
+    const r = card.review, zh = LANG === "zh";
+    const OV = { hold: [zh ? "假设成立" : "Holds", "checkbox-circle-fill"], watch: [zh ? "需关注" : "Watch", "error-warning-fill"], broken: [zh ? "已不成立" : "Broken", "close-circle-fill"] };
+    const ST = { ok: zh ? "成立" : "OK", watch: zh ? "需关注" : "Watch", broken: zh ? "不成立" : "Broken" };
+    const box = document.createElement("div"); box.className = "vrev " + r.overall;
+    const top = document.createElement("div"); top.className = "vrev-top";
+    const badge = document.createElement("span"); badge.className = "vrev-badge " + r.overall; badge.append(ri(OV[r.overall][1]), document.createTextNode(OV[r.overall][0]));
+    const when = document.createElement("span"); when.className = "vrev-when"; when.textContent = (zh ? "AI 复核 · " : "AI review · ") + (r.at ? r.at.slice(0, 10) : "");
+    top.append(badge, when);
+    box.appendChild(top);
+    if (card.updatedAt && r.at && card.updatedAt > r.at) {
+      const stale = document.createElement("div"); stale.className = "vrev-stale"; stale.textContent = zh ? "复核之后改过假设，结论可能已过期，可以重新复核。" : "Assumptions changed after this review; re-run it.";
+      box.appendChild(stale);
+    }
+    if (r.summary) { const p = document.createElement("div"); p.className = "vrev-sum"; p.textContent = r.summary; box.appendChild(p); }
+    const fields = model ? new Map(revFields(model, card.inputs).map((f) => [f.k, f])) : new Map();
+    if (r.checks && r.checks.length) {
+      const list = document.createElement("div"); list.className = "vrev-checks";
+      for (const ck of r.checks) {
+        const f = fields.get(ck.k);
+        const row = document.createElement("div"); row.className = "vrev-row";
+        const dot = document.createElement("span"); dot.className = "vrev-dot " + ck.status; dot.title = ST[ck.status];
+        const main = document.createElement("div"); main.className = "vrev-main";
+        const k = document.createElement("div"); k.className = "vrev-k";
+        k.append(document.createTextNode(f ? f.label : ck.k));
+        if (f) { const v = document.createElement("span"); v.className = "vrev-v"; v.textContent = (zh ? "当初 " : "was ") + revVal(f); k.appendChild(v); }
+        const why = document.createElement("div"); why.className = "vrev-why"; why.textContent = ck.reason || ST[ck.status];
+        main.append(k, why);
+        row.append(dot, main);
+        list.appendChild(row);
+      }
+      box.appendChild(list);
+    }
+    if (r.overall !== "hold") {
+      const go = document.createElement("button"); go.type = "button"; go.className = "vrev-go";
+      go.append(document.createTextNode(zh ? "去调整假设" : "Adjust assumptions"), ri("arrow-right-line"));
+      go.addEventListener("click", () => showEditor(card));
+      box.appendChild(go);
+    }
+    return box;
   }
 
   // 打开全屏双栏编辑器视图（添加/编辑卡片）

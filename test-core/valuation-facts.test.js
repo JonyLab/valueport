@@ -42,3 +42,51 @@ describe("verifiedFacts", () => {
     expect(verifiedFacts({ financials: null, dividends: null, dps: NaN })).toEqual(["没有查到现金分红记录：视为不分红，不要说它「分红稳定」，也不要推荐股息折现（DDM）"]);
   });
 });
+
+import { latestMetrics } from "../public/shared/valuation/facts.js";
+describe("latestMetrics", () => {
+  const fin = {
+    IS: [acct("OperatingRevenue", [[2021, 100], [2022, 110], [2023, 121], [2024, 133.1]]), acct("NetProfit", [[2021, 10], [2022, 12], [2023, 13], [2024, 13]]),
+         acct("OperatingIncome", [[2021, 15], [2022, 16.5], [2023, 18.15], [2024, 26.62]])],
+    CF: [acct("NetFreeCashFlow", [[2023, 10], [2024, 8]])],
+  };
+  const finQ = { IS: [{ field: "OperatingRevenue", values: [{ year: 2025, period: "Q2 2025", value: 40 * B, yoy: "12.5" }] }, { field: "NetProfit", values: [{ year: 2025, period: "Q2 2025", value: 4 * B, yoy: "-3.2" }] }] };
+  const refs = { pe: { current: 20, own5y: 25, industryMedian: 18 }, pb: { current: 3.2, own5y: null } };
+  it("summarises growth, margins, the latest quarter and multiples", () => {
+    const m = latestMetrics({ financials: fin, financialsQ: finQ, valuationRefs: refs, valuedAt: "2024-06-01T00:00:00Z", lang: "zh" }).join("\n");
+    expect(m).toContain("最新年报：FY2024（估值做于 2024-06-01，之后可能已有新年报）");
+    expect(m).toContain("营收增速：最新年同比 +10.0%，近三年复合 +10.0%");
+    expect(m).toContain("净利润增速：最新年同比 +0.0%");
+    expect(m).toContain("自由现金流增速：最新年同比 -20.0%");
+    expect(m).toContain("营业利润率：最新 20.0%，前三年均值 15.0%");
+    expect(m).toContain("最新季度 Q2 2025：营收同比 +12.5%，净利润同比 -3.2%");
+    expect(m).toContain("当前 P/E 20.0，自身五年中位 25.0，行业中位 18.0");
+    expect(m).toContain("当前 P/B 3.2");
+  });
+  it("returns nothing without data", () => {
+    expect(latestMetrics({})).toEqual([]);
+  });
+});
+
+import { assumptionChecks } from "../public/shared/valuation/facts.js";
+describe("assumptionChecks", () => {
+  const fin = {
+    IS: [acct("OperatingRevenue", [[2021, 100], [2022, 110], [2023, 121], [2024, 133.1]]), acct("NetProfit", [[2021, 10], [2022, 11], [2023, 12], [2024, 9]])],
+  };
+  const refs = { pe: { current: 18.1, own5y: 26 } };
+  it("places the actual value against the conservative / optimistic cases", () => {
+    const fields = [
+      { k: "growth", label: "营收增速", meta: "revGrowth", col: "dual", unit: "%", value: { c: 12, o: 20 } },
+      { k: "targetPE", label: "目标 PE", meta: "targetPE", col: "dual", unit: "", value: { c: 15, o: 25 } },
+      { k: "netMargin", label: "净利率", meta: "netMargin", col: "dual", unit: "%", value: { c: 5, o: 8 } },
+      { k: "revenue", label: "当前营收", meta: "revenue", col: "single", unit: "", value: 120 * B },
+      { k: "wacc", label: "WACC", meta: "wacc", col: "dual", unit: "%", value: { c: 10, o: 8 } },
+    ];
+    const m = assumptionChecks({ fields, financials: fin, valuationRefs: refs, lang: "zh" });
+    expect(m).toContain("growth（营收增速）：当初 保守 12 / 乐观 20；营收近三年复合增速 10.0% → 低于两档");
+    expect(m).toContain("targetPE（目标 PE）：当初 保守 15 / 乐观 25；当前倍数 18.1 → 落在两档之间；自身五年中位 26.0（高于两档）");
+    expect(m).toContain("netMargin（净利率）：当初 保守 5 / 乐观 8；最新净利率 6.8% → 落在两档之间");
+    expect(m).toContain("revenue（当前营收）：当初填 120.0B，最新年报 133.1B（高 10.9%）");
+    expect(m.some((x) => x.startsWith("wacc"))).toBe(false);
+  });
+});

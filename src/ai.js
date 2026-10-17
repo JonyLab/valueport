@@ -205,6 +205,61 @@ export function parsePicks(text, methods) {
   return { reply, picks };
 }
 
+// ── AI 复核：用最新财报检查一张估值卡当初的假设还成不成立 ──
+const REVIEW_OVERALL = new Set(["hold", "watch", "broken"]), REVIEW_STATUS = new Set(["ok", "watch", "broken"]);
+export function validateReviewReq(body) {
+  if (!body || typeof body !== "object") return "bad body";
+  const { stock, method, fields, result } = body;
+  if (!stock || typeof stock.name !== "string") return "stock required";
+  if (!method || typeof method.key !== "string") return "method required";
+  if (!Array.isArray(fields) || !fields.length || fields.length > 40) return "fields required";
+  for (const f of fields) if (!f || typeof f.k !== "string" || (f.col !== "single" && f.col !== "dual")) return "bad field";
+  if (!result || !Number.isFinite(Number(result.low)) || !Number.isFinite(Number(result.high))) return "result required";
+  if (badVerified(body.verified) || badVerified(body.metrics) || badVerified(body.comparisons)) return "bad facts";
+  if (JSON.stringify(body).length > 20000) return "body too large";
+  return null;
+}
+export function buildReviewPrompt(body, lang) {
+  const { stock, method, fields, result, valuedAt, verified, metrics, comparisons } = body;
+  const zh = lang !== "en";
+  const fieldLines = fields.map((f) => `- ${f.k}｜${f.label || f.k}｜${f.unit === "%" ? "百分数" : f.money ? "金额" : (f.unit || "数字")}｜当初填的：${fmtVal(f.value)}`).join("\n");
+  return [
+    "你是一位严谨的价值投资分析师，正在帮用户复核一张已保存的估值卡：用最新的财报数据检查当初的估值假设是否还成立。",
+    zh ? "用中文回答。" : "Answer in English.",
+    "",
+    `标的：${stock.name}（${stock.code || ""}）　币种：${stock.currency || "未知"}　现价：${stock.price || "未知"}`,
+    `估值方法：${method.label || method.key}　估值日期：${valuedAt || "未知"}　当初结论：合理价 ${result.low} ~ ${result.high}`,
+    "",
+    "当初的假设（k｜名称｜单位｜当初填的值；两档为 保守 / 乐观）：",
+    fieldLines,
+    ...verifiedBlock(verified),
+    ...(Array.isArray(metrics) && metrics.length ? ["", "最新实际数据（系统根据财报计算，以此为准）：", ...metrics.map((x) => "- " + x)] : []),
+    ...(Array.isArray(comparisons) && comparisons.length ? ["", "假设对照（系统已把最新实际值和两档假设比好，以此为准，不要自己重新比较数字）：", ...comparisons.map((x) => "- " + x)] : []),
+    "",
+    "规则：",
+    "1. 有「假设对照」的字段，状态必须和对照结果一致：落在两档之间或高于两档（增速、利润率）→ ok；低于两档 → watch 或 broken（差得多才算 broken）；倍数类看当前与自身历史是否支持当初的目标倍数。其余逐项对照关键假设和最新实际数据：增速、利润率、倍数、折现率等是否还说得通。实际表现落在保守与乐观之间或更好 → ok；接近保守下沿或趋势在变差 → watch；明显跌破保守假设、或前提已经变了 → broken。没有对应数据的假设（如折现率、永续增速）只在有明确理由时才评价，不必每项都写。",
+    "2. " + GROUNDING,
+    "3. 不给买卖建议，只说假设是否成立、哪里需要调整。",
+    "4. 正文不要罗列，结论全部放进回复最后的 ```json 代码块，格式严格如下：",
+    '```json\n{"overall": "hold|watch|broken", "summary": "两三句话的总体判断（100 字以内）", "checks": [{"k": "字段k", "status": "ok|watch|broken", "reason": "一句话依据，写出最新实际数字和当初的假设，如：近三年营收复合 10.0%，低于保守 12%"}]}\n```',
+  ].join("\n");
+}
+export function parseReview(text, fields) {
+  const re = /```(?:json)?\s*([\s\S]*?)```/gi;
+  let m, last = null;
+  while ((m = re.exec(text))) last = m;
+  let obj = null;
+  try { obj = JSON.parse(last ? last[1] : text); } catch { return null; }
+  if (!obj || !REVIEW_OVERALL.has(obj.overall)) return null;
+  const keys = new Set(fields.map((f) => f.k)), seen = new Set(), checks = [];
+  for (const ck of Array.isArray(obj.checks) ? obj.checks : []) {
+    if (!ck || !keys.has(ck.k) || seen.has(ck.k) || !REVIEW_STATUS.has(ck.status)) continue;
+    seen.add(ck.k);
+    checks.push({ k: ck.k, status: ck.status, reason: typeof ck.reason === "string" ? ck.reason.slice(0, 240) : "" });
+  }
+  return { overall: obj.overall, summary: typeof obj.summary === "string" ? obj.summary.slice(0, 400) : "", checks };
+}
+
 // 每人每天的对话次数上限（防刷；计数存在 settings 表的内部键，不在 SETTING_KEYS 白名单里，不会返回给前端）
 export const DAILY_LIMIT = 100;
 async function takeQuota(env, uid) {
@@ -246,5 +301,21 @@ export function registerAi(app, { chat = chatComplete } = {}) {
       return c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502);
     }
     return c.json(parsePicks(text, body.methods));
+  });
+  app.post("/api/my/ai/review", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const err = validateReviewReq(body);
+    if (err) return c.json({ error: err }, 400);
+    if (!(await takeQuota(c.env, c.get("uid")))) return c.json({ error: "daily_limit" }, 429);
+    const lang = body.lang === "en" ? "en" : "zh";
+    let text;
+    try {
+      text = await chat(c.env, buildReviewPrompt(body, lang), [{ role: "user", content: lang === "en" ? "Do the assumptions of this valuation still hold?" : "这张估值卡的假设还成立吗？" }]);
+    } catch (e) {
+      return c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502);
+    }
+    const review = parseReview(text, body.fields);
+    if (!review) return c.json({ error: "bad_ai_output" }, 502);
+    return c.json({ review: { ...review, at: new Date().toISOString() } });
   });
 }

@@ -2,6 +2,15 @@
 const METHODS = new Set(["fcff", "fcf", "fcfe", "ddm", "pe", "peg", "pb", "ps", "evebitda"]);
 
 // 校验估值卡片数组。返回 { ok, value } 或 { ok:false }。
+// AI 复核结果（可选）：只留合法的结论与有限长度的文字，其余丢掉
+const REVIEW_OVERALL = new Set(["hold", "watch", "broken"]), REVIEW_STATUS = new Set(["ok", "watch", "broken"]);
+function cleanReview(r) {
+  if (!r || typeof r !== "object" || !REVIEW_OVERALL.has(r.overall)) return undefined;
+  const checks = (Array.isArray(r.checks) ? r.checks : []).slice(0, 40)
+    .filter((c) => c && typeof c.k === "string" && REVIEW_STATUS.has(c.status))
+    .map((c) => ({ k: c.k.slice(0, 40), status: c.status, reason: typeof c.reason === "string" ? c.reason.slice(0, 240) : "" }));
+  return { overall: r.overall, summary: typeof r.summary === "string" ? r.summary.slice(0, 400) : "", checks, at: typeof r.at === "string" ? r.at.slice(0, 40) : "" };
+}
 function validateValuations(raw) {
   if (raw === undefined || raw === null) return { ok: true, value: [] };
   if (!Array.isArray(raw)) return { ok: false };
@@ -17,7 +26,8 @@ function validateValuations(raw) {
       note: typeof card.note === "string" ? card.note.slice(0, 2000) : "",
       derivations: (card.derivations && typeof card.derivations === "object" && !Array.isArray(card.derivations)) ? card.derivations : {},
       segments: (card.segments && typeof card.segments === "object" && !Array.isArray(card.segments)) ? card.segments : {},
-      updatedAt: typeof card.updatedAt === "string" ? card.updatedAt : "" });
+      updatedAt: typeof card.updatedAt === "string" ? card.updatedAt : "",
+      ...(cleanReview(card.review) ? { review: cleanReview(card.review) } : {}) });
   }
   return { ok: true, value: out };
 }

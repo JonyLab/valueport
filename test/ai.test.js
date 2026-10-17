@@ -147,3 +147,39 @@ describe("verified facts in prompts", () => {
     expect(validateMethodReq({ stock: { name: "x" }, methods: METHODS, verified: V })).toBeNull();
   });
 });
+
+describe("AI review", () => {
+  const FIELDS2 = [{ k: "growth", label: "营收增速", col: "dual", unit: "%", value: { c: 8, o: 15 } }, { k: "targetPE", label: "目标 PE", col: "dual", unit: "", value: { c: 18, o: 25 } }];
+  const BODY = { lang: "zh", stock: { name: "腾讯控股", code: "00700" }, method: { key: "pe", label: "P/E" }, valuedAt: "2025-03-01", fields: FIELDS2, result: { low: 400, high: 560, price: 417.8 },
+    verified: ["自由现金流 2016–2025：各年均为正"], metrics: ["营收增速：最新年同比 +7.0%，近三年复合 +6.1%"] };
+  it("builds a grounded prompt and parses only known keys and statuses", async () => {
+    const { buildReviewPrompt, parseReview, validateReviewReq } = await import("../src/ai.js");
+    const p = buildReviewPrompt(BODY, "zh");
+    expect(p).toContain("growth｜营收增速｜百分数｜当初填的：保守 8 / 乐观 15");
+    expect(p).toContain("最新实际数据");
+    expect(p).toContain("近三年复合 +6.1%");
+    expect(p).toContain("不给买卖建议");
+    const p2 = buildReviewPrompt({ ...BODY, comparisons: ["targetPE（目标 PE）：当初 保守 18 / 乐观 25；当前倍数 20.0 → 落在两档之间"] }, "zh");
+    expect(p2).toContain("假设对照");
+    expect(p2).toContain("落在两档之间");
+    const r = parseReview('```json\n{"overall":"watch","summary":"增速跌到保守假设以下","checks":[{"k":"growth","status":"broken","reason":"近三年复合 6.1% 低于保守 8%"},{"k":"nope","status":"ok"},{"k":"targetPE","status":"great"}]}\n```', FIELDS2);
+    expect(r).toEqual({ overall: "watch", summary: "增速跌到保守假设以下", checks: [{ k: "growth", status: "broken", reason: "近三年复合 6.1% 低于保守 8%" }] });
+    expect(parseReview('```json\n{"overall":"fine"}\n```', FIELDS2)).toBeNull();
+    expect(parseReview("没有代码块", FIELDS2)).toBeNull();
+    expect(validateReviewReq({ ...BODY, result: {} })).toBeTruthy();
+    expect(validateReviewReq({ ...BODY, metrics: "x" })).toBeTruthy();
+    expect(validateReviewReq(BODY)).toBeNull();
+  });
+  it("returns the review from the provider with a timestamp", async () => {
+    const ck = await userCookie("aiuser5");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" })
+      .reply(200, { choices: [{ message: { content: '```json\n{"overall":"hold","summary":"假设仍成立","checks":[{"k":"growth","status":"ok","reason":"增速落在区间内"}]}\n```' } }] });
+    const r = await SELF.fetch("https://x/api/my/ai/review", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) });
+    expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j.review).toMatchObject({ overall: "hold", summary: "假设仍成立", checks: [{ k: "growth", status: "ok", reason: "增速落在区间内" }] });
+    expect(typeof j.review.at).toBe("string");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, { choices: [{ message: { content: "随便聊聊" } }] });
+    expect((await SELF.fetch("https://x/api/my/ai/review", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) })).status).toBe(502);
+  });
+});
