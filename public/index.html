@@ -140,7 +140,7 @@
     background:rgba(255,255,255,.6);border:1px solid var(--card-edge);font-size:13.5px;color:var(--ink-soft);text-decoration:none}
   .vd-back:hover{color:var(--ink);background:#fff}
   .vd-pendhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .vd-pendedit{display:inline-flex;align-items:center;gap:5px;background:var(--track) !important;color:var(--ink-soft) !important}
+  .vd-pendedit{background:var(--track) !important;color:var(--ink-soft) !important;font-size:16px}
   .vd-pendedit:hover{background:var(--track-edge) !important;color:var(--ink) !important}
   .vd-backrow-right{display:flex;align-items:center;gap:8px}
   .ve-head-right{margin-left:auto}
@@ -605,7 +605,8 @@
     background:var(--card);border:1px solid var(--card-edge);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
   .vdist-none-msg{display:flex;align-items:center;gap:12px;font-size:14px;line-height:1.6;color:var(--ink-soft);min-width:0;flex:1 1 320px}
   .vdist-none-msg i{font-size:22px;color:var(--ink-mute)}
-  .vdist-none-acts{display:flex;gap:8px}
+  .vdist-none-acts{display:none;gap:8px} /* 宽屏侧栏钟摆卡里已有「添加估值」，这里不重复；窄屏侧栏排到下方时才显示 */
+  @media (max-width:1100px){ .vdist-none-acts{display:flex} }
   .vdist-params{grid-column:1 / -1;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink-mute)}
   .vdist-edit{appearance:none;border:0;background:none;padding:0;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);
     text-decoration:underline;text-underline-offset:3px;cursor:pointer}
@@ -1753,9 +1754,11 @@ function renderDetail(item, initialTab = 0) {
   pendSub.textContent = LANG === "zh" ? "现价落在你设定的五个估值区间中的哪一段" : "Where the price sits across your five valuation zones";
   const pendHead = document.createElement("div"); pendHead.className = "vd-pendhead"; pendHead.appendChild(pendLab);
   if (owner) {
-    const edit = document.createElement("button"); edit.type = "button"; edit.className = "btn sm vd-pendedit";
-    edit.append(ri("pencil-line"), document.createTextNode(t("b_edit")));
-    edit.title = LANG === "zh" ? "合理区间、安全边际、泡沫阈值" : "Fair range, margin of safety, bubble threshold";
+    // 低频设定（安全边际、泡沫阈值、手动区间、移除标的）收成一个齿轮图标，主行动「添加估值」在卡片中间
+    const edit = document.createElement("button"); edit.type = "button"; edit.className = "btn icon sm vd-pendedit";
+    edit.appendChild(ri("settings-3-line"));
+    const tip = LANG === "zh" ? "钟摆设置：安全边际、泡沫阈值、手动区间、移除标的" : "Pendulum settings: margin of safety, bubble threshold, manual range, remove";
+    edit.title = tip; edit.setAttribute("aria-label", tip);
     edit.addEventListener("click", () => openItemModal(item, false));
     pendHead.appendChild(edit);
   }
