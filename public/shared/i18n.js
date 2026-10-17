@@ -21,7 +21,7 @@ const DICT = {
   zh: {
     /* 看板页 */
     def_eyebrow: "",
-    def_title: "Watchlist",
+    def_title: "自选",
     def_sub: "",
     b_updated: (t, src) => `行情更新于 ${t} · ${src}`,
     src_longbridge: "实时 · 长桥",
@@ -41,9 +41,9 @@ const DICT = {
     b_notfound: "看板不存在。",
     b_loadfail: "加载失败，请稍后重试。",
     b_empty: "看板暂未配置内容。",
-    nav_watchlist: "Watchlist",
+    nav_watchlist: "自选",
     nav_macro: "宏观看板",
-    nav_portfolio: "Portfolio",
+    nav_portfolio: "资产",
     nav_macro_soon: "即将上线",
     nav_settings: "设置",
     /* 标的详情页 */

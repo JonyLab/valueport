@@ -142,7 +142,11 @@
     font-family:var(--font);font-size:14px;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;gap:6px}
   .pf-add:hover{background:rgba(255,255,255,.55);color:var(--ink)}
   /* 空状态 */
-  .pf-empty{text-align:center;padding:48px 24px}
+  /* 内容区撑满页面剩余高度，空状态卡片到底、内容垂直居中 */
+  #pfRoot{flex:1 1 auto;display:flex;flex-direction:column}
+  #pfRoot > .pf-grid{flex:none}
+  .pf-empty{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px 24px}
+  .pf-empty .btn{align-self:center}
   .pf-empty-ico{width:64px;height:64px;margin:0 auto 18px;border-radius:50%;background:var(--sun);color:var(--sun-ink);display:flex;align-items:center;justify-content:center;font-size:28px}
   .pf-empty-title{font-size:22px}
   .pf-empty-sub{max-width:520px;margin:10px auto 22px;font-size:14px;line-height:1.7;color:var(--ink-soft)}
@@ -191,10 +195,10 @@
 <body>
 <div class="page">
   <header class="topnav">
-    <a class="brand" href="/" id="brand">ValuePort<span class="brand-beta">beta</span></a>
+    <a class="brand" href="/portfolio" id="brand"><span class="brand-word"><b>Value</b>Port</span><span class="brand-beta">beta</span></a>
     <nav class="topnav-tabs" aria-label="导航">
-      <a class="nav-tab" id="tabBoard" href="/"><i class="ri-line-chart-line" aria-hidden="true"></i><span data-i18n="nav_watchlist">Watchlist</span></a>
       <a class="nav-tab on" href="/portfolio" aria-current="page"><i class="ri-pie-chart-2-line" aria-hidden="true"></i><span data-i18n="nav_portfolio">Portfolio</span></a>
+      <a class="nav-tab" id="tabBoard" href="/"><i class="ri-line-chart-line" aria-hidden="true"></i><span data-i18n="nav_watchlist">Watchlist</span></a>
       <button class="nav-tab" disabled aria-disabled="true" data-i18n-title="nav_macro_soon" title="即将上线"><i class="ri-earth-line" aria-hidden="true"></i><span data-i18n="nav_macro">宏观看板</span></button>
     </nav>
     <div class="topnav-actions" id="topActions"></div>
@@ -203,7 +207,7 @@
   <div class="pf-hero">
     <div>
       <p class="eyebrow" id="greet"></p>
-      <h1>Portfolio</h1>
+      <h1 data-i18n="nav_portfolio">Portfolio</h1>
     </div>
     <div class="pf-base" id="baseSel" role="radiogroup" aria-label="Currency"></div>
   </div>
@@ -289,7 +293,9 @@ if (!BASES.includes(base)) base = "USD";
 const me = await api("/api/me");
 if (!me.ok) { location.replace("/login"); }
 const slug = me.data.board && me.data.board.slug;
-for (const a of [$("brand"), $("tabBoard")]) a.href = "/b/" + encodeURIComponent(slug || "");
+if (slug) sessionStorage.setItem("owner_slug", slug); // 切到「自选」时导航可以立即显示
+$("tabBoard").href = "/b/" + encodeURIComponent(slug || "");
+document.title = (zh ? "资产" : "Portfolio") + " · ValuePort";
 $("greet").textContent = T(`${me.data.username} 的全部账户`, `All accounts of ${me.data.username}`);
 try {
   const st = await api("/api/my/settings");
@@ -379,9 +385,16 @@ function summarize(d) {
 
 // ---------- 渲染 ----------
 let data = null, history = [];
+// 先用本次会话里上一次的数据立即画出页面（避免切页时先空白再「蹦出」内容），后台拉最新数据再刷新
+const CACHE_KEY = () => "pf_cache_" + me.data.username + "_" + base; // 按用户区分，换号不会看到别人的缓存
+function fromCache() {
+  try { const c = JSON.parse(sessionStorage.getItem(CACHE_KEY()) || "null"); if (c && c.data && Array.isArray(c.data.accounts)) { data = c.data; history = c.history || []; render(); return true; } } catch {}
+  return false;
+}
 async function load() {
   const [r, h] = await Promise.all([api("/api/my/portfolio?base=" + base), api("/api/my/portfolio/history?days=3660")]);
   data = r.data; history = (h.data && h.data.points) || [];
+  try { sessionStorage.setItem(CACHE_KEY(), JSON.stringify({ data, history })); } catch { /* 存不下就算了 */ }
   render();
 }
 
@@ -688,6 +701,14 @@ function donut(title, map) {
 function distCard(s) {
   const c = el("section", "pf-card");
   const head = el("div", "pf-cardhead"); head.appendChild(el("span", "pf-cardtitle", T("资产分布", "Allocation"))); c.appendChild(head);
+  // 按标的：最大的 7 只单独列出，其余合并为「其他」，现金单独一块（与总资产口径一致）
+  const bySym = new Map();
+  const held = s.rows.filter((r) => Number.isFinite(r.value) && r.value > 0);
+  held.slice(0, 7).forEach((r) => bySym.set(r.boardName || r.name || r.symbol.slice(2).toUpperCase(), r.value));
+  const rest = held.slice(7).reduce((a, r) => a + r.value, 0);
+  if (rest > 0) bySym.set(T(`其他 ${held.length - 7} 只`, `${held.length - 7} others`), rest);
+  if (s.cashValue > 0) bySym.set(T("现金", "Cash"), s.cashValue);
+  c.appendChild(donut(T("按标的", "By holding"), bySym));
   if (data.accounts.length > 1) c.appendChild(donut(T("按账户", "By account"), s.byAccount));
   c.append(donut(T("按市场", "By market"), s.byMarket), donut(T("按币种", "By currency"), s.byCur));
   return c;
@@ -965,6 +986,7 @@ async function doImport() {
   $("holdSave").onclick = () => { closeOverlays(); $("holdSave").onclick = null; };
 }
 
+fromCache();
 await load();
 </script>
 </body>

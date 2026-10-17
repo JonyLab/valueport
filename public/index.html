@@ -667,16 +667,16 @@
 <div class="page">
   <!-- 顶部导航条：左 tabs（主人模式）/ 右 图标动作（语言全员可见、分享主人可见） -->
   <header class="topnav">
-    <a class="brand" href="/" id="brand">ValuePort<span class="brand-beta">beta</span></a>
+    <a class="brand" href="/" id="brand"><span class="brand-word"><b>Value</b>Port</span><span class="brand-beta">beta</span></a>
     <nav class="topnav-tabs hidden" id="appNav" aria-label="导航">
-      <button class="nav-tab on" data-view="board">
-        <i class="ri-line-chart-line" aria-hidden="true"></i>
-        <span data-i18n="nav_watchlist">Watchlist</span>
-      </button>
       <a class="nav-tab" href="/portfolio" data-view="portfolio">
         <i class="ri-pie-chart-2-line" aria-hidden="true"></i>
         <span data-i18n="nav_portfolio">Portfolio</span>
       </a>
+      <button class="nav-tab on" data-view="board">
+        <i class="ri-line-chart-line" aria-hidden="true"></i>
+        <span data-i18n="nav_watchlist">Watchlist</span>
+      </button>
       <button class="nav-tab" data-view="macro" disabled data-i18n-title="nav_macro_soon" title="即将上线" aria-disabled="true">
         <i class="ri-earth-line" aria-hidden="true"></i>
         <span data-i18n="nav_macro">宏观看板</span>
@@ -1064,6 +1064,9 @@ async function init() {
   const m = location.pathname.match(/^\/b\/([^/]+)/);
   boardSlug = m ? decodeURIComponent(m[1]) : "";
   if (!boardSlug) { location.replace("/login"); return; }
+  // 上次已确认是本看板主人：先把导航和主人按钮显示出来（避免切页时导航晚一拍出现），下面拿到 /api/me 后再按实际身份校正
+  const ownerHint = sessionStorage.getItem("owner_slug") === boardSlug;
+  if (ownerHint) for (const id of ["appNav", "btnShare", "btnSettings"]) document.getElementById(id).classList.remove("hidden");
 
   const [cfgRes, meRes] = await Promise.allSettled([
     fetch("/api/config?slug=" + encodeURIComponent(boardSlug)),
@@ -1076,6 +1079,11 @@ async function init() {
     try { me = await meRes.value.json(); } catch { me = null; }
   }
   owner = !!(me && me.board && me.board.slug === boardSlug);
+  if (owner) sessionStorage.setItem("owner_slug", boardSlug);
+  else {
+    if (ownerHint) sessionStorage.removeItem("owner_slug");
+    for (const id of ["appNav", "btnShare", "btnSettings"]) document.getElementById(id).classList.add("hidden"); // 身份已变（退出 / 换号）：收回
+  }
   greetName = owner ? me.username : "";
 
   // 看板数据
@@ -2423,7 +2431,11 @@ document.querySelectorAll('.nav-tab[data-view="board"]').forEach((tab) => // Por
   tab.addEventListener("click", () => { history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList(); }));
 btnSettings.addEventListener("click", showSettings);
 // 产品名 = 回到 Watchlist
-document.getElementById("brand").addEventListener("click", (e) => { e.preventDefault(); history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList(); });
+document.getElementById("brand").addEventListener("click", (e) => {
+  e.preventDefault();
+  if (owner) { location.href = "/portfolio"; return; } // 资产（Portfolio）是主人的首页；访客留在看板
+  history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList();
+});
 
 /* ---------- 分享 / 看板设置弹窗 ---------- */
 const shareOverlay = document.getElementById("shareOverlay");
@@ -2591,6 +2603,7 @@ boardNameEl.addEventListener("input", () => {
 
 document.getElementById("btnLogout").addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" });
+  try { sessionStorage.clear(); } catch {} // 清掉身份提示与资产页缓存
   location.reload();
 });
 

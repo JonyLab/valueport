@@ -18,7 +18,7 @@ Sessions are stateless HMAC-signed cookies (`SESSION_SECRET`). The owner backend
 
 | URL | Description |
 |-----|-------------|
-| `/login` | User login page |
+| `/login` | User login page — after signing in (or registering) you land on `/portfolio` |
 | `/register` | New-user registration (requires an activation code) |
 | `/b/<slug>` | The board page — read-only for visitors; the signed-in owner edits items via dialogs and opens Settings (top-right) for text/colors/board config |
 | `/app` | Legacy entry — 302 redirect to your `/b/<slug>` (or `/login`) |

@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>注册 · 估值钟摆</title>
 <link rel="stylesheet" href="/shared/styles.css">
 </head><body><div class="page"><div class="page-corner" id="corner"></div><div class="auth">
-<a class="auth-brand" href="/">ValuePort</a>
+<a class="auth-brand" href="/"><b>Value</b>Port</a>
 <h2 data-i18n="a_reg_title">注册</h2><p class="hint" data-i18n="a_reg_hint">需要一枚激活码（向站长索取）。</p><div class="err" id="err"></div>
 <input id="u" data-i18n-ph="a_reg_username_ph" placeholder="用户名（3-20 位字母/数字/_-）" autocomplete="username">
 <input id="p" type="password" data-i18n-ph="a_reg_password_ph" placeholder="密码（至少 6 位）" autocomplete="new-password">
@@ -20,7 +20,7 @@ async function reg(){ err.textContent="";
   const go=document.getElementById("go"); go.disabled=true;
   try{
     const r=await fetch("/api/register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value.trim(),password:document.getElementById("p").value,code:document.getElementById("c").value.trim()})});
-    if(r.ok){ const b=await r.json().catch(()=>({})); location.href=b.board&&b.board.slug?"/b/"+b.board.slug:"/app"; return; }
+    if(r.ok){ location.href="/portfolio"; return; } // 注册后先到资产（Portfolio）首页
     err.textContent=(await r.json().catch(()=>({}))).error||t("a_reg_fail");
   }catch{ err.textContent=t("a_net_err"); }
   finally{ go.disabled=false; }

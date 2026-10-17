@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>登录 · 估值钟摆</title>
 <link rel="stylesheet" href="/shared/styles.css">
 </head><body><div class="page"><div class="page-corner" id="corner"></div><div class="auth">
-<a class="auth-brand" href="/">ValuePort</a>
+<a class="auth-brand" href="/"><b>Value</b>Port</a>
 <h2 data-i18n="a_login_title">登录</h2><div class="err" id="err"></div>
 <input id="u" data-i18n-ph="a_username_ph" placeholder="用户名" autocomplete="username">
 <input id="p" type="password" data-i18n-ph="a_password_ph" placeholder="密码" autocomplete="current-password">
@@ -21,7 +21,7 @@ async function gotoMyBoard(replace){
     if(!r.ok) return false;
     const me=await r.json();
     if(!me.board||!me.board.slug) return false;
-    const url="/b/"+me.board.slug;
+    const url="/portfolio"; // 登录后先到资产（Portfolio）首页
     if(replace) location.replace(url); else location.href=url;
     return true;
   }catch{ return false; }
