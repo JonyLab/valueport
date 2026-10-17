@@ -50,21 +50,24 @@ async function tencentQuotes(symbols) {
     return { quotes: parseTencentQuotes(text, symbols), prevClose: parseTencentPrevClose(text, symbols) };
   } catch { return { quotes: {}, prevClose: {} }; }
 }
+// 现价：有长桥凭据则优先用其实时行情，失败或缺漏的退回腾讯延时；腾讯总要请求一次，补缺漏并提供昨收（长桥行情接口不返回昨收）
+async function getQuotes(env, symbols) {
+  let quotes = {}, source = "tencent";
+  if (env.LONGBRIDGE_APP_KEY && env.LONGBRIDGE_APP_SECRET && env.LONGBRIDGE_ACCESS_TOKEN) {
+    try { quotes = await fetchLongbridgeQuotes(env, symbols); source = "longbridge"; }
+    catch (e) { console.error("longbridge failed, fall back to tencent:", e && e.message); quotes = {}; source = "tencent"; }
+  }
+  const tc = await tencentQuotes(symbols);
+  for (const s of symbols) if (!(s in quotes) && s in tc.quotes) quotes[s] = tc.quotes[s];
+  return { quotes, prevClose: tc.prevClose, source };
+}
 app.get("/api/quotes", async (c) => {
   const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim()).filter((s) => s && s.length <= 16).slice(0, 50);
   if (!symbols.length) return c.json({ quotes: {}, ts: new Date().toISOString() });
-  let quotes = {}, source = "tencent";
-  // 有长桥凭据则优先用其实时行情；失败或缺漏的退回腾讯延时
-  if (c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN) {
-    try { quotes = await fetchLongbridgeQuotes(c.env, symbols); source = "longbridge"; }
-    catch (e) { console.error("longbridge failed, fall back to tencent:", e && e.message); quotes = {}; source = "tencent"; }
-  }
-  // 腾讯总要请求一次：补长桥缺漏的价格，并提供昨收（长桥行情接口不返回昨收）
-  const tc = await tencentQuotes(symbols);
-  for (const s of symbols) if (!(s in quotes) && s in tc.quotes) quotes[s] = tc.quotes[s];
+  const { quotes, prevClose, source } = await getQuotes(c.env, symbols);
   c.header("Cache-Control", "no-store"); // 实时行情不缓存
   if (!Object.keys(quotes).length) return c.json({ quotes: {}, error: "upstream unreachable", ts: new Date().toISOString() }, 502);
-  return c.json({ quotes, prevClose: tc.prevClose, source, ts: new Date().toISOString() });
+  return c.json({ quotes, prevClose, source, ts: new Date().toISOString() });
 });
 // 标的中英文名 + 静态信息（总股本、TTM EPS 等，估值计算器要用）。优先长桥；长桥未配置或缺项的，用腾讯行情串补
 // （英文名美股/港股有、A 股没有；总股本/币种/TTM EPS 三市场都有）。只补缺项，不覆盖长桥已给的值。
@@ -207,6 +210,7 @@ app.use("/api/my/*", async (c, next) => {
   c.set("uid", uid);
   await next();
 });
+
 
 /* ---------- 用户数据 CRUD（按 uid 隔离） ---------- */
 app.get("/api/my/items", async (c) => {
