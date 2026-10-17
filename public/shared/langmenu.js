@@ -27,6 +27,8 @@ export function mountLangMenu(host) {
   wrap.addEventListener("mouseenter", () => btn.setAttribute("aria-expanded", "true"));
   wrap.addEventListener("mouseleave", () => { if (!wrap.classList.contains("open")) btn.setAttribute("aria-expanded", "false"); });
   document.addEventListener("click", (e) => { if (!wrap.contains(e.target)) setOpen(false); });
-  host.appendChild(wrap);
+  // navboot.js 首帧放过一个静态占位：原地替换，位置不变、不闪
+  const stub = host.querySelector(".lang-menu[data-static]");
+  if (stub) stub.replaceWith(wrap); else host.appendChild(wrap);
   return wrap;
 }
