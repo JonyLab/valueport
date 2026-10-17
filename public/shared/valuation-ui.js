@@ -178,7 +178,13 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   }
   function showAiResult(r) {
     aiPicks = r.picks || [];
-    pickAiOut.replaceChildren(ri("sparkling-2-fill"), document.createTextNode(r.reply || ""));
+    // 结论块：左侧墨黑圆形徽章 +「AI 建议」小标题 + 正文，暖黄底，和普通说明文字区分开
+    const badge = el("span", "vc-picker-aibadge"); badge.appendChild(ri("sparkling-2-fill"));
+    const body = el("div", "vc-picker-aibody");
+    const lab = el("div", "vc-picker-ailab"); lab.textContent = lang === "zh" ? "AI 建议" : "AI suggestion";
+    const txt = el("div", "vc-picker-aitxt"); txt.textContent = r.reply || "";
+    body.append(lab, txt);
+    pickAiOut.replaceChildren(badge, body);
     pickAiOut.className = "vc-picker-aiout" + (r.reply ? " on" : "");
     pickAiBtn.hidden = true;
     applyPicks();
