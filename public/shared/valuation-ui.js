@@ -15,6 +15,7 @@ import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
 import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
 import { mountAiPanel } from "/shared/ai-panel.js";
+import { verifiedFacts } from "/shared/valuation/facts.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -160,7 +161,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   if (!stock || !stock.name) pickAi.hidden = true;
   pickHead.append(pickTop, pickSub, pickWarn, pickAi);
   let aiPicks = [];
-  const aiPickKey = () => "ai_method_" + ((stock && stock.code) || "") + "_" + lang;
+  const aiPickKey = () => "ai_method_v2_" + ((stock && stock.code) || "") + "_" + lang;
   function applyPicks() {
     methodBar.querySelectorAll(".vc-pcard").forEach((b) => {
       b.classList.remove("ai-pick", "ai-primary");
@@ -198,7 +199,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       .map((m) => ({ key: m.key, title: textFor(m.title, lang, m.key), subtitle: textFor(m.subtitle, lang, "") }));
     try {
       const res = await fetch("/api/my/ai/method", { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), methods }) });
+        body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), verified: aiVerified(), methods }) });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(res.status === 429 ? (lang === "zh" ? "今天的 AI 次数已用完" : "Daily AI limit reached") : (j.detail || j.error || res.status));
       showAiResult(j);
@@ -1236,6 +1237,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       revenueHistory: seriesOf("IS", "OperatingRevenue"), netIncomeHistory: seriesOf("IS", "NetProfit"), fcfHistory: seriesOf("CF", "NetFreeCashFlow"),
     };
   }
+  // 已核实的事实：由财报算出（现金流 / 盈利是否稳定、负值年份、是否分红等），提示词要求 AI 以此为准、不得凭印象编
+  function aiVerified() {
+    try { return verifiedFacts({ financials: refData && refData.financials, dividends: refData && refData.dividends, dps: ctx.dividendYield, lang }); } catch { return []; }
+  }
   function aiContext() {
     const model = MODELS[activeIdx]; if (!model) return null;
     const meta = methodMenuMeta(model);
@@ -1248,7 +1253,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       ...stockFacts(),
       currentConclusion: Number.isFinite(lastLow) && Number.isFinite(lastHigh) ? `${fmt(Math.min(lastLow, lastHigh), "—")} ~ ${fmt(Math.max(lastLow, lastHigh), "—")}` : null,
     };
-    return { stock: aiStock(),
+    return { stock: aiStock(), verified: aiVerified(),
       method: { key: model.key, label: textFor(meta && meta.title, lang, modelTitle(model, lang)) }, mode: currentMode || null, fields, facts };
   }
   const ai = mountAiPanel(mount, {

@@ -61,6 +61,13 @@ export async function chatComplete(env, system, messages, fetchImpl = fetch) {
 
 // ── 请求校验 ──
 const MAX_MSGS = 20, MAX_CHARS = 4000;
+// 已核实的事实：前端由财报算好的短句（≤20 条，每条 ≤300 字）
+function badVerified(v) { return v !== undefined && (!Array.isArray(v) || v.length > 20 || v.some((x) => typeof x !== "string" || x.length > 300)); }
+function verifiedBlock(v) {
+  if (!Array.isArray(v) || !v.length) return [];
+  return ["", "已核实的事实（系统根据财报计算，以此为准）：", ...v.map((x) => "- " + x)];
+}
+const GROUNDING = "凡是涉及现金流 / 盈利是否稳定、是否分红、增长快慢、负债多少的判断，都必须与「已核实的事实」一致；事实里没有的不要断言，不要编造任何数字或经营情况。";
 export function validateChat(body) {
   if (!body || typeof body !== "object") return "bad body";
   const { messages, context } = body;
@@ -70,6 +77,7 @@ export function validateChat(body) {
   }
   if (messages[messages.length - 1].role !== "user") return "last message must be from user";
   if (!context || typeof context !== "object" || !Array.isArray(context.fields) || !context.fields.length || context.fields.length > 40) return "context.fields required";
+  if (badVerified(context.verified)) return "bad verified facts";
   for (const f of context.fields) if (!f || typeof f.k !== "string" || (f.col !== "single" && f.col !== "dual")) return "bad field";
   if (JSON.stringify(context).length > 20000) return "context too large";
   return null;
@@ -95,13 +103,14 @@ export function buildSystemPrompt(context, lang) {
     "",
     "已知数据：",
     facts || "（无）",
+    ...verifiedBlock(c.verified),
     "",
     "当前方法的输入字段（k｜名称｜类型｜单位｜当前值）：",
     fieldLines,
     "",
     "规则：",
     "1. 只能建议上面列出的字段，不要发明字段；保守值应比乐观值更谨慎（增速、利润率、倍数更低；折现率更高）。",
-    "2. 基于已知数据与行业常识给出合理假设；数据不足时说明你的假设前提，不要编造具体财务数字。",
+    "2. 基于已知数据与行业常识给出合理假设；数据不足时说明你的假设前提，不要编造具体财务数字。" + GROUNDING,
     "3. 当你建议具体参数时，在回复最后附一个 ```json 代码块，格式严格如下（只含需要修改的字段）：",
     '```json\n{"params": {"单值字段k": 数字, "两档字段k": {"c": 保守数字, "o": 乐观数字}}, "reasons": {"字段k": "一句话理由"}}\n```',
     "4. 如果用户只是提问、还不需要改参数，就不要附代码块。",
@@ -149,11 +158,12 @@ export function validateMethodReq(body) {
   if (!stock || typeof stock !== "object" || typeof stock.name !== "string") return "stock required";
   if (!Array.isArray(methods) || !methods.length || methods.length > 30) return "methods required";
   for (const m of methods) if (!m || typeof m.key !== "string" || typeof m.title !== "string") return "bad method";
+  if (badVerified(body.verified)) return "bad verified facts";
   if (JSON.stringify(body).length > 20000) return "body too large";
   return null;
 }
 export function buildMethodPrompt(body, lang) {
-  const { stock, facts, methods } = body;
+  const { stock, facts, methods, verified } = body;
   const zh = lang !== "en";
   const factLines = facts && typeof facts === "object"
     ? Object.entries(facts).filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k, v]) => `- ${k}: ${v}`).join("\n") : "";
@@ -163,15 +173,17 @@ export function buildMethodPrompt(body, lang) {
     "",
     `标的：${stock.name}（${stock.code || ""}）　币种：${stock.currency || "未知"}　现价：${stock.price || "未知"}`,
     "已知数据：", factLines || "（无）",
+    ...verifiedBlock(verified),
     "",
     "可选方法（key｜名称｜适用场景）：",
     methods.map((m) => `- ${m.key}｜${m.title}｜${m.subtitle || ""}`).join("\n"),
     "",
     "规则：",
     "1. 推荐 1 个首选方法 + 1~2 个用来交叉验证的方法，只能从上面的 key 里选。",
-    "2. 依据公司实际情况：银行保险等看账面价值；稳定高分红看股息；现金流稳定可预测用现金流折现；尚未盈利或利润波动大的成长股用市销率；资源类看资产重估。数据不足时说明假设。",
-    "3. 正文用两三句话讲清这家公司的特点和选择依据（120 字以内），不要逐项罗列方法。",
-    "4. 回复最后附一个 ```json 代码块，格式严格如下：",
+    "2. 依据公司实际情况：银行保险等看账面价值；有长期稳定分红记录才考虑股息折现；现金流各年为正且稳定可预测才首选现金流折现；自由现金流有负值年份或大幅波动时，优先用盈利倍数（多业务公司可用 P/E 的「分业务」口径，按业务分别估）或市销率，现金流折现最多作交叉验证；尚未盈利的成长股用市销率；最近三年都盈利的公司不要首选市销率（盈利有波动就用 P/E 并说明取哪年口径）；资源类看资产重估。",
+    "3. " + GROUNDING,
+    "4. 正文用两三句话讲清这家公司的特点和选择依据（120 字以内），引用一两条已核实的事实作依据，不要逐项罗列方法。",
+    "5. 回复最后附一个 ```json 代码块，格式严格如下：",
     '```json\n{"picks": [{"key": "方法key", "role": "primary", "reason": "一句话理由"}, {"key": "方法key", "role": "check", "reason": "一句话理由"}]}\n```',
   ].join("\n");
 }

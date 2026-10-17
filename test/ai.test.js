@@ -128,3 +128,22 @@ describe("method recommendation", () => {
     expect(await r.json()).toEqual({ reply: "银行。", picks: [{ key: "pb", role: "primary", reason: "账面价值" }] });
   });
 });
+
+describe("verified facts in prompts", () => {
+  const V = ["自由现金流 2018–2025：2021、2022 年为负。判断：现金流不稳定，不能说「现金流稳定」", "没有查到现金分红记录：视为不分红"];
+  it("puts verified facts and the grounding rule into both prompts", async () => {
+    const { buildMethodPrompt } = await import("../src/ai.js");
+    const mp = buildMethodPrompt({ stock: { name: "小米集团" }, methods: METHODS, verified: V }, "zh");
+    expect(mp).toContain("已核实的事实");
+    expect(mp).toContain("2021、2022 年为负");
+    expect(mp).toContain("不要编造");
+    const sp = buildSystemPrompt({ ...CONTEXT, verified: V }, "zh");
+    expect(sp).toContain("没有查到现金分红记录");
+  });
+  it("rejects malformed verified facts", () => {
+    expect(validateMethodReq({ stock: { name: "x" }, methods: METHODS, verified: "nope" })).toBeTruthy();
+    expect(validateMethodReq({ stock: { name: "x" }, methods: METHODS, verified: ["x".repeat(301)] })).toBeTruthy();
+    expect(validateChat({ messages: [{ role: "user", content: "hi" }], context: { ...CONTEXT, verified: [1] } })).toBeTruthy();
+    expect(validateMethodReq({ stock: { name: "x" }, methods: METHODS, verified: V })).toBeNull();
+  });
+});

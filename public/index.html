@@ -2555,6 +2555,7 @@ function renderValuationPanel(item, panel, idBlock) {
         financials: (item._financials && item._financials.annual && item._financials.annual.financials) || null,
         financialsQ: (item._financials && item._financials.quarter && item._financials.quarter.financials) || null,
         valuationRefs: (item._financials && item._financials.annual && item._financials.annual.valuationRefs) || null,
+        dividends: (item._financials && item._financials.annual && item._financials.annual.dividends) || null,
         sources: valuationSources(item, LANG),
       },
       verdict: (low, high) => { const vv = verdictOf({ ...item.cfg, fairLow: low, fairHigh: high }, VMSGS); return { text: vv.text, cls: vv.cls }; },
