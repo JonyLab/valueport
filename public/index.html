@@ -36,6 +36,14 @@
   }
 
   /* ===== 标的卡片：半透明白瓷砖网格 ===== */
+  /* 启动中：小标题 / 大标题 / 说明 / 统计数字先画成骨架（看板自定义文案到了再显示，避免默认文案闪一下再变） */
+  body.booting :is(#eyebrow,#title,#sub,.stat-num){color:transparent !important;width:fit-content;max-width:100%;border-radius:10px;
+    background:linear-gradient(90deg,rgba(29,29,27,.055) 25%,rgba(29,29,27,.1) 37%,rgba(29,29,27,.055) 63%);background-size:400% 100%;animation:skShimmer 1.4s ease infinite}
+  body.booting #updated{visibility:hidden}
+  .sk-tile{min-height:196px;justify-content:space-between}
+  /* 真实内容替换骨架时淡入（只用于只渲染一次的块；会反复重绘的估值研究面板不加，避免每次操作都闪） */
+  .chart-item:not(.sk-tile),.vd-cols,.p-fund > .fd-sec{animation:skIn .28s ease both}
+  @media (prefers-reduced-motion:reduce){ .chart-item:not(.sk-tile),.vd-cols,.p-fund > .fd-sec{animation:none} }
   .charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(420px,100%),1fr));gap:16px;
     background:none;border:0;border-radius:0;margin:0;padding:0;box-shadow:none;max-width:none}
   .chart-item{position:relative;display:flex;flex-direction:column;gap:18px;padding:22px 22px 18px;
@@ -770,7 +778,7 @@
   .hidden{display:none}
 </style>
 </head>
-<body>
+<body class="booting">
 <div class="page">
   <!-- 顶部导航条：左 tabs（主人模式）/ 右 图标动作（语言全员可见、分享主人可见） -->
   <header class="topnav">
@@ -829,7 +837,7 @@
 
 
   <div class="layout">
-    <div class="charts" id="charts"></div>
+    <div class="charts" id="charts"><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div></div>
   </div>
 
   <!-- 设置视图（主人模式，由顶部齿轮图标切换） -->
@@ -858,6 +866,24 @@
   </div>
   <!-- 标的详情视图（客户端路由 /b/<slug>/<code> 渲染） -->
   <div class="view-detail hidden" id="viewDetail"></div>
+  <script>
+    // 直接打开 /b/<slug>/<代码>：在首帧把列表换成详情骨架，等数据到了 renderDetail 再整块替换（避免先闪一下看板列表）
+    if (/^\/b\/[^/]+\/[^/]+/.test(location.pathname)) {
+      document.querySelector(".page-head").classList.add("hidden");
+      document.querySelector(".layout").classList.add("hidden");
+      var vd = document.getElementById("viewDetail");
+      var L = function (w, h, extra) { return '<span class="sk sk-line" style="width:' + w + ';' + (h ? "height:" + h + "px;" : "") + (extra || "") + '"></span>'; };
+      var card = function (inner, extra) { return '<div class="sk-card" style="' + (extra || "") + '">' + inner + "</div>"; };
+      vd.innerHTML = '<div class="vd-backrow">' + L("84px", 34, "border-radius:999px") + '<span class="sk sk-round" style="width:40px;height:40px"></span></div>'
+        + '<div class="vd-hero"><span class="sk sk-round" style="width:72px;height:72px"></span><div>' + L("200px", 24) + L("120px", 11, "margin-top:10px") + "</div>" + L("180px", 52, "border-radius:14px") + "</div>"
+        + '<div class="vd-cols"><div class="vd-maincol">' + card(L("70%", 14), "margin-bottom:16px")
+        + card(L("90px", 16) + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px">' + new Array(9).join(L("60%", 10) + L("80%", 22)) + "</div>", "margin-bottom:16px")
+        + L("260px", 46, "border-radius:999px;margin-bottom:16px") + card(L("140px", 16) + L("100%", 160, "border-radius:16px") + L("60%", 12))
+        + '</div><div class="vd-side">' + card(L("100px", 18) + L("70%", 11) + '<span class="sk" style="height:130px;border-radius:130px 130px 0 0;margin:10px auto 0;width:260px"></span>', "margin-bottom:16px")
+        + card(L("90px", 18) + new Array(6).join('<div class="sk-row"><span class="sk sk-round" style="width:28px;height:28px"></span><span class="sk-grow">' + L("60%", 11) + "</span>" + L("40px", 14) + "</div>")) + "</div></div>";
+      vd.classList.remove("hidden");
+    }
+  </script>
   <!-- 估值编辑器全屏双栏视图 -->
   <div class="view-detail view-valedit hidden" id="viewValEdit"></div>
 </div>
@@ -2006,7 +2032,8 @@ function fdChartWrap(svg, years, series, opts) {
 
 // 基本面面板：01 盈利与现金 / 02 回报与利润率 / 03 资产负债表 / 04 资本配置
 function renderFundamentalsPanel(item, panel) {
-  panel.innerHTML = `<div class="fd-empty">${t("d_loading")}</div>`;
+  const skc = (h) => `<div class="sk-card" style="margin-bottom:14px" aria-hidden="true"><div class="sk-row"><span class="sk sk-line" style="width:140px;height:16px"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:70px;height:28px"></span></div><span class="sk" style="height:${h}px;border-radius:16px"></span><span class="sk sk-line" style="width:55%"></span></div>`;
+  panel.innerHTML = skc(180) + skc(120) + skc(150);
   const cur = (item.statics && item.statics.currency) || "";
   loadFinancials(item, "annual").then(({ financials, dividends }) => {
     panel.innerHTML = "";
@@ -2295,7 +2322,8 @@ function renderFinancialsPanel(item, panel) {
     perBtns.forEach(([k, b]) => b.classList.toggle("on", k === period));
   }
   function draw() {
-    body.innerHTML = `<div class="vd-empty">${t("d_loading")}</div>`;
+    // 财报表格骨架：表头一行 + 若干行
+    body.innerHTML = `<div aria-hidden="true" style="display:flex;flex-direction:column;gap:14px;padding:6px 0">${Array.from({ length: 8 }, (_, i) => `<div class="sk-row"><span class="sk sk-line" style="width:${i ? 22 : 14}%"></span><span class="sk-grow"></span>${'<span class="sk sk-line" style="width:9%"></span>'.repeat(5)}</div>`).join("")}</div>`;
     const reqStmt = stmt, reqPeriod = period;
     loadFinancials(item, period).then(({ financials }) => {
       if (reqStmt !== stmt || reqPeriod !== period) return; // 期间用户又切了，忽略旧结果
@@ -2761,7 +2789,7 @@ function initOwner(settings) {
   }).catch(() => {});
 }
 
-init();
+init().finally(() => document.body.classList.remove("booting"));
 setInterval(fetchQuotes, 60000);
 </script>
 </body>

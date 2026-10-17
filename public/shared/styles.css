@@ -262,3 +262,17 @@
   .topnav{view-transition-name:topnav}
   ::view-transition-old(root),::view-transition-new(root){animation-duration:.2s}
   ::view-transition-group(topnav){animation-duration:0s}
+
+/* ===== 骨架屏：数据到之前先画出和真实布局同形状的占位块，内容到了再淡入，切页不闪 ===== */
+.sk{display:block;background:linear-gradient(90deg,rgba(29,29,27,.055) 25%,rgba(29,29,27,.1) 37%,rgba(29,29,27,.055) 63%);background-size:400% 100%;
+  animation:skShimmer 1.4s ease infinite;border-radius:var(--r-sm)}
+.sk-line{height:12px;border-radius:6px}
+.sk-round{border-radius:50%}
+.sk-pill{border-radius:var(--r-pill)}
+.sk-card{background:var(--card);border:1px solid var(--card-edge);border-radius:var(--r-xl);box-shadow:var(--shadow);padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.sk-row{display:flex;align-items:center;gap:12px}
+.sk-grow{flex:1;min-width:0}
+.sk-fade{animation:skIn .28s ease both}
+@keyframes skShimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
+@keyframes skIn{from{opacity:0;transform:translateY(4px)}}
+@media (prefers-reduced-motion:reduce){ .sk{animation:none} .sk-fade{animation:none} }
