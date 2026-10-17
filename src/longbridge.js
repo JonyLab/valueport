@@ -78,7 +78,7 @@ export function pickLatestAnnual(financials) {
 }
 
 // 签名 GET（沿用 getOtp 的 canonical 规则；query 须按 key 字母序，签名与 URL 用同一字符串）
-async function signedGet(env, path, query) {
+export async function signedGet(env, path, query) {
   const ts = (Date.now() / 1000).toFixed(3);
   const names = "authorization;x-api-key;x-timestamp";
   const sh = `authorization:${env.LONGBRIDGE_ACCESS_TOKEN}\nx-api-key:${env.LONGBRIDGE_APP_KEY}\nx-timestamp:${ts}\n`;

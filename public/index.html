@@ -673,6 +673,10 @@
         <i class="ri-line-chart-line" aria-hidden="true"></i>
         <span data-i18n="nav_watchlist">Watchlist</span>
       </button>
+      <a class="nav-tab" href="/portfolio" data-view="portfolio">
+        <i class="ri-pie-chart-2-line" aria-hidden="true"></i>
+        <span data-i18n="nav_portfolio">Portfolio</span>
+      </a>
       <button class="nav-tab" data-view="macro" disabled data-i18n-title="nav_macro_soon" title="即将上线" aria-disabled="true">
         <i class="ri-earth-line" aria-hidden="true"></i>
         <span data-i18n="nav_macro">宏观看板</span>
@@ -2415,7 +2419,7 @@ window.addEventListener("popstate", () => {
   route();
 });
 
-document.querySelectorAll('.nav-tab[data-view="board"]').forEach((tab) => // 只有 Watchlist 回到列表（其余 tab 未上线或是普通链接）
+document.querySelectorAll('.nav-tab[data-view="board"]').forEach((tab) => // Portfolio 是普通链接，不拦截
   tab.addEventListener("click", () => { history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList(); }));
 btnSettings.addEventListener("click", showSettings);
 // 产品名 = 回到 Watchlist

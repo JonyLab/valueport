@@ -43,6 +43,7 @@ const DICT = {
     b_empty: "看板暂未配置内容。",
     nav_watchlist: "Watchlist",
     nav_macro: "宏观看板",
+    nav_portfolio: "Portfolio",
     nav_macro_soon: "即将上线",
     nav_settings: "设置",
     /* 标的详情页 */
@@ -180,6 +181,7 @@ const DICT = {
     b_empty: "Nothing on this board yet.",
     nav_watchlist: "Watchlist",
     nav_macro: "Macro",
+    nav_portfolio: "Portfolio",
     nav_macro_soon: "Coming soon",
     nav_settings: "Settings",
     /* Holding detail page */

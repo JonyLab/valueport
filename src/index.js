@@ -10,6 +10,10 @@ import { fetchDividendHistory } from "./dividends.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
+import { registerPortfolio } from "./portfolio.js";
+import { fetchLongbridgeAssets } from "./brokers/longbridge-assets.js";
+import { fetchIbkrFlex } from "./brokers/ibkr-flex.js";
+import { parseHoldingsCsv } from "./brokers/csv.js";
 
 const app = new Hono();
 const USER_COOKIE = "pendulum_user", OWNER_COOKIE = "pendulum_owner";
@@ -211,6 +215,11 @@ app.use("/api/my/*", async (c, next) => {
   await next();
 });
 
+/* ---------- Portfolio（券商账户 / 持仓汇总，按 uid 隔离，见 src/portfolio.js） ---------- */
+const portfolio = registerPortfolio(app, {
+  adapters: { longbridge: (cr) => fetchLongbridgeAssets(cr), ibkr: (cr) => fetchIbkrFlex(cr), csv: (text) => parseHoldingsCsv(text) },
+  getQuotes,
+});
 
 /* ---------- 用户数据 CRUD（按 uid 隔离） ---------- */
 app.get("/api/my/items", async (c) => {
@@ -331,9 +340,14 @@ app.get("/b/:slug", (c) => { const url = new URL(c.req.url); url.pathname = "/";
 // 标的详情页：同一个 SPA，前端按 /b/<slug>/<code> 解析后渲染详情
 app.get("/b/:slug/:code", (c) => { const url = new URL(c.req.url); url.pathname = "/"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
 // 估值方法介绍页（干净 URL，公开）
+app.get("/portfolio", (c) => { const url = new URL(c.req.url); url.pathname = "/portfolio.html"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
 app.get("/valuation", (c) => { const url = new URL(c.req.url); url.pathname = "/valuation.html"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
 app.all("*", (c) => {
   if (c.req.path.startsWith("/api/")) return c.json({ ok: false, error: "not found" }, 404);
   return c.env.ASSETS.fetch(c.req.raw);
 });
-export default app;
+// fetch = Hono 路由；scheduled = 每日定时任务（wrangler.toml [triggers]）：同步券商账户 + 记录资产快照
+export default {
+  fetch: (req, env, ctx) => app.fetch(req, env, ctx),
+  scheduled: (event, env, ctx) => ctx.waitUntil(portfolio.runDaily(env)),
+};

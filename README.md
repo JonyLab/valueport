@@ -23,6 +23,7 @@ Sessions are stateless HMAC-signed cookies (`SESSION_SECRET`). The owner backend
 | `/b/<slug>` | The board page — read-only for visitors; the signed-in owner edits items via dialogs and opens Settings (top-right) for text/colors/board config |
 | `/app` | Legacy entry — 302 redirect to your `/b/<slug>` (or `/login`) |
 | `/owner` | Station-master backend — issue activation codes, manage users, reset passwords |
+| `/portfolio` | Signed-in user's Portfolio — linked broker accounts (Longbridge / IBKR Flex / manual + CSV), total assets and holdings mapped onto the board's valuation zones |
 
 ## Architecture
 
@@ -180,6 +181,32 @@ After running the migration:
 
 New deployments should use `schema.sql` directly and skip this migration entirely.
 
+## Portfolio
+
+Each user can link their own brokerage accounts on `/portfolio`. Holdings and cash are stored as a snapshot per account (`broker_accounts`, `holdings`, `cash_balances`), priced with the same quote source as the board (Longbridge first, Tencent fallback), converted with ECB reference FX rates (Frankfurter), and mapped onto the user's own board items to show how much of the portfolio sits in each valuation zone.
+
+| Source | How | Freshness |
+|--------|-----|-----------|
+| Longbridge | User's own App Key / App Secret / Access Token → `GET /v1/asset/stock` + `/v1/asset/account` (`src/brokers/longbridge-assets.js`) | Live, on "Sync" |
+| IBKR | Flex Web Service token + Activity Flex Query ID (Open Positions + Cash Report) → SendRequest / GetStatement (`src/brokers/ibkr-flex.js`) | End of day |
+| Manual / CSV | Hand-entered rows, or a broker holdings export with English or Chinese headers (`src/brokers/csv.js`) | Whenever edited |
+
+**Asset curve.** There is no historical data from brokers, so the curve is recorded going forward: a daily Cron Trigger (`wrangler.toml` `[triggers]`, 22:30 UTC — after the US close) syncs every Longbridge / IBKR account and writes one snapshot per user per day into `portfolio_snapshots` (total + each account, stored in USD, HKD and CNY at that day's FX). Opening the Portfolio page also refreshes today's row. It does not back-fill from today's holdings × past prices, because past positions were different.
+
+**Credentials** are validated, encrypted with AES-256-GCM (`src/crypto.js`) using the `CREDENTIALS_KEY` Worker secret, and never returned by any endpoint — the API only reports whether credentials exist plus the last four characters of the key / query ID. They are used only to read positions and balances.
+
+Setup for an existing deployment:
+
+```bash
+# 1. New tables
+npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-portfolio.sql
+npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-portfolio-history.sql
+# 2. Encryption key for broker credentials (32 random bytes, base64). Keep it stable: rotating it makes stored credentials unreadable.
+openssl rand -base64 32 | npx wrangler secret put CREDENTIALS_KEY
+```
+
+For local dev, add `CREDENTIALS_KEY = "<base64 32 bytes>"` to `.dev.vars` and run the migration with `--local`.
+
 ## API Reference
 
 ### Public
@@ -210,6 +237,20 @@ New deployments should use `schema.sql` directly and skip this migration entirel
 | GET | `/api/my/settings` | Get current user's settings |
 | PUT | `/api/my/settings` | Update settings (partial) |
 | PUT | `/api/my/board` | `{slug, name}` → update board metadata; 409 on slug conflict |
+
+### Portfolio (requires `pendulum_user` cookie; every query is scoped to the session's `uid`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/my/portfolio?base=USD` | Accounts, holdings, cash, quotes, previous closes, FX rates into `base`, and the user's board items (fair ranges) |
+| GET | `/api/my/portfolio/history?days=365` | Daily snapshots `{day, accountId (0 = total), USD, HKD, CNY}`, oldest first |
+| GET | `/api/my/portfolio/accounts` | List accounts (`hasCreds`, `credHint`, `lastSyncAt`, `lastError`) — never credentials |
+| POST | `/api/my/portfolio/accounts` | `{broker: "longbridge"\|"ibkr"\|"manual", name, creds?}` → 201 `{ok, id, sync}`; broker accounts sync once immediately |
+| PUT | `/api/my/portfolio/accounts/:id` | `{name?, creds?}` — rename / replace credentials |
+| DELETE | `/api/my/portfolio/accounts/:id` | Delete the account and its snapshot |
+| POST | `/api/my/portfolio/accounts/:id/sync` | Pull the latest snapshot from the broker; failures are stored in `lastError` |
+| PUT | `/api/my/portfolio/accounts/:id/holdings` | Manual accounts only: replace `{positions, cash}` |
+| POST | `/api/my/portfolio/accounts/:id/import` | Manual accounts only: `{text}` CSV → replaces positions, keeps cash; returns `{imported, unsupported, errors}` |
 
 ### Station-master (requires `pendulum_owner` cookie)
 

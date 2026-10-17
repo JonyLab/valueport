@@ -21,7 +21,7 @@ export default defineWorkspace([
         workers: {
           wrangler: { configPath: "./wrangler.toml" },
           miniflare: {
-            bindings: { ADMIN_PASSWORD: "test-pass", SESSION_SECRET: "test-secret" },
+            bindings: { ADMIN_PASSWORD: "test-pass", SESSION_SECRET: "test-secret", CREDENTIALS_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" }, // CREDENTIALS_KEY：测试用 32 字节密钥
             d1Databases: ["DB"],
           },
         },

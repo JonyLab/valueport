@@ -16,3 +16,7 @@ database_id = "0be2e6bd-01f6-4b58-8112-516b9a1034db"
 #   LONGBRIDGE_APP_KEY        长桥 OpenAPI App Key（实时行情，可选）
 #   LONGBRIDGE_APP_SECRET     长桥 OpenAPI App Secret
 #   LONGBRIDGE_ACCESS_TOKEN   长桥 OpenAPI Access Token（有有效期，过期需更新）
+
+# 每天 UTC 22:30（北京时间次日 06:30，美股收盘后）同步券商账户并记录资产快照
+[triggers]
+crons = ["30 22 * * *"]
