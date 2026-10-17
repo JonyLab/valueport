@@ -37,7 +37,10 @@
 
   /* ===== 标的卡片：半透明白瓷砖网格 ===== */
   /* 启动中：小标题 / 大标题 / 说明 / 统计数字先画成骨架（看板自定义文案到了再显示，避免默认文案闪一下再变） */
-  body.booting :is(#eyebrow,#title,#sub,.stat-num){color:transparent !important;width:fit-content;max-width:100%;border-radius:10px;
+  /* 有会话缓存时页面脚本会立刻画缓存：首帧不画骨架，只把待替换的文案藏起来一瞬 */
+  html.has-cache .sk-tile{visibility:hidden}
+  html.has-cache body.booting :is(#eyebrow,#title,#sub,.stat-num,#updated){visibility:hidden}
+  html:not(.has-cache) body.booting :is(#eyebrow,#title,#sub,.stat-num){color:transparent !important;width:fit-content;max-width:100%;border-radius:10px;
     background:linear-gradient(90deg,rgba(29,29,27,.055) 25%,rgba(29,29,27,.1) 37%,rgba(29,29,27,.055) 63%);background-size:400% 100%;animation:skShimmer 1.4s ease infinite}
   body.booting #updated{visibility:hidden}
   .sk-tile{min-height:196px;justify-content:space-between}
@@ -261,7 +264,7 @@
   .view-valedit .ve-head{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding-bottom:0;margin-bottom:18px;flex:0 0 auto}
   .view-valedit .ve-back{margin-bottom:0}
   .view-valedit .ve-titlerow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-  .view-valedit .ve-title{font-size:clamp(30px,3.4vw,44px);line-height:1.1;letter-spacing:-.025em}
+  .view-valedit .ve-title{font-size:24px;line-height:1.2;letter-spacing:-.015em} /* 工作页标题：和返回按钮同一行、不抢内容 */
   .vc-mount{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
   .vc-workbench{display:grid;grid-template-columns:minmax(420px,5fr) minmax(0,7fr);gap:22px;padding-bottom:40px;color:var(--ink);flex:1 1 auto;min-height:0}
   /* 栏头：左「关键假设」= 输入，右「估值结论」= 输出 */
@@ -872,6 +875,8 @@
     if (/^\/b\/[^/]+\/[^/]+/.test(location.pathname)) {
       document.querySelector(".page-head").classList.add("hidden");
       document.querySelector(".layout").classList.add("hidden");
+    }
+    if (/^\/b\/[^/]+\/[^/]+/.test(location.pathname) && !document.documentElement.classList.contains("has-cache")) { // 有缓存时详情马上就能画，不用骨架
       var vd = document.getElementById("viewDetail");
       var L = function (w, h, extra) { return '<span class="sk sk-line" style="width:' + w + ';' + (h ? "height:" + h + "px;" : "") + (extra || "") + '"></span>'; };
       var card = function (inner, extra) { return '<div class="sk-card" style="' + (extra || "") + '">' + inner + "</div>"; };
@@ -1194,38 +1199,17 @@ async function fetchQuotes() {
 }
 
 /* ---------- 启动 ---------- */
-async function init() {
-  const m = location.pathname.match(/^\/b\/([^/]+)/);
-  boardSlug = m ? decodeURIComponent(m[1]) : "";
-  if (!boardSlug) { location.replace("/login"); return; }
-  // 上次已确认是本看板主人：先把导航和主人按钮显示出来（避免切页时导航晚一拍出现），下面拿到 /api/me 后再按实际身份校正
-  const ownerHint = sessionStorage.getItem("owner_slug") === boardSlug;
-  if (ownerHint) for (const id of ["appNav", "btnShare", "btnSettings"]) document.getElementById(id).classList.remove("hidden");
-
-  const [cfgRes, meRes] = await Promise.allSettled([
-    fetch("/api/config?slug=" + encodeURIComponent(boardSlug)),
-    fetch("/api/me"),
-  ]);
-
-  // 身份
-  let me = null;
-  if (meRes.status === "fulfilled" && meRes.value.ok) {
-    try { me = await meRes.value.json(); } catch { me = null; }
-  }
+// 看板缓存（本次会话）：有缓存就直接画缓存，不出骨架；新数据到了只在有变化时重画，否则只更新报价
+const BOARD_CACHE = () => "board_cache_" + boardSlug;
+let ownerInited = false;
+function applyBoard(me, data, prices) {
   owner = !!(me && me.board && me.board.slug === boardSlug);
   if (owner) sessionStorage.setItem("owner_slug", boardSlug);
   else {
-    if (ownerHint) sessionStorage.removeItem("owner_slug");
+    if (sessionStorage.getItem("owner_slug") === boardSlug) sessionStorage.removeItem("owner_slug");
     for (const id of ["appNav", "btnShare", "btnSettings"]) document.getElementById(id).classList.add("hidden"); // 身份已变（退出 / 换号）：收回
   }
   greetName = owner ? me.username : "";
-
-  // 看板数据
-  if (cfgRes.status !== "fulfilled") { chartsEl.innerHTML = `<div class="charts-empty">${t("b_loadfail")}</div>`; return; }
-  const res = cfgRes.value;
-  if (res.status === 404) { chartsEl.innerHTML = `<div class="charts-empty">${t("b_notfound")}</div>`; return; }
-  let data;
-  try { data = await res.json(); } catch { chartsEl.innerHTML = `<div class="charts-empty">${t("b_loadfail")}</div>`; return; }
   applySettings(data.settings || {});
   applyColors(data.settings || {});
   const rows = data.items || [];
@@ -1237,7 +1221,8 @@ async function init() {
     document.getElementById("btnShare").classList.remove("hidden");
     document.getElementById("btnSettings").classList.remove("hidden");
   } else if (me && me.board && me.board.slug) {
-    const mine = document.createElement("a");
+    document.getElementById("myBoardLink")?.remove();
+    const mine = document.createElement("a"); mine.id = "myBoardLink";
     mine.className = "btn sm ghost"; mine.style.textDecoration = "none";
     mine.href = "/b/" + me.board.slug; mine.textContent = t("b_myboard");
     actions.insertBefore(mine, document.getElementById("langMenu"));
@@ -1262,11 +1247,52 @@ async function init() {
     chartsEl.innerHTML = `<div class="charts-empty">${t("b_empty")}</div>`;
     return;
   }
-  rows.forEach((r) => addChart({ ...r, price: 0 }));
-  if (owner) initOwner(data.settings || {});
+  rows.forEach((r) => addChart({ ...r, price: (prices && prices[r.symbol]) || 0 }));
+  if (owner && !ownerInited) { ownerInited = true; initOwner(data.settings || {}); }
+  return true;
+}
+
+async function init() {
+  const m = location.pathname.match(/^\/b\/([^/]+)/);
+  boardSlug = m ? decodeURIComponent(m[1]) : "";
+  if (!boardSlug) { location.replace("/login"); return; }
+  const reqs = Promise.allSettled([
+    fetch("/api/config?slug=" + encodeURIComponent(boardSlug)),
+    fetch("/api/me"),
+  ]);
+  let cached = null;
+  try { cached = JSON.parse(sessionStorage.getItem(BOARD_CACHE()) || "null"); } catch { cached = null; }
+  if (cached && cached.data) {
+    applyBoard(cached.me, cached.data, cached.prices);
+    document.body.classList.remove("booting");
+    route();
+  }
+  const [cfgRes, meRes] = await reqs;
+
+  // 身份
+  let me = null;
+  if (meRes.status === "fulfilled" && meRes.value.ok) {
+    try { me = await meRes.value.json(); } catch { me = null; }
+  }
+
+  // 看板数据（有缓存时请求失败就保留缓存画面）
+  const fail = (msg) => { if (!cached) chartsEl.innerHTML = `<div class="charts-empty">${msg}</div>`; };
+  if (cfgRes.status !== "fulfilled") return fail(t("b_loadfail"));
+  const res = cfgRes.value;
+  if (res.status === 404) { sessionStorage.removeItem(BOARD_CACHE()); chartsEl.innerHTML = `<div class="charts-empty">${t("b_notfound")}</div>`; return; }
+  let data;
+  try { data = await res.json(); } catch { return fail(t("b_loadfail")); }
+  const same = cached && JSON.stringify(cached.data) === JSON.stringify(data) && JSON.stringify(cached.me) === JSON.stringify(me);
+  if (!same) {
+    const ok = applyBoard(me, data, cached && cached.prices);
+    document.body.classList.remove("booting");
+    if (!ok) return;
+  }
   await fetchQuotes();
+  const prices = {}; for (const i of items) if (i.cfg.symbol && i.cfg.price > 0) prices[i.cfg.symbol] = i.cfg.price;
+  try { sessionStorage.setItem(BOARD_CACHE(), JSON.stringify({ me, data, prices })); } catch { /* 存不下就算了 */ }
   loadNames(items.map((i) => i.cfg.symbol)); // 双语名 + 基本面静态信息（不阻塞首屏）
-  route(); // 按 URL 决定显示列表还是某标的详情
+  if (!same) route(); // 按 URL 决定显示列表还是某标的详情（缓存画面已 route 过且数据没变就不重画）
 }
 
 /* ================= 以下仅主人模式 ================= */

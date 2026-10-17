@@ -239,6 +239,7 @@
   .pf-plan-sum{margin-top:14px;font-size:13.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
   .pf-plan-sum.bad{color:var(--red)}
   @media (max-width:560px){ .pf-plan-opts{grid-template-columns:1fr} }
+  html.has-cache #pfSkel{visibility:hidden} /* 有会话缓存：马上画缓存，首帧不画骨架 */
 </style>
 </head>
 <body>
@@ -347,18 +348,24 @@ let base = localStorage.getItem("pf_base") || (zh ? "CNY" : "USD");
 if (!BASES.includes(base)) base = "USD";
 
 // ---------- 身份 / 配色 ----------
-const me = await api("/api/me");
-if (!me.ok) { location.replace("/login"); }
-const slug = me.data.board && me.data.board.slug;
-if (slug) sessionStorage.setItem("owner_slug", slug); // 切到「自选」时导航可以立即显示
-$("tabBoard").href = "/b/" + encodeURIComponent(slug || "");
-document.title = (zh ? "资产" : "Portfolio") + " · ValuePort";
-$("greet").textContent = T(`${me.data.username} 的全部账户`, `All accounts of ${me.data.username}`);
-try {
-  const st = await api("/api/my/settings");
-  const m = {}; for (const z of ZONES) { const v = st.data.settings && st.data.settings["color_" + z.key]; if (v) m[z.key] = v; }
+// 先用本次会话记下的身份与配色把缓存画出来（有缓存就不出骨架），/api/me 与配色在后台校正（见文件末尾）
+const meP = api("/api/me"), stP = api("/api/my/settings");
+let me = { ok: true, data: { username: sessionStorage.getItem("pf_user") || "", board: { slug: sessionStorage.getItem("owner_slug") || "" } } };
+let slug = "";
+function applyIdentity() {
+  slug = (me.data.board && me.data.board.slug) || "";
+  if (slug) sessionStorage.setItem("owner_slug", slug); // 切到「自选」时导航可以立即显示
+  if (me.data.username) sessionStorage.setItem("pf_user", me.data.username);
+  $("tabBoard").href = "/b/" + encodeURIComponent(slug);
+  $("greet").textContent = me.data.username ? T(`${me.data.username} 的全部账户`, `All accounts of ${me.data.username}`) : "";
+}
+function applyColorSettings(settings) {
+  const m = {}; for (const z of ZONES) { const v = settings && settings["color_" + z.key]; if (v) m[z.key] = v; }
   applyZoneColors(m);
-} catch {}
+}
+document.title = (zh ? "资产" : "Portfolio") + " · ValuePort";
+applyIdentity();
+try { applyColorSettings(JSON.parse(sessionStorage.getItem("pf_colors") || "null")); } catch {}
 
 // 币种切换
 function renderBaseSel() {
@@ -1251,7 +1258,12 @@ async function doImport() {
   $("holdSave").onclick = () => { closeOverlays(); $("holdSave").onclick = null; };
 }
 
-fromCache();
+const hadCache = me.data.username ? fromCache() : false;
+const meR = await meP;
+if (!meR.ok) { location.replace("/login"); throw new Error("unauthorized"); }
+if (meR.data.username !== me.data.username && hadCache) $("pfRoot").innerHTML = ""; // 身份和缓存对不上：别留着别人的画面
+me = meR; applyIdentity();
+try { const st = await stP; const set = (st.data && st.data.settings) || {}; sessionStorage.setItem("pf_colors", JSON.stringify(set)); applyColorSettings(set); } catch {}
 await load();
 </script>
 </body>

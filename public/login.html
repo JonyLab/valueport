@@ -30,7 +30,7 @@ async function login(){ err.textContent="";
   const go=document.getElementById("go"); go.disabled=true;
   try{
     const r=await fetch("/api/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value,password:document.getElementById("p").value})});
-    if(r.ok){ if(await gotoMyBoard(false)) return; err.textContent=t("a_board_fail"); }
+    if(r.ok){ try{sessionStorage.clear();}catch(e){} /* 换了身份：清掉上个账号的会话缓存 */ if(await gotoMyBoard(false)) return; err.textContent=t("a_board_fail"); }
     else err.textContent=(await r.json().catch(()=>({}))).error||t("a_login_fail");
   }catch{ err.textContent=t("a_net_err"); }
   finally{ go.disabled=false; }

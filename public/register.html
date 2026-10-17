@@ -20,7 +20,7 @@ async function reg(){ err.textContent="";
   const go=document.getElementById("go"); go.disabled=true;
   try{
     const r=await fetch("/api/register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value.trim(),password:document.getElementById("p").value,code:document.getElementById("c").value.trim()})});
-    if(r.ok){ location.href="/portfolio"; return; } // 注册后先到资产（Portfolio）首页
+    if(r.ok){ try{sessionStorage.clear();}catch(e){} location.href="/portfolio"; return; } // 换了身份：清掉上个账号的会话缓存 // 注册后先到资产（Portfolio）首页
     err.textContent=(await r.json().catch(()=>({}))).error||t("a_reg_fail");
   }catch{ err.textContent=t("a_net_err"); }
   finally{ go.disabled=false; }
