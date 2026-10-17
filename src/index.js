@@ -11,6 +11,7 @@ import { hashPassword, verifyPassword } from "./password.js";
 import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
 import { registerPortfolio } from "./portfolio.js";
+import { registerAi } from "./ai.js";
 import { fetchLongbridgeAssets } from "./brokers/longbridge-assets.js";
 import { fetchIbkrFlex } from "./brokers/ibkr-flex.js";
 import { parseHoldingsCsv } from "./brokers/csv.js";
@@ -216,6 +217,7 @@ app.use("/api/my/*", async (c, next) => {
 });
 
 /* ---------- Portfolio（券商账户 / 持仓汇总，按 uid 隔离，见 src/portfolio.js） ---------- */
+registerAi(app);
 const portfolio = registerPortfolio(app, {
   adapters: { longbridge: (cr) => fetchLongbridgeAssets(cr), ibkr: (cr) => fetchIbkrFlex(cr), csv: (text) => parseHoldingsCsv(text) },
   getQuotes,

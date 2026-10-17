@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { env, SELF } from "cloudflare:test";
+import { env, SELF, fetchMock } from "cloudflare:test";
 import { encryptJson, decryptJson } from "../src/crypto.js";
 import { validateCreds, validateSnapshot } from "../src/portfolio.js";
 
@@ -15,6 +15,9 @@ beforeAll(async () => {
     `CREATE TABLE IF NOT EXISTS portfolio_snapshots (user_id INTEGER NOT NULL, day TEXT NOT NULL, account_id INTEGER NOT NULL, v_usd REAL NOT NULL, v_hkd REAL NOT NULL, v_cny REAL NOT NULL, PRIMARY KEY (user_id, day, account_id))`,
   ];
   for (const q of ddl) await env.DB.prepare(q).run();
+  // 不连真实券商：出站请求直接失败，同步错误照常记到账户上
+  fetchMock.activate();
+  fetchMock.disableNetConnect();
 });
 
 const J = { "content-type": "application/json" };

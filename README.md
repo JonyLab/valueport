@@ -207,6 +207,21 @@ openssl rand -base64 32 | npx wrangler secret put CREDENTIALS_KEY
 
 For local dev, add `CREDENTIALS_KEY = "<base64 32 bytes>"` to `.dev.vars` and run the migration with `--local`.
 
+## AI valuation assistant
+
+The valuation workbench has an **Ask AI** drawer: chat about the stock, and the model returns suggested inputs for the current method (conservative / optimistic, with reasons) that you preview and apply to the form with one click (undoable). The server sends the model the stock, the known financials and the current method's fields; the model replies with prose plus a ```json block, which `src/ai.js` validates against the field list. No native tool calling is needed, so any provider works.
+
+Provider is configured site-wide:
+
+| Var | Default | Notes |
+|-----|---------|-------|
+| `AI_PROVIDER` | `workers-ai` | `workers-ai` (uses the `[ai]` binding, no key), `openai` (any OpenAI-compatible API), `anthropic` |
+| `AI_MODEL` | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` / `gpt-4o-mini` / `claude-sonnet-5-5` | Per provider |
+| `AI_BASE_URL` | Official endpoint | For `openai` / `anthropic`; point at any compatible service |
+| `AI_API_KEY` | — | Secret, for `openai` / `anthropic`: `npx wrangler secret put AI_API_KEY` |
+
+Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`. Each user gets 100 AI messages per day. Workers AI runs on your Cloudflare account even in `wrangler dev`, so local chats count toward usage.
+
 ## API Reference
 
 ### Public
@@ -251,6 +266,12 @@ For local dev, add `CREDENTIALS_KEY = "<base64 32 bytes>"` to `.dev.vars` and ru
 | POST | `/api/my/portfolio/accounts/:id/sync` | Pull the latest snapshot from the broker; failures are stored in `lastError` |
 | PUT | `/api/my/portfolio/accounts/:id/holdings` | Manual accounts only: replace `{positions, cash}` |
 | POST | `/api/my/portfolio/accounts/:id/import` | Manual accounts only: `{text}` CSV → replaces positions, keeps cash; returns `{imported, unsupported, errors}` |
+
+### AI (requires `pendulum_user` cookie)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/my/ai/valuation` | `{lang, messages:[{role,content}], context:{stock, method, mode, fields, facts}}` → `{reply, params, reasons}`; 429 after 100/day, 502 if the provider fails |
 
 ### Station-master (requires `pendulum_owner` cookie)
 

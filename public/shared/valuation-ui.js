@@ -14,6 +14,7 @@ import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/sh
 import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
 import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
+import { mountAiPanel } from "/shared/ai-panel.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -221,15 +222,20 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const methodRow = el("div", "vc-method-row");
   const methodName = el("div", "vc-method-name");
   const changeBtn = el("button", "vc-method-change", { type: "button" });
-  changeBtn.replaceChildren(ri("arrow-left-right-line"), document.createTextNode(lang === "zh" ? "更换方法" : "Change method"));
+  changeBtn.replaceChildren(ri("arrow-left-right-line"), document.createTextNode(lang === "zh" ? "更换" : "Change"));
   changeBtn.addEventListener("click", () => showPicker(true));
+  // AI 助手入口：右侧抽屉，聊完给出建议参数，确认后写入表单
+  const aiBtn = el("button", "vc-ai-entry", { type: "button" });
+  aiBtn.replaceChildren(ri("sparkling-2-fill"), document.createTextNode(lang === "zh" ? "AI 助手" : "Ask AI"));
   methodRow.append(methodName, changeBtn);
   const methodDesc = el("div", "vc-method-desc");
-  methodHead.append(methodRow, methodDesc);
+  const methodLab = el("div", "vc-method-lab"); methodLab.textContent = lang === "zh" ? "估值方法" : "Method";
+  methodHead.append(methodLab, methodRow, methodDesc);
   function updateMethodDesc() {
     const model = activeIdx >= 0 ? MODELS[activeIdx] : null;
     const meta = model ? methodMenuMeta(model) : null;
     methodName.textContent = model ? textFor(meta && meta.title, lang, modelTitle(model, lang)) : (lang === "zh" ? "选择估值方法" : "Choose a method");
+    aiBtn.hidden = !model;
     methodDesc.textContent = meta ? textFor(meta.subtitle, lang, "") : (lang === "zh" ? "从左侧选一种估值方法开始。" : "Pick a method on the left to begin.");
   }
   buildMethodMenu();
@@ -280,12 +286,19 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const pad = (max - min) * 0.15 || max * 0.1; min = Math.max(0, min - pad); max += pad;
     const X = (v) => ((v - min) / (max - min) * 100).toFixed(2) + "%";
     const track = el("div", "vc-rv-track");
-    const band = el("div", "vc-rv-band"); band.style.left = X(a); band.style.width = `calc(${X(b)} - ${X(a)})`;
     const now = el("div", "vc-rv-now"); now.style.left = X(p);
     const tag = el("span", "vc-rv-tag"); tag.textContent = (lang === "zh" ? "现价 " : "Price ") + fmt(p, "—"); now.appendChild(tag);
-    const l0 = el("span", "vc-rv-end"); l0.style.left = X(a); l0.textContent = fmt(a, "—");
-    const l1 = el("span", "vc-rv-end"); l1.style.left = X(b); l1.textContent = fmt(b, "—");
-    track.append(band, now, l0, l1);
+    if (Math.abs(b - a) < 1e-9) {
+      // 单点估值：圆点标记 + 「合理价」标签
+      const dot = el("div", "vc-rv-fair"); dot.style.left = X(a);
+      const ft = el("span", "vc-rv-fairtag"); ft.style.left = X(a); ft.textContent = (lang === "zh" ? "合理价 " : "Fair ") + fmt(a, "—");
+      track.append(dot, now, ft);
+    } else {
+      const band = el("div", "vc-rv-band"); band.style.left = X(a); band.style.width = `calc(${X(b)} - ${X(a)})`;
+      const l0 = el("span", "vc-rv-end"); l0.style.left = X(a); l0.textContent = fmt(a, "—");
+      const l1 = el("span", "vc-rv-end"); l1.style.left = X(b); l1.textContent = fmt(b, "—");
+      track.append(band, now, l0, l1);
+    }
     rangeViz.appendChild(track);
   }
 
@@ -318,7 +331,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   bdSec.append(bdTitle, bdMount);
   const saveBar = el("div", "vc-savebar");
   saveBar.append(noteWrap, submitBtn);
-  center.append(colHead("关键假设", "Assumptions", "选方法、核对数据、填写保守与乐观两档假设", "Pick a method, check the data, fill in conservative and optimistic cases"),
+  // 栏头一行：左「关键假设」，右「AI 助手」
+  const inHead = el("div", "vc-colhead-row");
+  inHead.append(colHead("关键假设", "Assumptions", "填写保守与乐观两档假设", "Conservative and optimistic cases"), aiBtn);
+  center.append(inHead,
     methodHead, infoSec, formWrap);
   sideR.append(colHead("估值结论", "Result", "根据左侧假设实时计算", "Computed live from the assumptions"),
     prof, summaryCard, bdSec, schedMount, vizGrid, saveBar);
@@ -1130,6 +1146,61 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   }
 
   function buildForm(readers) { const form = {}; readers.forEach(({ field, getVal }) => { form[field.k] = getVal(); }); if (MODELS[activeIdx] && MODELS[activeIdx].modes) form._mode = currentMode; if (MODELS[activeIdx] && MODELS[activeIdx].assetModel) { if (assetState.rows) form.assets = assetState.rows; form.prices = priceState; } return form; }
+
+  // ── AI 助手：上下文 = 标的 + 已知数据 + 当前方法的字段与当前值；建议参数经确认后并入表单重绘 ──
+  const finiteOr = (v) => (typeof v === "number" && Number.isFinite(v)) ? v : null;
+  // 表单值去掉 NaN（空格子），用作重绘的 seed
+  function cleanForm(form) {
+    const out = {};
+    for (const [k, v] of Object.entries(form || {})) {
+      if (v && typeof v === "object" && !Array.isArray(v) && ("c" in v || "o" in v)) out[k] = { c: Number.isFinite(v.c) ? v.c : "", o: Number.isFinite(v.o) ? v.o : "" };
+      else if (typeof v === "number") { if (Number.isFinite(v)) out[k] = v; }
+      else out[k] = v;
+    }
+    return out;
+  }
+  function seriesOf(kind, field) {
+    const fin = refData && refData.financials;
+    const a = fin && fin[kind] && fin[kind].find((x) => x.field === field);
+    return a && Array.isArray(a.values) ? a.values.slice(0, 6).filter((x) => Number.isFinite(x.value)).map((x) => `${x.year}: ${fmtMoney(x.value)}`).join(", ") : null;
+  }
+  function aiContext() {
+    const model = MODELS[activeIdx]; if (!model) return null;
+    const meta = methodMenuMeta(model);
+    const fields = modeFields(model, currentMode).map((f) => {
+      const v = lastForm[f.k];
+      return { k: f.k, label: textFor(f.label, lang, f.k), col: f.col, unit: f.unit || "", money: MONEY_METAS.has(f.meta),
+        value: f.col === "dual" ? { c: finiteOr(v && v.c), o: finiteOr(v && v.o) } : finiteOr(v) };
+    });
+    const facts = {
+      price: finiteOr(ctx.price), epsTtm: finiteOr(ctx.epsTtm), adjustedEpsTtm: finiteOr(ctx.adjustedEps), bookValuePerShare: finiteOr(ctx.bps),
+      sharesOutstanding: finiteOr(ctx.shares), marketCap: ctx.price > 0 && ctx.shares > 0 ? fmtMoney(ctx.price * ctx.shares) : null,
+      [`latestAnnualRevenue${ctx.annualYear ? " (FY" + ctx.annualYear + ")" : ""}`]: finiteOr(ctx.revenue), latestAnnualNetIncome: finiteOr(ctx.netIncome),
+      deductedNetIncome: finiteOr(ctx.deductedNetIncome), netDebt: finiteOr(ctx.netDebt), freeCashFlow: finiteOr(ctx.fcf),
+      revenueHistory: seriesOf("IS", "OperatingRevenue"), netIncomeHistory: seriesOf("IS", "NetProfit"), fcfHistory: seriesOf("CF", "NetFreeCashFlow"),
+      currentConclusion: Number.isFinite(lastLow) && Number.isFinite(lastHigh) ? `${fmt(Math.min(lastLow, lastHigh), "—")} ~ ${fmt(Math.max(lastLow, lastHigh), "—")}` : null,
+    };
+    return { stock: { name: (stock && stock.name) || "", code: (stock && stock.code) || "", currency: (stock && stock.currency) || "", price: finiteOr(ctx.price) },
+      method: { key: model.key, label: textFor(meta && meta.title, lang, modelTitle(model, lang)) }, mode: currentMode || null, fields, facts };
+  }
+  const ai = mountAiPanel(mount, {
+    lang,
+    getContext: aiContext,
+    fmtField: (f, v) => !Number.isFinite(v) ? "—" : f.money ? fmtMoney(v) : String(Math.round(v * 1000) / 1000),
+    onApply: (params) => {
+      const snap = { inputs: cleanForm(lastForm), derivations: JSON.parse(JSON.stringify(derivations)) };
+      const merged = cleanForm(lastForm);
+      for (const [k, v] of Object.entries(params)) { merged[k] = v; delete derivations[k]; } // 改了的字段解除推导
+      seedInputs = merged; renderForm();
+      return snap;
+    },
+    onUndo: (snap) => {
+      for (const k of Object.keys(derivations)) delete derivations[k];
+      Object.assign(derivations, snap.derivations);
+      seedInputs = snap.inputs; renderForm();
+    },
+  });
+  aiBtn.addEventListener("click", () => ai.toggle());
 
   renderForm();
 }

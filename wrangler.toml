@@ -20,3 +20,17 @@ database_id = "0be2e6bd-01f6-4b58-8112-516b9a1034db"
 # 每天 UTC 22:30（北京时间次日 06:30，美股收盘后）同步券商账户并记录资产快照
 [triggers]
 crons = ["30 22 * * *"]
+
+# 估值工作台 AI 助手：默认用 Workers AI（下面的绑定，无需 Key）。
+# 换别的服务：在 [vars] 设 AI_PROVIDER = "openai"（OpenAI 兼容协议）或 "anthropic"，
+# 可选 AI_MODEL / AI_BASE_URL，再 `wrangler secret put AI_API_KEY`。
+[ai]
+binding = "AI"
+
+# 仅给 vitest 用：本地测试运行时不支持 Workers AI 绑定，测试环境不带 [ai]（AI 调用走 fetchMock）
+# d1_databases 不会从顶层继承，需在这里重写一遍
+[env.test]
+[[env.test.d1_databases]]
+binding = "DB"
+database_name = "pendulum-db"
+database_id = "0be2e6bd-01f6-4b58-8112-516b9a1034db"

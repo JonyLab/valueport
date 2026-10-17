@@ -4,6 +4,7 @@ import { LANG } from "./i18n.js";
 // 区间名（随界面语言；与卡片五段条、详情文案一致）
 const ZONE_NAMES = { zh: ["击球区", "低估", "合理", "高估", "泡沫区"], en: ["Strike zone", "Undervalued", "Fair value", "Overvalued", "Bubble"] };
 const GAP = 1.6; // 相邻区间带之间的缝隙（度）
+const RC = 10;   // 区间带圆角半径
 
 const NS = "http://www.w3.org/2000/svg";
 const D2R = Math.PI / 180;
@@ -26,11 +27,15 @@ export class Gauge {
   pt(r, phi) { return [this.cx - r * Math.cos(phi * D2R), this.cy + r * Math.sin(phi * D2R)]; }
   // 区间带：两侧各内缩半个缝隙，带与带之间留出细缝（首尾贴着水平基线不内缩）
   band(i) { return this.annular(i * SEG + (i ? GAP / 2 : 0), (i + 1) * SEG - (i < N - 1 ? GAP / 2 : 0)); }
+  // 圆角扇环：四个角各用一段二次贝塞尔（控制点取原尖角）过渡，圆角半径 RC
   annular(a0, a1) {
-    const [ox0, oy0] = this.pt(this.rO, a0), [ox1, oy1] = this.pt(this.rO, a1);
-    const [ix1, iy1] = this.pt(this.rI, a1), [ix0, iy0] = this.pt(this.rI, a0);
-    return `M ${ox0} ${oy0} A ${this.rO} ${this.rO} 0 0 0 ${ox1} ${oy1} `
-         + `L ${ix1} ${iy1} A ${this.rI} ${this.rI} 0 0 1 ${ix0} ${iy0} Z`;
+    const { rO, rI } = this, rc = Math.min(RC, (rO - rI) / 2);
+    const dO = rc / rO / D2R, dI = rc / rI / D2R; // 圆角在内外弧上占的角度
+    const P = (r, a) => this.pt(r, a).join(" ");
+    return `M ${P(rO - rc, a0)} Q ${P(rO, a0)} ${P(rO, a0 + dO)} `
+         + `A ${rO} ${rO} 0 0 0 ${P(rO, a1 - dO)} Q ${P(rO, a1)} ${P(rO - rc, a1)} `
+         + `L ${P(rI + rc, a1)} Q ${P(rI, a1)} ${P(rI, a1 - dI)} `
+         + `A ${rI} ${rI} 0 0 1 ${P(rI, a0 + dI)} Q ${P(rI, a0)} ${P(rI + rc, a0)} Z`;
   }
   mk(tag, attrs = {}) { const el = document.createElementNS(NS, tag); for (const k in attrs) el.setAttribute(k, attrs[k]); return el; }
   build(mount) {
@@ -67,25 +72,24 @@ export class Gauge {
     }
     this.gNeedle = this.mk("g");
     const [bx, by] = this.pt(rB, 90);
-    const needle = this.mk("line", { x1: cx, y1: cy, x2: bx, y2: by, stroke: "var(--hub)", "stroke-width": 3, "stroke-linecap": "round" });
+    // 指针从圆心下方 20 起画（被中枢半圆盖住），否则圆头线帽会从半圆上沿露出一个小黑点
+    const needle = this.mk("line", { x1: cx, y1: cy + 20, x2: bx, y2: by, stroke: "var(--hub)", "stroke-width": 3, "stroke-linecap": "round" });
     this.ring = this.mk("circle", { cx: bx, cy: by, r: 9, fill: "#fff", "stroke-width": 3.5, class: "gring" });
     this.ring.style.transition = "stroke .4s ease";
     this.dot = this.mk("circle", { cx: bx, cy: by, r: 3, class: "gdot" });
     this.dot.style.transition = "fill .4s ease";
     this.gNeedle.append(needle, this.ring, this.dot);
-    const hubPath = `M ${cx - this.RHUB} ${cy} A ${this.RHUB} ${this.RHUB} 0 0 0 ${cx + this.RHUB} ${cy} Z`;
-    // 中枢：白色半圆 + 柔和投影（不再用灰描边）
-    const hubShadow = this.mk("path", { d: hubPath, fill: "rgba(60,50,20,.10)", transform: "translate(0,4)", filter: `url(#g${this.uid}blur)` });
-    const blur = this.mk("filter", { id: `g${this.uid}blur`, x: "-20%", y: "-20%", width: "140%", height: "160%" });
-    blur.appendChild(this.mk("feGaussianBlur", { stdDeviation: 6 }));
-    defs.appendChild(blur);
+    // 中枢半圆：两个上角圆角（RC），无投影
+    const R = this.RHUB, d = RC / R, cs = R * Math.cos(d), sn = R * Math.sin(d);
+    const hubPath = `M ${cx - R + RC} ${cy} L ${cx + R - RC} ${cy} Q ${cx + R} ${cy} ${cx + cs} ${cy + sn} `
+                  + `A ${R} ${R} 0 0 1 ${cx - cs} ${cy + sn} Q ${cx - R} ${cy} ${cx - R + RC} ${cy} Z`;
     const hubRing = this.mk("path", { d: hubPath, fill: "#fff" });
     // 第一行：名称（大）；第二行：代码（小）
     this.hubName = this.mk("text", { x: cx, y: cy + this.RHUB * 0.40, "text-anchor": "middle", "dominant-baseline": "middle" });
     this.hubName.style.cssText = "font-family:var(--font);font-weight:500;letter-spacing:-.01em;fill:var(--ink)";
     this.hubCode = this.mk("text", { x: cx, y: cy + this.RHUB * 0.70, "text-anchor": "middle", "dominant-baseline": "middle" });
     this.hubCode.style.cssText = "font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.04em;fill:var(--ink-mute)";
-    svg.append(defs, gB, gL, gN, this.gNeedle, hubShadow, hubRing, this.hubName, this.hubCode);
+    svg.append(defs, gB, gL, gN, this.gNeedle, hubRing, this.hubName, this.hubCode);
     if (this.compact) { // 小图：保留刻度数字，隐藏区间词标签/中枢文字
       gL.style.display = "none";
       this.hubName.style.display = "none"; this.hubCode.style.display = "none";
