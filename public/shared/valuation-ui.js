@@ -6,6 +6,7 @@
  * 导出：mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, refData, verdict, onDone, onCancel })
  *   onDone({ method, inputs, low, high, note })  —— 点 Submit、且低~高有效时触发
  *   verdict(low, high) → { text, cls } | null     —— 由宿主提供（结果卡判定行）
+ *   stock: { name, code, mountLogo(el), rows: [[标签, 值], …] } —— 右栏标的资料（可选）
  */
 import { METHOD_MENU_GROUPS, MODELS, methodMenuMeta, runModel, modeFields } from "/shared/valuation/index.js";
 import { midpointForm, scheduleSeries, sensitivityMatrix } from "/shared/valuation/workbench.js";
@@ -16,11 +17,13 @@ import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
-        submit: "保存", dash: "—", note: "备注", notePh: "为什么给出这个估值？关键逻辑、假设依据、风险…", useRange: "套用区间" },
+        submit: "保存估值", dash: "—", note: "备注", notePh: "为什么给出这个估值？关键逻辑、假设依据、风险…", useRange: "套用区间" },
   en: { method: "Method", facts: "Inputs", assume: "Assumptions", conservative: "Conservative", optimistic: "Optimistic",
-        submit: "Submit", dash: "—", note: "Note", notePh: "Why this valuation? Key logic, assumptions, risks…", useRange: "Use range" },
+        submit: "Save valuation", dash: "—", note: "Note", notePh: "Why this valuation? Key logic, assumptions, risks…", useRange: "Use range" },
 };
 
+// Remix Icon 图标（装饰性，读屏跳过）：ri("close-line") → <i class="ri-close-line">
+function ri(name) { const i = document.createElement("i"); i.className = "ri-" + name; i.setAttribute("aria-hidden", "true"); return i; }
 function el(tag, cls, attrs) {
   const node = document.createElement(tag);
   if (cls) node.className = cls;
@@ -28,6 +31,12 @@ function el(tag, cls, attrs) {
   return node;
 }
 function fmt(v, dash) { return (v !== null && isFinite(v)) ? Number(v).toFixed(2) : dash; }
+// 大号数字：小数点及之后缩小显示（同 index.html 的 setNum）
+function setNum(node, text) {
+  const s = String(text ?? ""), i = s.search(/\.\d/);
+  node.textContent = i < 0 ? s : s.slice(0, i);
+  if (i >= 0) node.appendChild(el("span", "num-dec", { textContent: s.slice(i) }));
+}
 function fmtMoney(n) {
   const s = n < 0 ? "-" : "", a = Math.abs(n);
   if (a >= 1e12) return s + (a / 1e12).toFixed(2) + "T";
@@ -77,11 +86,13 @@ function modelTitle(model, lang) {
   return textFor(meta && meta.title, lang, (model && model.label && model.label[lang]) || (model && model.key) || "");
 }
 
-export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, initialDerivations, initialSegments, refData, verdict, onDone, onCancel }) {
+export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, initialDerivations, initialSegments, refData, verdict, onDone, onCancel, stock }) {
   const L = TX[lang] || TX.zh;
   const tx = (k) => L[k];
-  // 新增默认用 PE；编辑时沿用原方法。
-  let activeIdx = MODELS.findIndex((m) => m.key === (initialMethod || "pe"));
+  // 新增：先进入「选择估值方法」页（activeIdx = -1）；编辑：直接沿用原方法进入工作台。
+  let activeIdx = initialMethod ? MODELS.findIndex((m) => m.key === initialMethod) : -1;
+  // 预填用的已存假设：只对原方法有效；换了方法就从头开始（同名字段在不同方法里含义不同，不能带过去）
+  let seedInputs = initialInputs || null;
   let lastLow = null, lastHigh = null, lastForm = {};
   let currentMode = null;
   const derivations = (initialDerivations && typeof initialDerivations === "object") ? JSON.parse(JSON.stringify(initialDerivations)) : {};
@@ -101,101 +112,141 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
 
   mount.innerHTML = "";
   mount.classList.add("vc-mount");
+  // 工作台两栏，各自滚动，输入与结论分开：
+  //   左「关键假设」= 方法 + 估值用到的数据 + 口径 + 各组假设（填的东西）
+  //   右「估值结论」= 标的与现价 + 大号结果 + 区间条 + 估值明细 + 逐年现金流与敏感性 + 备注与保存（算出来的东西）
+  // 选择估值方法用弹窗：新增时进来就弹出；编辑时点「更换方法」弹出
+  const pickerView = el("div", "vc-picker");
+  pickerView.setAttribute("role", "dialog"); pickerView.setAttribute("aria-modal", "true");
+  const pickerModal = el("div", "vc-picker-modal");
+  pickerView.appendChild(pickerModal);
   const root = el("div", "vc vc-workbench");
-  const top = el("div", "vc-top");
-  const methodTitle = el("button", "vc-method-title", { type: "button" });
-  const shell = el("div", "vc-shell");
-  const inputPanel = el("div", "vc-input-panel");
-  const resultsPanel = el("div", "vc-results-panel");
-  const inputBody = el("div", "vc-input-body");
-  const inputFooter = el("div", "vc-input-footer");
-  const summaryCard = el("section", "vc-result-card vc-summary-card");
+  const center = el("section", "vc-col vc-inputs");
+  const sideR = el("section", "vc-col vc-results");
+  const colHead = (zh, en, subZh, subEn) => {
+    const h = el("div", "vc-colhead");
+    const t = el("div", "vc-colhead-title"); t.textContent = lang === "zh" ? zh : en;
+    const st = el("div", "vc-colhead-sub"); st.textContent = lang === "zh" ? subZh : subEn;
+    h.append(t, st); return h;
+  };
+  const summaryCard = el("div", "vc-hero");
   const vizGrid = el("div", "vc-viz-grid");
   const chartCard = el("section", "vc-result-card vc-chart-card");
   const sensitivityCard = el("section", "vc-result-card vc-sens-card");
-  inputPanel.append(inputBody, inputFooter);
-  resultsPanel.append(summaryCard, vizGrid);
   vizGrid.append(chartCard, sensitivityCard);
-  shell.append(inputPanel, resultsPanel);
-  root.append(top, shell);
-  mount.appendChild(root);
+  root.append(center, sideR);
+  mount.append(pickerView, root);
 
-  // ── 估值方法：标题即切换器 ──
-  const picker = el("div", "vc-method-picker vc-method-title-picker");
-  const pickerBtn = methodTitle;
-  const pickerText = el("span", "vc-method-title-text");
-  const pickerIcon = el("span", "vc-method-chevron");
-  pickerIcon.textContent = "⌄";
-  pickerBtn.append(pickerText, pickerIcon);
-  const menu = el("div", "vc-method-menu");
-  menu.hidden = true;
-  menu.setAttribute("role", "listbox");
-  picker.append(pickerBtn, menu);
-  const titleText = activeIdx >= 0 ? modelTitle(MODELS[activeIdx], lang) : (lang === "zh" ? "添加估值" : "Add valuation");
-  pickerText.textContent = titleText;
-  function updatePickerLabel() {
-    pickerText.textContent = activeIdx >= 0 ? modelTitle(MODELS[activeIdx], lang) : (lang === "zh" ? "请选择估值方法…" : "Choose a method…");
+  // ── 选择估值方法弹窗（按口径分组的卡片，每张写清适用于什么样的公司）──
+  const methodBar = el("div", "vc-pgroups");
+  methodBar.setAttribute("role", "radiogroup");
+  methodBar.setAttribute("aria-label", lang === "zh" ? "估值方法" : "Valuation method");
+  const pickHead = el("div", "vc-picker-head");
+  const pickTitle = el("div", "vc-picker-title");
+  const pickSub = el("div", "vc-picker-sub");
+  const pickWarn = el("div", "vc-picker-warn");
+  const pickClose = el("button", "btn icon sm vc-picker-close", { type: "button" });
+  pickClose.setAttribute("aria-label", lang === "zh" ? "关闭" : "Close");
+  pickClose.appendChild(ri("close-line"));
+  pickClose.addEventListener("click", () => closePicker());
+  const pickTop = el("div", "vc-picker-top"); pickTop.append(pickTitle, pickClose);
+  pickHead.append(pickTop, pickSub, pickWarn);
+  pickerModal.append(pickHead, methodBar);
+  // 关闭：还没选过方法（新增）→ 退出工作台回详情；已有方法（更换）→ 保持原方法
+  function closePicker() { if (activeIdx < 0) { if (typeof onCancel === "function") onCancel(); } else showPicker(false); }
+  pickerView.addEventListener("click", (e) => { if (e.target === pickerView) closePicker(); });
+  // Esc 只关弹窗：捕获阶段先接住，避免宿主页的全局 Esc 顺带退出整个编辑器
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || pickerView.hidden || !pickerView.isConnected) return;
+    e.stopImmediatePropagation(); e.preventDefault(); closePicker();
+  }, true);
+  function buildMethodMenu() {
+    methodBar.innerHTML = "";
+    const byKey = new Map(MODELS.map((model, idx) => [model.key, { model, idx }]));
+    METHOD_MENU_GROUPS.forEach((group) => {
+      const available = group.methods.map((method) => ({ method, entry: byKey.get(method.key) })).filter((x) => x.entry);
+      if (!available.length) return;
+      const g = el("section", "vc-pgroup");
+      const lab = el("div", "vc-pgroup-lab"); lab.textContent = textFor(group.title, lang, group.key);
+      const items = el("div", "vc-pcards");
+      available.forEach(({ method, entry }) => {
+        const b = el("button", "vc-pcard", { type: "button" });
+        b.setAttribute("role", "radio");
+        b.dataset.idx = String(entry.idx);
+        const tt = el("span", "vc-pcard-title"); tt.textContent = textFor(method.title, lang, modelTitle(entry.model, lang));
+        const st = el("span", "vc-pcard-sub"); st.textContent = textFor(method.subtitle, lang, "");
+        const cur = el("span", "vc-pcard-cur"); cur.textContent = lang === "zh" ? "当前方法" : "Current";
+        b.append(tt, st, cur);
+        b.addEventListener("click", () => {
+          if (entry.idx === activeIdx) { showPicker(false); return; }
+          // 编辑已存估值时换方法：已填假设不保留
+          if (initialMethod && MODELS[entry.idx].key !== initialMethod) seedInputs = null;
+          if (initialMethod && MODELS[entry.idx].key === initialMethod) seedInputs = initialInputs || null;
+          selectMethod(entry.idx);
+          showPicker(false);
+        });
+        items.appendChild(b);
+      });
+      g.append(lab, items);
+      methodBar.appendChild(g);
+    });
   }
-  function setMenuOpen(open) {
-    menu.hidden = !open;
-    picker.classList.toggle("open", open);
-    pickerBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  function updatePickerLabel() {
+    methodBar.querySelectorAll(".vc-pcard").forEach((b) => {
+      const on = Number(b.dataset.idx) === activeIdx;
+      b.classList.toggle("on", on); b.setAttribute("aria-checked", on ? "true" : "false");
+    });
   }
   function selectMethod(idx) {
     activeIdx = idx;
     currentMode = null;
     updatePickerLabel();
-    setMenuOpen(false);
+    updateMethodDesc();
     renderForm();
   }
-  function buildMethodMenu() {
-    menu.innerHTML = "";
-    const byKey = new Map(MODELS.map((model, idx) => [model.key, { model, idx }]));
-    METHOD_MENU_GROUPS.forEach((group) => {
-      const available = group.methods.map((method) => ({ method, entry: byKey.get(method.key) })).filter((item) => item.entry);
-      if (!available.length) return;
-      const section = el("div", "vc-method-section");
-      const head = el("div", "vc-method-section-title");
-      head.textContent = textFor(group.title, lang, group.key);
-      section.appendChild(head);
-      available.forEach(({ method, entry }) => {
-        const option = el("button", "vc-method-option", { type: "button" });
-        option.setAttribute("role", "option");
-        option.setAttribute("aria-selected", entry.idx === activeIdx ? "true" : "false");
-        const title = el("span", "vc-method-option-title");
-        title.textContent = textFor(method.title, lang, modelTitle(entry.model, lang));
-        const sub = el("span", "vc-method-option-subtitle");
-        sub.textContent = textFor(method.subtitle, lang, "");
-        option.append(title, sub);
-        option.addEventListener("click", () => selectMethod(entry.idx));
-        section.appendChild(option);
-      });
-      menu.appendChild(section);
-    });
+  // 打开 / 关闭选方法弹窗；已有方法时（更换）显示「不保留已填假设」提醒
+  function showPicker(open) {
+    const changing = activeIdx >= 0;
+    pickTitle.textContent = changing ? (lang === "zh" ? "更换估值方法" : "Change method") : (lang === "zh" ? "选择估值方法" : "Choose a valuation method");
+    pickSub.textContent = lang === "zh"
+      ? "按公司类型选：银行保险看 P/B，稳定分红用 DDM，现金流可预测用 DCF，尚未盈利的成长股用 P/S，资源股用 NAV。想交叉验证，就再添加一张用别的方法的估值卡。"
+      : "Pick by business type: P/B for banks and insurers, DDM for steady dividend payers, DCF when cash flows are predictable, P/S for growth names not yet profitable, NAV for resource stocks. To cross-check, add another card with a different method.";
+    pickWarn.textContent = changing ? (lang === "zh" ? "切换后，已填的假设不会保留。" : "Switching clears the assumptions you have entered.") : "";
+    pickWarn.style.display = changing ? "" : "none";
+    pickerView.hidden = !open;
+    if (open) { const cur = methodBar.querySelector(".vc-pcard.on") || methodBar.querySelector(".vc-pcard"); if (cur) requestAnimationFrame(() => cur.focus()); }
   }
-  pickerBtn.setAttribute("aria-haspopup", "listbox");
-  pickerBtn.addEventListener("click", () => setMenuOpen(menu.hidden));
-  document.addEventListener("click", (event) => { if (!picker.contains(event.target)) setMenuOpen(false); });
-  document.addEventListener("keydown", (event) => { if (event.key === "Escape") setMenuOpen(false); });
+  // 当前方法的标题 + 适用说明 + 「更换方法」（中栏顶部）
+  const methodHead = el("div", "vc-method-head");
+  const methodRow = el("div", "vc-method-row");
+  const methodName = el("div", "vc-method-name");
+  const changeBtn = el("button", "vc-method-change", { type: "button" });
+  changeBtn.replaceChildren(ri("arrow-left-right-line"), document.createTextNode(lang === "zh" ? "更换方法" : "Change method"));
+  changeBtn.addEventListener("click", () => showPicker(true));
+  methodRow.append(methodName, changeBtn);
+  const methodDesc = el("div", "vc-method-desc");
+  methodHead.append(methodRow, methodDesc);
+  function updateMethodDesc() {
+    const model = activeIdx >= 0 ? MODELS[activeIdx] : null;
+    const meta = model ? methodMenuMeta(model) : null;
+    methodName.textContent = model ? textFor(meta && meta.title, lang, modelTitle(model, lang)) : (lang === "zh" ? "选择估值方法" : "Choose a method");
+    methodDesc.textContent = meta ? textFor(meta.subtitle, lang, "") : (lang === "zh" ? "从左侧选一种估值方法开始。" : "Pick a method on the left to begin.");
+  }
   buildMethodMenu();
   updatePickerLabel();
-  top.append(picker);
+  updateMethodDesc();
+  showPicker(activeIdx < 0); // 新增：先选方法
 
-  const panelHead = el("div", "vc-panel-head");
-  panelHead.textContent = "Inputs";
   const formWrap = el("div", "vc-form");
-  inputBody.append(panelHead, formWrap);
 
-  // ── 备注（跟随 Inputs 内容滚动，不吸底）──
+  // ── 备注（右栏底部，和保存按钮一起）──
   const noteWrap = el("div", "vc-note");
   const noteLabel = el("div", "vc-note-label"); noteLabel.textContent = tx("note");
   const noteInput = el("textarea", "vc-note-input"); noteInput.placeholder = tx("notePh");
   if (initialNote) noteInput.value = initialNote;
   noteWrap.append(noteLabel, noteInput);
 
-  // ── 结果区：摘要 + 图表 + 敏感性 ──
-  const summaryHead = el("div", "vc-card-title");
-  summaryHead.textContent = lang === "zh" ? "估值摘要" : "Valuation Summary";
+  // ── 中栏顶部：大号估值结果（区间 / 现价）+ 判定 + 区间 vs 现价条 ──
   const summaryLabel = el("div", "vc-summary-label");
   summaryLabel.textContent = lang === "zh" ? "合理价值区间" : "Fair value range";
   const nums = el("div", "vc-rnums");
@@ -205,7 +256,38 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const verdictEl = el("div", "vc-rverdict");
   const bdMount = el("div", "vc-summary-metrics");
   const schedMount = el("div", "vc-sched");
-  summaryCard.append(summaryHead, summaryLabel, nums, verdictEl, bdMount, schedMount);
+  const emptyHint = el("div", "vc-summary-empty");
+  emptyHint.textContent = lang === "zh" ? "填写左侧的关键假设，这里会实时算出合理价值区间，并和现价对照。" : "Fill in the assumptions on the left — the fair-value range is computed here live and compared with the price.";
+  const rangeViz = el("div", "vc-rangeviz");
+  const nowPx = el("span", "vc-rnow");
+  if (ctx && ctx.price > 0) nowPx.textContent = (lang === "zh" ? " / 现价 " : " / Price ") + fmt(ctx.price, "—");
+  const heroTop = el("div", "vc-hero-top");
+  const heroNums = el("div", "vc-hero-nums"); heroNums.append(nums, nowPx);
+  heroTop.append(heroNums, verdictEl);
+  // 保守 = 乐观时结果只是一个值：只显示一个数，并提示拉开两档
+  const pointHint = el("div", "vc-point-hint");
+  pointHint.textContent = lang === "zh" ? "保守与乐观假设相同，结果是单一估值；拉开两档就能得到区间。" : "Conservative and optimistic are identical, so this is a single value — spread them to get a range.";
+  pointHint.style.display = "none";
+  summaryCard.append(summaryLabel, heroTop, pointHint, emptyHint, rangeViz);
+  // 区间 vs 现价：一条轴上画出低~高区间和现价位置
+  function renderRangeViz(lo, hi, valid) {
+    rangeViz.innerHTML = "";
+    const p = ctx && ctx.price;
+    if (!valid || !(p > 0)) { rangeViz.style.display = "none"; return; }
+    rangeViz.style.display = "";
+    const a = Math.min(lo, hi), b = Math.max(lo, hi);
+    let min = Math.min(a, p), max = Math.max(b, p);
+    const pad = (max - min) * 0.15 || max * 0.1; min = Math.max(0, min - pad); max += pad;
+    const X = (v) => ((v - min) / (max - min) * 100).toFixed(2) + "%";
+    const track = el("div", "vc-rv-track");
+    const band = el("div", "vc-rv-band"); band.style.left = X(a); band.style.width = `calc(${X(b)} - ${X(a)})`;
+    const now = el("div", "vc-rv-now"); now.style.left = X(p);
+    const tag = el("span", "vc-rv-tag"); tag.textContent = (lang === "zh" ? "现价 " : "Price ") + fmt(p, "—"); now.appendChild(tag);
+    const l0 = el("span", "vc-rv-end"); l0.style.left = X(a); l0.textContent = fmt(a, "—");
+    const l1 = el("span", "vc-rv-end"); l1.style.left = X(b); l1.textContent = fmt(b, "—");
+    track.append(band, now, l0, l1);
+    rangeViz.appendChild(track);
+  }
 
   const submitBtn = el("button", "vc-submit"); submitBtn.type = "button"; submitBtn.textContent = tx("submit"); submitBtn.disabled = true;
   submitBtn.addEventListener("click", () => {
@@ -213,7 +295,33 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const segOut = currentMode === "segment" ? { enabled: true, rows: segments.rows } : { enabled: false, rows: segments.rows || [] };
     onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), segments: segOut, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim() });
   });
-  inputFooter.append(submitBtn);
+  // ── 标的（logo · 名称 · 代码 · 现价，放结论栏顶）· 估值用到的数据（放输入栏）· 估值明细 · 备注与保存 ──
+  const prof = el("div", "vc-prof");
+  const avatar = el("div", "vc-prof-av");
+  if (stock && typeof stock.mountLogo === "function") stock.mountLogo(avatar);
+  const pid = el("div", "vc-prof-id");
+  const pname = el("div", "vc-prof-name"); pname.textContent = (stock && stock.name) || "";
+  const pcode = el("div", "vc-prof-code"); pcode.textContent = (stock && stock.code) || "";
+  pid.append(pname, pcode);
+  const ppx = el("div", "vc-prof-px");
+  if (ctx && ctx.price > 0) setNum(ppx, fmt(ctx.price, "—"));
+  prof.append(avatar, pid, ppx);
+  const infoSec = el("div", "vc-prof-sec");
+  const infoTitle = el("div", "vc-prof-title"); infoTitle.textContent = lang === "zh" ? "估值用到的数据" : "Inputs from data";
+  infoSec.appendChild(infoTitle);
+  ((stock && stock.rows) || []).forEach(([k, v]) => {
+    const r = el("div", "vc-kv"); const kk = el("span", "vc-kv-k"); kk.textContent = k; const vv = el("span", "vc-kv-v"); vv.textContent = v;
+    r.append(kk, el("span", "vc-kv-dots"), vv); infoSec.appendChild(r);
+  });
+  const bdSec = el("div", "vc-prof-sec");
+  const bdTitle = el("div", "vc-prof-title"); bdTitle.textContent = lang === "zh" ? "估值明细" : "Breakdown";
+  bdSec.append(bdTitle, bdMount);
+  const saveBar = el("div", "vc-savebar");
+  saveBar.append(noteWrap, submitBtn);
+  center.append(colHead("关键假设", "Assumptions", "选方法、核对数据、填写保守与乐观两档假设", "Pick a method, check the data, fill in conservative and optimistic cases"),
+    methodHead, infoSec, formWrap);
+  sideR.append(colHead("估值结论", "Result", "根据左侧假设实时计算", "Computed live from the assumptions"),
+    prof, summaryCard, bdSec, schedMount, vizGrid, saveBar);
 
   // ── 计算 + 渲染结果 ──
   function consOpt(model, form) {
@@ -269,7 +377,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const isDiv = model.key === "ddm";
     const flowZh = isDiv ? "股息" : "现金流", flowEn = isDiv ? "Dividend" : "Cash flow";
     const title = lang === "zh" ? `逐年${flowZh}（情景取中）` : `Year-by-year ${flowEn.toLowerCase()} (mid)`;
-    const toggle = el("button", "vc-sched-toggle"); toggle.type = "button"; toggle.textContent = title + " ▾";
+    const toggle = el("button", "vc-sched-toggle"); toggle.type = "button";
+    const setToggle = (open) => toggle.replaceChildren(document.createTextNode(title), ri(open ? "arrow-up-s-line" : "arrow-down-s-line"));
+    setToggle(false);
     const body = el("div", "vc-sched-body"); body.style.display = "none";
     const tbl = el("table", "vc-sched-table");
     const head = el("tr");
@@ -282,7 +392,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     if (Number.isFinite(s.terminalPv)) sumPv += s.terminalPv;
     addRow("vc-sched-sum", lang === "zh" ? "现值合计" : "Total PV", "", fmtCf(sumPv));
     body.appendChild(tbl);
-    toggle.addEventListener("click", () => { const open = body.style.display === "none"; body.style.display = open ? "" : "none"; toggle.textContent = title + (open ? " ▴" : " ▾"); });
+    toggle.addEventListener("click", () => { const open = body.style.display === "none"; body.style.display = open ? "" : "none"; setToggle(open); });
     schedMount.append(toggle, body);
   }
   function renderChart(model, form, valid) {
@@ -336,8 +446,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     title.textContent = lang === "zh" ? "敏感性分析" : "Sensitivity analysis";
     const table = el("div", "vc-sens-table");
     const head = el("div", "vc-sens-row vc-sens-head");
+    // 角格标注「行」变量（↓），表上方小标题标注「列」变量（→），避免两者读反
     const corner = el("div", "vc-sens-axis");
-    corner.textContent = matrix.x.label;
+    corner.replaceChildren(document.createTextNode(matrix.y.label), ri("arrow-down-line"));
     head.appendChild(corner);
     matrix.columns.forEach((col) => {
       const cell = el("div", "vc-sens-hcell");
@@ -358,7 +469,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       table.appendChild(tr);
     });
     const yTitle = el("div", "vc-sens-ytitle");
-    yTitle.textContent = matrix.y.label;
+    yTitle.replaceChildren(document.createTextNode(matrix.x.label), ri("arrow-right-line"));
     sensitivityCard.append(title, yTitle, table);
   }
   function compute(formData) {
@@ -369,13 +480,20 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     lastLow = r.low; lastHigh = r.high;
     const dash = tx("dash");
     const valid = lastLow !== null && lastHigh !== null && isFinite(lastLow) && isFinite(lastHigh);
-    outLow.textContent = fmt(lastLow, dash); outHigh.textContent = fmt(lastHigh, dash);
+    setNum(outLow, fmt(lastLow, dash)); setNum(outHigh, fmt(lastHigh, dash));
     outDash.style.opacity = valid ? "1" : ".35";
     let v = null;
     if (valid && typeof verdict === "function") { try { v = verdict(Math.min(lastLow, lastHigh), Math.max(lastLow, lastHigh)); } catch { v = null; } }
+    if (v && (!v.text || v.text === "—")) v = null; // 低=高（保守与乐观相同）时宿主给不出判定，不显示空徽章
     verdictEl.textContent = v ? v.text : "";
     verdictEl.className = "vc-rverdict " + (v && v.cls ? v.cls : "");
     verdictEl.style.display = v ? "" : "none";
+    heroTop.style.display = valid ? "" : "none";
+    const point = valid && Math.abs(lastHigh - lastLow) < 1e-9;
+    outDash.style.display = outHigh.style.display = point ? "none" : "";
+    pointHint.style.display = point ? "" : "none";
+    emptyHint.style.display = valid ? "none" : "";
+    renderRangeViz(lastLow, lastHigh, valid);
     renderBreakdown(model, formData, valid);
     renderSchedule(model, formData, valid);
     renderChart(model, formData, valid);
@@ -391,7 +509,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const meta = field.meta && FIELD_META[field.meta];
     let guideRow = null;
     if (meta && meta.guide) {
-      const info = el("button", "vc-info"); info.type = "button"; info.textContent = "ⓘ"; info.setAttribute("aria-label", lang === "zh" ? "估值提示" : "Valuation tip");
+      const info = el("button", "vc-info"); info.type = "button"; info.appendChild(ri("information-line")); info.setAttribute("aria-label", lang === "zh" ? "估值提示" : "Valuation tip");
       guideRow = el("div", "vc-guide"); guideRow.textContent = meta.guide[lang] || meta.guide.zh; guideRow.style.display = "none";
       info.addEventListener("click", () => { guideRow.style.display = guideRow.style.display === "none" ? "block" : "none"; });
       lab.appendChild(info);
@@ -428,19 +546,19 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const src = (!isMultiple && refData.sources) ? refData.sources.financial : null;
     if (src) {
       const a = el("a", "vc-srclink"); a.href = src; a.target = "_blank"; a.rel = "noopener";
-      a.textContent = "↗"; a.title = lang === "zh" ? "查看年报出处" : "View annual report";
+      a.appendChild(ri("external-link-line")); a.title = lang === "zh" ? "查看年报出处" : "View annual report";
       row.appendChild(a);
     }
     return row;
   }
   // 「▾ 推导」折叠 + 子面板;写回 inC/inO 并维护 derivations[field.k]
-  function derivToggleText(open) { return (open ? "▴ " : "▾ ") + (lang === "zh" ? "推导" : "Derive"); }
+  function derivToggleContent(open) { return [ri(open ? "arrow-up-s-line" : "arrow-down-s-line"), document.createTextNode(lang === "zh" ? "推导" : "Derive")]; }
   function buildDerivation(field, deriv, inC, inO, recompute) {
     const wrap = el("div", "vc-deriv"); wrap.style.gridColumn = "1 / -1";
     const toggle = el("button", "vc-deriv-toggle", { type: "button" });
     const bodyBox = el("div", "vc-deriv-body");
     let open = false;
-    const sync = () => { toggle.textContent = derivToggleText(open); bodyBox.style.display = open ? "" : "none"; };
+    const sync = () => { toggle.replaceChildren(...derivToggleContent(open)); bodyBox.style.display = open ? "" : "none"; };
     toggle.addEventListener("click", () => { open = !open; sync(); });
     wrap.append(toggle, bodyBox);
     if (deriv.shape === "sum") buildSumPanel(field, deriv, inC, inO, recompute, bodyBox);
@@ -487,15 +605,15 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     if (refRow) bodyBox.appendChild(refRow);
   }
   function singleInit(field) {
-    if (initialInputs && Object.prototype.hasOwnProperty.call(initialInputs, field.k)) {
-      const v = initialInputs[field.k];
+    if (seedInputs && Object.prototype.hasOwnProperty.call(seedInputs, field.k)) {
+      const v = seedInputs[field.k];
       if (typeof v === "number") return v;
     }
     return initialFor(field, ctx);
   }
   function dualInit(field) {
-    if (initialInputs && initialInputs[field.k] && typeof initialInputs[field.k] === "object") {
-      return { c: initialInputs[field.k].c, o: initialInputs[field.k].o };
+    if (seedInputs && seedInputs[field.k] && typeof seedInputs[field.k] === "object") {
+      return { c: seedInputs[field.k].c, o: seedInputs[field.k].o };
     }
     const d = field.default ?? "";
     return { c: d, o: d };
@@ -531,7 +649,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const body = el("div", "vc-seg-body");
     const hero = el("div", "vc-seg-hero");
     const table = el("div", "vc-segcards");
-    const addBtn = el("button", "vc-seg-add", { type: "button" }); addBtn.textContent = lang === "zh" ? "＋ 添加分部" : "＋ Add segment";
+    const addBtn = el("button", "vc-seg-add", { type: "button" }); addBtn.replaceChildren(ri("add-line"), document.createTextNode(lang === "zh" ? "添加分部" : "Add segment"));
     const summary = el("div", "vc-seg-sum");
     body.append(hero, table, addBtn, summary);
     wrap.append(head, body);
@@ -590,7 +708,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const card = el("div", "vc-segcard");
       const name = el("input", "vc-input vc-seg-name", { type: "text" }); name.placeholder = lang === "zh" ? "业务名" : "Segment"; if (seed && seed.name) name.value = seed.name;
       const rev = makeMoneyInput(seed && Number.isFinite(Number(seed.revenue)) ? Number(seed.revenue) : ""); rev.placeholder = lang === "zh" ? "营收" : "Rev";
-      const del = el("button", "vc-segc-del", { type: "button" }); del.textContent = "✕";
+      const del = el("button", "vc-segc-del", { type: "button" }); del.appendChild(ri("close-line")); del.setAttribute("aria-label", lang === "zh" ? "删除" : "Remove");
       const top = el("div", "vc-segc-top"); top.append(name, rev, del);
       const gc = makeInput(seed && seed.growth ? seed.growth.c : ""), go = makeInput(seed && seed.growth ? seed.growth.o : "");
       const mc = makeInput(seed && seed.netMargin ? seed.netMargin.c : ""), mo = makeInput(seed && seed.netMargin ? seed.netMargin.o : "");
@@ -642,9 +760,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       : "Mine: output×(price−cost)×(1−tax)×annuity(life,WACC), no perpetuity. Fixed pack: direct PV (e.g. lithium). Option: undeveloped reserves via Black-Scholes.";
     const table = el("div", "vc-segcards");
     const btns = el("div", "vc-asset-btns");
-    const addMine = el("button", "vc-seg-add", { type: "button" }); addMine.textContent = lang === "zh" ? "＋ 在产矿" : "＋ Mine";
-    const addFixed = el("button", "vc-seg-add", { type: "button" }); addFixed.textContent = lang === "zh" ? "＋ 固定值包" : "＋ Fixed pack";
-    const addOption = el("button", "vc-seg-add", { type: "button" }); addOption.textContent = lang === "zh" ? "＋ 期权(未开发)" : "＋ Option";
+    const addMine = el("button", "vc-seg-add", { type: "button" }); addMine.replaceChildren(ri("add-line"), document.createTextNode(lang === "zh" ? "在产矿" : "Mine"));
+    const addFixed = el("button", "vc-seg-add", { type: "button" }); addFixed.replaceChildren(ri("add-line"), document.createTextNode(lang === "zh" ? "固定值包" : "Fixed pack"));
+    const addOption = el("button", "vc-seg-add", { type: "button" }); addOption.replaceChildren(ri("add-line"), document.createTextNode(lang === "zh" ? "期权(未开发)" : "Option"));
     btns.append(addMine, addFixed, addOption);
     const summary = el("div", "vc-seg-sum");
     assetBox.append(ah, hint, table, btns, summary);
@@ -713,7 +831,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const sel = el("select", "vc-input vc-asset-com");
       Object.keys(COMMODITIES).forEach((k) => { const o = document.createElement("option"); o.value = k; o.textContent = COMMODITIES[k].label[lang]; sel.appendChild(o); });
       sel.value = (seed && seed.commodity) || "copper";
-      const del = el("button", "vc-segc-del", { type: "button" }); del.textContent = "✕";
+      const del = el("button", "vc-segc-del", { type: "button" }); del.appendChild(ri("close-line")); del.setAttribute("aria-label", lang === "zh" ? "删除" : "Remove");
       const top = el("div", "vc-segc-top"); top.append(name, sel, del);
       const comDef = () => COMMODITIES[sel.value];
       // 产量 + 完全成本
@@ -742,7 +860,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const card = el("div", "vc-segcard");
       const name = el("input", "vc-input vc-seg-name", { type: "text" }); name.placeholder = lang === "zh" ? "资产包名（如 锂板块 / 未开发期权）" : "Fixed pack"; if (seed && seed.name) name.value = seed.name;
       const tag = el("span", "vc-asset-tag"); tag.textContent = lang === "zh" ? "固定值" : "Fixed";
-      const del = el("button", "vc-segc-del", { type: "button" }); del.textContent = "✕";
+      const del = el("button", "vc-segc-del", { type: "button" }); del.appendChild(ri("close-line")); del.setAttribute("aria-label", lang === "zh" ? "删除" : "Remove");
       const top = el("div", "vc-segc-top"); top.append(name, tag, del);
       const row = el("div", "vc-asset-row");
       const val = makeMoneyInput(seed && Number.isFinite(Number(seed.value)) ? Number(seed.value) : ""); val.placeholder = lang === "zh" ? "现值" : "Value";
@@ -763,7 +881,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       Object.keys(COMMODITIES).forEach((k) => { const o = document.createElement("option"); o.value = k; o.textContent = COMMODITIES[k].label[lang]; sel.appendChild(o); });
       sel.value = (seed && seed.commodity) || "copper";
       const tag = el("span", "vc-asset-tag"); tag.textContent = "B-S";
-      const del = el("button", "vc-segc-del", { type: "button" }); del.textContent = "✕";
+      const del = el("button", "vc-segc-del", { type: "button" }); del.appendChild(ri("close-line")); del.setAttribute("aria-label", lang === "zh" ? "删除" : "Remove");
       const top = el("div", "vc-segc-top"); top.append(name, sel, tag, del);
       const comDef = () => COMMODITIES[sel.value];
       // 行1：储量 + 单位边际成本
@@ -811,9 +929,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     formWrap.innerHTML = "";
     // 未选方法：显示提示、清空结果，不预填任何模型
     if (activeIdx < 0) {
-      pickerText.textContent = lang === "zh" ? "添加估值" : "Add valuation";
-      buildMethodMenu();
       updatePickerLabel();
+      updateMethodDesc();
       const hint = el("div", "vc-empty-method");
       hint.textContent = lang === "zh" ? "请先选择一个估值方法" : "Pick a valuation method to begin";
       formWrap.appendChild(hint);
@@ -821,6 +938,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const dash = tx("dash");
       outLow.textContent = dash; outHigh.textContent = dash; outDash.style.opacity = ".35";
       verdictEl.textContent = ""; verdictEl.style.display = "none";
+      heroTop.style.display = "none"; pointHint.style.display = "none"; emptyHint.style.display = ""; renderRangeViz(null, null, false);
       bdMount.innerHTML = ""; schedMount.innerHTML = "";
       chartCard.style.display = "none";
       sensitivityCard.style.display = "none";
@@ -828,13 +946,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       return;
     }
     const model = MODELS[activeIdx];
-    pickerText.textContent = modelTitle(model, lang);
-    buildMethodMenu();
     updatePickerLabel();
+    updateMethodDesc();
     if (model.modes) {
       if (!currentMode || !model.modes.some((m) => m.key === currentMode)) {
-        currentMode = (initialInputs && initialInputs._mode)
-          || (initialInputs && segments && segments.enabled ? "segment" : (initialInputs ? "revenue" : (model.defaultMode || model.modes[0].key)));
+        currentMode = (seedInputs && seedInputs._mode)
+          || (seedInputs && segments && segments.enabled ? "segment" : (seedInputs ? "revenue" : (model.defaultMode || model.modes[0].key)));
         if (!model.modes.some((m) => m.key === currentMode)) currentMode = model.modes[0].key;
       }
     } else { currentMode = null; }
@@ -1008,7 +1125,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       if (fieldEls.taxRate) macroInputs.push(fieldEls.taxRate.input);
       if (section._refresh) macroInputs.forEach((i) => i.addEventListener("input", section._refresh));
     }
-    formWrap.appendChild(noteWrap);
+
     recompute();
   }
 

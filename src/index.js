@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { signToken, verifyToken } from "./auth.js";
 import { validateItem, rowToItem } from "./items.js";
-import { parseTencentQuotes, parseTencentHints } from "./quotes.js";
+import { parseTencentQuotes, parseTencentHints, parseTencentStatics, parseTencentPrevClose, logoTicker } from "./quotes.js";
 import { fetchLongbridgeQuotes, fetchLongbridgeNames, fetchLongbridgeFinancials, pickLatestAnnual, fetchValuationRefs } from "./longbridge.js";
 import { fetchDeductedNetIncome } from "./eastmoney.js";
 import { fetchAdjustedEps } from "./finnhub.js";
@@ -42,10 +42,13 @@ app.get("/api/config", async (c) => {
   const { results } = await c.env.DB.prepare("SELECT * FROM items WHERE user_id=? ORDER BY sort_order ASC, id ASC").bind(user.id).all();
   return c.json({ board: { slug: user.board_slug, name: user.board_name }, items: (results || []).map(rowToItem), settings: await readSettings(c.env.DB, user.id) });
 });
+// 一次请求同时取现价与昨收（昨收用于前端算当日涨跌）
 async function tencentQuotes(symbols) {
-  if (!symbols.length) return {};
-  try { return parseTencentQuotes(await fetchGbk("https://qt.gtimg.cn/q=" + symbols.join(",")), symbols); }
-  catch { return {}; }
+  if (!symbols.length) return { quotes: {}, prevClose: {} };
+  try {
+    const text = await fetchGbk("https://qt.gtimg.cn/q=" + symbols.join(","));
+    return { quotes: parseTencentQuotes(text, symbols), prevClose: parseTencentPrevClose(text, symbols) };
+  } catch { return { quotes: {}, prevClose: {} }; }
 }
 app.get("/api/quotes", async (c) => {
   const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim()).filter((s) => s && s.length <= 16).slice(0, 50);
@@ -56,13 +59,15 @@ app.get("/api/quotes", async (c) => {
     try { quotes = await fetchLongbridgeQuotes(c.env, symbols); source = "longbridge"; }
     catch (e) { console.error("longbridge failed, fall back to tencent:", e && e.message); quotes = {}; source = "tencent"; }
   }
-  const missing = symbols.filter((s) => !(s in quotes));
-  if (missing.length) Object.assign(quotes, await tencentQuotes(missing));
+  // 腾讯总要请求一次：补长桥缺漏的价格，并提供昨收（长桥行情接口不返回昨收）
+  const tc = await tencentQuotes(symbols);
+  for (const s of symbols) if (!(s in quotes) && s in tc.quotes) quotes[s] = tc.quotes[s];
   c.header("Cache-Control", "no-store"); // 实时行情不缓存
   if (!Object.keys(quotes).length) return c.json({ quotes: {}, error: "upstream unreachable", ts: new Date().toISOString() }, 502);
-  return c.json({ quotes, source, ts: new Date().toISOString() });
+  return c.json({ quotes, prevClose: tc.prevClose, source, ts: new Date().toISOString() });
 });
-// 标的中英文名（用于切语言时显示对应名）。仅长桥提供，缺则返回空、前端回退已存名。
+// 标的中英文名 + 静态信息（总股本、TTM EPS 等，估值计算器要用）。优先长桥；长桥未配置或缺项的，用腾讯行情串补
+// （英文名美股/港股有、A 股没有；总股本/币种/TTM EPS 三市场都有）。只补缺项，不覆盖长桥已给的值。
 app.get("/api/names", async (c) => {
   const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim()).filter((s) => s && s.length <= 16).slice(0, 50);
   if (!symbols.length) return c.json({ names: {} });
@@ -71,8 +76,35 @@ app.get("/api/names", async (c) => {
     try { names = await fetchLongbridgeNames(c.env, symbols); }
     catch (e) { console.error("longbridge names failed:", e && e.message); names = {}; }
   }
+  const missing = symbols.filter((s) => !(names[s] && names[s].en && Number(names[s].totalShares) > 0 && Number(names[s].high52) > 0));
+  if (missing.length) {
+    let tc = {};
+    try { tc = parseTencentStatics(await fetchGbk("https://qt.gtimg.cn/q=" + missing.join(",")), missing); } catch { tc = {}; }
+    for (const s of missing) {
+      if (!tc[s]) continue;
+      const cur = names[s] || {};
+      const pick = (k) => (cur[k] !== undefined && cur[k] !== null && cur[k] !== "" && !(typeof cur[k] === "number" && !Number.isFinite(cur[k])) ? cur[k] : tc[s][k]);
+      names[s] = { ...cur, cn: pick("cn"), en: pick("en"), currency: pick("currency"),
+        totalShares: Number(cur.totalShares) > 0 ? cur.totalShares : tc[s].totalShares, epsTtm: pick("epsTtm"),
+        peTtm: pick("peTtm"), high52: pick("high52"), low52: pick("low52") };
+    }
+  }
   c.header("Cache-Control", "public, max-age=86400"); // 名称基本不变，可缓存一天
   return c.json({ names });
+});
+// 标的 logo：代理 FinancialModelingPrep 的公开图片（免 key，美/港/A 股都有），浏览器只请求本站，
+// 避免把用户看了哪些股票直接暴露给第三方；成功缓存 7 天，找不到返回 404（前端退回首字母头像）。
+app.get("/api/logo", async (c) => {
+  const t = logoTicker((c.req.query("symbol") || "").trim());
+  if (!t) return c.body(null, 404);
+  try {
+    const res = await fetch(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(t)}.png`, { cf: { cacheTtl: 604800, cacheEverything: true } });
+    const type = res.headers.get("content-type") || "";
+    if (!res.ok || !type.startsWith("image/")) return c.body(null, 404, { "Cache-Control": "public, max-age=86400" });
+    return new Response(res.body, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=604800" } });
+  } catch {
+    return c.body(null, 404);
+  }
 });
 // 财报（Fundamental）：按需取 + 缓存一天。无凭据/无权限 → financials:null（前端优雅降级）。
 app.get("/api/financials", async (c) => {
