@@ -1,7 +1,9 @@
 // 估值工作台的 AI 助手：和用户聊估值假设，回复末尾附一个 ```json 代码块给出建议参数，前端预览后一键应用。
 // 不依赖各家的原生 tool calling（Workers AI 开源模型支持参差），统一用「约定格式的 JSON 代码块」，三种协议通用。
 //
-// 模型服务（站点级配置，wrangler.toml [vars] / secret）：
+import { encryptJson, decryptJson } from "./crypto.js";
+
+// 模型服务：用户可在设置页选自己的（ai_settings 表，见 userAi()）；没设置就用站点默认（wrangler.toml [vars] / secret）：
 //   AI_PROVIDER  workers-ai（默认，用 [ai] 绑定，无需 Key）| openai（OpenAI 兼容协议）| anthropic
 //   AI_MODEL     模型名；不填按协议取默认
 //   AI_BASE_URL  openai / anthropic 协议的接口地址（可指向任意兼容服务）
@@ -21,9 +23,15 @@ export function aiConfig(env) {
   return { provider, model: env.AI_MODEL || d.model, baseUrl: (env.AI_BASE_URL || d.baseUrl || "").replace(/\/+$/, ""), apiKey: env.AI_API_KEY || "" };
 }
 
-// messages: [{ role: "user"|"assistant", content }]；返回模型回复文本
-export async function chatComplete(env, system, messages, fetchImpl = fetch) {
-  const cfg = aiConfig(env);
+// 推理类模型会把思考过程包在 <think> 里，只留最终回答
+const clean = (t) => t.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
+// messages: [{ role: "user"|"assistant", content }]；返回模型回复文本。cfg 不传则用站点默认
+export async function chatComplete(env, system, messages, fetchImpl = fetch, cfgIn = null) {
+  const text = await rawComplete(env, system, messages, fetchImpl, cfgIn || aiConfig(env));
+  return clean(text);
+}
+async function rawComplete(env, system, messages, fetchImpl, cfg) {
   if (cfg.provider === "workers-ai") {
     if (!env.AI || typeof env.AI.run !== "function") throw new Error("Workers AI binding (AI) is not configured");
     const out = await env.AI.run(cfg.model, { messages: [{ role: "system", content: system }, ...messages], max_tokens: MAX_TOKENS });
@@ -260,6 +268,54 @@ export function parseReview(text, fields) {
   return { overall: obj.overall, summary: typeof obj.summary === "string" ? obj.summary.slice(0, 400) : "", checks };
 }
 
+// ── 用户自己的模型设置 ──
+// Workers AI 可选的模型（不用 Key，走站点的 Workers AI 额度）
+export const WORKERS_MODELS = [
+  { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", label: "Llama 3.3 70B" },
+  { id: "@cf/meta/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout 17B" },
+  { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", label: "Mistral Small 3.1 24B" },
+];
+const MODEL_RE = /^[\w@.:\/-]{1,100}$/;
+function cleanBaseUrl(raw) {
+  let u; try { u = new URL(String(raw || "").trim()); } catch { return null; }
+  if (u.protocol !== "https:" || u.username || u.password || String(raw).length > 300) return null;
+  return u.toString().replace(/\/+$/, "");
+}
+// → { error } | { value: { provider, model, baseUrl, apiKey } }；apiKey: undefined = 沿用已存的
+export function validateAiSettings(b) {
+  if (!b || typeof b !== "object") return { error: "bad body" };
+  const provider = b.provider;
+  if (provider === "default") return { value: { provider } };
+  if (!["workers-ai", "openai", "anthropic"].includes(provider)) return { error: "bad provider" };
+  const model = typeof b.model === "string" ? b.model.trim() : "";
+  if (provider === "workers-ai") {
+    const m = model || WORKERS_MODELS[0].id;
+    if (!WORKERS_MODELS.some((x) => x.id === m)) return { error: "unsupported Workers AI model" };
+    return { value: { provider, model: m, baseUrl: "", apiKey: "" } };
+  }
+  if (!MODEL_RE.test(model)) return { error: "model required" };
+  let baseUrl = "";
+  if (b.baseUrl || provider === "openai") { baseUrl = cleanBaseUrl(b.baseUrl); if (!baseUrl) return { error: "base URL must be https" }; }
+  let apiKey;
+  if (b.apiKey !== undefined && b.apiKey !== "") {
+    if (typeof b.apiKey !== "string" || b.apiKey.length > 500 || /\s/.test(b.apiKey.trim())) return { error: "bad api key" };
+    apiKey = b.apiKey.trim();
+  }
+  return { value: { provider, model, baseUrl, apiKey } };
+}
+async function readAiRow(env, uid) {
+  try { return await env.DB.prepare("SELECT * FROM ai_settings WHERE user_id=?").bind(uid).first(); } catch { return null; } // 线上还没跑迁移时当作没设置
+}
+// 当前用户实际用的配置；own = 用的是自己的 Key（不占站点每日额度）
+export async function userAi(env, uid) {
+  const row = await readAiRow(env, uid);
+  if (!row) return { cfg: aiConfig(env), own: false };
+  if (row.provider === "workers-ai") return { cfg: { provider: "workers-ai", model: row.model || WORKERS_MODELS[0].id, baseUrl: "", apiKey: "" }, own: false };
+  const { apiKey } = row.key_enc ? await decryptJson(env.CREDENTIALS_KEY, row.key_enc) : { apiKey: "" };
+  return { cfg: { provider: row.provider, model: row.model, baseUrl: row.base_url || DEFAULTS[row.provider].baseUrl, apiKey }, own: true };
+}
+const keyHint = (k) => (k && k.length > 4 ? "…" + k.slice(-4) : "");
+
 // 每人每天的对话次数上限（防刷；计数存在 settings 表的内部键，不在 SETTING_KEYS 白名单里，不会返回给前端）
 export const DAILY_LIMIT = 100;
 async function takeQuota(env, uid) {
@@ -274,46 +330,91 @@ async function takeQuota(env, uid) {
 }
 
 export function registerAi(app, { chat = chatComplete } = {}) {
+  // 用当前用户的模型配置调用；自己的 Key 不占站点每日额度。返回 { text } 或 { res }（错误响应）
+  async function runChat(c, system, messages) {
+    let u;
+    try { u = await userAi(c.env, c.get("uid")); } catch { return { res: c.json({ error: "ai_settings_unreadable", detail: "saved API key can't be decrypted — re-enter it in settings" }, 500) }; }
+    if (!u.own && !(await takeQuota(c.env, c.get("uid")))) return { res: c.json({ error: "daily_limit" }, 429) };
+    try { return { text: await chat(c.env, system, messages, undefined, u.cfg) }; }
+    catch (e) { return { res: c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502) }; }
+  }
+  app.get("/api/my/ai/settings", async (c) => {
+    const row = await readAiRow(c.env, c.get("uid"));
+    let hint = "";
+    if (row && row.key_enc) { try { hint = keyHint((await decryptJson(c.env.CREDENTIALS_KEY, row.key_enc)).apiKey); } catch { hint = ""; } }
+    const site = aiConfig(c.env);
+    c.header("Cache-Control", "no-store");
+    return c.json({
+      settings: row ? { provider: row.provider, model: row.model, baseUrl: row.base_url, hasKey: !!row.key_enc, keyHint: hint } : { provider: "default", model: "", baseUrl: "", hasKey: false, keyHint: "" },
+      site: { provider: site.provider, model: site.model },
+      workersModels: WORKERS_MODELS,
+    });
+  });
+  // 合并出要保存 / 测试的配置：没填新 Key 时沿用已存的（仅限同一协议）
+  async function mergeSettings(c, value) {
+    const row = await readAiRow(c.env, c.get("uid"));
+    let apiKey = value.apiKey;
+    if (apiKey === undefined && row && row.provider === value.provider && row.key_enc) apiKey = (await decryptJson(c.env.CREDENTIALS_KEY, row.key_enc)).apiKey;
+    if ((value.provider === "openai" || value.provider === "anthropic") && !apiKey) return { error: "api key required" };
+    return { cfg: { provider: value.provider, model: value.model, baseUrl: value.baseUrl || (DEFAULTS[value.provider] && DEFAULTS[value.provider].baseUrl) || "", apiKey: apiKey || "" } };
+  }
+  app.put("/api/my/ai/settings", async (c) => {
+    const v = validateAiSettings(await c.req.json().catch(() => null));
+    if (v.error) return c.json({ error: v.error }, 400);
+    const uid = c.get("uid");
+    if (v.value.provider === "default") { await c.env.DB.prepare("DELETE FROM ai_settings WHERE user_id=?").bind(uid).run(); return c.json({ ok: true }); }
+    let m; try { m = await mergeSettings(c, v.value); } catch { return c.json({ error: "saved key unreadable, enter it again" }, 400); }
+    if (m.error) return c.json({ error: m.error }, 400);
+    const enc = m.cfg.apiKey ? await encryptJson(c.env.CREDENTIALS_KEY, { apiKey: m.cfg.apiKey }) : null;
+    await c.env.DB.prepare("INSERT INTO ai_settings (user_id, provider, model, base_url, key_enc, updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET provider=excluded.provider, model=excluded.model, base_url=excluded.base_url, key_enc=excluded.key_enc, updated_at=excluded.updated_at")
+      .bind(uid, m.cfg.provider, m.cfg.model, v.value.baseUrl || "", enc, new Date().toISOString()).run();
+    return c.json({ ok: true });
+  });
+  // 测试连接：用表单里（还没保存）的配置发一条最小请求
+  app.post("/api/my/ai/settings/test", async (c) => {
+    const v = validateAiSettings(await c.req.json().catch(() => null));
+    if (v.error) return c.json({ error: v.error }, 400);
+    let cfg, own = false;
+    if (v.value.provider === "default") cfg = aiConfig(c.env);
+    else {
+      let m; try { m = await mergeSettings(c, v.value); } catch { return c.json({ error: "saved key unreadable, enter it again" }, 400); }
+      if (m.error) return c.json({ error: m.error }, 400);
+      cfg = m.cfg; own = cfg.provider !== "workers-ai";
+    }
+    if (!own && !(await takeQuota(c.env, c.get("uid")))) return c.json({ error: "daily_limit" }, 429);
+    const t0 = Date.now();
+    try {
+      const text = await chat(c.env, "You are a connectivity check. Reply with exactly: OK", [{ role: "user", content: "ping" }], undefined, cfg);
+      return c.json({ ok: true, reply: String(text).slice(0, 80), ms: Date.now() - t0, model: cfg.model });
+    } catch (e) {
+      return c.json({ ok: false, error: String(e && e.message || e).slice(0, 300) });
+    }
+  });
   app.post("/api/my/ai/valuation", async (c) => {
     const body = await c.req.json().catch(() => null);
     const err = validateChat(body);
     if (err) return c.json({ error: err }, 400);
-    if (!(await takeQuota(c.env, c.get("uid")))) return c.json({ error: "daily_limit" }, 429);
     const lang = body.lang === "en" ? "en" : "zh";
-    let text;
-    try {
-      text = await chat(c.env, buildSystemPrompt(body.context, lang), body.messages.map((m) => ({ role: m.role, content: m.content })));
-    } catch (e) {
-      return c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502);
-    }
+    const { text, res } = await runChat(c, buildSystemPrompt(body.context, lang), body.messages.map((m) => ({ role: m.role, content: m.content })));
+    if (res) return res;
     return c.json(parseSuggestion(text, body.context.fields));
   });
   app.post("/api/my/ai/method", async (c) => {
     const body = await c.req.json().catch(() => null);
     const err = validateMethodReq(body);
     if (err) return c.json({ error: err }, 400);
-    if (!(await takeQuota(c.env, c.get("uid")))) return c.json({ error: "daily_limit" }, 429);
     const lang = body.lang === "en" ? "en" : "zh";
-    let text;
-    try {
-      text = await chat(c.env, buildMethodPrompt(body, lang), [{ role: "user", content: lang === "en" ? "Which valuation methods fit this company?" : "这家公司适合用哪些估值方法？" }]);
-    } catch (e) {
-      return c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502);
-    }
+    const { text, res } = await runChat(c, buildMethodPrompt(body, lang), [{ role: "user", content: lang === "en" ? "Which valuation methods fit this company?" : "这家公司适合用哪些估值方法？" }]);
+    if (res) return res;
     return c.json(parsePicks(text, body.methods));
   });
   app.post("/api/my/ai/review", async (c) => {
     const body = await c.req.json().catch(() => null);
     const err = validateReviewReq(body);
     if (err) return c.json({ error: err }, 400);
-    if (!(await takeQuota(c.env, c.get("uid")))) return c.json({ error: "daily_limit" }, 429);
     const lang = body.lang === "en" ? "en" : "zh";
-    let text;
-    try {
-      text = await chat(c.env, buildReviewPrompt(body, lang), [{ role: "user", content: lang === "en" ? "Do the assumptions of this valuation still hold?" : "这张估值卡的假设还成立吗？" }]);
-    } catch (e) {
-      return c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502);
-    }
+    const { text, res } = await runChat(c, buildReviewPrompt(body, lang), [{ role: "user", content: lang === "en" ? "Do the assumptions of this valuation still hold?" : "这张估值卡的假设还成立吗？" }]);
+    if (res) return res;
     const review = parseReview(text, body.fields);
     if (!review) return c.json({ error: "bad_ai_output" }, 502);
     return c.json({ review: { ...review, at: new Date().toISOString() } });

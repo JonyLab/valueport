@@ -77,3 +77,11 @@ CREATE TABLE IF NOT EXISTS portfolio_plans (
   plan        TEXT    NOT NULL,                -- {targets:{symbol:pct}, cash:pct|null, band:pp, rel:%}
   updated_at  TEXT    NOT NULL
 );
+CREATE TABLE IF NOT EXISTS ai_settings (
+  user_id     INTEGER PRIMARY KEY,
+  provider    TEXT    NOT NULL,                -- workers-ai | openai | anthropic
+  model       TEXT    NOT NULL DEFAULT '',
+  base_url    TEXT    NOT NULL DEFAULT '',
+  key_enc     TEXT,
+  updated_at  TEXT    NOT NULL
+);

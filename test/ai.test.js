@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { env, SELF, fetchMock } from "cloudflare:test";
-import { aiConfig, chatComplete, validateChat, buildSystemPrompt, parseSuggestion, validateMethodReq, parsePicks } from "../src/ai.js";
+import { validateAiSettings, aiConfig, chatComplete, validateChat, buildSystemPrompt, parseSuggestion, validateMethodReq, parsePicks } from "../src/ai.js";
 
 beforeAll(async () => {
   const ddl = [
     `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, pass_hash TEXT NOT NULL, pass_salt TEXT NOT NULL, board_slug TEXT NOT NULL UNIQUE, board_name TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS settings (user_id INTEGER NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (user_id, key))`,
+    `CREATE TABLE IF NOT EXISTS ai_settings (user_id INTEGER PRIMARY KEY, provider TEXT NOT NULL, model TEXT NOT NULL DEFAULT '', base_url TEXT NOT NULL DEFAULT '', key_enc TEXT, updated_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS activation_codes (code TEXT PRIMARY KEY, used_by INTEGER, created_at TEXT NOT NULL, used_at TEXT)`,
   ];
   for (const q of ddl) await env.DB.prepare(q).run();
@@ -181,5 +182,55 @@ describe("AI review", () => {
     expect(typeof j.review.at).toBe("string");
     fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, { choices: [{ message: { content: "随便聊聊" } }] });
     expect((await SELF.fetch("https://x/api/my/ai/review", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) })).status).toBe(502);
+  });
+});
+
+describe("per-user AI settings", () => {
+  const S = (ck, method, body, path = "/api/my/ai/settings") => SELF.fetch("https://x" + path, { method, headers: { ...J, cookie: ck }, body: body ? JSON.stringify(body) : undefined });
+  it("validates provider, model, https base URL and key", () => {
+    expect(validateAiSettings({ provider: "default" }).value).toEqual({ provider: "default" });
+    expect(validateAiSettings({ provider: "workers-ai", model: "@cf/evil/model" }).error).toBeTruthy();
+    expect(validateAiSettings({ provider: "workers-ai" }).value.model).toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+    expect(validateAiSettings({ provider: "openai", model: "gpt-x", baseUrl: "http://insecure.test/v1", apiKey: "k" }).error).toMatch(/https/);
+    expect(validateAiSettings({ provider: "openai", model: "gpt-x", baseUrl: "https://u:p@x.test/v1", apiKey: "k" }).error).toMatch(/https/);
+    expect(validateAiSettings({ provider: "anthropic", model: "", apiKey: "k" }).error).toMatch(/model/);
+    expect(validateAiSettings({ provider: "anthropic", model: "claude-x", apiKey: "a b" }).error).toMatch(/key/);
+    expect(validateAiSettings({ provider: "openai", model: "m", baseUrl: "https://x.test/v1/", apiKey: " sk-1 " }).value).toEqual({ provider: "openai", model: "m", baseUrl: "https://x.test/v1", apiKey: "sk-1" });
+  });
+  it("stores the key encrypted, never returns it, uses it for chats and skips the site quota", async () => {
+    const ck = await userCookie("aiset1");
+    expect((await (await S(ck, "GET")).json()).settings.provider).toBe("default");
+    expect((await S(ck, "PUT", { provider: "openai", model: "my-model", baseUrl: "https://user-llm.test/v1" })).status).toBe(400); // 没有 Key
+    expect((await S(ck, "PUT", { provider: "openai", model: "my-model", baseUrl: "https://user-llm.test/v1", apiKey: "sk-user-9876" })).status).toBe(200);
+    const g = await (await S(ck, "GET")).json();
+    expect(JSON.stringify(g)).not.toContain("sk-user-9876");
+    expect(g.settings).toMatchObject({ provider: "openai", model: "my-model", baseUrl: "https://user-llm.test/v1", hasKey: true, keyHint: "…9876" });
+    const uid = (await env.DB.prepare("SELECT id FROM users WHERE username='aiset1'").first()).id;
+    expect((await env.DB.prepare("SELECT key_enc FROM ai_settings WHERE user_id=?").bind(uid).first()).key_enc).not.toContain("9876");
+    // 改模型不重填 Key：沿用已存的
+    expect((await S(ck, "PUT", { provider: "openai", model: "my-model-2", baseUrl: "https://user-llm.test/v1" })).status).toBe(200);
+    // 站点额度用完也不影响自己的 Key
+    await env.DB.prepare("INSERT INTO settings (user_id,key,value) VALUES (?, '_ai_usage', ?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value").bind(uid, new Date().toISOString().slice(0, 10) + ":100").run();
+    let sent = null;
+    fetchMock.get("https://user-llm.test").intercept({ path: "/v1/chat/completions", method: "POST", body: (b) => { sent = JSON.parse(b); return true; } })
+      .reply(200, { choices: [{ message: { content: "<think>hmm</think>好的。" } }] });
+    const r = await post(ck, { messages: [{ role: "user", content: "hi" }], context: CONTEXT });
+    expect(r.status).toBe(200);
+    expect((await r.json()).reply).toBe("好的。"); // 去掉推理模型的 <think>
+    expect(sent.model).toBe("my-model-2");
+    // 恢复站点默认
+    expect((await S(ck, "PUT", { provider: "default" })).status).toBe(200);
+    expect((await (await S(ck, "GET")).json()).settings.provider).toBe("default");
+    expect((await post(ck, { messages: [{ role: "user", content: "hi" }], context: CONTEXT })).status).toBe(429); // 回到站点额度
+  });
+  it("tests a connection without saving it", async () => {
+    const ck = await userCookie("aiset2");
+    fetchMock.get("https://try-llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, { choices: [{ message: { content: "OK" } }] });
+    const ok = await (await S(ck, "POST", { provider: "openai", model: "m1", baseUrl: "https://try-llm.test/v1", apiKey: "sk-t" }, "/api/my/ai/settings/test")).json();
+    expect(ok).toMatchObject({ ok: true, reply: "OK", model: "m1" });
+    fetchMock.get("https://try-llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(401, { error: { message: "invalid api key" } });
+    const bad = await (await S(ck, "POST", { provider: "openai", model: "m1", baseUrl: "https://try-llm.test/v1", apiKey: "sk-t" }, "/api/my/ai/settings/test")).json();
+    expect(bad).toEqual({ ok: false, error: "invalid api key" });
+    expect((await (await S(ck, "GET")).json()).settings.provider).toBe("default"); // 测试不会保存
   });
 });

@@ -204,6 +204,7 @@ Setup for an existing deployment:
 npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-portfolio.sql
 npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-portfolio-history.sql
 npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-portfolio-plan.sql
+npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-ai-settings.sql
 # 2. Encryption key for broker credentials (32 random bytes, base64). Keep it stable: rotating it makes stored credentials unreadable.
 openssl rand -base64 32 | npx wrangler secret put CREDENTIALS_KEY
 ```
@@ -214,7 +215,9 @@ For local dev, add `CREDENTIALS_KEY = "<base64 32 bytes>"` to `.dev.vars` and ru
 
 Both AI features are grounded: `public/shared/valuation/facts.js` turns the annual reports into verified statements (revenue trend, loss years, negative free-cash-flow years, earnings / cash-flow stability verdicts, capex jumps, net cash, dividend record — "no dividend record found" when neither the dividend history nor the quote has one), and the prompts require every claim about stability, dividends, growth or debt to match them. The method picker has **Ask AI to recommend**: the model reads the company's business and financials and marks one primary method plus one or two cross-checks on the method cards (cached per stock for the session). Each saved valuation card has **AI review**: it sends the card's assumptions with the verified facts, the latest actuals (`latestMetrics`) and code-computed comparisons of each assumption against the latest value (`assumptionChecks`: below both cases / between / above both — the model only explains, it doesn't compare numbers) and stores the verdict on the card as `review` (validated in `src/items.js`). The valuation workbench has an **Ask AI** drawer: chat about the stock, and the model returns suggested inputs for the current method (conservative / optimistic, with reasons) that you preview and apply to the form with one click (undoable). The server sends the model the stock, the known financials and the current method's fields; the model replies with prose plus a ```json block, which `src/ai.js` validates against the field list. No native tool calling is needed, so any provider works.
 
-Provider is configured site-wide:
+**Per-user model.** Each user can pick their own model under board settings → **AI model**: the site default, one of a few Workers AI models (no key, shares the site quota), any OpenAI-compatible endpoint, or Anthropic. Keys are encrypted with `CREDENTIALS_KEY` in `ai_settings` and never returned (only the last four characters); requests on the user's own key skip the site's daily limit. Base URLs must be https. "Test connection" sends one tiny request with the unsaved form values.
+
+The site default provider is configured with:
 
 | Var | Default | Notes |
 |-----|---------|-------|
@@ -223,7 +226,7 @@ Provider is configured site-wide:
 | `AI_BASE_URL` | Official endpoint | For `openai` / `anthropic`; point at any compatible service |
 | `AI_API_KEY` | — | Secret, for `openai` / `anthropic`: `npx wrangler secret put AI_API_KEY` |
 
-Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`. Each user gets 100 AI messages per day. Workers AI runs on your Cloudflare account even in `wrangler dev`, so local chats count toward usage.
+Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`. Each user gets 100 AI messages per day on the site default / Workers AI. Workers AI runs on your Cloudflare account even in `wrangler dev`, so local chats count toward usage.
 
 ## API Reference
 
@@ -276,6 +279,9 @@ Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | `/api/my/ai/settings` | `{settings: {provider, model, baseUrl, hasKey, keyHint}, site: {provider, model}, workersModels}` — never the key |
+| PUT | `/api/my/ai/settings` | `{provider: "default"\|"workers-ai"\|"openai"\|"anthropic", model, baseUrl, apiKey?}`; omit `apiKey` to keep the saved one |
+| POST | `/api/my/ai/settings/test` | Same body; sends one tiny request without saving → `{ok, reply, ms, model}` or `{ok: false, error}` |
 | POST | `/api/my/ai/review` | `{lang, stock, method, valuedAt, fields, result:{low,high,price}, verified, metrics, comparisons}` → `{review:{overall: "hold"\|"watch"\|"broken", summary, checks:[{k, status, reason}], at}}`; 502 `bad_ai_output` if the model ignores the format; shares the daily limit |
 | POST | `/api/my/ai/method` | `{lang, stock, facts, methods:[{key,title,subtitle}]}` → `{reply, picks:[{key, role: "primary"\|"check", reason}]}`; shares the daily limit |
 | POST | `/api/my/ai/valuation` | `{lang, messages:[{role,content}], context:{stock, method, mode, fields, facts}}` → `{reply, params, reasons}`; 429 after 100/day, 502 if the provider fails |

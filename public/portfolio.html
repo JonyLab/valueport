@@ -21,7 +21,7 @@
   /* 总资产 */
   .pf-total-lab{font-size:13px;color:var(--ink-mute)}
   .pf-total{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-top:6px}
-  .pf-total-num{font-size:clamp(46px,6vw,72px);font-weight:400;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
+  .pf-total-num{font-size:clamp(36px,3.6vw,48px);font-weight:400;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
   .pf-total-cur{font-size:18px;color:var(--ink-mute)}
   .pf-day{font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--ink-mute)}
   .pf-day.up,.pf-pnl.up{color:var(--green)} .pf-day.down,.pf-pnl.down{color:var(--red)}
@@ -81,26 +81,28 @@
   .pf-info:hover,.pf-info:focus{color:var(--ink);outline:none}
   .pf-warn{color:#a4561a}
   /* 账户胶囊条 */
-  .pf-accs{display:flex;align-items:center;gap:12px;margin-top:20px;padding-top:18px;border-top:1px dashed var(--border)}
-  .pf-accs-lab{flex:none;font-size:13px;color:var(--ink-mute)}
-  .pf-accs-row{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+  .pf-total-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .pf-total-top .pf-total-lab{padding-top:8px}
+  .pf-accs{min-width:0}
+  .pf-accs-row{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;min-width:0}
+  .pf-hold-tabs{width:fit-content;max-width:100%;overflow-x:auto;margin:-6px 0 12px;scrollbar-width:none}
   .pf-acc-chipwrap{position:relative}
-  .pf-acc-chip{display:inline-flex;align-items:center;gap:9px;height:44px;padding:0 14px 0 5px;border:0;border-radius:var(--r-pill);background:rgba(29,29,27,.045);cursor:pointer;font-family:var(--font);color:var(--ink);text-align:left}
+  .pf-acc-chip{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px 0 4px;border:0;border-radius:var(--r-pill);background:rgba(29,29,27,.045);cursor:pointer;font-family:var(--font);color:var(--ink);text-align:left}
   .pf-acc-chip:hover{background:rgba(29,29,27,.08)}
   .pf-acc-chip.err{box-shadow:inset 0 0 0 1px rgba(198,65,65,.35)}
   .pf-acc-chip.err > i{color:var(--red);font-size:15px}
   .pf-acc-chip.busy{opacity:.6;pointer-events:none}
-  .pf-acc-chip .pf-acc-ico{width:34px;height:34px;font-size:15px}
+  .pf-acc-chip .pf-acc-ico{width:28px;height:28px;font-size:13px}
   .pf-acc-txt{display:flex;flex-direction:column;gap:1px;min-width:0}
-  .pf-acc-chip .pf-acc-name{font-size:13px;max-width:160px}
-  .pf-acc-chip .pf-acc-v{font-size:12px;color:var(--ink-mute);font-variant-numeric:tabular-nums;letter-spacing:0}
-  .pf-acc-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:20;display:flex;flex-direction:column;gap:2px;min-width:220px;padding:6px;background:#fff;border-radius:var(--r-md);
+  .pf-acc-chip .pf-acc-name{font-size:12.5px;max-width:140px;line-height:1.2}
+  .pf-acc-chip .pf-acc-v{font-size:11px;line-height:1.2;color:var(--ink-mute);font-variant-numeric:tabular-nums;letter-spacing:0}
+  .pf-acc-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:20;display:flex;flex-direction:column;gap:2px;min-width:220px;padding:6px;background:#fff;border-radius:var(--r-md);
     box-shadow:0 1px 2px rgba(60,50,20,.06),0 16px 36px -14px rgba(60,50,20,.35)}
   .pf-acc-menu[hidden]{display:none}
   .pf-acc-menu-meta{padding:6px 10px 4px;font-size:12px;line-height:1.55;color:var(--ink-mute);white-space:pre-line}
   .pf-acc-menu button{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border:0;border-radius:var(--r-sm);background:none;cursor:pointer;font-family:var(--font);font-size:13.5px;color:var(--ink);text-align:left}
   .pf-acc-menu button:hover{background:var(--track)}
-  .pf-acc-add{display:inline-flex;align-items:center;gap:5px;height:44px;padding:0 16px;border:1.5px dashed rgba(29,29,27,.2);border-radius:var(--r-pill);background:none;cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink-soft)}
+  .pf-acc-add{display:inline-flex;align-items:center;gap:4px;height:36px;padding:0 13px;border:1.5px dashed rgba(29,29,27,.2);border-radius:var(--r-pill);background:none;cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink-soft)}
   .pf-acc-add:hover{color:var(--ink);border-color:rgba(29,29,27,.35)}
   /* 仓位体检 */
   .pf-checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:8px}
@@ -178,7 +180,7 @@
   @media (max-width:1100px){ .pf-grid{grid-template-columns:1fr} }
   @media (max-width:640px){
     .pf-stats{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:16px}
-    .pf-accs{flex-direction:column;align-items:flex-start}
+    .pf-accs-row{justify-content:flex-start}
     .pf-stat:nth-child(3){padding-left:0;border-left:0}
     .pf-card{padding:18px 16px}
     .pf-brokers{grid-template-columns:1fr}
@@ -526,7 +528,10 @@ function totalCard(s) {
   info.title = T(`行情：${data.source === "longbridge" ? "长桥实时" : "腾讯延时"} · 汇率：欧洲央行参考价`, `Quotes: ${data.source === "longbridge" ? "Longbridge live" : "Tencent delayed"} · FX: ECB reference`);
   info.setAttribute("aria-label", info.title); info.tabIndex = 0;
   lab.appendChild(info);
-  c.appendChild(lab);
+  // 第一行：左「总资产」，右上角一排账户胶囊（省出单独一行）
+  const top = el("div", "pf-total-top");
+  top.append(lab, accountsStrip(s));
+  c.appendChild(top);
   const row = el("div", "pf-total");
   const num = el("span", "pf-total-num"); setNum(num, amt(s.total));
   // 币种单位即切换：点「CNY ▾」下拉选 USD / HKD / CNY
@@ -556,7 +561,6 @@ function totalCard(s) {
   if (s.missingFx.length) warns.push(T(`缺少汇率：${s.missingFx.join("、")}，相关金额未计入。`, `Missing FX rate for ${s.missingFx.join(", ")}; those amounts are excluded.`));
   if (s.noPrice) warns.push(T(`${s.noPrice} 只持仓暂无报价，未计入市值。`, `${s.noPrice} holding(s) have no quote and are excluded.`));
   if (warns.length) c.appendChild(el("div", "pf-note pf-warn", warns.join(" ")));
-  c.appendChild(accountsStrip(s)); // 账户不再单独一个模块：一排账户胶囊，点开是管理菜单
   c.appendChild(curveSection());   // 资产曲线并进总资产卡
   return c;
 }
@@ -750,17 +754,31 @@ function healthCard(s) {
 
 // 持仓表（并入目标仓位）：设了目标后多出「目标 / 偏离」与「建议」两列，占比格里画「当前 vs 目标 + 容忍带」小条；
 // 设了目标但还没持有的标的作为「计划建仓」行，现金目标单独一行
-function holdingsCard(s) {
-  const pv = s.plan, planOn = pv.active;
+let holdTab = 0; // 持仓卡的账户 tab：0 = 全部（跨重绘保留）
+function holdingsCard(sAll) {
+  // 单个账户：只看这个账户的持仓与账户内占比；目标仓位是整个组合的设定，单账户视图不显示目标列
+  const acc = holdTab ? data.accounts.find((a) => a.id === holdTab) : null;
+  if (!acc) holdTab = 0;
+  const s = acc ? summarize({ ...data, accounts: [acc], holdings: data.holdings.filter((h) => h.accountId === acc.id), cash: data.cash.filter((x) => x.accountId === acc.id) }) : sAll;
+  const pv = acc ? { active: false, rows: [], cash: null, untargeted: [], allocated: 0, plan: sAll.plan.plan } : sAll.plan, planOn = pv.active;
   const c = el("section", "pf-card"); c.id = "pfTarget";
   const head = el("div", "pf-cardhead");
   const ttl = el("div", "pf-titlewrap");
   ttl.append(el("span", "pf-cardtitle", T("持仓", "Holdings")),
     el("span", "pf-cardsub", T(`${s.rows.length} 只 · 金额单位 ${base}`, `${s.rows.length} · amounts in ${base}`) + (planOn ? T(` · 目标容忍带 ±${pv.plan.band}pp 或目标的 ${pv.plan.rel}%`, ` · band ±${pv.plan.band}pp or ${pv.plan.rel}% of target`) : "")));
   const edit = el("button", "btn sm"); edit.type = "button"; edit.append(ri(planOn ? "focus-3-line" : "add-line"), document.createTextNode(planOn ? T("调整目标仓位", "Edit targets") : T("设置目标仓位", "Set targets")));
-  edit.addEventListener("click", () => openPlan(s));
+  edit.addEventListener("click", () => openPlan(sAll));
   head.append(ttl, edit);
   c.appendChild(head);
+  if (data.accounts.length > 1) {
+    const tabs = el("div", "pf-seg pf-hold-tabs");
+    for (const [id, label] of [[0, T("全部", "All")], ...data.accounts.map((a) => [a.id, a.name])]) {
+      const b = el("button", id === holdTab ? "on" : "", label); b.type = "button";
+      b.addEventListener("click", () => { if (holdTab === id) return; holdTab = id; c.replaceWith(holdingsCard(sAll)); });
+      tabs.appendChild(b);
+    }
+    c.appendChild(tabs);
+  }
   const byPlan = new Map(pv.rows.map((r) => [r.symbol, r]));
   // 条的刻度：取所有当前 / 目标上沿中的最大值
   const max = Math.max(10, ...s.rows.map((r) => (Number.isFinite(r.value) && s.total ? r.value / s.total * 100 : 0)), ...pv.rows.map((r) => r.tgt + r.tol), pv.cash ? pv.cash.tgt + pv.cash.tol : 0) * 1.08;
@@ -1064,7 +1082,6 @@ function distCard(s) {
 // 账户：总资产卡底部一排胶囊（名称 · 资产 · 占比 · 状态），点开是这个账户的管理菜单；占比分布见「资产分布」的账户 tab
 function accountsStrip(s) {
   const wrap = el("div", "pf-accs");
-  wrap.appendChild(el("span", "pf-accs-lab", T("账户", "Accounts")));
   const row = el("div", "pf-accs-row");
   const closeAll = () => row.querySelectorAll(".pf-acc-menu").forEach((m) => { m.hidden = true; });
   for (const a of data.accounts) {
