@@ -107,6 +107,7 @@ const DICT = {
     st_failed: "保存失败",
     /* 分享弹窗 */
     s_title: "分享 · 看板设置",
+    s_title_short: "分享",
     s_share: "分享 / 看板设置",
     s_name: "看板名称",
     s_name_ph: "我的估值看板",
@@ -241,6 +242,7 @@ const DICT = {
     st_saved: "Saved",
     st_failed: "Save failed",
     s_title: "Share · Board settings",
+    s_title_short: "Share",
     s_share: "Share / board settings",
     s_name: "Board name",
     s_name_ph: "My valuation board",

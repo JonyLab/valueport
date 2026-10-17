@@ -822,15 +822,6 @@
   .ai-result{font-size:12.5px;color:var(--ink-mute)}
   .ai-result.ok{color:var(--green)} .ai-result.bad{color:var(--red)}
 
-  .color-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px dashed var(--divider)}
-  .color-row:first-child{border-top:none}
-  .color-row .c-lab{flex:1;font-size:13px;color:var(--ink-soft)}
-  .color-row input[type=color]{width:38px;height:38px;padding:3px;border:0;border-radius:var(--r-pill);background:#fff;cursor:pointer;box-shadow:inset 0 0 0 1px var(--divider)}
-  .color-row input[type=text]{width:104px;height:38px;font-family:var(--mono);font-size:12.5px;font-weight:500;
-    border:0;border-radius:var(--r-pill);padding:0 14px;background:#fff;outline:none;box-shadow:inset 0 0 0 1px var(--divider);
-    transition:box-shadow .15s}
-  .color-row input[type=text]:focus{box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 4px var(--ring)}
-  .color-row input[type=text].bad{border-color:var(--red);box-shadow:0 0 0 3px rgba(226,60,60,.12)}
 
   .share-url{display:flex;gap:8px;align-items:center;margin:6px 0 2px}
   .share-url a{flex:1;min-width:0;height:40px;display:flex;align-items:center;padding:0 16px;
@@ -862,9 +853,6 @@
       </button>
     </nav>
     <div class="topnav-actions" id="topActions">
-      <button class="btn icon hidden" id="btnShare" aria-label="分享 / 看板设置" data-i18n-title="s_share" title="分享列表 / 看板设置">
-        <i class="ri-share-box-line" aria-hidden="true"></i>
-      </button>
       <button class="btn icon hidden" id="btnSettings" data-i18n-title="nav_settings" title="设置" aria-label="设置">
         <i class="ri-equalizer-line" aria-hidden="true"></i>
       </button>
@@ -908,26 +896,39 @@
   <!-- 设置视图（主人模式，由顶部齿轮图标切换） -->
   <div class="view-settings hidden" id="viewSettings">
     <h1 class="set-title" data-i18n="nav_settings">设置</h1>
-    <div class="cfg-block">
-      <div class="cfg-top"><span class="cfg-name" data-i18n="set_text">页面文案</span><span class="save-state" id="setSave"></span></div>
+    <!-- 分享：看板名称 / 公开地址（原「分享 · 看板设置」弹窗并入这里） -->
+    <div class="cfg-block" id="shareCfg">
+      <div class="cfg-top"><span class="cfg-name" data-i18n="s_title_short">分享</span><span class="save-state" id="boardSave"></span></div>
       <div class="cfg-grid">
-        <label class="field full"><span class="f-lab" data-i18n="set_eyebrow">小标题</span>
-          <input id="setEyebrow" class="plain" type="text" autocomplete="off" data-i18n-ph="def_eyebrow" placeholder="市场情绪 · Valuation Pendulum"></label>
-        <label class="field full"><span class="f-lab" data-i18n="set_title">大标题</span>
-          <input id="setTitle" class="plain" type="text" autocomplete="off" data-i18n-ph="def_title" placeholder="估值钟摆看板"></label>
-        <label class="field full"><span class="f-lab" data-i18n="set_sub">说明</span>
-          <textarea id="setSubtitle" data-i18n-ph="def_sub" placeholder="每只标的一只钟摆：指针落位由现价与设定的合理价值区间、安全边际共同决定。市场在两端摆动，钟摆终将回归中点。"></textarea></label>
+        <label class="field"><span class="f-lab" data-i18n="s_name">看板名称</span>
+          <input id="boardName" class="plain" type="text" autocomplete="off" data-i18n-ph="s_name_ph" placeholder="我的估值看板"></label>
+        <label class="field"><span class="f-lab" data-i18n="s_slug">公开地址 Slug</span>
+          <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
       </div>
-      <p class="quote-note" data-i18n="set_text_note">留空即使用默认文案。改动自动保存，本页即时生效。</p>
+      <div class="f-lab" style="margin-top:12px" data-i18n="s_url_lab">纯查看网址（分享给任何人，只能看不能改）</div>
+      <div class="share-url">
+        <a id="boardLink" href="#" target="_blank">…</a>
+        <button class="btn" id="btnCopyUrl" type="button" data-i18n="s_copy">复制</button>
+      </div>
+      <p class="quote-note" data-i18n="s_note">改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。</p>
     </div>
-    <div class="cfg-block">
-      <div class="cfg-top"><span class="cfg-name" data-i18n="set_colors">色块配色</span><span class="save-state" id="colSave"></span></div>
-      <div id="colorRows"></div>
-      <p class="quote-note" data-i18n="set_colors_note">各估值区间的高亮色。用取色器或直接填 #rrggbb，改动自动保存、实时预览；清空恢复默认。</p>
+    <!-- 估值默认值：新添加标的时预填的安全边际 / 泡沫阈值 -->
+    <div class="cfg-block" id="defCfg">
+      <div class="cfg-top"><span class="cfg-name" id="defCfgName">估值默认值</span><span class="save-state" id="defSave"></span></div>
+      <div class="cfg-grid">
+        <label class="field"><span class="f-lab" id="defMosLab">安全边际 %</span><input id="defMos" class="plain" type="number" min="5" max="95" step="1" inputmode="decimal" placeholder="50"></label>
+        <label class="field"><span class="f-lab" id="defExtLab">泡沫阈值 %</span><input id="defExt" class="plain" type="number" min="5" max="300" step="1" inputmode="decimal" placeholder="40"></label>
+      </div>
+      <p class="quote-note" id="defNote"></p>
     </div>
     <div class="cfg-block" id="aiCfg">
       <div class="cfg-top"><span class="cfg-name" id="aiCfgName">AI 模型</span><span class="save-state" id="aiSave"></span></div>
       <div id="aiCfgBody"></div>
+    </div>
+    <!-- 数据：导出自选与估值卡（JSON 备份） -->
+    <div class="cfg-block" id="dataCfg">
+      <div class="cfg-top"><span class="cfg-name" id="dataCfgName">数据</span></div>
+      <div class="ai-acts"><button class="btn" id="btnExport" type="button"></button><span class="ai-result" id="exportNote"></span></div>
     </div>
     <div style="padding:18px 0">
       <button class="btn" id="btnLogout" style="width:100%;justify-content:center" data-i18n="set_logout">退出登录</button>
@@ -960,30 +961,7 @@
 </div>
 
 <!-- 分享 / 看板设置弹窗（主人模式，Watchlist 右上角分享图标打开） -->
-<div class="overlay hidden" id="shareOverlay">
-  <div class="modal" role="dialog" aria-modal="true" aria-label="分享与看板设置">
-    <div class="modal-head">
-      <span class="modal-title" style="font-family:var(--font)" data-i18n="s_title">分享 · 看板设置</span>
-      <span class="save-state" id="boardSave"></span>
-    </div>
-    <div class="cfg-grid">
-      <label class="field full"><span class="f-lab" data-i18n="s_name">看板名称</span>
-        <input id="boardName" class="plain" type="text" autocomplete="off" data-i18n-ph="s_name_ph" placeholder="我的估值看板"></label>
-      <label class="field full"><span class="f-lab" data-i18n="s_slug">公开地址 Slug</span>
-        <input id="boardSlug" type="text" autocomplete="off" maxlength="32" placeholder="my-board" spellcheck="false"></label>
-    </div>
-    <div class="f-lab" style="margin-top:12px" data-i18n="s_url_lab">纯查看网址（分享给任何人，只能看不能改）</div>
-    <div class="share-url">
-      <a id="boardLink" href="#" target="_blank">…</a>
-      <button class="btn" id="btnCopyUrl" type="button" data-i18n="s_copy">复制</button>
-    </div>
-    <p class="quote-note" data-i18n="s_note">改动自动保存（600ms 防抖）。Slug 仅限小写字母、数字和连字符，3–32 位；保存后本页地址自动更新。</p>
-    <div class="modal-foot">
-      <span></span>
-      <button class="btn primary" id="btnShareDone" data-i18n="m_done">完成</button>
-    </div>
-  </div>
-</div>
+
 
 <!-- 标的编辑弹窗（主人模式） -->
 <div class="overlay hidden" id="modalOverlay">
@@ -1007,7 +985,7 @@
 <script type="module">
 import { Gauge } from "/shared/gauge.js";
 import { Bar } from "/shared/bar.js";
-import { verdictOf, structValid, hasFairRange, applyZoneColors, computeAnchors, priceToPhi, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
+import { verdictOf, structValid, hasFairRange, applyZoneColors, computeAnchors, priceToPhi, ZONES } from "/shared/core.js";
 import { MKT_LABEL } from "/shared/market.js";
 import { t, applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
@@ -1044,8 +1022,6 @@ mountLangMenu(document.getElementById("topActions")).id = "langMenu";
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 const ZONE_KEYS = ZONES.map((z) => z.key);
-const ZONE_LABELS = { deep: t("zone_deep"), under: t("zone_under"), fair: t("zone_fair"), over: t("zone_over"), xover: t("zone_xover") };
-const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const SLUG_RE = /^[a-z0-9-]{3,32}$/;
 
 const chartsEl = document.getElementById("charts");
@@ -1273,18 +1249,18 @@ function applyBoard(me, data, prices) {
   if (owner) sessionStorage.setItem("owner_slug", boardSlug);
   else {
     if (sessionStorage.getItem("owner_slug") === boardSlug) sessionStorage.removeItem("owner_slug");
-    for (const id of ["appNav", "btnShare", "btnSettings"]) document.getElementById(id).classList.add("hidden"); // 身份已变（退出 / 换号）：收回
+    for (const id of ["appNav", "btnSettings"]) document.getElementById(id).classList.add("hidden"); // 身份已变（退出 / 换号）：收回
   }
   greetName = owner ? me.username : "";
   applySettings(data.settings || {});
   applyColors(data.settings || {});
+  applyItemDefaults(data.settings || {});
   const rows = data.items || [];
 
   // 头部入口 / 导航
   const actions = document.getElementById("topActions");
   if (owner) {
     document.getElementById("appNav").classList.remove("hidden");
-    document.getElementById("btnShare").classList.remove("hidden");
     document.getElementById("btnSettings").classList.remove("hidden");
   } else if (me && me.board && me.board.slug) {
     document.getElementById("myBoardLink")?.remove();
@@ -1303,7 +1279,7 @@ function applyBoard(me, data, prices) {
     addCardEl.replaceChildren(ri("add-line"), document.createTextNode(t("b_add")));
     addCardEl.addEventListener("click", () => {
       // 低/高点不预填（必须自己想清楚估值）；安全边际默认 50%、泡沫阈值默认 40%
-      const item = addChart({ ticker: "", name: "", symbol: null, price: 0, fairLow: "", fairHigh: "", mos: 50, ext: 40, sortOrder: items.length, valuations: [], selectedValuationId: null });
+      const item = addChart({ ticker: "", name: "", symbol: null, price: 0, fairLow: "", fairHigh: "", mos: itemDefaults.mos, ext: itemDefaults.ext, sortOrder: items.length, valuations: [], selectedValuationId: null });
       openItemModal(item, true);
       item.chartEl.scrollIntoView({ behavior: REDUCE ? "auto" : "smooth", block: "center" });
     });
@@ -2792,17 +2768,11 @@ document.getElementById("brand").addEventListener("click", (e) => {
   history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList();
 });
 
-/* ---------- 分享 / 看板设置弹窗 ---------- */
-const shareOverlay = document.getElementById("shareOverlay");
-document.getElementById("btnShare").addEventListener("click", () => shareOverlay.classList.remove("hidden"));
-document.getElementById("btnShareDone").addEventListener("click", () => shareOverlay.classList.add("hidden"));
-shareOverlay.addEventListener("click", (e) => { if (e.target === shareOverlay) shareOverlay.classList.add("hidden"); });
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (valEditReturn) { finishValEdit(); }
     else if (!modalOverlay.classList.contains("hidden")) closeItemModal();
-    else if (!shareOverlay.classList.contains("hidden")) shareOverlay.classList.add("hidden");
     return;
   }
   // Enter = 提交编辑弹窗（但代码联想下拉打开时让其自行处理，textarea 内不拦截）
@@ -2814,83 +2784,38 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-/* ---------- 页面文案（自动保存 + 本页实时生效） ---------- */
-const setEyebrow = document.getElementById("setEyebrow");
-const setTitle = document.getElementById("setTitle");
-const setSubtitle = document.getElementById("setSubtitle");
-const setSaveEl = document.getElementById("setSave");
-let setTimer = null;
-async function saveSettings() {
-  setSaveEl.className = "save-state"; setSaveEl.textContent = t("st_saving");
-  try {
-    const res = await fetch("/api/my/settings", {
-      method: "PUT", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ eyebrow: setEyebrow.value, title: setTitle.value, subtitle: setSubtitle.value }),
-    });
-    if (res.ok) {
-      setSaveEl.className = "save-state ok"; setSaveEl.textContent = t("st_saved");
-      applySettings({ eyebrow: setEyebrow.value.trim(), title: setTitle.value.trim(), subtitle: setSubtitle.value.trim() });
-    } else { setSaveEl.className = "save-state err"; setSaveEl.textContent = t("st_failed"); }
-  } catch { setSaveEl.className = "save-state err"; setSaveEl.textContent = t("st_failed"); }
+/* ---------- 估值默认值（新标的预填的安全边际 / 泡沫阈值，自动保存） ---------- */
+let itemDefaults = { mos: 50, ext: 40 };
+function applyItemDefaults(settings) {
+  const m = Number(settings && settings.default_mos), e = Number(settings && settings.default_ext);
+  itemDefaults = { mos: m > 0 ? m : 50, ext: e > 0 ? e : 40 };
 }
-[setEyebrow, setTitle, setSubtitle].forEach((el) =>
-  el.addEventListener("input", () => { clearTimeout(setTimer); setTimer = setTimeout(saveSettings, 600); }));
+const defMos = document.getElementById("defMos"), defExt = document.getElementById("defExt"), defSave = document.getElementById("defSave");
+let defTimer = null;
+async function saveDefaults() {
+  defSave.className = "save-state"; defSave.textContent = t("st_saving");
+  try {
+    const res = await fetch("/api/my/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ default_mos: defMos.value, default_ext: defExt.value }) });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok) { applyItemDefaults(j.settings || {}); defSave.className = "save-state ok"; defSave.textContent = t("st_saved"); }
+    else { defSave.className = "save-state err"; defSave.textContent = j.error || t("st_failed"); }
+  } catch { defSave.className = "save-state err"; defSave.textContent = t("st_failed"); }
+}
+[defMos, defExt].forEach((el) => el.addEventListener("input", () => { clearTimeout(defTimer); defTimer = setTimeout(saveDefaults, 600); }));
 
-/* ---------- 色块配色 ---------- */
-const colSaveEl = document.getElementById("colSave");
-let colorState = {};
-let colTimer = null;
-function currentColorMap() {
-  const m = {};
-  for (const k of ZONE_KEYS) if (colorState[k]) m[k] = colorState[k];
-  return m;
-}
-function buildColorRows() {
-  const wrap = document.getElementById("colorRows");
-  wrap.innerHTML = "";
-  ZONES.forEach((z) => {
-    const cur = colorState[z.key] || DEFAULT_ZONE_COLORS[z.key];
-    const row = document.createElement("div");
-    row.className = "color-row";
-    const lab = document.createElement("span");
-    lab.className = "c-lab";
-    lab.textContent = `${ZONE_LABELS[z.key] || z.key} · ${z.en}`;
-    const picker = document.createElement("input");
-    picker.type = "color"; picker.value = cur;
-    const hex = document.createElement("input");
-    hex.type = "text"; hex.maxLength = 7; hex.spellcheck = false; hex.autocomplete = "off";
-    hex.value = cur; hex.placeholder = DEFAULT_ZONE_COLORS[z.key];
-    picker.addEventListener("input", () => { hex.value = picker.value; hex.classList.remove("bad"); onColorChange(z.key, picker.value); });
-    hex.addEventListener("input", () => {
-      const v = hex.value.trim();
-      if (HEX_RE.test(v)) { hex.classList.remove("bad"); picker.value = v; onColorChange(z.key, v); }
-      else if (v === "") { hex.classList.remove("bad"); onColorChange(z.key, ""); }
-      else hex.classList.add("bad");
-    });
-    row.append(lab, picker, hex);
-    wrap.appendChild(row);
-  });
-}
-function onColorChange(key, value) {
-  if (value) colorState[key] = value; else delete colorState[key];
-  applyZoneColors(currentColorMap());
-  items.forEach((i) => i.gauge.repaint());
-  renderOverview(); // 击球区/泡沫区图标跟随新配色
-  clearTimeout(colTimer);
-  colTimer = setTimeout(saveColors, 600);
-}
-async function saveColors() {
-  colSaveEl.className = "save-state"; colSaveEl.textContent = t("st_saving");
-  const payload = {};
-  for (const k of ZONE_KEYS) payload["color_" + k] = colorState[k] || "";
+/* ---------- 数据导出：自选与全部估值卡（JSON） ---------- */
+document.getElementById("btnExport").addEventListener("click", async () => {
+  const note = document.getElementById("exportNote");
   try {
-    const res = await fetch("/api/my/settings", {
-      method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
-    });
-    colSaveEl.className = res.ok ? "save-state ok" : "save-state err";
-    colSaveEl.textContent = res.ok ? t("st_saved") : t("st_failed");
-  } catch { colSaveEl.className = "save-state err"; colSaveEl.textContent = t("st_failed"); }
-}
+    const j = await fetch("/api/my/items").then((r) => r.json());
+    const out = { app: "ValuePort", exportedAt: new Date().toISOString(), board: boardSlug, items: j.items || [] };
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));
+    a.download = `valueport-${boardSlug}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    note.className = "ai-result ok"; note.textContent = LANG === "zh" ? `已导出 ${out.items.length} 只标的` : `Exported ${out.items.length} item(s)`;
+  } catch { note.className = "ai-result bad"; note.textContent = t("st_failed"); }
+});
 
 /* ---------- 看板设置 ---------- */
 const boardNameEl = document.getElementById("boardName");
@@ -3071,13 +2996,15 @@ async function initAiSettings() {
 
 function initOwner(settings) {
   initAiSettings();
-  // 文案/配色编辑器回填（看板信息从 /api/me 来，已在 init 中确定 slug）
-  setEyebrow.value = settings.eyebrow || "";
-  setTitle.value = settings.title || "";
-  setSubtitle.value = settings.subtitle || "";
-  colorState = {};
-  for (const k of ZONE_KEYS) if (settings["color_" + k]) colorState[k] = settings["color_" + k];
-  buildColorRows();
+  const zh = LANG === "zh";
+  document.getElementById("defCfgName").textContent = zh ? "估值默认值" : "Valuation defaults";
+  document.getElementById("defMosLab").textContent = zh ? "安全边际 %" : "Margin of safety %";
+  document.getElementById("defExtLab").textContent = zh ? "泡沫阈值 %" : "Bubble threshold %";
+  document.getElementById("defNote").textContent = zh ? "新添加标的时预填的值，单个标的仍可在它的设置里改。安全边际 5–95，泡沫阈值 5–300；留空用 50 / 40。" : "Prefilled when you add a stock; each stock can still override them. Margin 5–95, bubble 5–300; blank = 50 / 40.";
+  defMos.value = settings.default_mos || ""; defExt.value = settings.default_ext || "";
+  document.getElementById("dataCfgName").textContent = zh ? "数据" : "Data";
+  document.getElementById("btnExport").textContent = zh ? "导出自选与估值卡（JSON）" : "Export watchlist & valuations (JSON)";
+  // 看板信息从 /api/me 来，已在 init 中确定 slug
   // 看板名/slug：取 /api/me（再取一次便宜且总是新鲜）
   fetch("/api/me").then((r) => r.ok ? r.json() : null).then((me) => {
     if (!me || !me.board) return;

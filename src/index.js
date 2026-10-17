@@ -19,10 +19,9 @@ import { parseHoldingsCsv } from "./brokers/csv.js";
 const app = new Hono();
 const USER_COOKIE = "pendulum_user", OWNER_COOKIE = "pendulum_owner";
 const TTL = 7 * 24 * 3600;
-const TEXT_KEYS = ["eyebrow", "title", "subtitle"];
-const COLOR_KEYS = ["color_deep", "color_under", "color_fair", "color_over", "color_xover"];
-const SETTING_KEYS = [...TEXT_KEYS, ...COLOR_KEYS];
-const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+// 用户设置：只剩「新标的的默认安全边际 / 泡沫阈值」（页面文案与区间配色已取消，库里旧值不再返回、不再生效）
+const NUM_SETTINGS = { default_mos: [5, 95], default_ext: [5, 300] }; // 键 → 允许范围（%）
+const SETTING_KEYS = Object.keys(NUM_SETTINGS);
 const COOKIE_OPTS = { httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: TTL };
 
 async function readSettings(db, userId) {
@@ -261,8 +260,10 @@ app.put("/api/my/settings", async (c) => {
   const uid = c.get("uid"), stmts = [];
   for (const k of SETTING_KEYS) {
     if (!(k in body)) continue;
-    const val = typeof body[k] === "string" ? body[k].trim() : "";
-    if (COLOR_KEYS.includes(k) && val && !HEX_RE.test(val)) continue;
+    const raw = body[k] === null || body[k] === undefined ? "" : String(body[k]).trim();
+    const n = Number(raw), [lo, hi] = NUM_SETTINGS[k];
+    if (raw && !(Number.isFinite(n) && n >= lo && n <= hi)) return c.json({ error: `${k} must be ${lo}-${hi}` }, 400);
+    const val = raw ? String(Math.round(n * 10) / 10) : "";
     stmts.push(val
       ? c.env.DB.prepare("INSERT INTO settings (user_id,key,value) VALUES (?,?,?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value").bind(uid, k, val)
       : c.env.DB.prepare("DELETE FROM settings WHERE user_id=? AND key=?").bind(uid, k));

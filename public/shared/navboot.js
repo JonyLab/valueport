@@ -12,7 +12,7 @@
   var m = location.pathname.match(/^\/b\/([^/]+)/);
   var ownerSlug = null; try { ownerSlug = sessionStorage.getItem("owner_slug"); } catch (e) { /* ignore */ }
   if (m && ownerSlug && ownerSlug === decodeURIComponent(m[1])) {
-    ["appNav", "btnShare", "btnSettings"].forEach(function (id) { var el = document.getElementById(id); if (el) el.classList.remove("hidden"); });
+    ["appNav", "btnSettings"].forEach(function (id) { var el = document.getElementById(id); if (el) el.classList.remove("hidden"); });
   }
   // ④ 本次会话有这页的缓存：页面脚本会先直接画缓存，首帧就不画骨架（骨架只给第一次、需要完全加载的时候）
   try {

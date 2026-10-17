@@ -141,3 +141,16 @@ describe("target allocation plan", () => {
     expect(sum.plan).toEqual({ targets: { usAAPL: 30 }, cash: 15, band: 4, rel: 20 });
   });
 });
+
+describe("user settings", () => {
+  it("keeps only the valuation defaults, validated", async () => {
+    const ck = await userCookie("set_amy");
+    const put = (body) => call(ck, "/api/my/settings", "PUT", body);
+    const r = await put({ default_mos: "30", default_ext: 60, eyebrow: "hello", color_deep: "#000000" });
+    expect(r.status).toBe(200);
+    expect((await r.json()).settings).toEqual({ default_mos: "30", default_ext: "60" }); // 文案 / 配色不再保存
+    expect((await put({ default_mos: 120 })).status).toBe(400);
+    expect((await put({ default_ext: "abc" })).status).toBe(400);
+    expect((await (await put({ default_mos: "" })).json()).settings).toEqual({ default_ext: "60" }); // 清空 = 恢复默认
+  });
+});

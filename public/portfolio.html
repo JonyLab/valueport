@@ -105,20 +105,9 @@
   .pf-acc-add{display:inline-flex;align-items:center;gap:4px;height:36px;padding:0 13px;border:1.5px dashed rgba(29,29,27,.2);border-radius:var(--r-pill);background:none;cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink-soft)}
   .pf-acc-add:hover{color:var(--ink);border-color:rgba(29,29,27,.35)}
   /* 仓位体检 */
-  .pf-checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:8px}
-  .pf-check{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px 14px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
-  .pf-check-ico{font-size:18px;line-height:1.2}
-  .pf-check.ok .pf-check-ico{color:var(--green)} .pf-check.warn .pf-check-ico{color:#d9772a} .pf-check.bad .pf-check-ico{color:var(--red)}
-  .pf-check-title{font-size:14px}
-  .pf-check-text{margin-top:4px;font-size:12.5px;line-height:1.6;color:var(--ink-mute)}
-  .pf-check-v{font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
   /* 资产分布：环形图 */
   .pf-donut + .pf-donut{margin-top:18px;padding-top:18px;border-top:1px dashed var(--border)}
   .pf-dist-tabs{width:fit-content;max-width:100%;overflow-x:auto;margin:-4px 0 6px;scrollbar-width:none}
-  .pf-checks .pf-check-more{display:none}
-  .pf-checks.all .pf-check-more{display:grid}
-  .pf-more{display:block;width:100%;margin-top:8px;height:34px;border:0;border-radius:var(--r-pill);background:none;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-mute)}
-  .pf-more:hover{background:var(--track);color:var(--ink)}
   .pf-donut-body{display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;align-items:center;margin-top:10px}
   .pf-donut-ring{position:relative;width:120px;height:120px}
   .pf-donut-svg{width:100%;height:100%;transform:rotate(-90deg)}
@@ -212,26 +201,34 @@
   .pf-curve-head{margin-bottom:10px}
   .pf-subhead{font-size:15px;color:var(--ink)}
   /* 仓位体检雷达 */
-  .pf-radar{display:block;width:100%;max-width:340px;margin:-6px auto 0}
+  .pf-radar-wrap{position:relative;width:100%;max-width:340px;margin:-4px auto 0}
+  .pf-radar{display:block;width:100%}
+  /* 轴端标签：状态图标 + 短名；悬停 / 聚焦 / 点按弹出依据 */
+  .pf-rtag{position:absolute;display:inline-flex;align-items:center;gap:3px;padding:3px 7px 3px 5px;border:0;border-radius:var(--r-pill);background:rgba(255,255,255,.85);
+    cursor:help;font-family:var(--font);font-size:12px;color:var(--ink-soft);white-space:nowrap;transform:translate(-50%,-50%);box-shadow:0 0 0 1px var(--divider)}
+  .pf-rtag.left{transform:translate(-100%,-50%) translateX(12px)} .pf-rtag.right{transform:translate(0,-50%) translateX(-12px)}
+  .pf-rtag i{font-size:14px}
+  .pf-rtag.ok i{color:var(--green)} .pf-rtag.warn i{color:#e0802a} .pf-rtag.bad i{color:var(--red)}
+  .pf-rtag.bad{color:var(--red)} .pf-rtag.warn{color:#b8661d}
+  .pf-rtag:hover,.pf-rtag:focus-visible,.pf-rtag.open{z-index:3;background:#fff;outline:none;box-shadow:0 0 0 1px var(--card-edge),0 6px 16px -8px rgba(60,50,20,.35)}
+  .pf-rtip{display:none;position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);width:240px;padding:11px 13px;border-radius:var(--r-md);background:var(--dark);color:#f3f0e8;
+    font-size:12.5px;line-height:1.6;white-space:normal;text-align:left;cursor:default;box-shadow:0 16px 36px -14px rgba(0,0,0,.45)}
+  .pf-rtag.left .pf-rtip{left:auto;right:-12px;transform:none} .pf-rtag.right .pf-rtip{left:-12px;transform:none}
+  .pf-rtag.low .pf-rtip{top:auto;bottom:calc(100% + 8px)}
+  .pf-rtag:hover .pf-rtip,.pf-rtag:focus-visible .pf-rtip,.pf-rtag.open .pf-rtip{display:block}
+  .pf-rtip-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:4px}
+  .pf-rtip-head b{font-weight:500;color:#fff}
+  .pf-rtip-v{color:var(--sun);font-variant-numeric:tabular-nums}
+  .pf-rtip-text{display:block;color:#d8d3c8}
   .pf-radar-ring{fill:none;stroke:rgba(29,29,27,.09);stroke-width:1}
   .pf-radar-axis{stroke:rgba(29,29,27,.08);stroke-width:1}
   .pf-radar-area{stroke-width:2;stroke-linejoin:round}
   .pf-radar-area.ok{fill:rgba(31,143,84,.16);stroke:var(--green)} .pf-radar-area.warn{fill:rgba(240,140,46,.18);stroke:#f08c2e} .pf-radar-area.bad{fill:rgba(198,65,65,.14);stroke:var(--red)}
   .pf-radar-dot{stroke:#fff;stroke-width:2}
   .pf-radar-dot.ok{fill:var(--green)} .pf-radar-dot.warn{fill:#f08c2e} .pf-radar-dot.bad{fill:var(--red)}
-  .pf-radar-lab{font-family:var(--font);font-size:12px;fill:var(--ink-soft)}
-  .pf-radar-lab.bad{fill:var(--red)} .pf-radar-lab.warn{fill:#c26a1c}
   .pf-radar-score{font-family:var(--font);font-size:30px;fill:var(--ink);letter-spacing:-.03em}
   .pf-health-sum{margin:2px 0 14px;font-size:13px;line-height:1.65;color:var(--ink-soft)}
   /* 体检项：侧栏里一列，点开看依据 */
-  .pf-side .pf-checks{grid-template-columns:1fr;gap:6px}
-  button.pf-check{width:100%;border:0;text-align:left;cursor:pointer;font-family:var(--font);color:var(--ink);align-items:center;padding:10px 12px}
-  button.pf-check:hover{background:rgba(29,29,27,.06)}
-  button.pf-check .pf-check-text{display:none}
-  button.pf-check.open{align-items:start}
-  button.pf-check.open .pf-check-text{display:block}
-  button.pf-check .pf-check-title{font-size:13.5px}
-  button.pf-check .pf-check-v{font-size:13.5px}
   /* 持仓表里的目标仓位列 */
   .pf-table th.left,.pf-table td.pf-tgt-act{text-align:left}
   .pf-table td.pf-w{min-width:96px}
@@ -327,7 +324,7 @@
 <script type="module">
 import { applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
-import { computeAnchors, priceToPhi, structValid, applyZoneColors, ZONES } from "/shared/core.js";
+import { computeAnchors, priceToPhi, structValid, ZONES } from "/shared/core.js";
 
 applyI18n();
 const zh = LANG === "zh";
@@ -379,8 +376,8 @@ let base = localStorage.getItem("pf_base") || (zh ? "CNY" : "USD");
 if (!BASES.includes(base)) base = "USD";
 
 // ---------- 身份 / 配色 ----------
-// 先用本次会话记下的身份与配色把缓存画出来（有缓存就不出骨架），/api/me 与配色在后台校正（见文件末尾）
-const meP = api("/api/me"), stP = api("/api/my/settings");
+// 先用本次会话记下的身份把缓存画出来（有缓存就不出骨架），/api/me 在后台校正（见文件末尾）
+const meP = api("/api/me");
 let me = { ok: true, data: { username: sessionStorage.getItem("pf_user") || "", board: { slug: sessionStorage.getItem("owner_slug") || "" } } };
 let slug = "";
 function applyIdentity() {
@@ -390,13 +387,8 @@ function applyIdentity() {
   $("tabBoard").href = "/b/" + encodeURIComponent(slug);
   $("greet").textContent = me.data.username ? T(`${me.data.username} 的全部账户`, `All accounts of ${me.data.username}`) : "";
 }
-function applyColorSettings(settings) {
-  const m = {}; for (const z of ZONES) { const v = settings && settings["color_" + z.key]; if (v) m[z.key] = v; }
-  applyZoneColors(m);
-}
 document.title = (zh ? "资产" : "Portfolio") + " · ValuePort";
 applyIdentity();
-try { applyColorSettings(JSON.parse(sessionStorage.getItem("pf_colors") || "null")); } catch {}
 
 // ---------- 汇总计算 ----------
 // 现价落在看板估值区间的第几段；-1 = 未估值（不在看板或没设区间）
@@ -702,53 +694,46 @@ function healthCard(s) {
   const level = score >= 80 ? "ok" : score >= 60 ? "warn" : "bad";
   const head = el("div", "pf-cardhead");
   const ttl = el("div", "pf-titlewrap");
-  ttl.append(el("span", "pf-cardtitle", T("仓位体检", "Position health")), el("span", "pf-cardsub", T("阈值按常见经验设定，仅供参考", "Rule-of-thumb thresholds, for reference")));
+  ttl.append(el("span", "pf-cardtitle", T("仓位体检", "Position health")), el("span", "pf-cardsub", T("阈值按常见经验设定，仅供参考；悬停各项看依据", "Rule-of-thumb thresholds; hover an item for details")));
   head.appendChild(ttl);
   c.appendChild(head);
-  // 雷达
+  // 雷达：轴上不写字，轴端放 HTML 标签（状态图标 + 短名），悬停 / 点按弹出该项的数值与依据（取代下面的检查项列表）
   const NS = "http://www.w3.org/2000/svg", mk = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
-  const W = 320, H = 280, cx = W / 2, cy = H / 2 + 4, R = 92, n = checks.length;
+  const W = 340, H = 290, cx = W / 2, cy = H / 2, R = 92, n = checks.length;
   const ang = (i) => -Math.PI / 2 + i * 2 * Math.PI / n;
   const P = (i, r) => [cx + Math.cos(ang(i)) * r, cy + Math.sin(ang(i)) * r];
+  const wrap = el("div", "pf-radar-wrap");
   const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, class: "pf-radar", role: "img", "aria-label": T(`综合 ${score} 分`, `Score ${score}`) });
   for (const f of [0.25, 0.5, 0.75, 1]) svg.appendChild(mk("polygon", { class: "pf-radar-ring", points: checks.map((_, i) => P(i, R * f).join(",")).join(" ") }));
   checks.forEach((_, i) => { const [x, y] = P(i, R); svg.appendChild(mk("line", { class: "pf-radar-axis", x1: cx, y1: cy, x2: x, y2: y })); });
   svg.appendChild(mk("polygon", { class: "pf-radar-area " + level, points: checks.map((x, i) => P(i, R * LEVEL_SCORE[x.level] / 100).join(",")).join(" ") }));
+  checks.forEach((x, i) => { const [px, py] = P(i, R * LEVEL_SCORE[x.level] / 100); svg.appendChild(mk("circle", { class: "pf-radar-dot " + x.level, cx: px, cy: py, r: 4 })); });
+  svg.appendChild(mk("text", { class: "pf-radar-score", x: cx, y: cy + 10, "text-anchor": "middle" }, String(score)));
+  wrap.appendChild(svg);
+  const closeTips = () => wrap.querySelectorAll(".pf-rtag.open").forEach((t) => t.classList.remove("open"));
   checks.forEach((x, i) => {
-    const [px, py] = P(i, R * LEVEL_SCORE[x.level] / 100);
-    svg.appendChild(mk("circle", { class: "pf-radar-dot " + x.level, cx: px, cy: py, r: 4 }));
-    const [lx, ly] = P(i, R + 22), a = Math.cos(ang(i));
-    const lab = (HEALTH_SHORT[x.key] || [x.title, x.title])[zh ? 0 : 1];
-    svg.appendChild(mk("text", { class: "pf-radar-lab " + x.level, x: lx, y: ly + 4, "text-anchor": Math.abs(a) < 0.2 ? "middle" : a > 0 ? "start" : "end" }, lab));
+    const [lx, ly] = P(i, R + 26), a = Math.cos(ang(i));
+    const side = Math.abs(a) < 0.2 ? "mid" : a > 0 ? "right" : "left";
+    const tag = el("button", `pf-rtag ${x.level} ${side}${ly > cy ? " low" : ""}`); tag.type = "button"; // 下半圈的提示往上弹，免得超出卡片底边
+    tag.style.left = (lx / W * 100) + "%"; tag.style.top = (ly / H * 100) + "%";
+    tag.append(ri(x.level === "ok" ? "checkbox-circle-fill" : x.level === "warn" ? "error-warning-fill" : "alarm-warning-fill"),
+      el("span", "", (HEALTH_SHORT[x.key] || [x.title, x.title])[zh ? 0 : 1]));
+    const tip = el("span", "pf-rtip"); tip.setAttribute("role", "tooltip");
+    const th = el("span", "pf-rtip-head"); th.append(el("b", "", x.title), el("span", "pf-rtip-v", x.value));
+    tip.append(th, el("span", "pf-rtip-text", x.text));
+    tag.appendChild(tip);
+    tag.setAttribute("aria-label", `${x.title} ${x.value}：${x.text}`);
+    // 触屏没有 hover：点按开合
+    tag.addEventListener("click", (e) => { e.stopPropagation(); const open = !tag.classList.contains("open"); closeTips(); tag.classList.toggle("open", open); });
+    wrap.appendChild(tag);
   });
-  svg.appendChild(mk("text", { class: "pf-radar-score", x: cx, y: cy + 8, "text-anchor": "middle" }, String(score)));
-  c.appendChild(svg);
+  document.addEventListener("click", closeTips);
+  c.appendChild(wrap);
   const counts = { ok: 0, warn: 0, bad: 0 }; checks.forEach((x) => counts[x.level]++);
   const sumTxt = el("div", "pf-health-sum " + level);
   sumTxt.textContent = T(`${score >= 80 ? "健康" : score >= 60 ? "一般" : "需关注"}：${counts.ok} 项正常、${counts.warn} 项注意、${counts.bad} 项警告。` + (strikeCount ? `击球区持仓 ${strikeCount} 只（${strike.toFixed(1)}%），最值得留意加仓。` : ""),
     `${score >= 80 ? "Healthy" : score >= 60 ? "Fair" : "Needs attention"}: ${counts.ok} fine, ${counts.warn} to watch, ${counts.bad} warnings.` + (strikeCount ? ` ${strikeCount} in the strike zone (${strike.toFixed(1)}%).` : ""));
   c.appendChild(sumTxt);
-  const list = el("div", "pf-checks");
-  const order = { bad: 0, warn: 1, ok: 2 };
-  const sorted = [...checks].sort((a, b) => order[a.level] - order[b.level]);
-  const issues = sorted.filter((x) => x.level !== "ok").length;
-  for (const x of sorted) {
-    const r = el("button", "pf-check " + x.level); r.type = "button"; r.setAttribute("aria-expanded", "false");
-    const ico = el("span", "pf-check-ico"); ico.appendChild(ri(x.level === "ok" ? "checkbox-circle-line" : x.level === "warn" ? "error-warning-line" : "alarm-warning-line"));
-    const body = el("div", "pf-check-body"); body.append(el("div", "pf-check-title", x.title), el("div", "pf-check-text", x.text));
-    r.append(ico, body, el("span", "pf-check-v", x.value));
-    r.addEventListener("click", () => { const open = !r.classList.contains("open"); r.classList.toggle("open", open); r.setAttribute("aria-expanded", open ? "true" : "false"); });
-    if (x.level === "ok" && issues) r.classList.add("pf-check-more"); // 有问题时默认只列出需要关注的项，正常项收起
-    list.appendChild(r);
-  }
-  c.appendChild(list);
-  if (issues && issues < sorted.length) {
-    const more = el("button", "pf-more"); more.type = "button";
-    const label = () => list.classList.contains("all") ? T("收起正常项", "Hide passing checks") : T(`查看全部 ${sorted.length} 项（另有 ${sorted.length - issues} 项正常）`, `Show all ${sorted.length} (${sorted.length - issues} passing)`);
-    more.textContent = label();
-    more.addEventListener("click", () => { list.classList.toggle("all"); more.textContent = label(); });
-    c.appendChild(more);
-  }
   return c;
 }
 
@@ -1340,7 +1325,6 @@ const meR = await meP;
 if (!meR.ok) { location.replace("/login"); throw new Error("unauthorized"); }
 if (meR.data.username !== me.data.username && hadCache) $("pfRoot").innerHTML = ""; // 身份和缓存对不上：别留着别人的画面
 me = meR; applyIdentity();
-try { const st = await stP; const set = (st.data && st.data.settings) || {}; sessionStorage.setItem("pf_colors", JSON.stringify(set)); applyColorSettings(set); } catch {}
 await load();
 </script>
 </body>

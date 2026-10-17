@@ -52,8 +52,8 @@ D1 database (binding: DB)
 ├── users             — id, username, pass_hash, pass_salt, board_slug, board_name, created_at
 ├── items             — id, user_id, ticker, name, symbol, fair_low, fair_high, mos, ext,
 │                       sort_order, updated_at
-├── settings          — (user_id, key) composite PK; keys: eyebrow, title, subtitle,
-│                       color_deep, color_under, color_fair, color_over, color_xover
+├── settings          — (user_id, key) composite PK; public keys: default_mos, default_ext
+│                       (new-stock defaults); internal: _ai_usage, _ai_active
 └── activation_codes  — code (PK), used_by (user id), created_at, used_at
 ```
 
