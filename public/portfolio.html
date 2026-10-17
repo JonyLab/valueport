@@ -33,16 +33,6 @@
   .pf-note{margin-top:14px;font-size:12.5px;color:var(--ink-mute)}
   .pf-note:empty{display:none}
   /* 估值视角：持仓市值按钟摆区间分布 */
-  .pf-zbar{display:flex;gap:4px;height:14px;margin:4px 0 18px}
-  .pf-zbar span{border-radius:var(--r-pill);min-width:6px}
-  .pf-zbar .none{background-color:rgba(255,255,255,.6);background-image:var(--hatch)}
-  .pf-zrows{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-  .pf-zrow{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
-  .pf-zrow-k{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft)}
-  .pf-zrow-k i{width:9px;height:9px;border-radius:50%;flex:none}
-  .pf-zrow-k i.none{background-image:var(--hatch);background-color:#fff;box-shadow:inset 0 0 0 1px var(--border)}
-  .pf-zrow-v{font-size:20px;font-variant-numeric:tabular-nums}
-  .pf-zrow-s{font-size:12px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
   .pf-callout{margin-top:14px;font-size:13.5px;line-height:1.7;color:var(--ink-soft)}
   .pf-callout b{color:var(--ink);font-weight:500}
   /* 持仓表 */
@@ -97,6 +87,11 @@
   .pf-check-v{font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
   /* 资产分布：环形图 */
   .pf-donut + .pf-donut{margin-top:18px;padding-top:18px;border-top:1px dashed var(--border)}
+  .pf-dist-tabs{width:fit-content;max-width:100%;overflow-x:auto;margin:-4px 0 6px;scrollbar-width:none}
+  .pf-checks .pf-check-more{display:none}
+  .pf-checks.all .pf-check-more{display:grid}
+  .pf-more{display:block;width:100%;margin-top:8px;height:34px;border:0;border-radius:var(--r-pill);background:none;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-mute)}
+  .pf-more:hover{background:var(--track);color:var(--ink)}
   .pf-donut-body{display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;align-items:center;margin-top:10px}
   .pf-donut-ring{position:relative;width:120px;height:120px}
   .pf-donut-svg{width:100%;height:100%;transform:rotate(-90deg)}
@@ -118,7 +113,9 @@
   .pf-acc-zbar span{border-radius:var(--r-pill);min-width:4px}
   .pf-acc-zbar .none{background-color:rgba(255,255,255,.6);background-image:var(--hatch)}
   /* 账户 */
-  .pf-acc{display:flex;flex-direction:column;gap:8px;padding:14px 0;border-top:1px dashed var(--border)}
+  .pf-accgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:10px}
+  .pf-acc{display:flex;flex-direction:column;gap:8px;padding:16px 18px;border-radius:var(--r-lg);background:rgba(29,29,27,.035)}
+  .pf-acc-acts{margin-top:auto}
   .pf-acc:first-child{border-top:0;padding-top:0}
   .pf-acc-top{display:flex;align-items:center;gap:10px}
   .pf-acc-ico{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--dark);color:var(--sun);font-size:16px;flex:none}
@@ -128,9 +125,6 @@
   .pf-acc-err{font-size:12px;color:var(--red);line-height:1.5}
   .pf-acc-acts{display:flex;gap:6px;flex-wrap:wrap}
   .pf-acc-acts .btn{height:30px;padding:0 12px;font-size:12.5px;background:rgba(255,255,255,.7)}
-  .pf-add{width:100%;margin-top:14px;height:44px;border:1.5px dashed rgba(29,29,27,.22);border-radius:var(--r-pill);background:none;cursor:pointer;
-    font-family:var(--font);font-size:14px;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;gap:6px}
-  .pf-add:hover{background:rgba(255,255,255,.55);color:var(--ink)}
   /* 空状态 */
   /* 内容区撑满页面剩余高度，空状态卡片到底、内容垂直居中 */
   #pfRoot{flex:1 1 auto;display:flex;flex-direction:column}
@@ -287,7 +281,7 @@
     </div>
   </div>
 
-  <div id="pfRoot"><div class="pf-grid" aria-hidden="true" id="pfSkel"><div class="pf-main"><div class="sk-card"><span class="sk sk-line" style="width:90px;height:12px;"></span><span class="sk sk-line" style="width:260px;height:54px;border-radius:14px"></span><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:6px"><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span></div><div class="sk-row" style="margin-top:12px"><span class="sk sk-line" style="width:80px;height:14px;"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:160px;height:28px;border-radius:999px"></span></div><span class="sk sk-line" style="width:100%;height:170px;border-radius:16px"></span></div><div class="sk-card"><span class="sk sk-line" style="width:120px;height:18px;"></span><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div></div></div><div class="pf-side"><div class="sk-card"><span class="sk sk-line" style="width:100px;height:18px;"></span><span class="sk" style="width:200px;height:200px;margin:8px auto;border-radius:50%"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span></div><div class="sk-card"><span class="sk sk-line" style="width:90px;height:18px;"></span><span class="sk sk-line" style="width:100%;height:14px;border-radius:999px"></span><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><span class="sk sk-line" style="width:100%;height:56px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:56px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:56px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:56px;border-radius:16px"></span></div></div></div></div></div>
+  <div id="pfRoot"><div class="pf-grid" aria-hidden="true" id="pfSkel"><div class="pf-main"><div class="sk-card"><span class="sk sk-line" style="width:90px;height:12px;"></span><span class="sk sk-line" style="width:260px;height:54px;border-radius:14px"></span><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:6px"><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span></div><div class="sk-row" style="margin-top:12px"><span class="sk sk-line" style="width:80px;height:14px;"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:160px;height:28px;border-radius:999px"></span></div><span class="sk sk-line" style="width:100%;height:170px;border-radius:16px"></span></div><div class="sk-card"><span class="sk sk-line" style="width:120px;height:18px;"></span><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div></div></div><div class="pf-side"><div class="sk-card"><span class="sk sk-line" style="width:100px;height:18px;"></span><span class="sk" style="width:200px;height:200px;margin:8px auto;border-radius:50%"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span></div><div class="sk-card"><span class="sk sk-line" style="width:90px;height:18px;"></span><span class="sk sk-line" style="width:260px;height:30px;border-radius:999px"></span><div class="sk-row"><span class="sk sk-round" style="width:120px;height:120px"></span><div class="sk-grow" style="display:flex;flex-direction:column;gap:10px"><span class="sk sk-line" style="width:80%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:10px;"></span></div></div></div></div></div></div>
 </div>
 
 <!-- 添加 / 编辑账户 -->
@@ -486,8 +480,9 @@ function render() {
   const s = summarize(data);
   const grid = el("div", "pf-grid"), main = el("div", "pf-main"), side = el("div", "pf-side");
   $("pfAlert").replaceChildren(...[driftAlert(s)].filter(Boolean)); // 偏离提醒挂在「资产」标题右边
-  main.append(totalCard(s), holdingsCard(s));
-  side.append(healthCard(s), zoneCard(s), distCard(s), accountsCard(s));
+  // 左栏放明细（总览 / 持仓 / 账户），右栏只放两张分析卡（体检 + 分布），两栏长度大致相当
+  main.append(totalCard(s), holdingsCard(s), accountsCard(s));
+  side.append(healthCard(s), distCard(s));
   grid.append(main, side);
   if (fromSkel) grid.classList.add("sk-fade");
   root.appendChild(grid);
@@ -714,48 +709,25 @@ function healthCard(s) {
   c.appendChild(sumTxt);
   const list = el("div", "pf-checks");
   const order = { bad: 0, warn: 1, ok: 2 };
-  for (const x of [...checks].sort((a, b) => order[a.level] - order[b.level])) {
+  const sorted = [...checks].sort((a, b) => order[a.level] - order[b.level]);
+  const issues = sorted.filter((x) => x.level !== "ok").length;
+  for (const x of sorted) {
     const r = el("button", "pf-check " + x.level); r.type = "button"; r.setAttribute("aria-expanded", "false");
     const ico = el("span", "pf-check-ico"); ico.appendChild(ri(x.level === "ok" ? "checkbox-circle-line" : x.level === "warn" ? "error-warning-line" : "alarm-warning-line"));
     const body = el("div", "pf-check-body"); body.append(el("div", "pf-check-title", x.title), el("div", "pf-check-text", x.text));
     r.append(ico, body, el("span", "pf-check-v", x.value));
     r.addEventListener("click", () => { const open = !r.classList.contains("open"); r.classList.toggle("open", open); r.setAttribute("aria-expanded", open ? "true" : "false"); });
+    if (x.level === "ok" && issues) r.classList.add("pf-check-more"); // 有问题时默认只列出需要关注的项，正常项收起
     list.appendChild(r);
   }
   c.appendChild(list);
-  return c;
-}
-
-function zoneCard(s) {
-  const c = el("section", "pf-card");
-  const head = el("div", "pf-cardhead");
-  head.append(el("span", "pf-cardtitle", T("估值视角", "Valuation view")), el("span", "pf-cardsub", T("持仓市值按看板上的估值区间分布", "Holdings value by your board's valuation zones")));
-  c.appendChild(head);
-  const total = s.zones.reduce((a, z) => a + z.value, 0);
-  const bar = el("div", "pf-zbar");
-  for (const z of s.zones) {
-    if (!(z.value > 0)) continue;
-    const seg = el("span", z.key === "none" ? "none" : ""); seg.style.flexGrow = z.value; if (z.color) seg.style.background = z.color;
-    seg.title = `${z.name} ${(z.value / total * 100).toFixed(1)}%`;
-    bar.appendChild(seg);
+  if (issues && issues < sorted.length) {
+    const more = el("button", "pf-more"); more.type = "button";
+    const label = () => list.classList.contains("all") ? T("收起正常项", "Hide passing checks") : T(`查看全部 ${sorted.length} 项（另有 ${sorted.length - issues} 项正常）`, `Show all ${sorted.length} (${sorted.length - issues} passing)`);
+    more.textContent = label();
+    more.addEventListener("click", () => { list.classList.toggle("all"); more.textContent = label(); });
+    c.appendChild(more);
   }
-  c.appendChild(bar);
-  const rows = el("div", "pf-zrows");
-  for (const z of s.zones) {
-    const r = el("div", "pf-zrow");
-    const k = el("div", "pf-zrow-k"); const dot = el("i", z.key === "none" ? "none" : ""); if (z.color) dot.style.background = z.color; k.append(dot, document.createTextNode(z.name));
-    const v = el("div", "pf-zrow-v"); setNum(v, total ? (z.value / total * 100).toFixed(1) + "%" : "—");
-    r.append(k, v, el("div", "pf-zrow-s", `${z.count} ${T("只", "")} · ${amt(z.value, 0)}`));
-    rows.appendChild(r);
-  }
-  c.appendChild(rows);
-  const strike = s.zones[0], bubble = s.zones[4], none = s.zones[5];
-  const p = (z) => (total ? (z.value / total * 100).toFixed(1) + "%" : "—");
-  const call = el("div", "pf-callout");
-  call.innerHTML = zh
-    ? `击球区 <b>${strike.count}</b> 只，占持仓 <b>${p(strike)}</b>；泡沫区 <b>${bubble.count}</b> 只，占 <b>${p(bubble)}</b>。` + (none.count ? `另有 <b>${none.count}</b> 只不在看板或未设区间，加到看板并估值后就能纳入。` : "")
-    : `<b>${strike.count}</b> holding(s) in the strike zone (<b>${p(strike)}</b>), <b>${bubble.count}</b> in the bubble zone (<b>${p(bubble)}</b>).` + (none.count ? ` <b>${none.count}</b> aren't on your board or have no fair range yet.` : "");
-  c.appendChild(call);
   return c;
 }
 
@@ -996,9 +968,10 @@ function openPlan(s) {
 // 分类配色：墨黑 / 暖黄 / 暖灰 / 绿 / 蓝 / 橙 / 浅灰，与看板同一套色调
 const PALETTE = ["#2a2a29", "#f6cf4a", "#a39e93", "#3a9e64", "#3a73ee", "#f08c2e", "#d8d2c4", "#7a5c3a"];
 // 环形图：entries=[[label, value]]，大到小排列；环心写合计（隐藏金额时写条目数）
-function donut(title, map) {
+function donut(title, map, colors) {
   const box = el("div", "pf-donut");
-  box.appendChild(el("div", "pf-dist-title", title));
+  if (title) box.appendChild(el("div", "pf-dist-title", title));
+  const colorOf = (k, i) => (colors && colors.get(k)) || PALETTE[i % PALETTE.length];
   const entries = [...map.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const tot = entries.reduce((a, [, v]) => a + v, 0);
   const body = el("div", "pf-donut-body");
@@ -1011,7 +984,7 @@ function donut(title, map) {
     const len = v / tot * C;
     const arc = document.createElementNS(NS, "circle");
     arc.setAttribute("cx", 60); arc.setAttribute("cy", 60); arc.setAttribute("r", R);
-    arc.setAttribute("stroke", PALETTE[i % PALETTE.length]); arc.setAttribute("class", "pf-donut-arc");
+    arc.setAttribute("stroke", colorOf(k, i)); arc.setAttribute("class", "pf-donut-arc");
     arc.setAttribute("stroke-dasharray", `${Math.max(0.01, len - gap)} ${C}`); arc.setAttribute("stroke-dashoffset", -off);
     svg.appendChild(arc); off += len;
   });
@@ -1020,7 +993,7 @@ function donut(title, map) {
   const ring2 = el("div", "pf-donut-ring"); ring2.append(svg, mid);
   const legend = el("div", "pf-legend");
   entries.forEach(([k, v], i) => {
-    const r = el("div", "pf-legend-row"); const dot = el("i"); dot.style.background = PALETTE[i % PALETTE.length];
+    const r = el("div", "pf-legend-row"); const dot = el("i"); dot.style.background = colorOf(k, i);
     r.append(dot, el("span", "pf-legend-k", k), el("span", "pf-legend-v", (v / tot * 100).toFixed(1) + "%"));
     legend.appendChild(r);
   });
@@ -1029,6 +1002,7 @@ function donut(title, map) {
   box.appendChild(body);
   return box;
 }
+let distTab = "zone"; // 分布卡当前 tab（跨重绘保留）
 function distCard(s) {
   const c = el("section", "pf-card");
   const head = el("div", "pf-cardhead"); head.appendChild(el("span", "pf-cardtitle", T("资产分布", "Allocation"))); c.appendChild(head);
@@ -1039,15 +1013,44 @@ function distCard(s) {
   const rest = held.slice(7).reduce((a, r) => a + r.value, 0);
   if (rest > 0) bySym.set(T(`其他 ${held.length - 7} 只`, `${held.length - 7} others`), rest);
   if (s.cashValue > 0) bySym.set(T("现金", "Cash"), s.cashValue);
-  c.appendChild(donut(T("按标的", "By holding"), bySym));
-  if (data.accounts.length > 1) c.appendChild(donut(T("按账户", "By account"), s.byAccount));
-  c.append(donut(T("按市场", "By market"), s.byMarket), donut(T("按币种", "By currency"), s.byCur));
+  // 按估值区间（持仓市值，不含现金），颜色取钟摆区间色
+  const byZone = new Map(), zoneColors = new Map();
+  for (const z of s.zones) { if (z.value > 0) { byZone.set(z.name, z.value); zoneColors.set(z.name, z.color || "#d8d2c4"); } }
+  const tabs = [["zone", T("估值区间", "Zone"), byZone, zoneColors], ["sym", T("标的", "Holding"), bySym], ["mkt", T("市场", "Market"), s.byMarket], ["cur", T("币种", "Currency"), s.byCur]];
+  if (data.accounts.length > 1) tabs.push(["acc", T("账户", "Account"), s.byAccount]);
+  if (!tabs.some((t) => t[0] === distTab)) distTab = "zone";
+  const seg = el("div", "pf-seg pf-dist-tabs"), body = el("div");
+  const draw = () => {
+    seg.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.k === distTab));
+    const [k, , map, colors] = tabs.find((t) => t[0] === distTab);
+    body.replaceChildren(donut("", map, colors));
+    if (k === "zone") {
+      const total = s.zones.reduce((a, z) => a + z.value, 0), p = (z) => (total ? (z.value / total * 100).toFixed(1) + "%" : "—");
+      const strike = s.zones[0], bubble = s.zones[4], none = s.zones[5];
+      const call = el("div", "pf-callout");
+      call.innerHTML = zh
+        ? `持仓市值里，击球区 <b>${strike.count}</b> 只占 <b>${p(strike)}</b>，泡沫区 <b>${bubble.count}</b> 只占 <b>${p(bubble)}</b>。` + (none.count ? `<b>${none.count}</b> 只不在看板或未设区间。` : "")
+        : `Of holdings value, <b>${strike.count}</b> in the strike zone (<b>${p(strike)}</b>), <b>${bubble.count}</b> in the bubble zone (<b>${p(bubble)}</b>).` + (none.count ? ` <b>${none.count}</b> have no fair range.` : "");
+      body.appendChild(call);
+    }
+  };
+  for (const [k, label] of tabs) {
+    const b = el("button", "", label); b.type = "button"; b.dataset.k = k;
+    b.addEventListener("click", () => { if (distTab !== k) { distTab = k; draw(); } });
+    seg.appendChild(b);
+  }
+  c.append(seg, body);
+  draw();
   return c;
 }
 
 function accountsCard(s) {
   const c = el("section", "pf-card");
-  const head = el("div", "pf-cardhead"); head.appendChild(el("span", "pf-cardtitle", T("账户", "Accounts"))); c.appendChild(head);
+  const head = el("div", "pf-cardhead"); head.appendChild(el("span", "pf-cardtitle", T("账户", "Accounts")));
+  const add = el("button", "btn sm"); add.type = "button"; add.append(ri("add-line"), document.createTextNode(T("添加账户", "Add account")));
+  add.addEventListener("click", () => openAccount());
+  head.appendChild(add); c.appendChild(head);
+  const grid = el("div", "pf-accgrid"); c.appendChild(grid);
   for (const a of data.accounts) {
     const m = BROKER_META[a.broker] || BROKER_META.manual;
     const row = el("div", "pf-acc");
@@ -1088,11 +1091,8 @@ function accountsCard(s) {
     }
     btn(T("设置", "Settings"), "settings-3-line", () => openAccount(a));
     row.appendChild(acts);
-    c.appendChild(row);
+    grid.appendChild(row);
   }
-  const add = el("button", "pf-add"); add.type = "button"; add.append(ri("add-line"), document.createTextNode(T("添加账户", "Add account")));
-  add.addEventListener("click", () => openAccount());
-  c.appendChild(add);
   return c;
 }
 
