@@ -163,7 +163,7 @@ async function saveSettings() {
 
 /* ---------- 色块配色（自动保存 + 实时预览） ---------- */
 const ZONE_KEYS = ZONES.map((z) => z.key);
-const ZONE_LABELS = { deep: "深度低估", under: "低估", fair: "合理", over: "高估", xover: "极度高估" };
+const ZONE_LABELS = { deep: "击球区", under: "低估", fair: "合理", over: "高估", xover: "泡沫区" };
 const colSaveEl = document.getElementById("colSave");
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 let colorState = {}; // 仅存自定义的区间色；缺省即用默认
@@ -316,7 +316,7 @@ const FIELDS = [
   { k: "fairLow", lab: "合理 · 低点", type: "number" },
   { k: "fairHigh", lab: "合理 · 高点", type: "number" },
   { k: "mos", lab: "安全边际 %", type: "number", presets: [10, 20, 30, 40, 50] },
-  { k: "ext", lab: "极度高估 %", type: "number", presets: [10, 20, 30, 40, 50] },
+  { k: "ext", lab: "泡沫阈值 %", type: "number", presets: [10, 20, 30, 40, 50] },
 ];
 
 function addCfgDom(item) {

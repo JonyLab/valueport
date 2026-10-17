@@ -1,25 +1,20 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>注册 · 估值钟摆</title>
 <link rel="stylesheet" href="/shared/styles.css">
-<style>.auth{max-width:380px;margin:72px auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:var(--sh);padding:0 24px 24px}
-.auth h2{font-family:var(--serif);font-weight:500;font-size:22px;letter-spacing:-.01em;margin:0 -24px 16px;padding:22px 24px 16px;border-bottom:1px solid var(--divider)}
-.auth p.hint{font-size:12px;color:var(--ink-soft);line-height:1.7;margin:0 0 16px;padding:9px 12px;border:1px dashed var(--node);border-radius:3px}
-.auth input{width:100%;font-size:14px;padding:10px;border:1px solid var(--border);border-radius:5px;margin-bottom:12px;background:#fff}
-.auth input:focus{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
-.auth .err{color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px}.auth .alt{font-size:12.5px;color:var(--ink-soft);margin-top:14px;text-align:center}.auth .alt a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}</style>
-</head><body><div class="page"><div class="auth">
+</head><body><div class="page"><div class="page-corner" id="corner"></div><div class="auth">
+<a class="auth-brand" href="/">ValuePort</a>
 <h2 data-i18n="a_reg_title">注册</h2><p class="hint" data-i18n="a_reg_hint">需要一枚激活码（向站长索取）。</p><div class="err" id="err"></div>
 <input id="u" data-i18n-ph="a_reg_username_ph" placeholder="用户名（3-20 位字母/数字/_-）" autocomplete="username">
 <input id="p" type="password" data-i18n-ph="a_reg_password_ph" placeholder="密码（至少 6 位）" autocomplete="new-password">
 <input id="c" data-i18n-ph="a_reg_code_ph" placeholder="激活码 XXXX-XXXX-XXXX">
 <button class="btn primary" id="go" style="width:100%" data-i18n="a_reg_btn">注册并进入</button>
-<div class="alt"><span data-i18n="a_has_account">已有账号？</span><a href="/login" data-i18n="a_login_link">去登录</a> · <a href="#" id="langSw"></a></div>
+<div class="alt"><span data-i18n="a_has_account">已有账号？</span><a href="/login" data-i18n="a_login_link">去登录</a></div>
 </div></div>
 <script type="module">
-import { t, applyI18n, toggleLang, langButtonLabel } from "/shared/i18n.js";
+import { t, applyI18n } from "/shared/i18n.js";
+import { mountLangMenu } from "/shared/langmenu.js";
 applyI18n();
-const sw=document.getElementById("langSw"); sw.textContent=langButtonLabel();
-sw.addEventListener("click",(e)=>{e.preventDefault();toggleLang();});
+mountLangMenu(document.getElementById("corner"));
 const err=document.getElementById("err");
 async function reg(){ err.textContent="";
   const go=document.getElementById("go"); go.disabled=true;

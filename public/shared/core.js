@@ -1,10 +1,10 @@
 // 纯逻辑：无 DOM 依赖，可在 node 下单测。
 export const ZONES = [
-  { key: "deep",  en: "Deep value",  hex: "#2ea35d" },
+  { key: "deep",  en: "Strike zone", hex: "#2ea35d" },
   { key: "under", en: "Undervalued", hex: "#3a73ee" },
   { key: "fair",  en: "Fair value",  hex: "#555e6b" },
-  { key: "over",  en: "Overvalued",  hex: "#e23c3c" },
-  { key: "xover", en: "Extreme",     hex: "#a31515" },
+  { key: "over",  en: "Overvalued",  hex: "#f08c2e" },
+  { key: "xover", en: "Bubble",      hex: "#e23c3c" },
 ];
 export const N = ZONES.length;
 export const SEG = 180 / N;

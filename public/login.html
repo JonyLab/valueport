@@ -1,22 +1,19 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>登录 · 估值钟摆</title>
 <link rel="stylesheet" href="/shared/styles.css">
-<style>.auth{max-width:360px;margin:80px auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:var(--sh);padding:0 24px 24px}
-.auth h2{font-family:var(--serif);font-weight:500;font-size:22px;letter-spacing:-.01em;margin:0 -24px 18px;padding:22px 24px 16px;border-bottom:1px solid var(--divider)}.auth input{width:100%;font-size:14px;padding:10px;border:1px solid var(--border);border-radius:5px;margin-bottom:12px;background:#fff}
-.auth input:focus{outline:none;border-color:var(--ring-border);box-shadow:0 0 0 3px var(--ring)}
-.auth .err{color:var(--red);font-size:12px;margin-bottom:10px;min-height:16px}.auth .alt{font-size:12.5px;color:var(--ink-soft);margin-top:14px;text-align:center}.auth .alt a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}</style>
-</head><body><div class="page"><div class="auth">
+</head><body><div class="page"><div class="page-corner" id="corner"></div><div class="auth">
+<a class="auth-brand" href="/">ValuePort</a>
 <h2 data-i18n="a_login_title">登录</h2><div class="err" id="err"></div>
 <input id="u" data-i18n-ph="a_username_ph" placeholder="用户名" autocomplete="username">
 <input id="p" type="password" data-i18n-ph="a_password_ph" placeholder="密码" autocomplete="current-password">
 <button class="btn primary" id="go" style="width:100%" data-i18n="a_login_btn">登录</button>
-<div class="alt"><span data-i18n="a_no_account">没有账号？</span><a href="/register" data-i18n="a_register_link">用激活码注册</a> · <a href="#" id="langSw"></a></div>
+<div class="alt"><span data-i18n="a_no_account">没有账号？</span><a href="/register" data-i18n="a_register_link">用激活码注册</a></div>
 </div></div>
 <script type="module">
-import { t, applyI18n, toggleLang, langButtonLabel } from "/shared/i18n.js";
+import { t, applyI18n } from "/shared/i18n.js";
+import { mountLangMenu } from "/shared/langmenu.js";
 applyI18n();
-const sw=document.getElementById("langSw"); sw.textContent=langButtonLabel();
-sw.addEventListener("click",(e)=>{e.preventDefault();toggleLang();});
+mountLangMenu(document.getElementById("corner"));
 const err=document.getElementById("err");
 async function gotoMyBoard(replace){
   try{

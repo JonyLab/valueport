@@ -4,10 +4,10 @@ import { LANG } from "./i18n.js";
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 const SEG_DEG = 180 / ZONES.length; // 36
-// 区间缩写（与钟摆五区间一一对应：深度低估/低估/合理/高估/极度高估）
+// 区间缩写（与钟摆五区间一一对应：击球区/低估/合理/高估/泡沫区）
 const ZONE_SHORT = {
-  zh: ["深值", "低估", "合理", "高估", "极高"],
-  en: ["Deep", "Under", "Fair", "Over", "Ext"],
+  zh: ["击球区", "低估", "合理", "高估", "泡沫"],
+  en: ["Strike", "Under", "Fair", "Over", "Bubble"],
 };
 
 export class Bar {
@@ -23,7 +23,7 @@ export class Bar {
     track.appendChild(this.marker);
     // 未设区间时覆盖在条带上的占位提示
     this.emptyHint = document.createElement("div"); this.emptyHint.className = "vbar-empty";
-    this.emptyHint.textContent = LANG === "zh" ? "未设内在价值" : "No fair value set";
+    this.emptyHint.dataset.t = LANG === "zh" ? "未设内在价值" : "No fair value set";
     track.appendChild(this.emptyHint);
     const ticks = document.createElement("div"); ticks.className = "vbar-ticks";
     this.tickEls = [0, 1, 2, 3].map((k) => { const s = document.createElement("span"); s.className = "vbar-tick"; s.style.left = ((k + 1) * 20) + "%"; ticks.appendChild(s); return s; });
@@ -31,7 +31,10 @@ export class Bar {
     mount.appendChild(root);
     this.root = root;
   }
+  // 区间配色变化后按上次的 cfg 重画（与 Gauge.repaint 同名，供设置页实时预览）
+  repaint() { if (this._cfg) this.set(this._cfg, false); }
   set(cfg, animate = true) {
+    this._cfg = cfg;
     // 未设内在价值区间：占位态——条带置灰、刻度留空、隐藏标记、显示提示
     const valued = hasFairRange(cfg);
     this.root.classList.toggle("is-empty", !valued);
@@ -53,7 +56,7 @@ export class Bar {
     const x = Math.max(0, Math.min(100, phi / 180 * 100));
     this.marker.style.display = hasPrice ? "" : "none";
     if (!animate || REDUCE) { this.marker.style.transition = "none"; this.marker.style.left = x + "%"; }
-    else { this.marker.style.transition = "left 1.1s cubic-bezier(.22,1,.36,1)"; requestAnimationFrame(() => { this.marker.style.left = x + "%"; }); }
+    else { this.marker.style.transition = "left .5s cubic-bezier(.22,1,.36,1)"; requestAnimationFrame(() => { this.marker.style.left = x + "%"; }); }
   }
   destroy() { if (this.root) this.root.remove(); }
 }

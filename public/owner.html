@@ -1,41 +1,55 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>站长后台 · 估值钟摆</title>
 <link rel="stylesheet" href="/shared/styles.css">
-<style>.wrap{max-width:760px;margin:40px auto}.gate{max-width:360px;margin:80px auto;background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:28px 24px}
-.gate input{width:100%;font-size:14px;padding:10px;border:1px solid #dfe3ea;border-radius:8px;margin-bottom:12px}
-.card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px 20px;margin-bottom:20px}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.hidden{display:none}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{text-align:left;padding:6px 8px;border-bottom:1px solid #eef0f3}
-.mono{font-family:var(--mono)}.err{color:var(--red);font-size:12px;min-height:16px}</style>
-</head><body>
-<div class="gate" id="gate"><h2>站长登录</h2><div class="err" id="gerr"></div>
-<input id="pw" type="password" placeholder="站长密码"><button class="btn primary" id="gin" style="width:100%">进入</button></div>
+<style>.wrap{max-width:860px;width:100%;margin:0 auto;padding-top:8px}.hidden{display:none}
+.owner-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
+.owner-head h1{font-size:44px;margin:0}
+.card{padding:22px 24px;margin-bottom:14px}
+.card-title{font-size:20px;font-weight:400;margin-right:auto}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row input[type=number]{width:84px;height:40px;padding:0 14px;border:0;border-radius:var(--r-pill);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:14px}
+th{text-align:left;padding:8px 10px;font-weight:400;color:var(--ink-mute);font-size:12.5px}
+td{text-align:left;padding:9px 10px;border-top:1px dashed var(--border)}
+td .btn{height:32px;padding:0 13px;font-size:13px}
+.tag{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:var(--r-pill);font-size:12px;background:var(--track);color:var(--ink-soft)}
+.tag.free{background:var(--sun);color:var(--sun-ink)}
+.mono{font-family:var(--mono)}</style>
+</head><body><div class="page center" id="page"><div class="page-corner" id="corner"></div>
+<div class="gate" id="gate"><a class="auth-brand" href="/">ValuePort</a><h2 data-i18n="o_login">站长登录</h2><div class="err" id="gerr"></div>
+<input id="pw" type="password" placeholder="站长密码" data-i18n-ph="o_pw_ph"><button class="btn primary" id="gin" style="width:100%" data-i18n="o_enter">进入</button></div>
 <div class="wrap hidden" id="app">
-  <div class="row" style="justify-content:space-between"><h1>站长后台</h1><button class="btn" id="out">退出</button></div>
-  <div class="card"><div class="row"><b>激活码</b><input id="cnt" type="number" min="1" max="50" value="5" style="width:70px">
-    <button class="btn primary" id="gen">生成</button></div><div id="codes"></div></div>
-  <div class="card"><b>用户</b><div id="users"></div></div>
+  <div class="owner-head"><h1 data-i18n="o_title">站长后台</h1><button class="btn" id="out" data-i18n="o_out">退出</button></div>
+  <div class="card"><div class="row"><span class="card-title" data-i18n="o_codes">激活码</span><input id="cnt" type="number" min="1" max="50" value="5">
+    <button class="btn primary" id="gen" data-i18n="o_gen">生成</button></div><div id="codes"></div></div>
+  <div class="card"><div class="row"><span class="card-title" data-i18n="o_users">用户</span></div><div id="users"></div></div>
+</div>
 </div>
 <script type="module">
+import { t, applyI18n } from "/shared/i18n.js";
+import { mountLangMenu } from "/shared/langmenu.js";
+applyI18n();
+document.title = t("o_title") + " · ValuePort";
+mountLangMenu(document.getElementById("corner"));
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 async function tryLoad(){ let r; try{ r=await fetch("/api/owner/codes"); }catch{ return false; } if(r.status===401) return false;
-  $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); await refreshCodes(); await refreshUsers(); return true; }
+  $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); $("page").classList.remove("center"); await refreshCodes(); await refreshUsers(); return true; }
 async function login(){ $("gerr").textContent="";
-  let r; try{ r=await fetch("/api/owner/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:$("pw").value})}); }catch{ $("gerr").textContent="网络错误，请重试"; return; }
-  if(r.ok) tryLoad(); else $("gerr").textContent="密码错误"; }
+  let r; try{ r=await fetch("/api/owner/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:$("pw").value})}); }catch{ $("gerr").textContent=t("a_net_err"); return; }
+  if(r.ok) tryLoad(); else $("gerr").textContent=t("o_pw_bad"); }
 $("gin").addEventListener("click",login); $("pw").addEventListener("keydown",(e)=>{if(e.key==="Enter")login();});
 $("out").addEventListener("click",async()=>{await fetch("/api/owner/logout",{method:"POST"});location.reload();});
 $("gen").addEventListener("click",async()=>{ await fetch("/api/owner/codes",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({count:Number($("cnt").value)||1})}); refreshCodes(); });
 async function refreshCodes(){ const {codes}=await (await fetch("/api/owner/codes")).json();
-  const t=document.createElement("div");
-  t.innerHTML="<table><tr><th>激活码</th><th>状态</th><th></th></tr>"+codes.map(c=>`<tr><td class="mono">${esc(c.code)}</td><td>${c.used?"已用":"未用"}</td><td>${c.used?"":`<button class="btn" data-code="${esc(c.code)}">复制</button>`}</td></tr>`).join("")+"</table>";
-  t.querySelectorAll("button[data-code]").forEach(b=>b.addEventListener("click",()=>{ navigator.clipboard.writeText(b.dataset.code); const orig=b.textContent; b.textContent="已复制"; setTimeout(()=>{ b.textContent=orig; },1500); }));
-  $("codes").innerHTML=""; $("codes").appendChild(t); }
+  const tb=document.createElement("div");
+  tb.innerHTML=`<table><tr><th>${esc(t("o_codes"))}</th><th>${esc(t("o_status"))}</th><th></th></tr>`+codes.map(c=>`<tr><td class="mono">${esc(c.code)}</td><td><span class="tag${c.used?"":" free"}">${esc(c.used?t("o_used"):t("o_free"))}</span></td><td>${c.used?"":`<button class="btn" data-code="${esc(c.code)}">${esc(t("o_copy"))}</button>`}</td></tr>`).join("")+"</table>";
+  tb.querySelectorAll("button[data-code]").forEach(b=>b.addEventListener("click",()=>{ navigator.clipboard.writeText(b.dataset.code); const orig=b.textContent; b.textContent=t("o_copied"); setTimeout(()=>{ b.textContent=orig; },1500); }));
+  $("codes").innerHTML=""; $("codes").appendChild(tb); }
 async function refreshUsers(){ const {users}=await (await fetch("/api/owner/users")).json();
-  const t=document.createElement("div");
-  t.innerHTML="<table><tr><th>用户名</th><th>网址</th><th>注册时间</th><th></th></tr>"+users.map(u=>`<tr><td>${esc(u.username)}</td><td class="mono">/b/${esc(u.boardSlug)}</td><td>${esc((u.createdAt||"").slice(0,10))}</td><td><button class="btn" data-id="${esc(u.id)}">重置密码</button></td></tr>`).join("")+"</table>";
-  t.querySelectorAll("button[data-id]").forEach(b=>b.addEventListener("click",async()=>{ const r=await fetch(`/api/owner/users/${b.dataset.id}/reset`,{method:"POST"}); const j=await r.json(); if(j.ok) alert("临时密码（转告该用户，登录后请改）：\n"+j.password); }));
-  $("users").innerHTML=""; $("users").appendChild(t); }
+  const tb=document.createElement("div");
+  tb.innerHTML=`<table><tr><th>${esc(t("o_username"))}</th><th>${esc(t("o_url"))}</th><th>${esc(t("o_created"))}</th><th></th></tr>`+users.map(u=>`<tr><td>${esc(u.username)}</td><td class="mono">/b/${esc(u.boardSlug)}</td><td>${esc((u.createdAt||"").slice(0,10))}</td><td><button class="btn" data-id="${esc(u.id)}">${esc(t("o_reset"))}</button></td></tr>`).join("")+"</table>";
+  tb.querySelectorAll("button[data-id]").forEach(b=>b.addEventListener("click",async()=>{ const r=await fetch(`/api/owner/users/${b.dataset.id}/reset`,{method:"POST"}); const j=await r.json(); if(j.ok) alert(t("o_reset_ok")+"\n"+j.password); }));
+  $("users").innerHTML=""; $("users").appendChild(tb); }
 tryLoad();
 </script></body></html>
