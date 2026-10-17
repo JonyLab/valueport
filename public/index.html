@@ -832,6 +832,26 @@
   .share-url .btn{flex:none}
   .hidden{display:none}
 </style>
+  <!-- 模块依赖整棵树先声明：浏览器一次并行拉取，不用等上一层下载完才发现下一层（线上每个文件都要回源校验，层层等很慢） -->
+  <link rel="modulepreload" href="/shared/ai-panel.js">
+  <link rel="modulepreload" href="/shared/bar.js">
+  <link rel="modulepreload" href="/shared/core.js">
+  <link rel="modulepreload" href="/shared/field-meta.js">
+  <link rel="modulepreload" href="/shared/gauge.js">
+  <link rel="modulepreload" href="/shared/i18n.js">
+  <link rel="modulepreload" href="/shared/langmenu.js">
+  <link rel="modulepreload" href="/shared/market.js">
+  <link rel="modulepreload" href="/shared/valuation-ui.js">
+  <link rel="modulepreload" href="/shared/valuation/derivations.js">
+  <link rel="modulepreload" href="/shared/valuation/facts.js">
+  <link rel="modulepreload" href="/shared/valuation/index.js">
+  <link rel="modulepreload" href="/shared/valuation/intrinsic.js">
+  <link rel="modulepreload" href="/shared/valuation/relative.js">
+  <link rel="modulepreload" href="/shared/valuation/resource.js">
+  <link rel="modulepreload" href="/shared/valuation/segments.js">
+  <link rel="modulepreload" href="/shared/valuation/workbench.js">
+  <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页，点击后几乎立即切换（Chrome 系浏览器支持，其他浏览器忽略） -->
+  <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"}]},"eagerness":"moderate"}]}</script>
 </head>
 <body class="booting">
 <div class="page">

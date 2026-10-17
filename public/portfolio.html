@@ -270,6 +270,12 @@
   @media (max-width:560px){ .pf-plan-opts{grid-template-columns:1fr} }
   html.has-cache #pfSkel{visibility:hidden} /* 有会话缓存：马上画缓存，首帧不画骨架 */
 </style>
+  <!-- 模块依赖整棵树先声明：浏览器一次并行拉取，不用等上一层下载完才发现下一层（线上每个文件都要回源校验，层层等很慢） -->
+  <link rel="modulepreload" href="/shared/core.js">
+  <link rel="modulepreload" href="/shared/i18n.js">
+  <link rel="modulepreload" href="/shared/langmenu.js">
+  <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页，点击后几乎立即切换（Chrome 系浏览器支持，其他浏览器忽略） -->
+  <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"}]},"eagerness":"moderate"}]}</script>
 </head>
 <body>
 <div class="page">
