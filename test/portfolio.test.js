@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { env, SELF, fetchMock } from "cloudflare:test";
 import { encryptJson, decryptJson } from "../src/crypto.js";
-import { validateCreds, validateSnapshot } from "../src/portfolio.js";
+import { validateCreds, validateSnapshot, validatePlan } from "../src/portfolio.js";
 
 beforeAll(async () => {
   const ddl = [
@@ -12,6 +12,7 @@ beforeAll(async () => {
     `CREATE TABLE IF NOT EXISTS broker_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, broker TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', cred_enc TEXT, last_sync_at TEXT, last_error TEXT, created_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS holdings (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, symbol TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', quantity REAL NOT NULL, cost_price REAL, currency TEXT NOT NULL, market TEXT NOT NULL DEFAULT '')`,
     `CREATE TABLE IF NOT EXISTS cash_balances (account_id INTEGER NOT NULL, currency TEXT NOT NULL, amount REAL NOT NULL, PRIMARY KEY (account_id, currency))`,
+    `CREATE TABLE IF NOT EXISTS portfolio_plans (user_id INTEGER PRIMARY KEY, plan TEXT NOT NULL, updated_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS portfolio_snapshots (user_id INTEGER NOT NULL, day TEXT NOT NULL, account_id INTEGER NOT NULL, v_usd REAL NOT NULL, v_hkd REAL NOT NULL, v_cny REAL NOT NULL, PRIMARY KEY (user_id, day, account_id))`,
   ];
   for (const q of ddl) await env.DB.prepare(q).run();
@@ -114,5 +115,29 @@ describe("portfolio history", () => {
     expect(pts[1].HKD).toBeCloseTo(858);
     expect((await call(f, "/api/my/portfolio/history")).status).toBe(200);
     expect((await (await call(f, "/api/my/portfolio/history")).json()).points.map((p) => p.USD)).toEqual([999]);
+  });
+});
+
+describe("target allocation plan", () => {
+  it("validates targets, cash and tolerance bands", () => {
+    expect(validatePlan({ targets: { usAAPL: 20, hk00700: "15.5", sh600519: 0 }, cash: 10 }).plan)
+      .toEqual({ targets: { usAAPL: 20, hk00700: 15.5 }, cash: 10, band: 5, rel: 25 });
+    expect(validatePlan({ targets: { AAPL: 10 } }).error).toMatch(/symbol/);
+    expect(validatePlan({ targets: { usAAPL: 70, usMSFT: 40 } }).error).toMatch(/100/);
+    expect(validatePlan({ targets: { usAAPL: 95 }, cash: 10 }).error).toMatch(/100/);
+    expect(validatePlan({ targets: {}, band: 0 }).error).toMatch(/band/);
+    expect(validatePlan({ targets: [] }).error).toBeTruthy();
+  });
+  it("saves per user and comes back with the portfolio summary", async () => {
+    const a = await userCookie("plan_alice"), b = await userCookie("plan_bob");
+    expect((await (await call(a, "/api/my/portfolio/plan")).json()).plan).toEqual({ targets: {}, cash: null, band: 5, rel: 25 });
+    expect((await call(a, "/api/my/portfolio/plan", "PUT", { targets: { usAAPL: 120 } })).status).toBe(400);
+    const r = await call(a, "/api/my/portfolio/plan", "PUT", { targets: { usAAPL: 30 }, cash: 15, band: 4, rel: 20 });
+    expect(r.status).toBe(200);
+    expect((await (await call(a, "/api/my/portfolio/plan")).json()).plan).toEqual({ targets: { usAAPL: 30 }, cash: 15, band: 4, rel: 20 });
+    expect((await (await call(b, "/api/my/portfolio/plan")).json()).plan.targets).toEqual({});
+    await call(a, "/api/my/portfolio/accounts", "POST", { broker: "manual", name: "M" });
+    const sum = await (await call(a, "/api/my/portfolio?base=USD")).json();
+    expect(sum.plan).toEqual({ targets: { usAAPL: 30 }, cash: 15, band: 4, rel: 20 });
   });
 });

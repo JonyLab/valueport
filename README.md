@@ -193,6 +193,8 @@ Each user can link their own brokerage accounts on `/portfolio`. Holdings and ca
 
 **Asset curve.** There is no historical data from brokers, so the curve is recorded going forward: a daily Cron Trigger (`wrangler.toml` `[triggers]`, 22:30 UTC — after the US close) syncs every Longbridge / IBKR account and writes one snapshot per user per day into `portfolio_snapshots` (total + each account, stored in USD, HKD and CNY at that day's FX). Opening the Portfolio page also refreshes today's row. It does not back-fill from today's holdings × past prices, because past positions were different.
 
+**Target allocation.** Users can set an intended weight per symbol (percent of total assets, cash included) plus a cash target, stored as one JSON plan per user in `portfolio_plans`. Drift is flagged with the 5/25 rule: off target by more than `band` points (default 5) or more than `rel`% of the target (default 25), whichever is tighter. Suggested actions combine drift with the board's valuation zone (overweight + overvalued → trim; underweight + strike zone / undervalued → add; underweight but overvalued → wait), and targets for board items you don't hold yet show up as planned positions.
+
 **Credentials** are validated, encrypted with AES-256-GCM (`src/crypto.js`) using the `CREDENTIALS_KEY` Worker secret, and never returned by any endpoint — the API only reports whether credentials exist plus the last four characters of the key / query ID. They are used only to read positions and balances.
 
 Setup for an existing deployment:
@@ -201,6 +203,7 @@ Setup for an existing deployment:
 # 1. New tables
 npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-portfolio.sql
 npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-portfolio-history.sql
+npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-portfolio-plan.sql
 # 2. Encryption key for broker credentials (32 random bytes, base64). Keep it stable: rotating it makes stored credentials unreadable.
 openssl rand -base64 32 | npx wrangler secret put CREDENTIALS_KEY
 ```
@@ -265,6 +268,8 @@ Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`
 | DELETE | `/api/my/portfolio/accounts/:id` | Delete the account and its snapshot |
 | POST | `/api/my/portfolio/accounts/:id/sync` | Pull the latest snapshot from the broker; failures are stored in `lastError` |
 | PUT | `/api/my/portfolio/accounts/:id/holdings` | Manual accounts only: replace `{positions, cash}` |
+| GET | `/api/my/portfolio/plan` | `{plan: {targets: {symbol: pct}, cash, band, rel}}` (defaults when unset; also included in `GET /api/my/portfolio`) |
+| PUT | `/api/my/portfolio/plan` | Replace the plan; weights 0–100, all targets + cash ≤ 100, `band` 0.5–30, `rel` 5–100 |
 | POST | `/api/my/portfolio/accounts/:id/import` | Manual accounts only: `{text}` CSV → replaces positions, keeps cash; returns `{imported, unsupported, errors}` |
 
 ### AI (requires `pendulum_user` cookie)

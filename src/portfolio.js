@@ -53,6 +53,45 @@ export function validateSnapshot(body) {
   return { positions, cash, errors };
 }
 
+// 目标仓位计划：targets = { 腾讯格式代码: 目标占总资产 % }，cash = 现金目标 %（可空），
+// 容忍带按「5/25 规则」：偏离超过 band 个百分点，或超过目标的 rel%，二者先到为准
+const SYM_RE = /^(us|hk|sh|sz|bj)[A-Za-z0-9.]{1,12}$/;
+export const PLAN_DEFAULTS = { targets: {}, cash: null, band: 5, rel: 25 };
+export function validatePlan(body) {
+  if (!body || typeof body !== "object") return { error: "bad body" };
+  const t = body.targets;
+  if (!t || typeof t !== "object" || Array.isArray(t)) return { error: "targets must be an object" };
+  const entries = Object.entries(t);
+  if (entries.length > 200) return { error: "too many targets" };
+  const targets = {};
+  let sum = 0;
+  for (const [sym, v] of entries) {
+    if (!SYM_RE.test(sym)) return { error: `bad symbol: ${sym}` };
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > 100) return { error: `bad weight for ${sym}` };
+    if (n > 0) { targets[sym] = Math.round(n * 100) / 100; sum += n; }
+  }
+  let cash = null;
+  if (body.cash !== null && body.cash !== undefined && body.cash !== "") {
+    cash = Number(body.cash);
+    if (!Number.isFinite(cash) || cash < 0 || cash > 100) return { error: "bad cash target" };
+    cash = Math.round(cash * 100) / 100;
+    sum += cash;
+  }
+  if (sum > 100.0001) return { error: "targets add up to more than 100%" };
+  const band = body.band === undefined ? PLAN_DEFAULTS.band : Number(body.band);
+  const rel = body.rel === undefined ? PLAN_DEFAULTS.rel : Number(body.rel);
+  if (!Number.isFinite(band) || band < 0.5 || band > 30) return { error: "band must be 0.5-30" };
+  if (!Number.isFinite(rel) || rel < 5 || rel > 100) return { error: "rel must be 5-100" };
+  return { plan: { targets, cash, band, rel } };
+}
+async function readPlan(db, uid) {
+  try {
+    const row = await db.prepare("SELECT plan FROM portfolio_plans WHERE user_id=?").bind(uid).first();
+    return row ? { ...PLAN_DEFAULTS, ...JSON.parse(row.plan) } : { ...PLAN_DEFAULTS };
+  } catch { return { ...PLAN_DEFAULTS }; } // 线上还没跑迁移时不影响资产页
+}
+
 function credHint(broker, creds) {
   if (!creds) return "";
   const v = broker === "longbridge" ? creds.appKey : broker === "ibkr" ? creds.queryId : "";
@@ -227,9 +266,12 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     ]);
     const holdings = (hs || []).map((h) => ({ accountId: h.account_id, symbol: h.symbol, name: h.name, quantity: h.quantity, costPrice: h.cost_price, currency: h.currency, market: h.market }));
     const cash = (cs || []).map((r) => ({ accountId: r.account_id, currency: r.currency, amount: r.amount }));
-    const symbols = [...new Set(holdings.map((h) => h.symbol))];
+    const plan = await readPlan(db, uid);
+    // 计划建仓的标的（有目标、还没持有）也要报价，用来算「约需买入多少股」
+    const symbols = [...new Set([...holdings.map((h) => h.symbol), ...Object.keys(plan.targets)])];
     const q = symbols.length ? await getQuotes(c.env, symbols) : { quotes: {}, prevClose: {} };
-    const fx = await fxRates(base, [...holdings.map((h) => h.currency), ...cash.map((r) => r.currency)]);
+    const planCur = Object.keys(plan.targets).map((sym) => sym.startsWith("us") ? "USD" : sym.startsWith("hk") ? "HKD" : "CNY");
+    const fx = await fxRates(base, [...holdings.map((h) => h.currency), ...cash.map((r) => r.currency), ...planCur]);
     // 顺手记下今天的快照（不阻塞响应；同一天重复打开只会覆盖当天那一行）
     try { c.executionCtx.waitUntil(recordSnapshot(c.env, uid).catch((e) => console.error("snapshot failed:", e && e.message))); } catch { /* 测试环境可能没有 executionCtx */ }
     c.header("Cache-Control", "no-store");
@@ -239,8 +281,20 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
       holdings, cash,
       quotes: q.quotes || {}, prevClose: q.prevClose || {}, source: q.source || "tencent",
       items: (its || []).map((r) => ({ ticker: r.ticker, name: r.name, symbol: r.symbol, fairLow: r.fair_low, fairHigh: r.fair_high, mos: r.mos, ext: r.ext })),
+      plan,
       ts: new Date().toISOString(),
     });
+  });
+
+  // ---------- 目标仓位 ----------
+  app.get("/api/my/portfolio/plan", async (c) => c.json({ plan: await readPlan(c.env.DB, c.get("uid")) }));
+  app.put("/api/my/portfolio/plan", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const { error, plan } = validatePlan(body);
+    if (error) return c.json({ error }, 400);
+    await c.env.DB.prepare("INSERT INTO portfolio_plans (user_id, plan, updated_at) VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET plan=excluded.plan, updated_at=excluded.updated_at")
+      .bind(c.get("uid"), JSON.stringify(plan), new Date().toISOString()).run();
+    return c.json({ ok: true, plan });
   });
 
   // ---------- 资产曲线：每日快照 ----------

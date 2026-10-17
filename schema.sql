@@ -72,3 +72,8 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
   v_cny       REAL    NOT NULL,
   PRIMARY KEY (user_id, day, account_id)
 );
+CREATE TABLE IF NOT EXISTS portfolio_plans (
+  user_id     INTEGER PRIMARY KEY,
+  plan        TEXT    NOT NULL,                -- {targets:{symbol:pct}, cash:pct|null, band:pp, rel:%}
+  updated_at  TEXT    NOT NULL
+);

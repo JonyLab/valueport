@@ -190,6 +190,56 @@
     .pf-brokers{grid-template-columns:1fr}
     .pf-table .hide-sm{display:none}
   }
+  /* 目标仓位 */
+  .pf-titlewrap{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .pf-alert{display:flex;align-items:center;gap:10px;width:100%;padding:12px 18px;border:0;border-radius:var(--r-pill);background:rgba(240,140,46,.14);color:#a4561a;
+    cursor:pointer;font-family:var(--font);font-size:13.5px;text-align:left}
+  .pf-alert i:first-child{font-size:17px}
+  .pf-alert span{flex:1;min-width:0}
+  .pf-alert:hover{background:rgba(240,140,46,.2)}
+  .pf-tgt-list{display:flex;flex-direction:column;gap:8px}
+  .pf-tgt{display:grid;grid-template-columns:minmax(150px,1.3fr) minmax(120px,1.4fr) 128px 70px minmax(180px,1.6fr);gap:14px;align-items:center;
+    padding:12px 14px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
+  .pf-tgt.link{cursor:pointer}
+  .pf-tgt.link:hover{background:rgba(29,29,27,.06)}
+  .pf-tgt-id{display:flex;align-items:center;gap:10px;min-width:0}
+  .pf-tgt-id .pf-sym-id{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .pf-logo-cash{display:flex;align-items:center;justify-content:center;background:var(--dark);color:var(--sun);font-size:15px}
+  .pf-tgt-bar{position:relative;height:10px;border-radius:var(--r-pill);background:rgba(29,29,27,.06)}
+  .pf-tgt-band{position:absolute;top:0;bottom:0;border-radius:var(--r-pill);background:rgba(246,207,74,.38)}
+  .pf-tgt-fill{position:absolute;left:0;top:2px;bottom:2px;border-radius:var(--r-pill);background:var(--dark)}
+  .pf-tgt.over .pf-tgt-fill{background:#f08c2e} .pf-tgt.under .pf-tgt-fill{background:#3a73ee}
+  .pf-tgt-mark{position:absolute;top:-4px;bottom:-4px;width:3px;margin-left:-1.5px;border-radius:3px;background:var(--sun-ink)}
+  .pf-tgt-nums{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pf-tgt-cur{font-size:15px}
+  .pf-tgt-of{font-size:12px;color:var(--ink-mute)}
+  .pf-tgt-drift{justify-self:start;font-size:12.5px;font-variant-numeric:tabular-nums;padding:3px 9px;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft);white-space:nowrap}
+  .pf-tgt.over .pf-tgt-drift{background:rgba(240,140,46,.16);color:#a4561a}
+  .pf-tgt.under .pf-tgt-drift{background:rgba(58,115,238,.12);color:#2c5bc4}
+  .pf-tgt-act{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .pf-tgt-say{font-size:13px;color:var(--ink)}
+  .pf-tgt-say.ok{color:var(--ink-mute)}
+  .pf-tgt-say.trimHot{color:var(--red)} .pf-tgt-say.addCheap,.pf-tgt-say.buildCheap{color:var(--green)}
+  .pf-tgt-how{font-size:12px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  @media (max-width:980px){
+    .pf-tgt{grid-template-columns:minmax(0,1fr) auto auto;row-gap:10px}
+    .pf-tgt-bar{grid-column:1 / -1;grid-row:2}
+    .pf-tgt-act{grid-column:1 / -1}
+  }
+  .pf-plan-rows{display:flex;flex-direction:column;gap:6px;margin:14px 0 10px;max-height:44vh;overflow:auto}
+  .pf-plan-row{display:grid;grid-template-columns:auto minmax(0,1fr) 120px;gap:10px;align-items:center;padding:8px 12px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
+  .pf-plan-row .pf-sym-id{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .pf-plan-in{display:flex;align-items:center;gap:6px}
+  .pf-plan-in input,.pf-plan-opt input{width:100%;height:36px;padding:0 12px;border:0;border-radius:var(--r-sm);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .pf-plan-in input:focus,.pf-plan-opt input:focus{outline:none;box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 4px var(--ring)}
+  .pf-plan-in span{color:var(--ink-mute);font-size:13px}
+  .pf-plan-add{width:100%;height:38px;margin-bottom:6px;padding:0 12px;border:0;border-radius:var(--r-pill);background:var(--track);font-family:var(--font);font-size:13px;color:var(--ink-soft);cursor:pointer}
+  .pf-plan-opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--border)}
+  .pf-plan-opt{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--ink-soft)}
+  .pf-plan-opt small{font-size:11.5px;color:var(--ink-mute)}
+  .pf-plan-sum{margin-top:14px;font-size:13.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+  .pf-plan-sum.bad{color:var(--red)}
+  @media (max-width:560px){ .pf-plan-opts{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -232,6 +282,14 @@
   <div id="holdBody"></div>
   <div class="pf-err" id="holdErr"></div>
   <div class="modal-foot"><button class="btn ghost" data-close id="holdCancel"></button><button class="btn primary" id="holdSave"></button></div>
+</div></div>
+
+<!-- 目标仓位 -->
+<div class="overlay hidden" id="planOverlay"><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="planTitle">
+  <div class="modal-top"><span class="modal-title" id="planTitle"></span><button class="btn icon sm modal-close" data-close aria-label="close"><i class="ri-close-line" aria-hidden="true"></i></button></div>
+  <div id="planBody"></div>
+  <div class="pf-err" id="planErr"></div>
+  <div class="modal-foot"><button class="btn ghost" data-close id="planCancel"></button><button class="btn primary" id="planSave"></button></div>
 </div></div>
 
 <script type="module">
@@ -315,6 +373,13 @@ function renderBaseSel() {
 renderBaseSel();
 
 // ---------- 汇总计算 ----------
+// 现价落在看板估值区间的第几段；-1 = 未估值（不在看板或没设区间）
+function zoneFor(it, price) {
+  if (!it || !(price > 0)) return -1;
+  const cfg = { ...it, price };
+  if (!structValid(cfg)) return -1;
+  return Math.min(ZONES.length - 1, Math.floor(Math.max(0, Math.min(179.9, priceToPhi(computeAnchors(cfg), price))) / (180 / ZONES.length)));
+}
 // 每只持仓：市值 / 成本 / 今日涨跌都换算成 base；同一标的跨账户合并成一行
 function summarize(d) {
   const accName = new Map(d.accounts.map((a) => [a.id, a.name]));
@@ -338,12 +403,7 @@ function summarize(d) {
   const items = new Map(d.items.map((it) => [it.symbol, it]));
   const rows = [...bySym.values()].map((r) => {
     const it = items.get(r.symbol);
-    let zone = -1; // -1 = 未估值
-    if (it && r.price > 0) {
-      const cfg = { ...it, price: r.price };
-      if (structValid(cfg)) zone = Math.min(ZONES.length - 1, Math.floor(Math.max(0, Math.min(179.9, priceToPhi(computeAnchors(cfg), r.price))) / (180 / ZONES.length)));
-    }
-    return { ...r, zone, onBoard: !!it, ticker: it ? it.ticker : "", boardName: it ? it.name : "" };
+    return { ...r, zone: zoneFor(it, r.price), onBoard: !!it, ticker: it ? it.ticker : "", boardName: it ? it.name : "" };
   }).sort((a, b) => (b.value || 0) - (a.value || 0));
   const holdValue = rows.reduce((s, r) => s + (Number.isFinite(r.value) ? r.value : 0), 0);
   const cashRows = new Map();
@@ -380,7 +440,8 @@ function summarize(d) {
   }
   for (const c of d.cash) { const A = perAcc.get(c.accountId); const v = conv(c.amount, c.currency); if (A && Number.isFinite(v)) { A.cash += v; A.value += v; } }
   const byAccount = new Map(d.accounts.map((a) => [a.name, perAcc.get(a.id).value]));
-  return { rows, holdValue, cashValue, total, pnl, pnlPct: pnlCost ? pnl / pnlCost * 100 : NaN, day, dayPct: total - day ? day / (total - day) * 100 : NaN, zones, byMarket, byCur, byAccount, perAcc, missingFx: [...missingFx], noPrice };
+  const s0 = { rows, holdValue, cashValue, total };
+  return { ...s0, plan: planView(d, s0, items, conv), pnl, pnlPct: pnlCost ? pnl / pnlCost * 100 : NaN, day, dayPct: total - day ? day / (total - day) * 100 : NaN, zones, byMarket, byCur, byAccount, perAcc, missingFx: [...missingFx], noPrice };
 }
 
 // ---------- 渲染 ----------
@@ -403,7 +464,9 @@ function render() {
   if (!data.accounts.length) { root.appendChild(emptyState()); return; }
   const s = summarize(data);
   const grid = el("div", "pf-grid"), main = el("div", "pf-main"), side = el("div", "pf-side");
-  main.append(totalCard(s), curveCard(), healthCard(s), zoneCard(s), holdingsCard(s));
+  const alert = driftAlert(s);
+  if (alert) main.appendChild(alert);
+  main.append(totalCard(s), curveCard(), targetCard(s), healthCard(s), zoneCard(s), holdingsCard(s));
   side.append(distCard(s), accountsCard(s));
   grid.append(main, side);
   root.appendChild(grid);
@@ -562,6 +625,14 @@ function healthChecks(s) {
   out.push({ key: "mkt", title: T("市场 / 币种集中度", "Market / currency"), level: mp > 85 || cp > 85 ? "warn" : "ok", value: `${mk} ${mp.toFixed(0)}%`,
     text: T(`最大市场 ${mk} 占 ${mp.toFixed(1)}%，最大币种 ${ck} 占 ${cp.toFixed(1)}%。` + (mp > 85 || cp > 85 ? "几乎全部押在一个市场或币种上，会受单一市场或汇率波动影响。" : ""),
       `Largest market ${mk} ${mp.toFixed(1)}%, largest currency ${ck} ${cp.toFixed(1)}%.`) });
+  if (s.plan.active) {
+    // 与顶部提醒同一口径：超配 / 低配 / 现金偏离；计划建仓不算偏离
+    const off = [...s.plan.rows.filter((r) => r.status === "over" || r.status === "under"), ...(s.plan.cash && s.plan.cash.status !== "ok" ? [{ ...s.plan.cash, name: T("现金", "Cash") }] : [])];
+    const far = off.filter((r) => Math.abs(r.drift) > 2 * r.tol);
+    out.push({ key: "plan", title: T("目标偏离", "Drift from targets"), level: far.length ? "bad" : off.length ? "warn" : "ok", value: `${off.length} ${T("项", "")}`,
+      text: off.length ? T(`${off.length} 项超出容忍带：${off.slice(0, 3).map((r) => r.name).join("、")}。见「目标仓位」里的建议。`, `${off.length} item(s) outside the tolerance band. See Target allocation.`)
+        : T("所有设了目标的仓位都在容忍带内。", "Every targeted position is within its band.") });
+  }
   const losers = s.rows.filter((r) => r.costKnown && r.cost > 0 && Number.isFinite(r.value) && r.value / r.cost - 1 < -0.2);
   const lw = hv ? losers.reduce((a, r) => a + r.value, 0) / hv * 100 : 0;
   out.push({ key: "loss", title: T("深度浮亏仓位", "Deep losers"), level: lw > 25 ? "bad" : lw > 10 ? "warn" : "ok", value: `${losers.length} ${T("只", "")}`,
@@ -660,6 +731,198 @@ function holdingsCard(s) {
   tb.appendChild(body); wrap.appendChild(tb); c.appendChild(wrap);
   if (!s.rows.length) c.appendChild(el("div", "pf-note", T("这些账户里还没有持仓。", "No holdings in these accounts yet.")));
   return c;
+}
+
+// ---------- 目标仓位 ----------
+// 偏离按「5/25 规则」判定：|当前 − 目标| 超过 band 个百分点，或超过目标的 rel%，二者先到为准（小仓位也管得住）。
+// 价值投资不机械再平衡：建议动作结合看板估值区间——超配且高估才明确减，低配且在击球区 / 低估才明确加。
+const DRIFT_TEXT = {
+  trimHot: T("超配且已高估，考虑减仓", "Overweight and overvalued — consider trimming"),
+  trimHold: T("超配但仍低估，可以继续持有，留意集中度", "Overweight but still cheap — fine to hold, watch concentration"),
+  trim: T("超配，按计划减仓回到目标", "Overweight — trim back to target"),
+  addCheap: T("低配且价格便宜，是加仓的好时机", "Underweight and cheap — a good time to add"),
+  addWait: T("低配但已高估，不急着补，等更好的价格", "Underweight but expensive — wait for a better price"),
+  add: T("低配，按计划加仓回到目标", "Underweight — add back to target"),
+  build: T("计划建仓", "Planned position"),
+  buildCheap: T("计划建仓，已进入击球区 / 低估", "Planned — now in strike / undervalued zone"),
+  ok: T("在容忍带内", "Within band"),
+  cashLow: T("现金低于目标，加仓余力不足", "Cash below target — less room to add"),
+  cashHigh: T("现金高于目标，可以留意击球区标的", "Cash above target — look for strike-zone names"),
+};
+function planView(d, s, items, conv) {
+  const plan = d.plan || { targets: {}, cash: null, band: 5, rel: 25 };
+  const targets = plan.targets || {};
+  const active = Object.keys(targets).length > 0 || Number.isFinite(plan.cash);
+  const tot = s.total;
+  const tolOf = (t) => Math.max(0.1, Math.min(plan.band, t * plan.rel / 100));
+  const held = new Map(s.rows.map((r) => [r.symbol, r]));
+  const rows = [];
+  for (const [sym, tgt] of Object.entries(targets)) {
+    const h = held.get(sym), it = items.get(sym);
+    const price = h ? h.price : d.quotes[sym];
+    const cur = h && Number.isFinite(h.value) && tot ? h.value / tot * 100 : 0;
+    const zone = h ? h.zone : zoneFor(it, price);
+    const currency = h ? h.currency : (sym.startsWith("us") ? "USD" : sym.startsWith("hk") ? "HKD" : "CNY");
+    const tol = tolOf(tgt), drift = cur - tgt;
+    const status = !h ? "build" : drift > tol ? "over" : drift < -tol ? "under" : "ok";
+    const hot = zone >= 3, cheap = zone >= 0 && zone <= 1;
+    const action = status === "build" ? (cheap ? "buildCheap" : "build")
+      : status === "over" ? (hot ? "trimHot" : cheap ? "trimHold" : "trim")
+      : status === "under" ? (cheap ? "addCheap" : hot ? "addWait" : "add") : "ok";
+    const trade = (tgt - cur) / 100 * tot;                        // 回到目标需要买(+)卖(−)多少（base 货币）
+    const px = price > 0 ? conv(price, currency) : NaN;          // 每股价格折成 base
+    const shares = Number.isFinite(px) && px > 0 ? Math.round(trade / px) : NaN;
+    rows.push({ symbol: sym, name: (it && it.name) || (h && (h.boardName || h.name)) || sym.slice(2).toUpperCase(), ticker: it ? it.ticker : "",
+      cur, tgt, tol, drift, status, zone, action, trade, shares, currency });
+  }
+  // 设了计划但没给目标的持仓：单独列出，不报警
+  const untargeted = active ? s.rows.filter((r) => !(r.symbol in targets) && Number.isFinite(r.value) && r.value > 0)
+    .map((r) => ({ symbol: r.symbol, name: r.boardName || r.name || r.symbol, cur: tot ? r.value / tot * 100 : 0, zone: r.zone })) : [];
+  let cash = null;
+  if (Number.isFinite(plan.cash)) {
+    const cur = tot ? s.cashValue / tot * 100 : 0, tol = tolOf(plan.cash), drift = cur - plan.cash;
+    cash = { cur, tgt: plan.cash, tol, drift, status: drift > tol ? "over" : drift < -tol ? "under" : "ok", trade: (plan.cash - cur) / 100 * tot };
+  }
+  const rank = (r) => (r.status === "over" || r.status === "under" ? 0 : r.status === "build" ? 1 : 2);
+  rows.sort((a, b) => rank(a) - rank(b) || Math.abs(b.drift) - Math.abs(a.drift));
+  const allocated = Object.values(targets).reduce((a, b) => a + b, 0) + (Number.isFinite(plan.cash) ? plan.cash : 0);
+  const offCount = rows.filter((r) => r.status === "over" || r.status === "under").length + (cash && cash.status !== "ok" ? 1 : 0);
+  return { plan, active, rows, untargeted, cash, allocated, offCount };
+}
+
+// 顶部提醒：有超出容忍带的偏离时显示，点一下滚到目标仓位卡
+function driftAlert(s) {
+  if (!s.plan.active || !s.plan.offCount) return null;
+  const a = el("button", "pf-alert"); a.type = "button";
+  const hot = s.plan.rows.filter((r) => r.action === "trimHot").length, cheap = s.plan.rows.filter((r) => r.action === "addCheap" || r.action === "buildCheap").length;
+  const extra = [hot ? T(`${hot} 项超配且高估`, `${hot} overweight & overvalued`) : "", cheap ? T(`${cheap} 项低配且便宜`, `${cheap} underweight & cheap`) : ""].filter(Boolean).join(T("，", ", "));
+  a.append(ri("alarm-warning-line"), el("span", "", T(`${s.plan.offCount} 项仓位偏离目标超出容忍带`, `${s.plan.offCount} position(s) drifted outside the tolerance band`) + (extra ? T("：", ": ") + extra : "")), ri("arrow-down-line"));
+  a.addEventListener("click", () => { const c = document.getElementById("pfTarget"); if (c) c.scrollIntoView({ behavior: "smooth", block: "start" }); });
+  return a;
+}
+
+function targetCard(s) {
+  const pv = s.plan;
+  const c = el("section", "pf-card"); c.id = "pfTarget";
+  const head = el("div", "pf-cardhead");
+  const ttl = el("div", "pf-titlewrap");
+  ttl.append(el("span", "pf-cardtitle", T("目标仓位", "Target allocation")),
+    el("span", "pf-cardsub", pv.active ? T(`容忍带 ±${pv.plan.band}pp 或目标的 ${pv.plan.rel}%，先到为准`, `Band ±${pv.plan.band}pp or ${pv.plan.rel}% of target, whichever is tighter`) : T("给标的设一个预期占比，偏离时提醒你", "Set an intended weight per holding and get alerted on drift")));
+  const edit = el("button", "btn sm"); edit.type = "button"; edit.append(ri(pv.active ? "edit-line" : "add-line"), document.createTextNode(pv.active ? T("调整目标", "Edit targets") : T("设置目标", "Set targets")));
+  edit.addEventListener("click", () => openPlan(s));
+  head.append(ttl, edit);
+  c.appendChild(head);
+  if (!pv.active) {
+    c.appendChild(el("div", "pf-callout", T("先想好每只股票在组合里「应该」占多少，比如高确定性的核心仓 15–25%，观察仓 3–5%，再留一部分现金等击球区。之后价格涨跌让仓位偏离时，这里会结合估值区间告诉你该减、该加，还是继续拿着。",
+      "Decide what each stock should weigh — e.g. 15–25% for high-conviction core holdings, 3–5% for starter positions, plus some cash for strike-zone opportunities. When prices push weights off target, this card combines drift with your valuation zones to say trim, add, or hold.")));
+    return c;
+  }
+  const max = Math.max(10, ...pv.rows.map((r) => Math.max(r.cur, r.tgt + r.tol)), pv.cash ? Math.max(pv.cash.cur, pv.cash.tgt + pv.cash.tol) : 0) * 1.08;
+  const X = (v) => Math.max(0, Math.min(100, v / max * 100)) + "%";
+  const list = el("div", "pf-tgt-list");
+  const lineFor = (r, isCash) => {
+    const row = el("div", "pf-tgt " + (r.status === "over" ? "over" : r.status === "under" ? "under" : r.status === "build" ? "build" : "ok"));
+    const id = el("div", "pf-tgt-id");
+    if (isCash) { const lg = el("span", "pf-logo pf-logo-cash"); lg.appendChild(ri("wallet-3-line")); id.append(lg, el("span", "pf-sym-name", T("现金", "Cash"))); }
+    else {
+      const lg = el("span", "pf-logo"); mountLogo(lg, r.symbol, r.name);
+      const nm = el("div", "pf-sym-id"); nm.append(el("span", "pf-sym-name", r.name));
+      const zp = el("span", "pf-zone"); const zd = el("i");
+      if (r.zone >= 0) { zd.style.background = ZONES[r.zone].hex; zp.append(zd, document.createTextNode(ZONE_NAMES[r.zone])); } else zp.textContent = NONE_NAME;
+      nm.appendChild(zp); id.append(lg, nm);
+    }
+    // 条：浅色 = 容忍带，竖线 = 目标，实心 = 当前
+    const bar = el("div", "pf-tgt-bar");
+    const band = el("span", "pf-tgt-band"); band.style.left = X(Math.max(0, r.tgt - r.tol)); band.style.width = `calc(${X(r.tgt + r.tol)} - ${X(Math.max(0, r.tgt - r.tol))})`;
+    const fill = el("span", "pf-tgt-fill"); fill.style.width = X(r.cur);
+    const mark = el("span", "pf-tgt-mark"); mark.style.left = X(r.tgt);
+    bar.append(band, fill, mark);
+    const nums = el("div", "pf-tgt-nums");
+    nums.append(el("span", "pf-tgt-cur", r.cur.toFixed(1) + "%"), el("span", "pf-tgt-of", T(" / 目标 ", " / target ") + r.tgt.toFixed(1) + "%"));
+    const dr = el("span", "pf-tgt-drift", r.status === "build" ? T("未持有", "Not held") : (r.drift > 0 ? "+" : r.drift < 0 ? "−" : "") + Math.abs(r.drift).toFixed(1) + "pp");
+    const act = el("div", "pf-tgt-act");
+    const key = isCash ? (r.status === "under" ? "cashLow" : r.status === "over" ? "cashHigh" : "ok") : r.action;
+    act.appendChild(el("span", "pf-tgt-say " + key, DRIFT_TEXT[key]));
+    if (r.status !== "ok" && Number.isFinite(r.trade) && Math.abs(r.trade) > 0) {
+      const buy = r.trade > 0;
+      const how = isCash ? T(buy ? `约需补 ${amt(r.trade, 0)} ${base}` : `约多出 ${amt(-r.trade, 0)} ${base}`, buy ? `≈ ${amt(r.trade, 0)} ${base} short` : `≈ ${amt(-r.trade, 0)} ${base} extra`)
+        : T(`回到目标约需${buy ? "买入" : "卖出"} ${amt(Math.abs(r.trade), 0)} ${base}`, `≈ ${buy ? "buy" : "sell"} ${amt(Math.abs(r.trade), 0)} ${base} to reach target`)
+          + (Number.isFinite(r.shares) && r.shares !== 0 ? T(`（约 ${qtyText(Math.abs(r.shares))} 股）`, ` (~${qtyText(Math.abs(r.shares))} sh)`) : "");
+      act.appendChild(el("span", "pf-tgt-how", how));
+    }
+    row.append(id, bar, nums, dr, act);
+    if (!isCash && r.ticker) { row.classList.add("link"); row.addEventListener("click", () => { location.href = "/b/" + encodeURIComponent(slug) + "/" + encodeURIComponent(r.ticker.toUpperCase()); }); }
+    return row;
+  };
+  pv.rows.forEach((r) => list.appendChild(lineFor(r, false)));
+  if (pv.cash) list.appendChild(lineFor(pv.cash, true));
+  c.appendChild(list);
+  const foot = [];
+  if (pv.untargeted.length) foot.push(T(`${pv.untargeted.length} 只持仓没设目标（${pv.untargeted.slice(0, 3).map((r) => r.name).join("、")}），合计 ${pv.untargeted.reduce((a, r) => a + r.cur, 0).toFixed(1)}%。`,
+    `${pv.untargeted.length} holding(s) have no target (${pv.untargeted.reduce((a, r) => a + r.cur, 0).toFixed(1)}%).`));
+  foot.push(T(`目标合计 ${pv.allocated.toFixed(1)}%` + (pv.allocated < 99.95 ? `，还有 ${(100 - pv.allocated).toFixed(1)}% 未分配。` : "。"), `Targets add up to ${pv.allocated.toFixed(1)}%.`));
+  c.appendChild(el("div", "pf-note", foot.join(" ")));
+  return c;
+}
+
+// 设置目标弹窗：已持有 + 已设目标的标的各一行；可从看板加标的（计划建仓）；现金目标与容忍带
+function openPlan(s) {
+  const pv = s.plan;
+  $("planTitle").textContent = T("设置目标仓位", "Target allocation");
+  $("planCancel").textContent = T("取消", "Cancel"); $("planSave").textContent = T("保存", "Save"); $("planErr").textContent = "";
+  const body = $("planBody"); body.innerHTML = "";
+  body.appendChild(el("div", "pf-help", T("按占总资产（含现金）的百分比填写；留空或 0 表示不设目标。小仓位也会按相对偏离提醒。", "Percent of total assets including cash. Leave blank or 0 for no target.")));
+  const tbl = el("div", "pf-plan-rows");
+  const inputs = new Map();
+  const curW = new Map(s.rows.map((r) => [r.symbol, s.total && Number.isFinite(r.value) ? r.value / s.total * 100 : 0]));
+  const names = new Map([...data.items.map((it) => [it.symbol, it.name || it.ticker]), ...s.rows.map((r) => [r.symbol, r.boardName || r.name || r.symbol])]);
+  const addRow = (sym) => {
+    if (inputs.has(sym)) return;
+    const r = el("div", "pf-plan-row");
+    const lg = el("span", "pf-logo"); mountLogo(lg, sym, names.get(sym) || sym);
+    const nm = el("div", "pf-sym-id"); nm.append(el("span", "pf-sym-name", names.get(sym) || sym.slice(2).toUpperCase()), el("span", "pf-sym-sub", T("当前 ", "Now ") + (curW.get(sym) || 0).toFixed(1) + "%"));
+    const box = el("div", "pf-plan-in"); const i = el("input"); i.type = "number"; i.min = "0"; i.max = "100"; i.step = "0.5"; i.inputMode = "decimal"; i.placeholder = "—";
+    if (pv.plan.targets[sym]) i.value = String(pv.plan.targets[sym]);
+    i.addEventListener("input", sum);
+    box.append(i, el("span", "", "%"));
+    r.append(lg, nm, box); tbl.appendChild(r); inputs.set(sym, i);
+  };
+  [...new Set([...s.rows.map((r) => r.symbol), ...Object.keys(pv.plan.targets)])].forEach(addRow);
+  body.appendChild(tbl);
+  // 从看板加一个还没持有的标的（计划建仓）
+  const pool = data.items.filter((it) => it.symbol && !inputs.has(it.symbol));
+  if (pool.length) {
+    const sel = el("select", "pf-plan-add");
+    sel.appendChild(el("option", "", T("＋ 从看板添加计划建仓的标的", "+ Add a planned position from your board")));
+    pool.forEach((it) => { const o = el("option", "", `${it.name || it.ticker} · ${it.ticker}`); o.value = it.symbol; sel.appendChild(o); });
+    sel.addEventListener("change", () => { if (sel.value && sel.selectedIndex > 0) { addRow(sel.value); sel.options[sel.selectedIndex].remove(); sel.selectedIndex = 0; sum(); } });
+    body.appendChild(sel);
+  }
+  const fill = el("button", "pf-row-add"); fill.type = "button"; fill.append(ri("equalizer-line"), document.createTextNode(T("按当前占比填入", "Fill with current weights")));
+  fill.addEventListener("click", () => { for (const [sym, i] of inputs) { const w = curW.get(sym) || 0; i.value = w ? String(Math.round(w * 2) / 2) : ""; } cashIn.value = s.total ? String(Math.round(s.cashValue / s.total * 100 * 2) / 2) : ""; sum(); });
+  body.appendChild(fill);
+  const opts = el("div", "pf-plan-opts");
+  const field = (label, val, step, hint) => { const f = el("label", "pf-plan-opt"); const i = el("input"); i.type = "number"; i.step = step; i.inputMode = "decimal"; if (val !== null && val !== undefined) i.value = String(val); f.append(el("span", "", label), i, el("small", "", hint)); opts.appendChild(f); return i; };
+  const cashIn = field(T("现金目标 %", "Cash target %"), pv.plan.cash, "0.5", T("留作击球区的弹药", "Dry powder for strike-zone buys"));
+  const bandIn = field(T("绝对容忍 pp", "Absolute band pp"), pv.plan.band, "0.5", T("偏离超过几个百分点提醒", "Alert beyond ± this many points"));
+  const relIn = field(T("相对容忍 %", "Relative band %"), pv.plan.rel, "1", T("偏离超过目标的百分之几提醒", "Alert beyond this share of the target"));
+  cashIn.addEventListener("input", sum);
+  body.appendChild(opts);
+  const total = el("div", "pf-plan-sum"); body.appendChild(total);
+  function sum() {
+    let t = 0; for (const i of inputs.values()) t += Number(i.value) || 0; t += Number(cashIn.value) || 0;
+    total.textContent = T(`已分配 ${t.toFixed(1)}%`, `Allocated ${t.toFixed(1)}%`) + (t > 100.0001 ? T("，超过 100% 了", " — over 100%") : t < 99.95 ? T(`，剩余 ${(100 - t).toFixed(1)}%`, `, ${(100 - t).toFixed(1)}% left`) : "");
+    total.classList.toggle("bad", t > 100.0001);
+  }
+  sum();
+  $("planSave").onclick = async () => {
+    $("planErr").textContent = "";
+    const targets = {}; for (const [sym, i] of inputs) { const v = Number(i.value); if (i.value !== "" && v > 0) targets[sym] = v; }
+    const r = await api("/api/my/portfolio/plan", { method: "PUT", body: JSON.stringify({ targets, cash: cashIn.value === "" ? null : Number(cashIn.value), band: Number(bandIn.value), rel: Number(relIn.value) }) });
+    if (!r.ok) { $("planErr").textContent = r.data.error || T("保存失败", "Save failed"); return; }
+    closeOverlays(); data.plan = r.data.plan; render(); load();
+  };
+  $("planOverlay").classList.remove("hidden");
 }
 
 // 分类配色：墨黑 / 暖黄 / 暖灰 / 绿 / 蓝 / 橙 / 浅灰，与看板同一套色调
