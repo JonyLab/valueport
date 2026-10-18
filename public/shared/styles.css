@@ -277,3 +277,29 @@
 @keyframes skShimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
 @keyframes skIn{from{opacity:0;transform:translateY(4px)}}
 @media (prefers-reduced-motion:reduce){ .sk{animation:none} .sk-fade{animation:none} }
+
+/* ===== 反馈（全站共用，见 /shared/feedback.js）：顶栏语言按钮左边的圆形图标 + 弹窗（与各页 .overlay / .modal 同一套样子） ===== */
+.fb-btn{background:rgba(255,255,255,.6);border:1px solid var(--card-edge)}
+.fb-btn:hover{background:#fff}
+.fb-btn.hidden,.fb-overlay.hidden,.fb-modal .hidden{display:none}
+.fb-overlay{position:fixed;inset:0;background:rgba(40,36,25,.32);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);z-index:95;display:flex;padding:20px}
+.fb-modal{margin:auto;width:min(480px,100%);max-height:calc(100vh - 40px);overflow:auto;overscroll-behavior:none;background:#fbfaf6;border-radius:var(--r-xl);
+  box-shadow:0 40px 100px -30px rgba(40,35,20,.5);padding:22px 24px 20px;font-family:var(--font);color:var(--ink)}
+.fb-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.fb-title{font-size:22px;font-weight:400;letter-spacing:-.01em}
+.fb-close{background:var(--track) !important;box-shadow:none}
+.fb-form{display:flex;flex-direction:column;gap:14px}
+.fb-types{margin-top:0}
+.fb-check{display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:var(--ink);cursor:pointer}
+.fb-check input{margin:2px 0 0;width:16px;height:16px;accent-color:var(--dark);flex:none}
+.fb-check > span{display:flex;flex-direction:column;gap:2px}
+.fb-hint{font-size:12px;color:var(--ink-mute);line-height:1.5}
+.fb-note{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.55;color:var(--sun-ink);background:rgba(246,207,74,.18);border-radius:var(--r-md);padding:10px 12px}
+.fb-note i{font-size:15px;margin-top:1px}
+.fb-err{font-size:12.5px;color:var(--red);display:none}
+.fb-done{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:18px 0 6px}
+.fb-done-ico{width:52px;height:52px;border-radius:50%;background:var(--sun);color:var(--sun-ink);display:grid;place-items:center;font-size:26px;margin-bottom:6px}
+.fb-done-title{font-size:18px;font-weight:500}
+.fb-link{margin-top:10px;text-decoration:none;color:var(--ink);gap:6px}
+.fb-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px dashed var(--border)}
+.fb-foot .btn i{font-size:15px;margin-left:2px}

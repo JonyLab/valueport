@@ -39,6 +39,9 @@ export function symbolToCounterId(lp) {
   return `ST/${lp.slice(i + 1).toUpperCase()}/${lp.slice(0, i)}`;
 }
 
+// 长桥现返回 ROEDf / NetProfitMarginDf,前端(基本面 tab、field-meta)按 ROE / NetProfitMargin 取 → 统一成后者
+const FIELD_ALIAS = { ROEDf: "ROE", NetProfitMarginDf: "NetProfitMargin" };
+
 // 解析 /v1/quote/financial-reports 响应 → { IS:[Acct], BS:[Acct], CF:[Acct] } 或 null
 // Acct = { field, name, currency, values:[{ year, fpEnd, period, value:Number, yoy }] }（最新期在前）
 export function parseFinancials(json) {
@@ -52,7 +55,7 @@ export function parseFinancials(json) {
       const cur = ind.currency || "";
       for (const a of ind.accounts || []) {
         accts.push({
-          field: a.field, name: a.name, currency: a.currency || cur,
+          field: FIELD_ALIAS[a.field] || a.field, name: a.name, currency: a.currency || cur,
           values: (a.values || []).map((v) => ({ year: v.year, fpEnd: v.fp_end, period: v.period, value: parseFloat(v.value), yoy: v.yoy || "" })),
         });
       }
@@ -101,8 +104,15 @@ export async function fetchLongbridgeFinancials(env, tencentSymbol, report) {
   if (!lp) return null;
   const rep = report === "qf" ? "qf" : "af";
   const query = `counter_id=${symbolToCounterId(lp)}&kind=ALL&report=${rep}`; // 已按字母序：counter_id<kind<report
-  try { return parseFinancials(await signedGet(env, "/v1/quote/financial-reports", query)); }
-  catch { return null; }
+  try {
+    let j = await signedGet(env, "/v1/quote/financial-reports", query);
+    if (j && j.code === 429002) { // 同接口 1 秒限频:等一下重试一次
+      await new Promise((r) => setTimeout(r, 1100));
+      j = await signedGet(env, "/v1/quote/financial-reports", query);
+    }
+    if (!j || j.code !== 0) console.error("longbridge financial-reports failed:", tencentSymbol, rep, j && j.code, j && j.message); // 只记错误码/信息,不含凭据
+    return parseFinancials(j);
+  } catch (e) { console.error("longbridge financial-reports error:", tencentSymbol, e && e.message); return null; }
 }
 
 /* ---------- 行业估值参考（PE/PB/PS：当前 / 自身5年均 / 行业中位） ---------- */

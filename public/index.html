@@ -883,6 +883,8 @@
   <link rel="modulepreload" href="/shared/gauge.js">
   <link rel="modulepreload" href="/shared/i18n.js">
   <link rel="modulepreload" href="/shared/langmenu.js">
+  <link rel="modulepreload" href="/shared/feedback.js">
+  <link rel="modulepreload" href="/shared/feedback-core.js">
   <link rel="modulepreload" href="/shared/market.js">
   <link rel="modulepreload" href="/shared/valuation-ui.js">
   <link rel="modulepreload" href="/shared/valuation/derivations.js">
@@ -1052,6 +1054,7 @@ import { verdictOf, structValid, hasFairRange, applyZoneColors, computeAnchors, 
 import { MKT_LABEL } from "/shared/market.js";
 import { t, applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
+import { mountFeedback } from "/shared/feedback.js";
 import { mountValuationCalc } from "/shared/valuation-ui.js";
 import { MODELS, modeFields } from "/shared/valuation/index.js";
 import { verifiedFacts, latestMetrics, assumptionChecks, marketViews, masterLenses } from "/shared/valuation/facts.js";
@@ -1083,6 +1086,7 @@ const VMSGS = {
 };
 // 语言切换（全站共用组件）：看板顶栏一个；详情页、估值工作台隐藏顶栏，各自在页头再挂一个
 mountLangMenu(document.getElementById("topActions")).id = "langMenu";
+mountFeedback(document.getElementById("topActions")); // 反馈入口（只对已登录用户显示）
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 const ZONE_KEYS = ZONES.map((z) => z.key);
@@ -1958,6 +1962,7 @@ function renderDetail(item, initialTab = "val") {
   backRow.appendChild(back);
   const rightGroup = document.createElement("div"); rightGroup.className = "vd-backrow-right";
   mountLangMenu(rightGroup);
+  mountFeedback(rightGroup);
   backRow.appendChild(rightGroup);
 
   // 身份区：头像 + 代码徽章 + 名称 / 现价 + 当日涨跌 + 判定
