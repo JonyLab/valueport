@@ -15,6 +15,7 @@ import { registerPortfolio } from "./portfolio.js";
 import { registerAi } from "./ai.js";
 import { registerResearch } from "./research.js";
 import { registerMacro, refreshIfStale } from "./macro.js";
+import { registerFeedback } from "./feedback.js";
 import { fetchLongbridgeAssets } from "./brokers/longbridge-assets.js";
 import { fetchIbkrFlex } from "./brokers/ibkr-flex.js";
 import { parseHoldingsCsv } from "./brokers/csv.js";
@@ -230,6 +231,7 @@ app.use("/api/my/*", async (c, next) => {
 registerAi(app);
 registerResearch(app); // 分析师评级 / 目标价 / 一致预期（公开，按标的缓存 6 小时）
 registerMacro(app);
+registerFeedback(app);
 const portfolio = registerPortfolio(app, {
   adapters: { longbridge: (cr) => fetchLongbridgeAssets(cr), ibkr: (cr) => fetchIbkrFlex(cr), csv: (text) => parseHoldingsCsv(text) },
   getQuotes,

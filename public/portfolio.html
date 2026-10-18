@@ -310,6 +310,8 @@
   <link rel="modulepreload" href="/shared/holding.js">
   <link rel="modulepreload" href="/shared/i18n.js">
   <link rel="modulepreload" href="/shared/langmenu.js">
+  <link rel="modulepreload" href="/shared/feedback.js">
+  <link rel="modulepreload" href="/shared/feedback-core.js">
   <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页，点击后几乎立即切换（Chrome 系浏览器支持，其他浏览器忽略） -->
   <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"},{"href_matches":"/macro"}]},"eagerness":"moderate"}]}</script>
 </head>
@@ -367,6 +369,7 @@
 <script type="module">
 import { applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
+import { mountFeedback } from "/shared/feedback.js";
 import { computeAnchors, priceToPhi, structValid, ZONES } from "/shared/core.js";
 import { driftText, driftTolerance, driftStatus, driftAction } from "/shared/holding.js";
 
@@ -374,6 +377,7 @@ applyI18n();
 const zh = LANG === "zh";
 const T = (a, b) => (zh ? a : b);
 mountLangMenu(document.getElementById("topActions"));
+mountFeedback(document.getElementById("topActions")); // 反馈入口（只对已登录用户显示）
 
 // ---------- 小工具 ----------
 const $ = (id) => document.getElementById(id);

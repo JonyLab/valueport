@@ -136,6 +136,7 @@ npx wrangler d1 execute pendulum-db --remote --file=./schema.sql
 # 4. Set secrets (you will be prompted to enter values)
 npx wrangler secret put ADMIN_PASSWORD
 npx wrangler secret put SESSION_SECRET
+npx wrangler secret put GITHUB_TOKEN   # optional: file feedback as GitHub issues (see "Feedback")
 
 # 5. Deploy
 npm run deploy
@@ -238,6 +239,21 @@ Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`
 npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-18-macro.sql
 ```
 
+## Feedback → GitHub issues
+
+Signed-in users see a feedback icon next to the language menu (board / stock detail, `/portfolio`, `/macro`). The dialog (`public/shared/feedback.js`, pure logic shared with the Worker in `public/shared/feedback-core.js`) asks for a type (Bug / Idea / Other → labels `bug` / `enhancement` / `question`), a title (3–120 chars), a description (≤ 5000) and, optionally, page info (path without query, language, viewport, user agent — never cookies, tokens or amounts). Issues are public, and the dialog says so.
+
+- **Server-side filing (recommended).** Create a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new) limited to the feedback repo with **Repository permissions → Issues: Read and write**, then:
+
+  ```bash
+  npx wrangler secret put GITHUB_TOKEN
+  ```
+
+  `POST /api/my/feedback` then creates the issue through the GitHub REST API with the ValuePort username in the body and returns the issue URL; the dialog shows a link to it. Each user can file 10 issues per day (`_feedback_usage` in `settings`). If GitHub rejects the labels (422) it retries once without them. The token is only sent to `api.github.com` — never logged or returned.
+- **Without a token** the endpoint returns 501 and the dialog instead opens `https://github.com/<repo>/issues/new` with title, body and label prefilled (URL kept under 8,000 chars by trimming the description); the user files it with their own GitHub account.
+
+The target repo defaults to `JonyLab/watchlist`; override it with `FEEDBACK_REPO = "owner/repo"` under `[vars]` in `wrangler.toml`.
+
 ## API Reference
 
 ### Public
@@ -299,6 +315,13 @@ npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-18-macr
 | POST | `/api/my/ai/review` | `{lang, stock, method, valuedAt, fields, result:{low,high,price}, verified, metrics, comparisons}` → `{review:{overall: "hold"\|"watch"\|"broken", summary, checks:[{k, status, reason}], at}}`; 502 `bad_ai_output` if the model ignores the format; shares the daily limit |
 | POST | `/api/my/ai/method` | `{lang, stock, facts, methods:[{key,title,subtitle}]}` → `{reply, picks:[{key, role: "primary"\|"check", reason}]}`; shares the daily limit |
 | POST | `/api/my/ai/valuation` | `{lang, messages:[{role,content}], context:{stock, method, mode, fields, facts}}` → `{reply, params, reasons}`; 429 after 100/day, 502 if the provider fails |
+
+### Feedback (requires `pendulum_user` cookie)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/my/feedback` | `{server, repo}` — whether `GITHUB_TOKEN` is configured (never the token) and the target repo |
+| POST | `/api/my/feedback` | `{type: "bug"\|"idea"\|"other", title, description?, meta?: {path, lang, viewport, ua}}` → `{ok, url, number}`; 400 invalid, 429 after 10/day, 501 `{error: "not_configured", repo}` without a token, 502 if GitHub fails |
 
 ### Macro (public)
 

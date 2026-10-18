@@ -33,7 +33,7 @@
 - 估值五区间色（`core.js` 的 `ZONES`）是**用户可配置的数据色**，只用在钟摆、五段条、对照图和统计图标上，不要拿它做 UI 装饰色。默认值：击球区 `#2ea35d`（绿）· 低估 `#3a73ee`（蓝）· 合理 `#555e6b`（灰）· 高估 `#f08c2e`（橙）· 泡沫区 `#e23c3c`（红）。用户在设置里自定义过的颜色会覆盖默认值。
 
 ### 图标
-统一用 **Remix Icon**（jsDelivr 上的 `remixicon@4.9.1`，字体图标）：`<i class="ri-xxx-line" aria-hidden="true">`，颜色跟随 `currentColor`，大小用 `font-size` 控制。默认用 `-line` 线性款。JS 里用 `ri("name")` 生成。不要再手写内联 SVG，也不要用 ↗ ✕ ⓘ ▾ 这类文字符号当图标。常用的几个：导航 `line-chart` / `earth`，设置 `equalizer`，语言 `global`，分享 `share-box`，进详情 `arrow-right-up`，返回 `arrow-left`，添加 `add`，删除 `close`，提示 `information`，展开 `arrow-down-s`，外链 `external-link`。
+统一用 **Remix Icon**（jsDelivr 上的 `remixicon@4.9.1`，字体图标）：`<i class="ri-xxx-line" aria-hidden="true">`，颜色跟随 `currentColor`，大小用 `font-size` 控制。默认用 `-line` 线性款。JS 里用 `ri("name")` 生成。不要再手写内联 SVG，也不要用 ↗ ✕ ⓘ ▾ 这类文字符号当图标。常用的几个：导航 `line-chart` / `earth`，设置 `equalizer`，语言 `global`，反馈 `feedback`，分享 `share-box`，进详情 `arrow-right-up`，返回 `arrow-left`，添加 `add`，删除 `close`，提示 `information`，展开 `arrow-down-s`，外链 `external-link`。
 
 ### 标的 logo
 通过本站的 `/api/logo?symbol=` 代理 FinancialModelingPrep 的公开图片（免 key，美股、港股、A 股都有，缓存 7 天），浏览器不直接请求第三方。前端 `mountLogo(el, item)` 先放首字母占位，图片加载成功再替换（白底圆形）；查不到时（如北交所）保留首字母。用在看板卡片、详情页头像、同看板列表、估值工作台的标的胶囊。
@@ -109,7 +109,7 @@
 三栏 grid：
 - **左**：无边框文字标「**Value**Port」（Value 700、Port 400），带暖黄 `BETA` 徽章；登录 / 注册 / 站长卡片顶部用同样的写法。
 - **中**：半透明胶囊槽里的 tabs，当前项填墨黑。
-- **右**：圆形图标按钮（分享〔仅主人〕、设置、语言）。
+- **右**：圆形图标按钮（分享〔仅主人〕、设置、反馈〔已登录〕、语言）。
 
 ### 页面切换不闪
 - 资产 ⇄ 自选等同源跳转用浏览器原生 View Transitions（`styles.css` 的 `@view-transition { navigation: auto }`，0.2s 淡入淡出），顶部导航 `view-transition-name: topnav` 固定不动；不支持的浏览器自动忽略，`prefers-reduced-motion` 时不启用。
@@ -121,6 +121,10 @@
 共用组件 `/shared/langmenu.js` 的 `mountLangMenu(容器)`：只有地球图标，悬停（或点按 / 键盘聚焦）弹出「中文 / English」下拉，当前语言后面有暖黄圆点；样式在 `styles.css` 的 `.lang-menu`。位置：看板在顶栏右侧；详情页在「返回」那一行的右侧；估值工作台在页头最右；登录 / 注册 / 站长后台固定在页面右上角（`.page-corner`）；估值方法文章在返回链接的同一行右侧。站长后台的文案也已接入 i18n（`o_*` 键）。新页面都要挂上它。
 
 移动端 tabs 换到第二行，撑满宽度。
+
+### 反馈（已登录才有）
+共用组件 `/shared/feedback.js` 的 `mountFeedback(容器)`：圆形图标按钮 `ri-feedback-line`，插在语言按钮左边；位置跟语言按钮一样（看板顶栏右侧、详情页「返回」行右侧、资产页、宏观看板），估值工作台不放。只对已登录用户显示（`GET /api/my/feedback` 401 就不出现）；本次会话确认过登录（`sessionStorage.fb_cap`）时 `navboot.js` 首帧先放占位，不晚一拍出现。
+点开是一个白色弹窗（与各页 `.overlay` / `.modal` 同样子，样式在 `styles.css` 的 `.fb-*`）：类型用 `.chip` 三选一（问题 / 建议 / 其他，选中墨黑）→ 标题 → 描述 → 「附上页面信息」勾选框（默认勾上，下面一行小字写清只含路径、语言、窗口尺寸、浏览器）→ 浅暖黄提示块「反馈会公开发布在 GitHub 上，请不要填写个人信息」→ 底部「取消」+ 墨黑主按钮。服务器配了 GitHub token 时主按钮是「提交」，成功后弹窗换成暖黄圆底对勾 + 「查看 issue #n」外链按钮；没配时主按钮是「去 GitHub 提交」带 `external-link` 图标，直接在新标签打开预填好的 GitHub 新建 issue 页。
 
 ### 概览区（Watchlist 视图）
 1. **问候 + 主标题**：小标题留空、且是看板主人本人访问时，显示「欢迎回来，<用户名>」。

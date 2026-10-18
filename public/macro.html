@@ -93,6 +93,8 @@
   <link rel="modulepreload" href="/shared/gauge.js">
   <link rel="modulepreload" href="/shared/i18n.js">
   <link rel="modulepreload" href="/shared/langmenu.js">
+  <link rel="modulepreload" href="/shared/feedback.js">
+  <link rel="modulepreload" href="/shared/feedback-core.js">
   <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页 -->
   <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"},{"href_matches":"/macro"}]},"eagerness":"moderate"}]}</script>
 </head>
@@ -144,11 +146,13 @@
 <script type="module">
 import { applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
+import { mountFeedback } from "/shared/feedback.js";
 import { Gauge } from "/shared/gauge.js";
 import { ZONES, structValid, computeAnchors, priceToPhi } from "/shared/core.js";
 
 applyI18n();
 mountLangMenu(document.getElementById("topActions"));
+mountFeedback(document.getElementById("topActions")); // 反馈入口（只对已登录用户显示）
 const zh = LANG === "zh", T = (a, b) => (zh ? a : b);
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };

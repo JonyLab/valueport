@@ -41,4 +41,13 @@
     w.innerHTML = '<button type="button" class="btn icon lang-btn" aria-label="切换语言 / Switch language"><i class="ri-global-line" aria-hidden="true"></i></button>';
     host.appendChild(w);
   }
+  // ⑤ 本次会话已确认登录（/shared/feedback.js 记下的 fb_cap）：反馈按钮先放静态占位，mountFeedback 原地替换
+  try {
+    if (host && sessionStorage.getItem("fb_cap") && !host.querySelector(".fb-btn")) {
+      var f = document.createElement("button"); f.type = "button"; f.className = "btn icon fb-btn"; f.setAttribute("data-static", "");
+      f.setAttribute("aria-label", lang === "zh" ? "反馈" : "Feedback");
+      f.innerHTML = '<i class="ri-feedback-line" aria-hidden="true"></i>';
+      host.insertBefore(f, host.querySelector(".lang-menu"));
+    }
+  } catch (e) { /* ignore */ }
 })();
