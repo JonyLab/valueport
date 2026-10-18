@@ -67,9 +67,10 @@
   .ci-idtext{display:flex;flex-direction:column;gap:3px;min-width:0} /* 名称一行、代码一行 */
   .ci-name{line-height:1.15}
   .ci-code{font-size:12px;line-height:1.2;color:var(--ink-mute)}
-  .chart-info .verdict{display:flex;align-items:center;gap:12px;flex-wrap:wrap;text-align:left;margin:0;line-height:1}
+  .chart-info .verdict{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;text-align:left;margin:0;line-height:1}
   .chart-info .verdict .px{font-size:44px;font-weight:400;letter-spacing:-.035em}
-  .chart-info .verdict .lbl{display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:var(--r-pill);
+  .chart-info .verdict .lbl{position:relative;top:-8.25px; /* 标签底边落在价格基线上 */
+    display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:var(--r-pill);
     background:var(--track);font-size:12.5px;font-weight:500;color:var(--ink-soft)}
   .chart-info .verdict.v-under .lbl{background:rgba(31,143,84,.12);color:var(--green)}
   .chart-info .verdict.v-over .lbl{background:rgba(198,65,65,.10);color:var(--red)}
