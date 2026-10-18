@@ -111,3 +111,22 @@ describe("financials", () => {
     expect((await r.json()).financials).toBe(null);
   });
 });
+
+describe("GET /api/macro", () => {
+  it("serves stored series without refetching", async () => {
+    const e = env, S = SELF;
+    for (const q of [
+      "CREATE TABLE IF NOT EXISTS macro_series (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date))",
+      "CREATE TABLE IF NOT EXISTS macro_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+    ]) await e.DB.prepare(q).run();
+    await e.DB.batch([
+      e.DB.prepare("INSERT OR REPLACE INTO macro_series VALUES ('US_CAPE','2026-09',38),('US_CAPE','2026-10',40),('US_REAL10Y','2026-09',2),('US_REAL10Y','2026-10',2)"),
+      e.DB.prepare("INSERT OR REPLACE INTO macro_meta VALUES ('fetched_at', ?)").bind(new Date().toISOString()),
+    ]);
+    const r = await S.fetch("https://x/api/macro");
+    expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j.markets.find((m) => m.key === "us").indicators.find((i) => i.key === "cape").value).toBe(40);
+    expect(j.markets.find((m) => m.key === "hk").pending).toBe(true);
+  });
+});

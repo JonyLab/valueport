@@ -285,7 +285,7 @@
   <link rel="modulepreload" href="/shared/i18n.js">
   <link rel="modulepreload" href="/shared/langmenu.js">
   <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页，点击后几乎立即切换（Chrome 系浏览器支持，其他浏览器忽略） -->
-  <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"}]},"eagerness":"moderate"}]}</script>
+  <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"},{"href_matches":"/macro"}]},"eagerness":"moderate"}]}</script>
 </head>
 <body>
 <div class="page">
@@ -294,7 +294,7 @@
     <nav class="topnav-tabs" aria-label="导航">
       <a class="nav-tab on" href="/portfolio" aria-current="page"><i class="ri-pie-chart-2-line" aria-hidden="true"></i><span data-i18n="nav_portfolio">Portfolio</span></a>
       <a class="nav-tab" id="tabBoard" href="/"><i class="ri-line-chart-line" aria-hidden="true"></i><span data-i18n="nav_watchlist">Watchlist</span></a>
-      <button class="nav-tab" disabled aria-disabled="true" data-i18n-title="nav_macro_soon" title="即将上线"><i class="ri-earth-line" aria-hidden="true"></i><span data-i18n="nav_macro">宏观看板</span></button>
+      <a class="nav-tab" href="/macro"><i class="ri-earth-line" aria-hidden="true"></i><span data-i18n="nav_macro">宏观看板</span></a>
     </nav>
     <div class="topnav-actions" id="topActions"></div>
   </header>

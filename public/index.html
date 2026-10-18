@@ -875,7 +875,7 @@
   <link rel="modulepreload" href="/shared/valuation/segments.js">
   <link rel="modulepreload" href="/shared/valuation/workbench.js">
   <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页，点击后几乎立即切换（Chrome 系浏览器支持，其他浏览器忽略） -->
-  <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"}]},"eagerness":"moderate"}]}</script>
+  <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"},{"href_matches":"/macro"}]},"eagerness":"moderate"}]}</script>
 </head>
 <body class="booting">
 <div class="page">
@@ -891,10 +891,10 @@
         <i class="ri-line-chart-line" aria-hidden="true"></i>
         <span data-i18n="nav_watchlist">Watchlist</span>
       </button>
-      <button class="nav-tab" data-view="macro" disabled data-i18n-title="nav_macro_soon" title="即将上线" aria-disabled="true">
+      <a class="nav-tab" href="/macro" data-view="macro">
         <i class="ri-earth-line" aria-hidden="true"></i>
         <span data-i18n="nav_macro">宏观看板</span>
-      </button>
+      </a>
     </nav>
     <div class="topnav-actions" id="topActions">
       <button class="btn icon hidden" id="btnSettings" data-i18n-title="nav_settings" title="设置" aria-label="设置">

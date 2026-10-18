@@ -23,7 +23,7 @@ function graph(page) {
 }
 
 describe("modulepreload", () => {
-  for (const page of ["index.html", "portfolio.html"]) {
+  for (const page of ["index.html", "portfolio.html", "macro.html"]) {
     it(`${page} preloads exactly its module graph`, () => {
       const { needed, preloaded } = graph(page);
       expect(preloaded).toEqual(needed);

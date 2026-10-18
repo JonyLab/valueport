@@ -88,3 +88,13 @@ CREATE TABLE IF NOT EXISTS ai_models (
   created_at  TEXT    NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ai_models_user ON ai_models(user_id);
+CREATE TABLE IF NOT EXISTS macro_series (
+  series  TEXT NOT NULL,                -- US_10Y / US_REAL10Y / US_EQUITY / US_GDP / US_CAPE / CN_10Y / CN_PE
+  date    TEXT NOT NULL,                -- YYYY-MM
+  value   REAL NOT NULL,
+  PRIMARY KEY (series, date)
+);
+CREATE TABLE IF NOT EXISTS macro_meta (
+  key    TEXT PRIMARY KEY,
+  value  TEXT NOT NULL
+);

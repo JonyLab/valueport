@@ -12,6 +12,7 @@ import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
 import { registerPortfolio } from "./portfolio.js";
 import { registerAi } from "./ai.js";
+import { registerMacro, refreshIfStale } from "./macro.js";
 import { fetchLongbridgeAssets } from "./brokers/longbridge-assets.js";
 import { fetchIbkrFlex } from "./brokers/ibkr-flex.js";
 import { parseHoldingsCsv } from "./brokers/csv.js";
@@ -217,6 +218,7 @@ app.use("/api/my/*", async (c, next) => {
 
 /* ---------- Portfolio（券商账户 / 持仓汇总，按 uid 隔离，见 src/portfolio.js） ---------- */
 registerAi(app);
+registerMacro(app);
 const portfolio = registerPortfolio(app, {
   adapters: { longbridge: (cr) => fetchLongbridgeAssets(cr), ibkr: (cr) => fetchIbkrFlex(cr), csv: (text) => parseHoldingsCsv(text) },
   getQuotes,
@@ -344,6 +346,7 @@ app.get("/b/:slug", (c) => { const url = new URL(c.req.url); url.pathname = "/";
 app.get("/b/:slug/:code", (c) => { const url = new URL(c.req.url); url.pathname = "/"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
 // 估值方法介绍页（干净 URL，公开）
 app.get("/portfolio", (c) => { const url = new URL(c.req.url); url.pathname = "/portfolio.html"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
+app.get("/macro", (c) => { const url = new URL(c.req.url); url.pathname = "/macro.html"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
 app.get("/valuation", (c) => { const url = new URL(c.req.url); url.pathname = "/valuation.html"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
 app.all("*", (c) => {
   if (c.req.path.startsWith("/api/")) return c.json({ ok: false, error: "not found" }, 404);
@@ -352,5 +355,6 @@ app.all("*", (c) => {
 // fetch = Hono 路由；scheduled = 每日定时任务（wrangler.toml [triggers]）：同步券商账户 + 记录资产快照
 export default {
   fetch: (req, env, ctx) => app.fetch(req, env, ctx),
-  scheduled: (event, env, ctx) => ctx.waitUntil(portfolio.runDaily(env)),
+  // 每日：同步券商账户 + 记资产快照；宏观序列超过 7 天没刷新就顺带刷新一次
+  scheduled: (event, env, ctx) => ctx.waitUntil(Promise.all([portfolio.runDaily(env), refreshIfStale(env).catch((e) => console.error("macro refresh failed:", e && e.message))])),
 };

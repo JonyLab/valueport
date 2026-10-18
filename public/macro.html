@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宏观看板 · ValuePort</title>
+<link rel="stylesheet" href="/shared/styles.css">
+<style>
+  /* ===== 宏观看板（MVP）：只量水位与引力，不预测天气；最后落到你自己的击球区。设计见 docs/macro-design.md ===== */
+  .page{display:flex;flex-direction:column}
+  .mc-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:0 4px 22px}
+  .mc-hero h1{font-size:clamp(36px,5vw,56px);margin:0}
+  /* 一句话判定拆成几颗短胶囊：每个市场的区间与分位 + 自选里的机会数 */
+  .mc-chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 10px}
+  .mc-chip{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px 0 11px;border-radius:var(--r-pill);background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 1px var(--card-edge);font-size:13px;color:var(--ink-soft);white-space:nowrap}
+  .mc-chip i{width:8px;height:8px;border-radius:50%;flex:none}
+  .mc-chip b{font-weight:500;color:var(--ink)}
+  .mc-meta{font-size:13px;color:var(--ink-mute)}
+  .mc-badge{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 15px;border-radius:var(--r-pill);font-size:13px;white-space:nowrap;background:var(--track);color:var(--ink-soft)}
+  .mc-badge.go{background:var(--sun);color:var(--sun-ink)}
+  .mc-grid{display:flex;flex-direction:column;gap:16px}
+  .mc-card{background:var(--card);border:1px solid var(--card-edge);border-radius:var(--r-xl);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);padding:22px 24px}
+  .mc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  .mc-title{font-size:20px;font-weight:500;letter-spacing:-.01em}
+  .mc-sub{font-size:12.5px;color:var(--ink-mute);margin-top:3px}
+  /* 市场水位：三列 */
+  .mc-markets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .mc-mkt{display:flex;flex-direction:column;gap:10px;padding:16px 16px 14px;border-radius:var(--r-lg);background:rgba(29,29,27,.035)}
+  .mc-mkt-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .mc-mkt-name{font-size:16px;font-weight:500}
+  .mc-mkt-zone{font-size:12.5px;padding:2px 10px;border-radius:var(--r-pill);color:#fff}
+  .mc-gauge{width:100%;max-width:280px;margin:0 auto}
+  .mc-gauge svg{display:block;width:100%}
+  .mc-inds{display:flex;flex-direction:column;gap:9px}
+  .mc-ind{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:baseline}
+  .mc-ind-k{font-size:13px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;min-width:0}
+  .mc-ind-k i{color:var(--ink-mute);font-size:13px;cursor:help}
+  .mc-ind-v{font-size:14px;font-variant-numeric:tabular-nums;text-align:right}
+  .mc-pbar{grid-column:1 / -1;position:relative;display:flex;gap:2px;height:6px;margin-top:3px}
+  .mc-pbar span{border-radius:var(--r-pill);opacity:.28}
+  .mc-pbar b{position:absolute;top:-3px;width:3px;height:12px;margin-left:-1.5px;border-radius:2px;background:var(--ink)}
+  .mc-ind-note{grid-column:1 / -1;font-size:11.5px;color:var(--ink-mute)}
+  .mc-pending{flex:1;display:flex;align-items:center;justify-content:center;min-height:220px;padding:20px;border-radius:var(--r-md);text-align:center;
+    background-color:rgba(255,255,255,.4);background-image:var(--hatch);font-size:13px;line-height:1.7;color:var(--ink-soft)}
+  /* 引力 */
+  .mc-ctl{display:flex;gap:8px;flex-wrap:wrap}
+  .mc-seg{display:flex;gap:2px;padding:3px;background:var(--track);border-radius:var(--r-pill)}
+  .mc-seg button{height:28px;padding:0 12px;border:0;border-radius:var(--r-pill);background:none;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);white-space:nowrap}
+  .mc-seg button.on{background:#fff;color:var(--ink)}
+  .mc-gsay{font-size:14px;line-height:1.7;color:var(--ink-soft);margin:-4px 0 12px}
+  .mc-gsay b{color:var(--ink);font-weight:500}
+  .mc-chart{position:relative;height:240px;padding-left:44px}
+  .mc-chart svg{position:absolute;left:44px;right:0;top:0;bottom:22px;width:calc(100% - 44px);height:calc(100% - 22px)}
+  .mc-grid-line{position:absolute;left:0;right:0;border-top:1px dashed rgba(29,29,27,.09)}
+  .mc-grid-line span{position:absolute;left:0;top:-7px;width:38px;text-align:right;font-size:10.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .mc-axis{position:absolute;left:44px;right:0;bottom:0;height:18px;font-size:11px;color:var(--ink-mute)}
+  .mc-axis span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+  .mc-ey{fill:none;stroke:var(--chart-2);stroke-width:2.4;stroke-linejoin:round}
+  .mc-y10{fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round}
+  .mc-real{fill:none;stroke:var(--ink-mute);stroke-width:1.5;stroke-dasharray:4 3}
+  .mc-gap{fill:rgba(246,207,74,.28);stroke:none}
+  .mc-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--ink-mute)}
+  .mc-legend i{display:inline-block;width:16px;height:0;border-top:2.2px solid;vertical-align:middle;margin-right:5px}
+  /* 你的击球区 */
+  .mc-zones{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+  .mc-zone{padding:12px 14px;border-radius:var(--r-md);background:rgba(29,29,27,.035);display:flex;flex-direction:column;gap:4px}
+  .mc-zone-k{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-soft)}
+  .mc-zone-k i{width:8px;height:8px;border-radius:50%}
+  .mc-zone-v{font-size:26px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .mc-names{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .mc-name{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 13px 0 6px;border-radius:var(--r-pill);background:rgba(29,29,27,.045);color:var(--ink);text-decoration:none;font-size:13px}
+  .mc-name:hover{background:rgba(29,29,27,.08)}
+  .mc-name .dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px}
+  .mc-name small{color:var(--ink-mute);font-size:11.5px}
+  .mc-callout{margin-top:14px;font-size:13.5px;line-height:1.7;color:var(--ink-soft);background:rgba(246,207,74,.16);border-radius:var(--r-md);padding:11px 15px}
+  .mc-foot{margin:26px 4px 8px;text-align:center;font-size:13px;color:var(--ink-mute);line-height:1.8}
+  .mc-foot q{display:block;font-size:15px;color:var(--ink-soft);quotes:"「" "」"}
+  @media (max-width:1100px){ .mc-markets{grid-template-columns:1fr} .mc-zones{grid-template-columns:repeat(3,minmax(0,1fr))} }
+  @media (max-width:560px){ .mc-card{padding:18px 16px} .mc-zones{grid-template-columns:repeat(2,minmax(0,1fr))} }
+</style>
+  <!-- 模块依赖整棵树先声明：浏览器一次并行拉取，不用等上一层下载完才发现下一层 -->
+  <link rel="modulepreload" href="/shared/core.js">
+  <link rel="modulepreload" href="/shared/gauge.js">
+  <link rel="modulepreload" href="/shared/i18n.js">
+  <link rel="modulepreload" href="/shared/langmenu.js">
+  <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页 -->
+  <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"},{"href_matches":"/macro"}]},"eagerness":"moderate"}]}</script>
+</head>
+<body>
+<div class="page">
+  <header class="topnav">
+    <a class="brand" href="/portfolio" id="brand"><span class="brand-word"><b>Value</b>Port</span><span class="brand-beta">beta</span></a>
+    <nav class="topnav-tabs" aria-label="导航">
+      <a class="nav-tab" href="/portfolio"><i class="ri-pie-chart-2-line" aria-hidden="true"></i><span data-i18n="nav_portfolio">Portfolio</span></a>
+      <a class="nav-tab" id="tabBoard" href="/"><i class="ri-line-chart-line" aria-hidden="true"></i><span data-i18n="nav_watchlist">Watchlist</span></a>
+      <a class="nav-tab on" href="/macro" aria-current="page"><i class="ri-earth-line" aria-hidden="true"></i><span data-i18n="nav_macro">宏观看板</span></a>
+    </nav>
+    <div class="topnav-actions" id="topActions"></div>
+  </header>
+  <script src="/shared/navboot.js"></script>
+
+  <div class="mc-hero">
+    <div>
+      <p class="eyebrow" id="mcEyebrow"></p>
+      <h1 data-i18n="nav_macro">宏观看板</h1>
+      <div class="mc-chips" id="mcVerdict"></div>
+      <div class="mc-meta" id="mcMeta"></div>
+    </div>
+    <span class="mc-badge" id="mcBadge" hidden></span>
+  </div>
+
+  <div class="mc-grid">
+    <section class="mc-card">
+      <div class="mc-head"><div><div class="mc-title" id="mcLevelTitle"></div><div class="mc-sub" id="mcLevelSub"></div></div></div>
+      <div class="mc-markets" id="mcMarkets"><div class="sk-card" style="min-height:300px"></div><div class="sk-card"></div><div class="sk-card"></div></div>
+    </section>
+    <section class="mc-card" id="mcGravity">
+      <div class="mc-head"><div><div class="mc-title" id="mcGravTitle"></div><div class="mc-sub" id="mcGravSub"></div></div><div class="mc-ctl" id="mcGravCtl"></div></div>
+      <div class="mc-gsay" id="mcGravSay"></div>
+      <div class="mc-chart" id="mcGravChart"></div>
+      <div class="mc-legend" id="mcGravLegend"></div>
+    </section>
+    <section class="mc-card" id="mcMine" hidden>
+      <div class="mc-head"><div><div class="mc-title" id="mcMineTitle"></div><div class="mc-sub" id="mcMineSub"></div></div><a class="btn sm" id="mcMineLink" href="/"></a></div>
+      <div class="mc-zones" id="mcZones"></div>
+      <div class="mc-names" id="mcNames"></div>
+      <div class="mc-callout" id="mcMineSay" hidden></div>
+    </section>
+  </div>
+
+  <div class="mc-foot"><q id="mcQuote"></q><span id="mcFootNote"></span></div>
+</div>
+
+<script type="module">
+import { applyI18n, LANG } from "/shared/i18n.js";
+import { mountLangMenu } from "/shared/langmenu.js";
+import { Gauge } from "/shared/gauge.js";
+import { ZONES, structValid, computeAnchors, priceToPhi } from "/shared/core.js";
+
+applyI18n();
+mountLangMenu(document.getElementById("topActions"));
+const zh = LANG === "zh", T = (a, b) => (zh ? a : b);
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const ri = (name) => { const i = document.createElement("i"); i.className = "ri-" + name; i.setAttribute("aria-hidden", "true"); return i; };
+document.title = T("宏观看板", "Macro") + " · ValuePort";
+const ZN = zh ? ["击球区", "低估", "合理", "高估", "泡沫区"] : ["Strike zone", "Undervalued", "Fair", "Overvalued", "Bubble"];
+const MKT = { us: T("美股", "US"), hk: T("港股", "Hong Kong"), cn: T("A 股", "A-shares") };
+const IND = {
+  buffett: { name: T("总市值 / GDP", "Market cap / GDP"), tip: T("美国非金融企业股权市值 ÷ GDP（季度，FRED）。巴菲特称之为衡量整体估值最好的单一指标。跨国收入让这个比值长期上移，看分位比看绝对值更有意义。", "US non-financial corporate equity ÷ GDP (quarterly, FRED). Buffett's favourite single gauge; global earnings push it up over time, so the percentile matters more than the level.") },
+  cape: { name: "Shiller CAPE", tip: T("标普 500 价格 ÷ 过去 10 年经通胀调整的平均盈利（月度，multpl / Shiller 数据）。", "S&P 500 price ÷ 10-year inflation-adjusted average earnings (monthly).") },
+  us_erp: { name: T("盈利收益率 − 实际利率", "Earnings yield − real rate"), tip: T("1 / CAPE 减去 10 年期 TIPS 实际利率：股票相对无风险资产多给你多少。越低越贵，所以这里按反向计入水位。", "1/CAPE minus the 10-year TIPS real yield: what stocks pay over a risk-free asset. Lower is pricier, so it counts inversely.") },
+  cn_pe: { name: T("全 A 股市盈率（TTM）", "All A-share P/E (TTM)"), tip: T("沪深两市全部 A 股的市盈率（东方财富，2017 年起）。历史较短，分位仅供参考。", "P/E of all A-shares (eastmoney, since 2017). Short history — treat the percentile with care.") },
+  cn_erp: { name: T("股债性价比", "Equity vs bond yield"), tip: T("全 A 股盈利收益率（1 / PE）减 10 年国债收益率。越低越贵，按反向计入水位。", "All A-share earnings yield (1/PE) minus the 10-year CGB yield. Lower is pricier, so it counts inversely.") },
+};
+const QUOTES = [
+  [T("利率之于资产价格，如同引力之于苹果。", "Interest rates act on asset prices like gravity on an apple."), T("巴菲特", "Buffett")],
+  [T("反过来想，总是反过来想。", "Invert, always invert."), T("芒格", "Munger")],
+  [T("知道自己不知道，是能力圈的开始。", "Knowing what you don't know is where the circle of competence begins."), T("李录", "Li Lu")],
+  [T("别人贪婪时恐惧，别人恐惧时贪婪。", "Be fearful when others are greedy, and greedy when others are fearful."), T("巴菲特", "Buffett")],
+];
+
+// ---------- 页头：上次来看是几天前 ----------
+const lastVisit = Number(localStorage.getItem("macro_last_visit")) || 0;
+localStorage.setItem("macro_last_visit", String(Date.now()));
+$("mcEyebrow").textContent = T("宏观看板 · 每月看一次就够了", "Macro · once a month is enough");
+const q = QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
+$("mcQuote").textContent = q[0]; $("mcFootNote").textContent = `—— ${q[1]}　·　${T("数据按月更新。这一页每月看一次就够了。", "Data updates monthly. Looking once a month is plenty.")}`;
+$("mcLevelTitle").textContent = T("市场水位", "Market level");
+$("mcLevelSub").textContent = T("各指标在自身历史里的分位，平均成一个水位：0–10 击球区 · 10–30 低估 · 30–70 合理 · 70–90 高估 · 90–100 泡沫区", "Each gauge's percentile in its own history, averaged: 0–10 strike · 10–30 cheap · 30–70 fair · 70–90 pricey · 90–100 bubble");
+$("mcGravTitle").textContent = T("引力：股票盈利收益率 vs 10 年国债", "Gravity: earnings yield vs 10-year bonds");
+$("mcGravSub").textContent = T("利率越高，未来盈利折回今天越不值钱；两条线的差就是股票多给你的补偿", "Higher rates make future earnings worth less today; the gap is what stocks pay you extra");
+
+// ---------- 宏观数据 ----------
+let gMkt = "us", gRange = "all"; // 引力图的市场 / 区间选择（要在 renderMarkets 调用之前声明）
+let macro = null;
+try { const r = await fetch("/api/macro", { cache: "no-cache" }); macro = r.ok ? await r.json() : null; } catch { macro = null; } // 每次回源校验，别用旧缓存
+if (!macro) { $("mcMarkets").innerHTML = ""; $("mcMarkets").appendChild(el("div", "mc-pending", T("宏观数据暂时拿不到，稍后再来。", "Macro data is unavailable right now."))); }
+else renderMarkets(macro);
+
+// 钟摆复用：把百分位当「价格」，合理区间 30–70，安全边际 / 泡沫阈值换算成 10 和 90 两条线
+function marketGauge(mount, m) {
+  const g = new Gauge(mount);
+  g.setName(MKT[m.key]);
+  g.set({ ticker: zh ? `${m.level} 分位` : `P${m.level}`, fairLow: 30, fairHigh: 70, mos: 200 / 3, ext: 200 / 7, price: Math.max(0.5, m.level) }, false);
+  const svg = mount.querySelector("svg"); // 收紧 viewBox，去掉钟摆四周留白
+  if (svg) requestAnimationFrame(() => { try { const b = svg.getBBox(); if (b.width) svg.setAttribute("viewBox", `${b.x - 6} ${b.y - 6} ${b.width + 12} ${b.height + 12}`); } catch {} });
+  g.swingIn();
+}
+function renderMarkets(d) {
+  const box = $("mcMarkets"); box.innerHTML = "";
+  for (const m of d.markets) {
+    const card = el("div", "mc-mkt");
+    const top = el("div", "mc-mkt-top"); top.appendChild(el("span", "mc-mkt-name", MKT[m.key]));
+    if (m.pending) {
+      card.append(top, el("div", "mc-pending", T("港股：恒生指数的长历史估值（PE / PB / 股息率）还没接入。在那之前，港股标的请看你自己在自选里给的区间。", "Hong Kong: long Hang Seng valuation history (P/E, P/B, yield) isn't wired in yet. Until then, rely on your own watchlist ranges.")));
+      box.appendChild(card); continue;
+    }
+    const zb = el("span", "mc-mkt-zone", ZN[m.zone]); zb.style.background = ZONES[m.zone].hex; top.appendChild(zb);
+    const gm = el("div", "mc-gauge");
+    card.append(top, gm);
+    const inds = el("div", "mc-inds");
+    for (const x of m.indicators) {
+      const meta = IND[x.key] || { name: x.key, tip: "" };
+      const row = el("div", "mc-ind");
+      const k = el("span", "mc-ind-k", meta.name); const info = ri("information-line"); info.title = meta.tip; k.appendChild(info);
+      row.append(k, el("span", "mc-ind-v", `${x.value}${x.unit === "%" ? "%" : x.unit === "pp" ? " pp" : ""}`));
+      // 五段条：位置 = 「贵的程度」分位（风险溢价类已反向）
+      const bar = el("div", "mc-pbar");
+      for (const [w, z] of [[10, 0], [20, 1], [40, 2], [20, 3], [10, 4]]) { const sgm = el("span"); sgm.style.flex = String(w); sgm.style.background = ZONES[z].hex; bar.appendChild(sgm); }
+      const mark = el("b"); mark.style.left = x.expensive + "%"; bar.appendChild(mark);
+      row.append(bar, el("span", "mc-ind-note", T(`${x.since.slice(0, 4)} 年至今的 ${x.pct} 分位${x.cheapHigh ? "（越低越贵）" : ""} · ${x.date}`, `${x.pct}th percentile since ${x.since.slice(0, 4)}${x.cheapHigh ? " (lower = pricier)" : ""} · ${x.date}`)));
+      inds.appendChild(row);
+    }
+    card.appendChild(inds);
+    box.appendChild(card);
+    marketGauge(gm, m);
+  }
+  renderGravity(d.gravity);
+}
+
+// ---------- 引力长线 ----------
+function renderGravity(G) {
+  const ctl = $("mcGravCtl"); ctl.innerHTML = "";
+  const seg = (opts, cur, pick) => { const s = el("div", "mc-seg"); for (const [k, lab] of opts) { const b = el("button", k === cur ? "on" : "", lab); b.type = "button"; b.addEventListener("click", () => { pick(k); renderGravity(G); }); s.appendChild(b); } return s; };
+  ctl.append(seg([["us", MKT.us], ["cn", MKT.cn]], gMkt, (k) => { gMkt = k; }), seg([["10", T("10 年", "10Y")], ["20", T("20 年", "20Y")], ["all", T("全部", "All")]], gRange, (k) => { gRange = k; }));
+  const g = G[gMkt];
+  const since = gRange === "all" ? "" : `${new Date().getFullYear() - Number(gRange)}-01`;
+  const cut = (s) => (s || []).filter(([d]) => d >= since);
+  const ey = cut(g.ey), y10 = cut(g.y10), real = cut(g.real);
+  const chart = $("mcGravChart"); chart.innerHTML = "";
+  if (ey.length < 2) { chart.appendChild(el("div", "mc-pending", T("数据不足", "Not enough data"))); $("mcGravSay").textContent = ""; return; }
+  const lastEY = ey[ey.length - 1][1], lastY = y10.length ? y10[y10.length - 1][1] : NaN;
+  if (!Number.isFinite(lastY)) $("mcGravSay").innerHTML = zh ? `现在${MKT[gMkt]}每 100 元大约买到 <b>${lastEY.toFixed(1)} 元</b>盈利（国债数据暂缺）。` : `Today ${MKT[gMkt]} pay about <b>${lastEY.toFixed(1)}</b> of earnings per 100 (bond data unavailable).`;
+  else $("mcGravSay").innerHTML = zh
+    ? `现在${MKT[gMkt]}每 100 元大约买到 <b>${lastEY.toFixed(1)} 元</b>盈利，买 10 年国债拿到 <b>${lastY.toFixed(1)} 元</b>利息，差 <b>${(lastEY - lastY).toFixed(1)}</b>。${lastEY - lastY < 1 ? "股票多给的补偿很薄，安全边际要求更厚一些——这不是要你卖，而是买得更挑剔。" : ""}`
+    : `Today ${MKT[gMkt]} pay about <b>${lastEY.toFixed(1)}</b> of earnings per 100, vs <b>${lastY.toFixed(1)}</b> from 10-year bonds — a gap of <b>${(lastEY - lastY).toFixed(1)}</b>.${lastEY - lastY < 1 ? " A thin premium calls for a thicker margin of safety, not for selling." : ""}`;
+  // 横轴按月份序号，纵轴取三条线的范围；网格 / 刻度 / 年份用 HTML，线用 SVG（不变形）
+  const months = [...new Set([...ey, ...y10, ...real].map(([d]) => d))].sort();
+  const idx = new Map(months.map((d, i) => [d, i]));
+  const vals = [...ey, ...y10, ...real].map(([, v]) => v);
+  let lo = Math.min(...vals, 0), hi = Math.max(...vals);
+  const step = hi - lo > 12 ? 4 : hi - lo > 6 ? 2 : 1; lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  const W = 1000, H = 218, X = (d) => idx.get(d) / Math.max(1, months.length - 1) * W, Y = (v) => (hi - v) / (hi - lo) * H;
+  for (let t = lo; t <= hi + 1e-9; t += step) { const gl = el("div", "mc-grid-line"); gl.style.top = (Y(t) / H * (240 - 22)) + "px"; gl.appendChild(el("span", "", t + "%")); chart.appendChild(gl); }
+  const NS = "http://www.w3.org/2000/svg", mk = (tag, a) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none" });
+  const path = (s) => s.map(([d, v], i) => `${i ? "L" : "M"}${X(d).toFixed(1)},${Y(v).toFixed(1)}`).join("");
+  // 风险溢价面积：盈利收益率与 10 年国债之间
+  const yMap = new Map(y10);
+  const both = ey.filter(([d]) => yMap.has(d));
+  if (both.length > 1) svg.appendChild(mk("path", { class: "mc-gap", d: path(both) + both.slice().reverse().map(([d]) => `L${X(d).toFixed(1)},${Y(yMap.get(d)).toFixed(1)}`).join("") + "Z" }));
+  if (real.length > 1) svg.appendChild(mk("path", { class: "mc-real", d: path(real), "vector-effect": "non-scaling-stroke" }));
+  if (y10.length > 1) svg.appendChild(mk("path", { class: "mc-y10", d: path(y10), "vector-effect": "non-scaling-stroke" }));
+  svg.appendChild(mk("path", { class: "mc-ey", d: path(ey), "vector-effect": "non-scaling-stroke" }));
+  chart.appendChild(svg);
+  const axis = el("div", "mc-axis");
+  const years = [...new Set(months.map((d) => d.slice(0, 4)))]; const every = Math.ceil(years.length / 8);
+  years.forEach((yr, i) => { if (i % every) return; const sp = el("span", "", yr); sp.style.left = (X(`${yr}-01`) !== undefined && idx.has(`${yr}-01`) ? X(`${yr}-01`) : X(months.find((d) => d.startsWith(yr)))) / W * 100 + "%"; axis.appendChild(sp); });
+  chart.appendChild(axis);
+  const lg = $("mcGravLegend"); lg.innerHTML = "";
+  const item = (color, text, dashed) => { const s = el("span"); const i = el("i"); i.style.borderColor = color; if (dashed) i.style.borderTopStyle = "dashed"; s.append(i, document.createTextNode(text)); lg.appendChild(s); };
+  item("var(--chart-2)", gMkt === "us" ? T("盈利收益率（1 / CAPE）", "Earnings yield (1/CAPE)") : T("盈利收益率（1 / PE）", "Earnings yield (1/PE)"));
+  item("var(--ink)", T("10 年国债收益率", "10-year bond yield"));
+  if (real.length) item("var(--ink-mute)", T("10 年实际利率（TIPS）", "10-year real yield (TIPS)"), true);
+}
+
+// ---------- 你的击球区：自选在五区间里的分布（市场水位之外，自下而上的机会数） ----------
+async function renderMine() {
+  const me = await fetch("/api/me").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const slug = me && me.board && me.board.slug;
+  if (!slug) return;
+  $("tabBoard").href = "/b/" + encodeURIComponent(slug);
+  let data = null, prices = {};
+  try { const c = JSON.parse(sessionStorage.getItem("board_cache_" + slug) || "null"); if (c && c.data) { data = c.data; prices = c.prices || {}; } } catch { /* 没缓存 */ }
+  if (!data) data = await fetch("/api/config?slug=" + encodeURIComponent(slug)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const items = (data && data.items) || [];
+  const need = items.map((i) => i.symbol).filter((s) => s && !(prices[s] > 0));
+  if (need.length) { const qd = await fetch("/api/quotes?symbols=" + encodeURIComponent(need.join(","))).then((r) => (r.ok ? r.json() : null)).catch(() => null); Object.assign(prices, (qd && qd.quotes) || {}); }
+  const counts = [0, 0, 0, 0, 0]; let none = 0; const cheap = [];
+  for (const it of items) {
+    const price = prices[it.symbol], cfg = { ...it, price };
+    if (!(price > 0) || !structValid(cfg)) { none++; continue; }
+    const z = Math.min(ZONES.length - 1, Math.floor(Math.max(0, Math.min(179.9, priceToPhi(computeAnchors(cfg), price))) / (180 / ZONES.length)));
+    counts[z]++;
+    if (z <= 1) cheap.push({ it, z, toStrike: (computeAnchors(cfg)[1] / price - 1) * 100 });
+  }
+  $("mcMineTitle").textContent = T("你的击球区", "Your strike zone");
+  $("mcMineSub").textContent = T(`自选 ${items.length} 只按你自己给的合理区间归类${none ? `，${none} 只未估值` : ""}——宏观只决定该多勤快地去翻自选，不决定买什么`, `${items.length} watchlist names by your own fair ranges${none ? `, ${none} not valued` : ""} — macro decides how often to look, not what to buy`);
+  const link = $("mcMineLink"); link.href = "/b/" + encodeURIComponent(slug); link.textContent = T("去自选", "Open watchlist");
+  const zb = $("mcZones"); zb.innerHTML = "";
+  counts.forEach((n, i) => { const t = el("div", "mc-zone"); const k = el("div", "mc-zone-k"); const d = el("i"); d.style.background = ZONES[i].hex; k.append(d, document.createTextNode(ZN[i])); t.append(k, el("div", "mc-zone-v", String(n))); zb.appendChild(t); });
+  const nb = $("mcNames"); nb.innerHTML = "";
+  cheap.sort((a, b) => a.z - b.z || b.toStrike - a.toStrike).forEach(({ it, z, toStrike }) => {
+    const a = el("a", "mc-name"); a.href = `/b/${encodeURIComponent(slug)}/${encodeURIComponent(String(it.ticker || "").toUpperCase())}`;
+    const dot = el("span", "dot"); dot.style.background = ZONES[z].hex; dot.appendChild(ri(z === 0 ? "focus-3-line" : "arrow-down-line"));
+    a.append(dot, document.createTextNode(it.name || it.ticker), el("small", "", z === 0 ? T("已在击球区", "in the strike zone") : T(`距击球区 ${toStrike.toFixed(0)}%`, `${toStrike.toFixed(0)}% to strike`)));
+    nb.appendChild(a);
+  });
+  // 和市场水位互相印证：市场便宜 → 去更新估值；市场贵 → 击球区里的名字更要复核
+  const say = $("mcMineSay");
+  const pricey = macro && macro.markets.some((m) => !m.pending && m.zone >= 3);
+  const cheapMkt = macro && macro.markets.some((m) => !m.pending && m.zone <= 1);
+  if (cheapMkt) { say.hidden = false; say.textContent = T("有市场整体落在低估以下：这时最该做的是把自选里的估值更新一遍，而不是急着下单。", "A market is cheap overall: the best move is refreshing your watchlist valuations, not rushing to buy."); }
+  else if (pricey && counts[0] + counts[1] > 0) { say.hidden = false; say.textContent = T("市场整体偏贵，但你的自选里仍有便宜的名字：这正是自下而上的机会——先复核它们的护城河和假设，再决定。", "The market is pricey, yet some of your names are cheap — bottom-up opportunities. Re-check their moats and assumptions first."); }
+  $("mcMine").hidden = false;
+  return counts;
+}
+const mine = await renderMine();
+
+// 页头一句话：规则生成（不用 AI，不做预测）
+if (macro) {
+  const live = macro.markets.filter((m) => !m.pending);
+  const chips = $("mcVerdict"); chips.innerHTML = "";
+  const chip = (color, label, strong, rest) => { const c = el("span", "mc-chip"); if (color) { const d = el("i"); d.style.background = color; c.appendChild(d); } c.append(document.createTextNode(label + " · "), el("b", "", strong)); if (rest) c.append(document.createTextNode(" " + rest)); chips.appendChild(c); };
+  for (const m of live) chip(ZONES[m.zone].hex, MKT[m.key], ZN[m.zone], T(`${m.level} 分位`, `P${m.level}`));
+  if (mine) chip("", T("自选", "Watchlist"), T(`击球区 ${mine[0]}`, `${mine[0]} strike`), T(`· 低估 ${mine[1]}`, `· ${mine[1]} undervalued`));
+  const go = live.some((m) => m.zone <= 1) || (mine && mine[0] > 0);
+  const badge = $("mcBadge"); badge.hidden = false; badge.className = "mc-badge" + (go ? " go" : "");
+  badge.replaceChildren(ri(go ? "search-eye-line" : "cup-line"), document.createTextNode(go ? T("值得翻一翻自选", "Worth a look at your watchlist") : T("本月无需行动", "Nothing to do this month")));
+  const upd = macro.updatedAt ? new Date(macro.updatedAt) : null;
+  const days = lastVisit ? Math.floor((Date.now() - lastVisit) / 86400000) : null;
+  $("mcMeta").textContent = [upd ? T(`数据更新于 ${upd.toLocaleDateString("zh-CN")}`, `Data updated ${upd.toLocaleDateString("en-US")}`) : "",
+    days === null ? T("第一次来", "First visit") : days === 0 ? T("今天来过", "Visited earlier today") : T(`上次来看是 ${days} 天前`, `Last visit ${days} days ago`)].filter(Boolean).join(" · ");
+}
+</script>
+</body>
+</html>

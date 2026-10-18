@@ -228,6 +228,14 @@ The site default provider is configured with:
 
 Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`. Each user gets 100 AI messages per day on the site default / Workers AI. Workers AI runs on your Cloudflare account even in `wrangler dev`, so local chats count toward usage.
 
+## Macro
+
+`/macro` follows `docs/macro-design.md`: no forecasts, only how expensive each market is versus its own history ("water level") and long rates ("gravity"), ending at the user's own strike zone. `src/macro.js` pulls monthly series into `macro_series` — multpl (Shiller CAPE, 10-year Treasury, 10-year real yield), FRED public CSV (non-financial corporate equity and GDP for market cap / GDP; optional, 10 s timeout), eastmoney (all-A-share P/E since 2017, China 10-year) — at most once a week from the daily cron, or on the first request when the table is empty. Each indicator becomes a percentile of its own history; a market's level is the average "expensiveness" percentile, mapped to the five pendulum zones (0–10 strike … 90–100 bubble). Hong Kong is a placeholder until long Hang Seng valuation history is wired in.
+
+```bash
+npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-18-macro.sql
+```
+
 ## API Reference
 
 ### Public
@@ -288,6 +296,12 @@ Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`
 | POST | `/api/my/ai/review` | `{lang, stock, method, valuedAt, fields, result:{low,high,price}, verified, metrics, comparisons}` → `{review:{overall: "hold"\|"watch"\|"broken", summary, checks:[{k, status, reason}], at}}`; 502 `bad_ai_output` if the model ignores the format; shares the daily limit |
 | POST | `/api/my/ai/method` | `{lang, stock, facts, methods:[{key,title,subtitle}]}` → `{reply, picks:[{key, role: "primary"\|"check", reason}]}`; shares the daily limit |
 | POST | `/api/my/ai/valuation` | `{lang, messages:[{role,content}], context:{stock, method, mode, fields, facts}}` → `{reply, params, reasons}`; 429 after 100/day, 502 if the provider fails |
+
+### Macro (public)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/macro` | `{updatedAt, markets: [{key, level, zone, indicators: [{key, value, unit, date, since, pct, expensive, cheapHigh}]} \| {key, pending}], gravity: {us: {ey, y10, real}, cn: {ey, y10}}}`; refreshes in the background when older than 7 days |
 
 ### Station-master (requires `pendulum_owner` cookie)
 

@@ -105,6 +105,7 @@ export class Gauge {
     this.bands.forEach((b, i) => b.setAttribute("fill", i === zi ? z.hex : "var(--track)"));
     this.labels.forEach((t, i) => t.style.fill = i === zi ? "#fff" : "var(--ink-mute)");
     this.ring.setAttribute("stroke", z ? z.hex : "var(--node)");
+    this.gNeedle.style.opacity = this.hasPrice ? "1" : "0"; // 没有价格时不画指针（否则会竖在正上方「卡住」，等价格到了才摆过去）
     this.dot.setAttribute("fill", z ? z.hex : "var(--node)");
   }
   set(cfg, animate = true) {
@@ -114,8 +115,11 @@ export class Gauge {
     // 第一行名称、第二行代码；名称可被 setName() 覆盖（双语切换），否则用 cfg.name
     this._code = (cfg.ticker || "—").toUpperCase();
     this._renderHub(this.displayName != null ? this.displayName : (cfg.name || ""));
+    const hadPrice = this.hasPrice;
     this.hasPrice = cfg.price > 0;
     this.target = this.hasPrice ? priceToPhi(this.anchors, cfg.price) : 90;
+    // 第一次拿到价格：从侧面摆进来，而不是从正上方慢慢挪过去
+    if (!hadPrice && this.hasPrice && animate && !REDUCE && !this.swinging) { this.swingIn(); return; }
     if (!animate || REDUCE) { this.current = this.target; this.paint(this.current); return; }
     if (!this.raf && !this.swinging) this.follow();
   }
