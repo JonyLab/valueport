@@ -19,6 +19,9 @@ import { registerFeedback } from "./feedback.js";
 import { fetchLongbridgeAssets } from "./brokers/longbridge-assets.js";
 import { fetchIbkrFlex } from "./brokers/ibkr-flex.js";
 import { fetchTigerAssets } from "./brokers/tiger.js";
+import { fetchSchwabAssets, schwabAuthorizeUrl, schwabExchangeCode } from "./brokers/schwab.js";
+import { fetchEtradeAssets, etradeStart, etradeFinish } from "./brokers/etrade.js";
+import { fetchWebullAssets } from "./brokers/webull.js";
 import { parseHoldingsCsv } from "./brokers/csv.js";
 
 const app = new Hono();
@@ -114,6 +117,23 @@ app.get("/api/logo", async (c) => {
     const type = res.headers.get("content-type") || "";
     if (!res.ok || !type.startsWith("image/")) return c.body(null, 404, { "Cache-Control": "public, max-age=86400" });
     return new Response(res.body, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=604800" } });
+  } catch {
+    return c.body(null, 404);
+  }
+});
+// 券商 logo：只认白名单里的券商，取其官网图标（Google favicon 服务，128px），同样经本站代理；拿不到 404，前端退回线条图标。
+const BROKER_LOGO_DOMAINS = {
+  longbridge: "longbridge.com", ibkr: "interactivebrokers.com", tiger: "itiger.com",
+  schwab: "schwab.com", etrade: "etrade.com", webull: "webull.com",
+};
+app.get("/api/broker-logo/:broker", async (c) => {
+  const domain = BROKER_LOGO_DOMAINS[c.req.param("broker")];
+  if (!domain) return c.body(null, 404);
+  try {
+    const res = await fetch(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`, { cf: { cacheTtl: 2592000, cacheEverything: true } });
+    const type = res.headers.get("content-type") || "";
+    if (!res.ok || !type.startsWith("image/")) return c.body(null, 404, { "Cache-Control": "public, max-age=86400" });
+    return new Response(res.body, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=2592000" } });
   } catch {
     return c.body(null, 404);
   }
@@ -234,7 +254,16 @@ registerResearch(app); // 分析师评级 / 目标价 / 一致预期（公开，
 registerMacro(app);
 registerFeedback(app);
 const portfolio = registerPortfolio(app, {
-  adapters: { longbridge: (cr) => fetchLongbridgeAssets(cr), ibkr: (cr) => fetchIbkrFlex(cr), tiger: (cr) => fetchTigerAssets(cr), csv: (text) => parseHoldingsCsv(text) },
+  adapters: { longbridge: (cr) => fetchLongbridgeAssets(cr), ibkr: (cr) => fetchIbkrFlex(cr), tiger: (cr) => fetchTigerAssets(cr),
+    schwab: (cr) => fetchSchwabAssets(cr), etrade: (cr) => fetchEtradeAssets(cr), webull: (cr) => fetchWebullAssets(cr),
+    oauth: {
+      schwab: { start: (cr, { redirectUri, state }) => ({ url: schwabAuthorizeUrl(cr.appKey, redirectUri, state) }), finish: (cr, { code }, { redirectUri }) => schwabExchangeCode(cr, code, redirectUri) },
+      etrade: {
+        start: async (cr) => { const r = await etradeStart(cr); return { url: r.url, verifier: true, pending: { requestToken: r.requestToken, requestSecret: r.requestSecret } }; },
+        finish: (cr, { verifier }) => etradeFinish(cr, verifier),
+      },
+    },
+    csv: (text) => parseHoldingsCsv(text) },
   getQuotes,
 });
 

@@ -165,10 +165,15 @@
   .pf-broker .pf-broker-ic.longbridge{background:rgba(58,115,238,.12);color:#2c5bc4}
   .pf-broker .pf-broker-ic.ibkr{background:rgba(198,65,65,.10);color:#b03a3a}
   .pf-broker .pf-broker-ic.tiger{background:rgba(232,128,26,.12);color:#b8620c}
+  .pf-cb{display:flex;gap:6px;align-items:center;margin-top:6px}
+  .pf-cb code{flex:1;min-width:0;font-size:12px;padding:6px 8px;border-radius:var(--r-xs);background:var(--track);overflow-wrap:anywhere}
+  .pf-field select{height:40px;border-radius:var(--r-sm);border:0;background:var(--track);padding:0 12px;font:inherit}
   .pf-key{font-family:var(--mono,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:12px!important;line-height:1.45!important;min-height:96px!important;word-break:break-all;-webkit-text-security:disc}
   .pf-key:focus{-webkit-text-security:none}
   .f-opt{font-weight:400;color:var(--ink-faint,var(--ink-soft));margin-left:4px}
   .pf-broker.on .pf-broker-ic{background:var(--sun);color:var(--sun-ink)}
+  .pf-broker-ic.has-img,.pf-broker.on .pf-broker-ic.has-img,.pf-acc-ico.has-img{background:#fff;box-shadow:inset 0 0 0 1px var(--divider);overflow:hidden}
+  .pf-broker-ic.has-img img,.pf-acc-ico.has-img img{width:100%;height:100%;object-fit:contain}
   .pf-broker span{font-size:12px;color:var(--ink-mute);line-height:1.5}
   .pf-help{font-size:12.5px;line-height:1.7;color:var(--ink-soft);background:rgba(246,207,74,.18);border-radius:var(--r-md);padding:10px 14px;margin:4px 0 14px}
   .pf-help-link{display:inline-flex;align-items:center;gap:3px;color:var(--ink);font-weight:500;text-decoration:underline;text-decoration-color:rgba(29,29,27,.25);text-underline-offset:3px;white-space:nowrap}
@@ -403,6 +408,13 @@ function setNum(node, text) {
   node.textContent = i < 0 ? s : s.slice(0, i);
   if (i >= 0) node.appendChild(el("span", "num-dec", s.slice(i)));
 }
+// 券商真实 logo（/api/broker-logo 代理官网图标）；加载失败就保留原来的线条图标
+function mountBrokerLogo(node, broker) {
+  if (!BROKER_LOGO.has(broker)) return;
+  const img = new Image(); img.alt = "";
+  img.onload = () => { node.replaceChildren(img); node.classList.add("has-img"); };
+  img.src = "/api/broker-logo/" + broker;
+}
 function mountLogo(node, symbol, label) {
   node.textContent = (label || symbol || "?").trim().slice(0, 1).toUpperCase();
   const img = new Image(); img.alt = "";
@@ -422,8 +434,13 @@ const BROKER_META = {
   longbridge: { name: T("长桥", "Longbridge"), icon: "pulse-line", desc: T("实时持仓与余额", "Live positions & cash") },
   ibkr: { name: "IBKR", icon: "global-line", desc: T("Flex 日终数据", "Flex, end of day") },
   tiger: { name: T("老虎证券", "Tiger"), icon: "line-chart-line", desc: T("实时持仓与余额", "Live positions & cash") },
+  schwab: { name: T("嘉信", "Schwab"), icon: "bank-line", desc: T("实时 · 每 7 天重新授权", "Live · re-sign-in every 7 days") },
+  etrade: { name: "E*TRADE", icon: "exchange-line", desc: T("实时 · 每天重新授权", "Live · re-sign-in daily") },
+  webull: { name: T("微牛", "Webull"), icon: "bar-chart-2-line", desc: T("实时持仓与余额", "Live positions & cash") },
   manual: { name: T("手动 / CSV", "Manual / CSV"), icon: "file-list-3-line", desc: T("A 股等没有接口的券商", "For brokers without an API") },
 };
+const OAUTH_BROKERS = new Set(["schwab", "etrade"]);
+const BROKER_LOGO = new Set(["longbridge", "ibkr", "tiger", "schwab", "etrade", "webull"]);
 const BASES = ["USD", "HKD", "CNY"];
 let base = localStorage.getItem("pf_base") || (zh ? "CNY" : "USD");
 if (!BASES.includes(base)) base = "USD";
@@ -553,8 +570,8 @@ function emptyState() {
   const b = el("button", "btn primary"); b.type = "button"; b.append(ri("add-line"), document.createTextNode(T("添加账户", "Add an account")));
   b.addEventListener("click", () => openAccount());
   c.append(ico, el("div", "pf-empty-title", T("把你的券商账户连进来", "Connect your brokerage accounts")),
-    el("div", "pf-empty-sub", T("支持长桥（实时）、IBKR（Flex 日终数据），以及手动录入或导入 CSV（适合 A 股等没有接口的券商）。连上后，这里会汇总总资产，并把每只持仓和你看板上的估值区间对上：多少仓位在击球区，多少在泡沫区。",
-      "Longbridge (live), IBKR (Flex, end of day), or manual entry / CSV import for brokers without an API. Once connected, this page totals your assets and maps every holding onto your board's valuation zones.")), b);
+    el("div", "pf-empty-sub", T("支持长桥、老虎、嘉信、E*TRADE、Webull（实时）和 IBKR（Flex 日终数据），以及手动录入或导入 CSV（适合 A 股等没有接口的券商）。连上后，这里会汇总总资产，并把每只持仓和你看板上的估值区间对上：多少仓位在击球区，多少在泡沫区。",
+      "Longbridge, Tiger, Schwab, E*TRADE and Webull (live), IBKR (Flex, end of day), or manual entry / CSV import for brokers without an API. Once connected, this page totals your assets and maps every holding onto your board's valuation zones.")), b);
   return c;
 }
 
@@ -1137,7 +1154,7 @@ function accountsStrip(s) {
     const m = BROKER_META[a.broker] || BROKER_META.manual, A = s.perAcc.get(a.id);
     const box = el("div", "pf-acc-chipwrap");
     const chip = el("button", "pf-acc-chip" + (a.lastError ? " err" : "")); chip.type = "button"; chip.setAttribute("aria-haspopup", "menu");
-    const ico = el("span", "pf-acc-ico"); ico.appendChild(ri("wallet-3-line")); // 账户统一用钱包图标（券商类型写在菜单里）
+    const ico = el("span", "pf-acc-ico"); ico.appendChild(ri("wallet-3-line")); mountBrokerLogo(ico, a.broker); // 券商账户用券商 logo，手动账户用钱包图标
     const txt = el("span", "pf-acc-txt");
     txt.append(el("span", "pf-acc-name", a.name), el("span", "pf-acc-v", A && A.value ? `${amt(A.value, 0)} · ${(A.value / s.total * 100).toFixed(1)}%` : "—"));
     chip.append(ico, txt);
@@ -1149,6 +1166,7 @@ function accountsStrip(s) {
     if (A && A.value) menu.appendChild(el("div", "pf-acc-menu-meta", [`${T("现金", "Cash")} ${(A.cash / A.value * 100).toFixed(1)}%`, A.top ? `${T("最大持仓", "Largest")} ${A.top.name} ${(A.top.value / A.value * 100).toFixed(1)}%` : ""].filter(Boolean).join(" · ")));
     const item = (label, icon, fn) => { const b = el("button", ""); b.type = "button"; b.setAttribute("role", "menuitem"); b.append(ri(icon), document.createTextNode(label)); b.addEventListener("click", (e) => { e.stopPropagation(); closeAll(); fn(b); }); menu.appendChild(b); };
     if (a.broker !== "manual") item(T("同步", "Sync"), "refresh-line", async () => { chip.classList.add("busy"); await api(`/api/my/portfolio/accounts/${a.id}/sync`, { method: "POST" }); await load(); });
+    if (OAUTH_BROKERS.has(a.broker)) item(T("重新授权", "Reconnect"), "link", () => startAuth(a.id, a.broker));
     else { item(T("编辑持仓", "Edit holdings"), "edit-line", () => openHoldings(a)); item(T("导入 CSV", "Import CSV"), "upload-2-line", () => openImport(a)); }
     item(T("设置", "Settings"), "settings-3-line", () => openAccount(a));
     chip.addEventListener("click", (e) => { e.stopPropagation(); const open = menu.hidden; closeAll(); menu.hidden = !open; });
@@ -1188,6 +1206,26 @@ const CRED_UI = {
     link: ["https://developer.itigerup.com/profile", T("打开老虎开发者信息页", "Open Tiger developer profile")],
     fields: [["tigerId", "Tiger ID"], ["account", T("资金账号", "Account")], ["privateKey", T("私钥", "Private key"), { textarea: true }], ["token", "Token", { optional: true }]],
   },
+  schwab: {
+    help: T("先在嘉信开发者平台（developer.schwab.com）创建应用，API 产品选「Accounts and Trading Production」，回调地址填下面这个，等应用状态变成 Ready。保存后会跳到嘉信登录授权；嘉信规定每 7 天要重新授权一次（账户菜单里点「重新授权」）。",
+      "Create an app on the Schwab developer portal (developer.schwab.com) with the “Accounts and Trading Production” product and the callback URL below, and wait until it is Ready. After saving you are sent to Schwab to sign in; Schwab requires signing in again every 7 days (use “Reconnect” in the account menu)."),
+    link: ["https://developer.schwab.com/dashboard/apps", T("打开嘉信开发者平台", "Open Schwab developer portal")],
+    callback: true,
+    fields: [["appKey", "App Key"], ["appSecret", "Secret"]],
+  },
+  etrade: {
+    help: T("在 E*TRADE 开发者平台申请正式环境的 Consumer Key / Secret。保存后会打开 E*TRADE 授权页，把页面上显示的验证码填回来。E*TRADE 的授权在美东时间午夜失效，每天要重新授权一次才能同步。",
+      "Request a production consumer key and secret from the E*TRADE developer portal. After saving, the E*TRADE authorization page opens; paste the verification code it shows. E*TRADE authorization expires at midnight US Eastern, so you need to reconnect each day before syncing."),
+    link: ["https://developer.etrade.com/getting-started", T("打开 E*TRADE 开发者平台", "Open E*TRADE developer portal")],
+    fields: [["consumerKey", "Consumer Key"], ["consumerSecret", "Consumer Secret"]],
+  },
+  webull: {
+    help: T("在 Webull 开发者平台申请开通 OpenAPI，审核通过后在「应用管理」里拿到 App Key 和 App Secret。账户号可以不填，默认同步这个应用订阅的全部账户。",
+      "Apply for OpenAPI access on the Webull developer portal; once approved, get the App Key and App Secret under app management. The account ID is optional: by default every account subscribed to the app is synced."),
+    link: ["https://developer.webull.com/apis/docs/trade-api/getting-started/", T("打开 Webull 开发者平台", "Open Webull developer portal")],
+    fields: [["appKey", "App Key"], ["appSecret", "App Secret"], ["accountId", T("账户号", "Account ID"), { optional: true, plain: true }],
+      ["region", T("地区", "Region"), { select: [["us", T("美国 Webull US", "Webull US")], ["hk", T("香港 Webull HK", "Webull Hong Kong")]] }]],
+  },
   manual: {
     help: T("手动录入持仓，或导入券商导出的持仓 CSV（支持中英文表头）。适合 A 股等没有对个人开放接口的券商。", "Enter holdings by hand or import a holdings CSV exported from your broker (English or Chinese headers). For brokers without a public API, such as most A-share brokers."),
     fields: [],
@@ -1200,6 +1238,7 @@ let accEditing = null, accBroker = "longbridge";
 function parseCredBlob(text, broker) {
   const want = broker === "ibkr" ? { token: /token/, queryId: /query/ }
     : broker === "tiger" ? { tigerId: /^(tiger)?id$/, account: /^account$/, privateKey: /privatekey/, token: /^token$/ } // 老虎 tiger_openapi_config.properties：tiger_id / account / private_key_pk1|pk8
+    : broker === "etrade" ? { consumerKey: /consumerkey|^key$/, consumerSecret: /consumersecret|^secret$/ }
     : { appKey: /appkey|^key$/, appSecret: /appsecret|^secret$/, accessToken: /accesstoken|^token$/ };
   const norm = (k) => String(k).toLowerCase().replace(/^(export\s+)?(longport|longbridge|lb|ibkr|flex|tigeropen)[_\s-]*/, "").replace(/[^a-z]/g, "");
   const out = {};
@@ -1221,6 +1260,7 @@ function parseCredBlob(text, broker) {
   return out;
 }
 function openAccount(acc) {
+  if (!acc || !accAuth || accAuth.id !== acc.id) accAuth = null;
   accEditing = acc || null;
   accBroker = acc ? acc.broker : "longbridge";
   $("accTitle").textContent = acc ? T("账户设置", "Account settings") : T("添加账户", "Add account");
@@ -1234,24 +1274,31 @@ function openAccount(acc) {
 function renderAccForm() {
   const bx = $("accBrokers"); bx.innerHTML = "";
   bx.style.display = accEditing ? "none" : "";
-  for (const k of ["longbridge", "ibkr", "tiger", "manual"]) {
+  for (const k of ["longbridge", "ibkr", "tiger", "schwab", "etrade", "webull", "manual"]) {
     const m = BROKER_META[k]; const b = el("button", "pf-broker" + (k === accBroker ? " on" : "")); b.type = "button";
-    const ic = el("span", "pf-broker-ic " + k); ic.appendChild(ri(m.icon));
+    const ic = el("span", "pf-broker-ic " + k); ic.appendChild(ri(m.icon)); mountBrokerLogo(ic, k);
     b.append(ic, el("b", "", m.name), el("span", "", m.desc));
     b.addEventListener("click", () => { accBroker = k; renderAccForm(); });
     bx.appendChild(b);
   }
   const ui = CRED_UI[accBroker];
+  if (accAuth) return renderAuthStep();
   $("accHelp").textContent = ui.help;
   if (ui.link) {
     const a = el("a", "pf-help-link"); a.href = ui.link[0]; a.target = "_blank"; a.rel = "noopener noreferrer";
     a.append(document.createTextNode(ui.link[1]), ri("external-link-line"));
     $("accHelp").append(" ", a);
   }
+  if (ui.callback) { // 嘉信：要在开发者应用里登记的回调地址
+    const cb = el("div", "pf-cb"); const code = el("code", "", location.origin + "/api/my/portfolio/oauth/callback");
+    const copy = el("button", "btn ghost sm"); copy.type = "button"; copy.append(ri("file-copy-line"), document.createTextNode(T("复制", "Copy")));
+    copy.addEventListener("click", () => navigator.clipboard && navigator.clipboard.writeText(code.textContent));
+    cb.append(code, copy); $("accHelp").appendChild(cb);
+  }
   const f = $("accFields"); f.innerHTML = "";
   const nameLab = el("label", "field"); nameLab.append(el("span", "f-lab", T("账户名称", "Account name")));
   const nameIn = el("input", "plain"); nameIn.id = "accName"; nameIn.value = accEditing ? accEditing.name : BROKER_META[accBroker].name; nameIn.maxLength = 40; nameLab.appendChild(nameIn); f.appendChild(nameLab);
-  if (ui.fields.length > 1) f.appendChild(el("div", "pf-paste-hint", accBroker === "longbridge"
+  if (["longbridge", "ibkr", "tiger"].includes(accBroker)) f.appendChild(el("div", "pf-paste-hint", accBroker === "longbridge"
     ? T("可以在长桥开发者中心点「复制所有」，然后粘贴到任意一栏，会自动拆开填好三项。", "Tip: use “Copy all” in the Longbridge developer center and paste into any field — all three are filled in.")
     : accBroker === "tiger"
     ? T("也可以把开发者信息页导出的 tiger_openapi_config.properties 整个粘贴到任意一栏，会自动填好。", "You can also paste the whole tiger_openapi_config.properties exported from the developer page into any field.")
@@ -1263,15 +1310,18 @@ function renderAccForm() {
     l.append(fl);
     let i;
     if (opt.textarea) { i = el("textarea", "pf-key"); i.rows = 4; i.placeholder = "-----BEGIN RSA PRIVATE KEY-----"; }
-    else { i = el("input"); i.type = "password"; }
+    else if (opt.select) { i = el("select"); for (const [v, t] of opt.select) { const o = el("option", "", t); o.value = v; i.appendChild(o); } l.classList.add("pf-field"); }
+    else { i = el("input"); i.type = opt.plain ? "text" : "password"; }
     i.autocomplete = "off"; i.spellcheck = false; i.dataset.k = k;
     if (opt.optional) i.dataset.opt = "1";
-    if (accEditing) i.placeholder = T("留空则不修改", "Leave blank to keep");
+    if (opt.select) i.dataset.opt = "1"; // 下拉总有值，不算「填了凭证」
+    else if (accEditing) i.placeholder = T("留空则不修改", "Leave blank to keep");
     // 粘贴的内容含多项时，自动拆开分别填入
     i.addEventListener("paste", (e) => {
       const text = (e.clipboardData || window.clipboardData).getData("text");
       if (!/[\r\n]|[:=：].*[:=：]|^\s*\{/.test(text)) return; // 单个值：照常粘贴
       const got = parseCredBlob(text, accBroker);
+      for (const x of Object.keys(got)) if (!ui.fields.some(([k]) => k === x)) delete got[x];
       const n = Object.keys(got).length;
       if (n < 2) return;
       e.preventDefault();
@@ -1298,7 +1348,8 @@ $("accSave").addEventListener("click", async () => {
   $("accErr").textContent = "";
   const name = $("accName").value.trim();
   const creds = {}; let any = false, all = true;
-  $("accFields").querySelectorAll("[data-k]").forEach((i) => { const v = i.value.trim(); if (v) { creds[i.dataset.k] = v; any = true; } else if (!i.dataset.opt) all = false; });
+  if (accAuth) return finishAuthStep();
+  $("accFields").querySelectorAll("[data-k]").forEach((i) => { const v = i.value.trim(); if (v) { creds[i.dataset.k] = v; if (i.tagName !== "SELECT") any = true; } else if (!i.dataset.opt) all = false; });
   const btn = $("accSave"); btn.disabled = true;
   try {
     if (accEditing) {
@@ -1306,18 +1357,69 @@ $("accSave").addEventListener("click", async () => {
       if (any) { if (!all) { $("accErr").textContent = T("更换凭证时需要把所有字段都填上。", "Fill in every field to replace credentials."); return; } body.creds = creds; }
       const r = await api(`/api/my/portfolio/accounts/${accEditing.id}`, { method: "PUT", body: JSON.stringify(body) });
       if (!r.ok) { $("accErr").textContent = r.data.error || T("保存失败", "Save failed"); return; }
+      if (body.creds && OAUTH_BROKERS.has(accEditing.broker)) { await startAuth(accEditing.id, accEditing.broker); return; }
       if (body.creds) await api(`/api/my/portfolio/accounts/${accEditing.id}/sync`, { method: "POST" });
     } else {
       if (CRED_UI[accBroker].fields.length && !all) { $("accErr").textContent = T("请把所有字段都填上。", "Please fill in every field."); return; }
       btn.textContent = T("连接中…", "Connecting…");
       const r = await api("/api/my/portfolio/accounts", { method: "POST", body: JSON.stringify({ broker: accBroker, name, creds: CRED_UI[accBroker].fields.length ? creds : undefined }) });
       if (!r.ok) { $("accErr").textContent = r.data.error || T("添加失败", "Could not add the account"); return; }
+      if (r.data.needsAuth) { await startAuth(r.data.id, accBroker); return; }
       if (r.data.sync && !r.data.sync.ok) { closeOverlays(); await load(); return; } // 失败原因显示在账户卡上
       if (accBroker === "manual") { closeOverlays(); await load(); const a = data.accounts.find((x) => x.id === r.data.id); if (a) openHoldings(a); return; }
     }
     closeOverlays(); await load();
-  } finally { btn.disabled = false; btn.textContent = accEditing ? T("保存", "Save") : T("连接并同步", "Connect & sync"); }
+  } finally { btn.disabled = false; if (!accAuth) btn.textContent = accEditing ? T("保存", "Save") : T("连接并同步", "Connect & sync"); }
 });
+
+// ---------- 券商授权（嘉信跳转 / E*TRADE 验证码）----------
+let accAuth = null; // { id, broker, url }：E*TRADE 等待验证码时，弹窗切换成「填验证码」
+async function startAuth(id, broker) {
+  const r = await api(`/api/my/portfolio/accounts/${id}/oauth/start`, { method: "POST" });
+  if (!r.ok) {
+    if ($("accOverlay").classList.contains("hidden")) { await load(); alert(r.data.error || T("授权失败", "Authorization failed")); }
+    else $("accErr").textContent = r.data.error || T("授权失败", "Authorization failed");
+    return;
+  }
+  if (!r.data.verifier) { location.href = r.data.url; return; } // 嘉信：整页跳去登录，授权完会跳回本页
+  window.open(r.data.url, "_blank", "noopener");
+  accAuth = { id, broker, url: r.data.url };
+  if ($("accOverlay").classList.contains("hidden")) openAccount(data.accounts.find((a) => a.id === id) || null);
+  renderAccForm();
+}
+function renderAuthStep() {
+  $("accTitle").textContent = T("完成授权", "Finish authorization");
+  $("accBrokers").style.display = "none";
+  $("accHelp").textContent = T("已在新标签页打开 E*TRADE 授权页。登录并同意后，页面会显示一串验证码，把它填在下面。", "The E*TRADE authorization page opened in a new tab. Sign in and accept; it then shows a verification code — enter it below.");
+  const a = el("a", "pf-help-link"); a.href = accAuth.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+  a.append(document.createTextNode(T("重新打开授权页", "Open the authorization page again")), ri("external-link-line"));
+  $("accHelp").append(" ", a);
+  const f = $("accFields"); f.innerHTML = "";
+  const l = el("label", "field"); l.append(el("span", "f-lab", T("验证码", "Verification code")));
+  const i = el("input", "plain"); i.id = "accVerifier"; i.autocomplete = "off"; i.spellcheck = false; i.maxLength = 64;
+  l.appendChild(i); f.appendChild(l);
+  $("accSave").textContent = T("完成并同步", "Finish & sync");
+  setTimeout(() => i.focus(), 0);
+}
+async function finishAuthStep() {
+  const v = $("accVerifier").value.trim();
+  if (!v) { $("accErr").textContent = T("请填写验证码。", "Enter the verification code."); return; }
+  const btn = $("accSave"); btn.disabled = true;
+  try {
+    const r = await api(`/api/my/portfolio/accounts/${accAuth.id}/oauth/finish`, { method: "POST", body: JSON.stringify({ verifier: v }) });
+    if (!r.ok) { $("accErr").textContent = r.data.error || T("授权失败", "Authorization failed"); return; }
+    accAuth = null; closeOverlays(); await load();
+  } finally { btn.disabled = false; }
+}
+// 嘉信授权跳回：?connected=<id> / ?oauth_error=…
+{
+  const q = new URLSearchParams(location.search);
+  if (q.has("connected") || q.has("oauth_error")) {
+    const err = q.get("oauth_error");
+    history.replaceState(null, "", location.pathname);
+    if (err) setTimeout(() => alert(T("授权没有完成：", "Authorization did not complete: ") + err), 0);
+  }
+}
 
 // ---------- 弹窗：手动持仓编辑 ----------
 let holdAcc = null, holdMode = "edit";

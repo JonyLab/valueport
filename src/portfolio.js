@@ -3,7 +3,7 @@
 // 凭证只写不读：加密存库（src/crypto.js），接口永远不返回明文，只返回是否已配置 + 末四位提示。
 import { encryptJson, decryptJson } from "./crypto.js";
 
-export const BROKERS = ["longbridge", "ibkr", "tiger", "manual"];
+export const BROKERS = ["longbridge", "ibkr", "tiger", "schwab", "etrade", "webull", "manual"];
 const SYMBOL_RE = /^(us|hk|sh|sz)[A-Za-z0-9.]{1,12}$/;
 const CUR_RE = /^[A-Z]{3}$/;
 const MAX_POSITIONS = 500, MAX_CASH = 20;
@@ -13,8 +13,14 @@ const CRED_FIELDS = {
   longbridge: ["appKey", "appSecret", "accessToken"],
   ibkr: ["token", "queryId"],
   tiger: ["tigerId", "account", "privateKey"],
+  schwab: ["appKey", "appSecret"],
+  etrade: ["consumerKey", "consumerSecret"],
+  webull: ["appKey", "appSecret"],
 };
-const OPTIONAL_FIELDS = { tiger: ["token"] };
+const OPTIONAL_FIELDS = { tiger: ["token"], webull: ["accountId", "region"] };
+// 需要用户在券商页面授权（OAuth）的券商：建账户时不立即同步，令牌由授权流程写回加密凭证
+export const OAUTH_BROKERS = ["schwab", "etrade"];
+const BROKER_NAMES = { longbridge: "Longbridge", ibkr: "IBKR", tiger: "Tiger", schwab: "Schwab", etrade: "E*TRADE", webull: "Webull" };
 const MAX_CRED_LEN = { privateKey: 8192 }; // RSA 私钥 PEM 比别的凭证长
 
 export function validateCreds(broker, creds) {
@@ -32,6 +38,8 @@ export function validateCreds(broker, creds) {
     if (v.length > 4096) return { ok: false, error: `invalid ${f}` };
     if (v) out[f] = v;
   }
+  if (out.region && !["us", "hk"].includes(out.region.toLowerCase())) return { ok: false, error: "invalid region" };
+  if (out.region) out.region = out.region.toLowerCase();
   return { ok: true, value: out };
 }
 
@@ -102,7 +110,7 @@ async function readPlan(db, uid) {
 
 function credHint(broker, creds) {
   if (!creds) return "";
-  const v = broker === "longbridge" ? creds.appKey : broker === "ibkr" ? creds.queryId : broker === "tiger" ? creds.account : "";
+  const v = { longbridge: creds.appKey, ibkr: creds.queryId, tiger: creds.account, schwab: creds.appKey, etrade: creds.consumerKey, webull: creds.appKey }[broker] || "";
   return v ? "…" + String(v).slice(-4) : "";
 }
 
@@ -165,7 +173,9 @@ async function fxRates(base, currencies) {
 /**
  * 注册 Portfolio 路由。
  * @param app       Hono 实例（/api/my/* 的登录中间件需已挂好）
- * @param adapters  { longbridge(creds), ibkr(creds), tiger(creds), csv(text) } → { positions, cash, unsupported, errors? }
+ * @param adapters  { longbridge(creds), ibkr(creds), tiger(creds), schwab(creds), etrade(creds), webull(creds), csv(text) }
+ *                  → { positions, cash, unsupported, errors?, creds? }（creds：刷新过的令牌，会重新加密保存）
+ *                  adapters.oauth[broker] = { start(creds, {redirectUri, state}) → {url, verifier?, pending?}, finish(creds, input, {redirectUri}) → creds }
  * @param getQuotes async (env, symbols) → { quotes: {sym: price}, prevClose: {sym: price}, source }
  */
 export function registerPortfolio(app, { adapters, getQuotes }) {
@@ -189,7 +199,7 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     const body = await c.req.json().catch(() => ({}));
     const broker = String(body.broker || "");
     if (!BROKERS.includes(broker)) return c.json({ ok: false, error: "unknown broker" }, 400);
-    const name = String(body.name || "").trim().slice(0, 40) || ({ longbridge: "Longbridge", ibkr: "IBKR", tiger: "Tiger" }[broker] || "Manual");
+    const name = String(body.name || "").trim().slice(0, 40) || (BROKER_NAMES[broker] || "Manual");
     const v = validateCreds(broker, body.creds);
     if (!v.ok) return c.json({ ok: false, error: v.error }, 400);
     let enc = null;
@@ -200,8 +210,9 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     const { meta } = await c.env.DB.prepare("INSERT INTO broker_accounts (user_id,broker,name,cred_enc,created_at) VALUES (?,?,?,?,?)")
       .bind(c.get("uid"), broker, name, enc, new Date().toISOString()).run();
     const id = meta.last_row_id;
-    const sync = broker === "manual" ? null : await syncAccount(c, id);
-    return c.json({ ok: true, id, sync }, 201);
+    const needsAuth = OAUTH_BROKERS.includes(broker);
+    const sync = broker === "manual" || needsAuth ? null : await syncAccount(c, id);
+    return c.json({ ok: true, id, sync, needsAuth }, 201);
   });
 
   // 改名 / 换凭证
@@ -239,6 +250,7 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     try {
       const creds = await decryptJson(env.CREDENTIALS_KEY, acc.cred_enc);
       const snap = await fn(creds);
+      if (snap.creds) await env.DB.prepare("UPDATE broker_accounts SET cred_enc=? WHERE id=?").bind(await encryptJson(env.CREDENTIALS_KEY, snap.creds), acc.id).run(); // 刷新过的令牌
       await replaceSnapshot(env.DB, acc.id, snap);
       await ensureOnBoard(env.DB, uid);
       await env.DB.prepare("UPDATE broker_accounts SET last_sync_at=?, last_error=NULL WHERE id=?").bind(now, acc.id).run();
@@ -253,6 +265,67 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
   app.post("/api/my/portfolio/accounts/:id/sync", async (c) => {
     const r = await syncAccount(c, c.req.param("id"));
     return c.json(r, r.ok ? 200 : (r.status || 500));
+  });
+
+  // ---------- OAuth 授权（嘉信 / E*TRADE）----------
+  // 回调地址固定为本站 /api/my/portfolio/oauth/callback（嘉信要求在开发者应用里登记完全一致的地址）
+  const callbackUrl = (c) => new URL(c.req.url).origin + "/api/my/portfolio/oauth/callback";
+  async function finishAuth(c, acc, creds, input) {
+    const next = await adapters.oauth[acc.broker].finish(creds, input, { redirectUri: callbackUrl(c) });
+    await c.env.DB.prepare("UPDATE broker_accounts SET cred_enc=?, last_error=NULL WHERE id=?").bind(await encryptJson(key(c), next), acc.id).run();
+    return syncAccount(c, acc.id);
+  }
+  app.post("/api/my/portfolio/accounts/:id/oauth/start", async (c) => {
+    const acc = await own(c, c.req.param("id"));
+    if (!acc) return c.json({ ok: false }, 404);
+    const flow = adapters.oauth && adapters.oauth[acc.broker];
+    if (!flow || !acc.cred_enc) return c.json({ ok: false, error: "this account does not use authorization" }, 400);
+    try {
+      const creds = await decryptJson(key(c), acc.cred_enc);
+      const state = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      const r = await flow.start(creds, { redirectUri: callbackUrl(c), state });
+      const { oauthState, requestToken, requestSecret, ...base } = creds; // 清掉上一次没完成的授权
+      await c.env.DB.prepare("UPDATE broker_accounts SET cred_enc=? WHERE id=?").bind(await encryptJson(key(c), { ...base, oauthState: state, ...(r.pending || {}) }), acc.id).run();
+      return c.json({ ok: true, url: r.url, verifier: !!r.verifier, redirectUri: callbackUrl(c) });
+    } catch (e) {
+      return c.json({ ok: false, error: String((e && e.message) || e).slice(0, 300) }, 502);
+    }
+  });
+  // E*TRADE：用户把授权页给的验证码交回来
+  app.post("/api/my/portfolio/accounts/:id/oauth/finish", async (c) => {
+    const acc = await own(c, c.req.param("id"));
+    if (!acc) return c.json({ ok: false }, 404);
+    if (!(adapters.oauth && adapters.oauth[acc.broker]) || !acc.cred_enc) return c.json({ ok: false, error: "this account does not use authorization" }, 400);
+    const body = await c.req.json().catch(() => ({}));
+    const verifier = typeof body.verifier === "string" ? body.verifier.trim() : "";
+    if (!verifier || verifier.length > 64) return c.json({ ok: false, error: "missing verification code" }, 400);
+    try {
+      const sync = await finishAuth(c, acc, await decryptJson(key(c), acc.cred_enc), { verifier });
+      return c.json({ ok: true, sync });
+    } catch (e) {
+      return c.json({ ok: false, error: String((e && e.message) || e).slice(0, 300) }, 502);
+    }
+  });
+  // 嘉信：浏览器从授权页跳回这里（带 code 与 state），换令牌、同步，再回到资产页
+  app.get("/api/my/portfolio/oauth/callback", async (c) => {
+    const code = c.req.query("code") || "", state = c.req.query("state") || "";
+    const back = (q) => c.redirect("/portfolio?" + new URLSearchParams(q));
+    if (!code || !/^[0-9a-f]{32}$/.test(state)) return back({ oauth_error: c.req.query("error_description") || c.req.query("error") || "missing code" });
+    const { results } = await c.env.DB.prepare("SELECT * FROM broker_accounts WHERE user_id=? AND cred_enc IS NOT NULL").bind(c.get("uid")).all();
+    for (const acc of results || []) {
+      if (!(adapters.oauth && adapters.oauth[acc.broker])) continue;
+      let creds;
+      try { creds = await decryptJson(key(c), acc.cred_enc); } catch { continue; }
+      if (creds.oauthState !== state) continue;
+      try {
+        const sync = await finishAuth(c, acc, creds, { code });
+        return back(sync && sync.ok ? { connected: acc.id } : { connected: acc.id, oauth_error: (sync && sync.error) || "sync failed" });
+      } catch (e) {
+        await c.env.DB.prepare("UPDATE broker_accounts SET last_error=? WHERE id=?").bind(String((e && e.message) || e).slice(0, 300), acc.id).run();
+        return back({ oauth_error: String((e && e.message) || e).slice(0, 200) });
+      }
+    }
+    return back({ oauth_error: "authorization session not found — start again from the account menu" });
   });
 
   // 手动账户：直接提交持仓 / 现金（整体替换）
