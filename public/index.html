@@ -98,7 +98,7 @@
   .chart-item:hover .card-actions .btn.edit,.card-actions:focus-within .btn.edit{opacity:1}
   @media (hover:none){ .card-actions .btn.edit{opacity:1} }
   /* 「添加」瓷砖：虚线胶囊框 */
-  .add-card{min-height:200px;border:1.5px dashed rgba(29,29,27,.22);border-radius:var(--r-xl);background:rgba(255,255,255,.22);
+  .add-card{min-height:200px;border:1.5px dashed rgba(29,29,27,.12);border-radius:var(--r-xl);background:rgba(255,255,255,.22);
     color:var(--ink-soft);font-size:15px;font-weight:400;cursor:pointer;font-family:var(--font);
     transition:background .15s,color .15s,border-color .15s}
   .add-card{display:flex;align-items:center;justify-content:center;gap:8px}
@@ -1702,10 +1702,16 @@ function trySubmitModal() {
   }
   if (firstBad) { const el = fieldInputs[firstBad]; if (el) { el.focus(); el.scrollIntoView({ block: "nearest" }); } return; }
   clearTimeout(item._saveT);
+  const wasNew = modalIsNew;
   saveItem(item);            // 立即提交（不等防抖）
   refreshDetailIfOpen(item); // 详情页正展示该标的时，同步钟摆/占位与判定
   modalItem = null;
   modalOverlay.classList.add("hidden");
+  // 新加的标的：直接进它的详情页（下一步通常就是估值）；地址同步成 /b/<slug>/<代码>，返回键回到列表
+  if (wasNew && c.ticker && viewDetail.classList.contains("hidden")) {
+    history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug) + "/" + encodeURIComponent(String(c.ticker).toUpperCase()));
+    showDetail(item);
+  }
 }
 document.getElementById("btnModalDone").addEventListener("click", trySubmitModal);
 modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) closeItemModal(); });
