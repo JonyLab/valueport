@@ -162,7 +162,7 @@ describe("method recommendation", () => {
       .reply(200, { choices: [{ message: { content: '银行。\n```json\n{"picks":[{"key":"pb","reason":"账面价值"}]}\n```' } }] });
     const r = await SELF.fetch("https://x/api/my/ai/method", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify({ lang: "zh", stock: { name: "招商银行", code: "600036" }, facts: { bps: 40 }, methods: METHODS }) });
     expect(r.status).toBe(200);
-    expect(await r.json()).toEqual({ reply: "银行。", picks: [{ key: "pb", role: "primary", reason: "账面价值" }] });
+    expect(await r.json()).toEqual({ reply: "银行。", business: null, picks: [{ key: "pb", role: "primary", reason: "账面价值" }] });
   });
 });
 
@@ -300,7 +300,7 @@ describe("market research and master lenses in prompts", () => {
     const rp = buildReviewPrompt({ stock: { name: "苹果" }, method: { key: "pe" }, fields: [{ k: "g", col: "single", value: 1 }], result: { low: 1, high: 2 }, market, lenses }, "zh");
     expect(rp).toContain("分析师评级（46 家）");
     expect(plain("用 **DCF** 做主方法，`pe` 交叉验证")).toBe("用 DCF 做主方法，pe 交叉验证");
-    expect(parsePicks('首选 **fcf**。\n```json\n{"picks":[{"key":"pb","reason":"**账面**"}]}\n```', METHODS)).toEqual({ reply: "首选 fcf。", picks: [{ key: "pb", role: "primary", reason: "账面" }] });
+    expect(parsePicks('首选 **fcf**。\n```json\n{"picks":[{"key":"pb","reason":"**账面**"}]}\n```', METHODS)).toEqual({ reply: "首选 fcf。", business: null, picks: [{ key: "pb", role: "primary", reason: "账面" }] });
   });
 });
 
