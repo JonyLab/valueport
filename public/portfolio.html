@@ -16,7 +16,7 @@
   .pf-card{background:var(--card);border:1px solid var(--card-edge);border-radius:var(--r-xl);box-shadow:var(--shadow);
     -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);padding:22px 24px}
   .pf-cardhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-  .pf-cardtitle{font-size:20px;font-weight:400;letter-spacing:-.01em}
+  .pf-cardtitle{font-size:20px;font-weight:500;letter-spacing:-.01em}
   .pf-cardsub{font-size:13px;color:var(--ink-mute)}
   /* 总资产 */
   .pf-total-lab{font-size:13px;color:var(--ink-mute)}
@@ -25,7 +25,8 @@
   .pf-total-cur{font-size:18px;color:var(--ink-mute)}
   .pf-day{font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--ink-mute)}
   .pf-day.up,.pf-pnl.up{color:var(--green)} .pf-day.down,.pf-pnl.down{color:var(--red)}
-  .pf-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin-top:22px}
+  .pf-total-band{display:flex;align-items:flex-end;justify-content:space-between;gap:16px 28px;flex-wrap:wrap}
+  .pf-stats{display:flex;gap:0;margin-top:0}
   .pf-stat{display:flex;flex-direction:column;gap:8px;padding-right:16px}
   .pf-stat + .pf-stat{padding-left:16px;border-left:1px dashed var(--border)}
   .pf-stat-k{font-size:13px;color:var(--ink-mute)}
@@ -41,6 +42,8 @@
   .pf-table th:first-child,.pf-table td:first-child{text-align:left;padding-left:0}
   .pf-table td{text-align:right;padding:11px 10px;border-top:1px dashed var(--border);font-variant-numeric:tabular-nums;white-space:nowrap}
   .pf-table tr.link{cursor:pointer}
+  .pf-zone.add{color:var(--ink-soft);background:none;box-shadow:inset 0 0 0 1px var(--divider)}
+  .pf-zone.add i{font-size:13px}
   .pf-table tr.link:hover td{background:rgba(246,207,74,.10)}
   .pf-sym{display:flex;align-items:center;gap:10px;min-width:0}
   .pf-logo{width:32px;height:32px;border-radius:50%;background:var(--track-edge);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;overflow:hidden;flex:none}
@@ -61,17 +64,19 @@
   .pf-curve-ctl{display:flex;gap:8px;flex-wrap:wrap}
   .pf-seg{display:flex;gap:2px;padding:3px;background:var(--track);border-radius:var(--r-pill)}
   .pf-seg button{height:28px;padding:0 11px;border:0;border-radius:var(--r-pill);background:none;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pf-seg button.on{background:var(--dark);color:#fff}
-  .pf-curve-sum{font-size:14px;font-weight:500;color:var(--ink-mute);margin:-6px 0 10px;font-variant-numeric:tabular-nums}
+  .pf-seg button.on{background:#fff;color:var(--ink)}
+  .pf-curve-sum{font-size:13px;font-weight:500;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .pf-curve-titles{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;min-width:0}
   .pf-curve-sum.up{color:var(--green)} .pf-curve-sum.down{color:var(--red)}
-  .pf-curve-wrap{position:relative;height:240px}
+  .pf-curve-wrap{position:relative;height:190px}
   .pf-curve-svg{width:100%;height:100%;display:block;overflow:visible}
   .pf-curve-grid{stroke:var(--divider);stroke-dasharray:3 4;vector-effect:non-scaling-stroke}
   .pf-curve-lab{font-family:var(--font);font-size:12px;fill:var(--ink-mute)}
   .pf-curve-area{fill:rgba(246,207,74,.22)}
   .pf-curve-line{fill:none;stroke:var(--ink);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
   .pf-curve-hover{stroke:var(--ink-mute);stroke-width:1;vector-effect:non-scaling-stroke}
-  .pf-curve-dot{fill:var(--sun);stroke:var(--ink);stroke-width:2;vector-effect:non-scaling-stroke}
+  .pf-curve-dot{position:absolute;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;background:var(--sun);box-shadow:0 0 0 2px var(--ink);pointer-events:none}
+  .pf-curve-dot[hidden]{display:none}
   .pf-curve-tip{position:absolute;top:-6px;pointer-events:none;display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:var(--r-sm);background:var(--dark);color:#fff;font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
   .pf-curve-tip[hidden]{display:none}
   .pf-curve-tip b{font-size:15px;font-weight:500}
@@ -81,8 +86,7 @@
   .pf-info:hover,.pf-info:focus{color:var(--ink);outline:none}
   .pf-warn{color:#a4561a}
   /* 账户胶囊条 */
-  .pf-total-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
-  .pf-total-top .pf-total-lab{padding-top:8px}
+  #pfAccounts{min-width:0;margin-left:auto}
   .pf-accs{min-width:0}
   .pf-accs-row{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;min-width:0}
   .pf-hold-tabs{width:fit-content;max-width:100%;overflow-x:auto;margin:-6px 0 12px;scrollbar-width:none}
@@ -108,6 +112,7 @@
   /* 资产分布：环形图 */
   .pf-donut + .pf-donut{margin-top:18px;padding-top:18px;border-top:1px dashed var(--border)}
   .pf-dist-tabs{width:fit-content;max-width:100%;overflow-x:auto;margin:-4px 0 6px;scrollbar-width:none}
+  .pf-dist-tabs button,.pf-hold-tabs button{flex:none;max-width:none} /* 不被挤成「Zo…」，放不下就横向滚 */
   .pf-donut-body{display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;align-items:center;margin-top:10px}
   .pf-donut-ring{position:relative;width:120px;height:120px}
   .pf-donut-svg{width:100%;height:100%;transform:rotate(-90deg)}
@@ -168,7 +173,7 @@
   .pf-csv-result{font-size:13px;line-height:1.7;color:var(--ink-soft);margin-top:10px}
   @media (max-width:1100px){ .pf-grid{grid-template-columns:1fr} }
   @media (max-width:640px){
-    .pf-stats{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:16px}
+    .pf-stats{flex-wrap:wrap;row-gap:16px}
     .pf-accs-row{justify-content:flex-start}
     .pf-stat:nth-child(3){padding-left:0;border-left:0}
     .pf-card{padding:18px 16px}
@@ -197,7 +202,7 @@
   .pf-cur-menu button.on{font-weight:500}
   .pf-cur-menu button.on::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--sun);margin-left:8px;vertical-align:middle}
   /* 资产曲线并进总资产卡 */
-  .pf-curve-sec{margin-top:22px;padding-top:20px;border-top:1px dashed var(--border)}
+  .pf-curve-sec{margin-top:18px;padding-top:16px;border-top:1px dashed var(--border)}
   .pf-curve-head{margin-bottom:10px}
   .pf-subhead{font-size:15px;color:var(--ink)}
   /* 仓位体检雷达 */
@@ -272,6 +277,7 @@
 </style>
   <!-- 模块依赖整棵树先声明：浏览器一次并行拉取，不用等上一层下载完才发现下一层（线上每个文件都要回源校验，层层等很慢） -->
   <link rel="modulepreload" href="/shared/core.js">
+  <link rel="modulepreload" href="/shared/holding.js">
   <link rel="modulepreload" href="/shared/i18n.js">
   <link rel="modulepreload" href="/shared/langmenu.js">
   <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页，点击后几乎立即切换（Chrome 系浏览器支持，其他浏览器忽略） -->
@@ -295,6 +301,7 @@
       <p class="eyebrow" id="greet"></p>
       <div class="pf-titlerow"><h1 data-i18n="nav_portfolio">Portfolio</h1><div id="pfAlert"></div></div>
     </div>
+    <div id="pfAccounts"></div><!-- 账户胶囊挂在标题行右侧 -->
   </div>
 
   <div id="pfRoot"><div class="pf-grid" aria-hidden="true" id="pfSkel"><div class="pf-main"><div class="sk-card"><span class="sk sk-line" style="width:90px;height:12px;"></span><span class="sk sk-line" style="width:260px;height:54px;border-radius:14px"></span><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:6px"><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span><span class="sk sk-line" style="width:60%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:20px;"></span></div><div class="sk-row" style="margin-top:12px"><span class="sk sk-line" style="width:80px;height:14px;"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:160px;height:28px;border-radius:999px"></span></div><span class="sk sk-line" style="width:100%;height:170px;border-radius:16px"></span></div><div class="sk-card"><span class="sk sk-line" style="width:120px;height:18px;"></span><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div><div class="sk-row"><span class="sk sk-round" style="width:30px;height:30px"></span><span class="sk-grow"><span class="sk sk-line" style="width:40%;height:12px;"></span></span><span class="sk sk-line" style="width:30%;height:10px;"></span></div></div></div><div class="pf-side"><div class="sk-card"><span class="sk sk-line" style="width:100px;height:18px;"></span><span class="sk" style="width:200px;height:200px;margin:8px auto;border-radius:50%"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span><span class="sk sk-line" style="width:100%;height:36px;border-radius:16px"></span></div><div class="sk-card"><span class="sk sk-line" style="width:90px;height:18px;"></span><span class="sk sk-line" style="width:260px;height:30px;border-radius:999px"></span><div class="sk-row"><span class="sk sk-round" style="width:120px;height:120px"></span><div class="sk-grow" style="display:flex;flex-direction:column;gap:10px"><span class="sk sk-line" style="width:80%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:10px;"></span><span class="sk sk-line" style="width:80%;height:10px;"></span></div></div></div></div></div></div>
@@ -331,6 +338,7 @@
 import { applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
 import { computeAnchors, priceToPhi, structValid, ZONES } from "/shared/core.js";
+import { driftText, driftTolerance, driftStatus, driftAction } from "/shared/holding.js";
 
 applyI18n();
 const zh = LANG === "zh";
@@ -487,10 +495,11 @@ function render() {
   const root = $("pfRoot");
   const fromSkel = !!$("pfSkel"); // 只在替换骨架时淡入；缓存先画、新数据再画时不重复淡入（否则会闪）
   root.innerHTML = "";
-  if (!data.accounts.length) { $("pfAlert").replaceChildren(); root.appendChild(emptyState()); return; }
+  if (!data.accounts.length) { $("pfAlert").replaceChildren(); $("pfAccounts").replaceChildren(); root.appendChild(emptyState()); return; }
   const s = summarize(data);
   const grid = el("div", "pf-grid"), main = el("div", "pf-main"), side = el("div", "pf-side");
   $("pfAlert").replaceChildren(...[driftAlert(s)].filter(Boolean)); // 偏离提醒挂在「资产」标题右边
+  $("pfAccounts").replaceChildren(accountsStrip(s)); // 账户胶囊在标题行右侧
   // 左栏放明细（总览 / 持仓 / 账户），右栏只放两张分析卡（体检 + 分布），两栏长度大致相当
   main.append(totalCard(s), holdingsCard(s));
   side.append(healthCard(s), distCard(s));
@@ -527,9 +536,7 @@ function totalCard(s) {
   info.setAttribute("aria-label", info.title); info.tabIndex = 0;
   lab.appendChild(info);
   // 第一行：左「总资产」，右上角一排账户胶囊（省出单独一行）
-  const top = el("div", "pf-total-top");
-  top.append(lab, accountsStrip(s));
-  c.appendChild(top);
+  c.appendChild(lab);
   const row = el("div", "pf-total");
   const num = el("span", "pf-total-num"); setNum(num, amt(s.total));
   // 币种单位即切换：点「CNY ▾」下拉选 USD / HKD / CNY
@@ -548,12 +555,12 @@ function totalCard(s) {
   cur.append(curBtn, curMenu);
   const day = el("span", "pf-day " + (s.day > 0 ? "up" : s.day < 0 ? "down" : ""), `${T("今日", "Today")} ${hideAmt ? "" : signed(s.day) + " "}(${pct(s.dayPct, 2)})`);
   row.append(num, cur, day);
-  c.appendChild(row);
+  const band = el("div", "pf-total-band"); band.appendChild(row); c.appendChild(band);
   const stats = el("div", "pf-stats");
   const stat = (k, v, cls) => { const d = el("div", "pf-stat"); d.append(el("span", "pf-stat-k", k)); const vv = el("span", "pf-stat-v " + (cls || "")); setNum(vv, v); d.append(vv); return d; };
   stats.append(stat(T("持仓市值", "Holdings"), amt(s.holdValue)), stat(T("现金", "Cash"), amt(s.cashValue)),
     stat(T("浮动盈亏", "Unrealised P/L"), hideAmt ? pct(s.pnlPct) : `${signed(s.pnl)}  ${pct(s.pnlPct)}`, "pf-pnl " + (s.pnl > 0 ? "up" : s.pnl < 0 ? "down" : "")));
-  c.appendChild(stats);
+  band.appendChild(stats);
   // 缺汇率 / 缺报价会让总额不准，这类提醒照常显示
   const warns = [];
   if (s.missingFx.length) warns.push(T(`缺少汇率：${s.missingFx.join("、")}，相关金额未计入。`, `Missing FX rate for ${s.missingFx.join(", ")}; those amounts are excluded.`));
@@ -569,7 +576,8 @@ let curveRange = "ALL", curveAcc = 0; // 0 = 全部账户合计
 function curveSection() {
   const c = el("div", "pf-curve-sec");
   const head = el("div", "pf-cardhead pf-curve-head");
-  head.appendChild(el("span", "pf-subhead", T("资产曲线", "Asset curve")));
+  const titles = el("div", "pf-curve-titles"); titles.appendChild(el("span", "pf-subhead", T("资产曲线", "Asset curve")));
+  head.appendChild(titles);
   const ctl = el("div", "pf-curve-ctl");
   const seg = (opts, cur, onPick) => {
     const box = el("div", "pf-seg");
@@ -594,8 +602,8 @@ function curveSection() {
   }
   const v0 = pts[0][1], v1 = pts[pts.length - 1][1], ch = v1 - v0;
   const sum = el("div", "pf-curve-sum " + (ch > 0 ? "up" : ch < 0 ? "down" : ""), `${hideAmt ? "" : signed(ch) + " "}(${pct(v0 ? ch / v0 * 100 : NaN, 2)}) · ${pts[0][0]} – ${pts[pts.length - 1][0]}`);
-  c.appendChild(sum);
-  const W = 1000, H = 260, PL = 4, PR = hideAmt ? 8 : 74, PT = 14, PB = 26;
+  titles.appendChild(sum); // 区间涨跌挂在「资产曲线」标题后面，省一行
+  const W = 1000, H = 190, PL = 4, PR = hideAmt ? 8 : 74, PT = 14, PB = 26;
   let lo = Math.min(...pts.map((p) => p[1])), hi = Math.max(...pts.map((p) => p[1]));
   const pad = (hi - lo) * 0.12 || hi * 0.02 || 1; lo -= pad; hi += pad;
   const X = (i) => PL + i / (pts.length - 1) * (W - PL - PR), Y = (v) => PT + (1 - (v - lo) / (hi - lo)) * (H - PT - PB);
@@ -617,20 +625,21 @@ function curveSection() {
     svg.appendChild(mk("text", { x: X(i), y: H - 6, class: "pf-curve-lab", "text-anchor": k === 0 ? "start" : k === nT - 1 ? "end" : "middle" }, `${+m}/${+dd}`));
   }
   const hover = mk("line", { y1: PT, y2: H - PB, class: "pf-curve-hover", visibility: "hidden" });
-  const dot = mk("circle", { r: 5, class: "pf-curve-dot", visibility: "hidden" });
-  svg.append(hover, dot);
+  svg.append(hover);
+  // 悬停圆点用 HTML 画：SVG 横向拉伸（preserveAspectRatio=none），圆会被压成椭圆
+  const dot = el("span", "pf-curve-dot"); dot.hidden = true;
   const wrap = el("div", "pf-curve-wrap"); const tip = el("div", "pf-curve-tip"); tip.hidden = true;
-  wrap.append(svg, tip); c.appendChild(wrap);
+  wrap.append(svg, dot, tip); c.appendChild(wrap);
   svg.addEventListener("mousemove", (ev) => {
     const r = svg.getBoundingClientRect(); const vx = (ev.clientX - r.left) / r.width * W;
     const i = Math.max(0, Math.min(pts.length - 1, Math.round((vx - PL) / (W - PL - PR) * (pts.length - 1))));
     hover.setAttribute("x1", X(i)); hover.setAttribute("x2", X(i)); hover.setAttribute("visibility", "visible");
-    dot.setAttribute("cx", X(i)); dot.setAttribute("cy", Y(pts[i][1])); dot.setAttribute("visibility", "visible");
+    dot.style.left = (X(i) / W * 100) + "%"; dot.style.top = (Y(pts[i][1]) / H * 100) + "%"; dot.hidden = false;
     tip.replaceChildren(el("b", "", hideAmt ? pct(v0 ? (pts[i][1] / v0 - 1) * 100 : NaN, 2) : money(pts[i][1], 0)), el("span", "", pts[i][0]));
     tip.hidden = false;
     tip.style.left = Math.max(0, Math.min(r.width - tip.offsetWidth, X(i) / W * r.width - tip.offsetWidth / 2)) + "px";
   });
-  svg.addEventListener("mouseleave", () => { hover.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); tip.hidden = true; });
+  svg.addEventListener("mouseleave", () => { hover.setAttribute("visibility", "hidden"); dot.hidden = true; tip.hidden = true; });
   return c;
 }
 
@@ -811,7 +820,8 @@ function holdingsCard(sAll) {
   const zoneTd = (zone, onBoard) => {
     const zt = el("td"); const zp = el("span", "pf-zone"); const zd = el("i");
     if (zone >= 0) { zd.style.background = ZONES[zone].hex; zp.append(zd, document.createTextNode(ZONE_NAMES[zone])); }
-    else zp.textContent = onBoard ? NONE_NAME : T("不在看板", "Not on board");
+    else if (onBoard) zp.textContent = NONE_NAME;
+    else { zp.classList.add("add"); zp.append(ri("add-line"), document.createTextNode(T("加入自选", "Add to watchlist"))); }
     zt.appendChild(zp); return zt;
   };
   const symTd = (symbol, name, sub, isCash) => {
@@ -821,6 +831,11 @@ function holdingsCard(sAll) {
     box.append(logo, id); td.appendChild(box); return td;
   };
   const weightTd = (w, p) => { const td = el("td", "pf-w"); const v = el("span", "pf-w-v", Number.isFinite(w) ? w.toFixed(1) + "%" : "—"); td.appendChild(v); if (planOn) td.appendChild(bar(Number.isFinite(w) ? w : 0, p)); return td; };
+  // 不在自选里的持仓：点了去自选页打开预填好的添加弹窗，加进来后就有详情页、能估值
+  const addLink = (tr, symbol, name) => {
+    tr.classList.add("link"); tr.title = T("不在自选里：点击加入自选，之后可以估值", "Not on your watchlist: click to add it");
+    tr.addEventListener("click", () => { location.href = `/b/${encodeURIComponent(slug)}?add=${encodeURIComponent(symbol)}&name=${encodeURIComponent(name || "")}`; });
+  };
   const link = (tr, ticker) => { if (!ticker) return; tr.classList.add("link"); tr.addEventListener("click", () => { location.href = "/b/" + encodeURIComponent(slug) + "/" + encodeURIComponent(ticker.toUpperCase()); }); };
   for (const r of s.rows) {
     const p = byPlan.get(r.symbol);
@@ -832,6 +847,7 @@ function holdingsCard(sAll) {
     if (planOn) tr.append(...tgtCells(p, false));
     tr.append(el("td", "pf-pnl " + (pl > 0 ? "up" : pl < 0 ? "down" : ""), pct(pl)));
     if (r.onBoard) link(tr, r.ticker);
+    else addLink(tr, r.symbol, r.name);
     body.appendChild(tr);
   }
   // 计划建仓：设了目标、还没持有
@@ -865,25 +881,13 @@ function holdingsCard(sAll) {
 // ---------- 目标仓位 ----------
 // 偏离按「5/25 规则」判定：|当前 − 目标| 超过 band 个百分点，或超过目标的 rel%，二者先到为准（小仓位也管得住）。
 // 价值投资不机械再平衡：建议动作结合看板估值区间——超配且高估才明确减，低配且在击球区 / 低估才明确加。
-const DRIFT_TEXT = {
-  trimHot: T("超配且已高估，考虑减仓", "Overweight and overvalued — consider trimming"),
-  trimHold: T("超配但仍低估，可以继续持有，留意集中度", "Overweight but still cheap — fine to hold, watch concentration"),
-  trim: T("超配，按计划减仓回到目标", "Overweight — trim back to target"),
-  addCheap: T("低配且价格便宜，是加仓的好时机", "Underweight and cheap — a good time to add"),
-  addWait: T("低配但已高估，不急着补，等更好的价格", "Underweight but expensive — wait for a better price"),
-  add: T("低配，按计划加仓回到目标", "Underweight — add back to target"),
-  build: T("计划建仓", "Planned position"),
-  buildCheap: T("计划建仓，已进入击球区 / 低估", "Planned — now in strike / undervalued zone"),
-  ok: T("在容忍带内", "Within band"),
-  cashLow: T("现金低于目标，加仓余力不足", "Cash below target — less room to add"),
-  cashHigh: T("现金高于目标，可以留意击球区标的", "Cash above target — look for strike-zone names"),
-};
+const DRIFT_TEXT = driftText(LANG); // 文案与判定规则在 /shared/holding.js，和个股详情页共用
 function planView(d, s, items, conv) {
   const plan = d.plan || { targets: {}, cash: null, band: 5, rel: 25 };
   const targets = plan.targets || {};
   const active = Object.keys(targets).length > 0 || Number.isFinite(plan.cash);
   const tot = s.total;
-  const tolOf = (t) => Math.max(0.1, Math.min(plan.band, t * plan.rel / 100));
+  const tolOf = (t) => driftTolerance(t, plan);
   const held = new Map(s.rows.map((r) => [r.symbol, r]));
   const rows = [];
   for (const [sym, tgt] of Object.entries(targets)) {
@@ -893,11 +897,8 @@ function planView(d, s, items, conv) {
     const zone = h ? h.zone : zoneFor(it, price);
     const currency = h ? h.currency : (sym.startsWith("us") ? "USD" : sym.startsWith("hk") ? "HKD" : "CNY");
     const tol = tolOf(tgt), drift = cur - tgt;
-    const status = !h ? "build" : drift > tol ? "over" : drift < -tol ? "under" : "ok";
-    const hot = zone >= 3, cheap = zone >= 0 && zone <= 1;
-    const action = status === "build" ? (cheap ? "buildCheap" : "build")
-      : status === "over" ? (hot ? "trimHot" : cheap ? "trimHold" : "trim")
-      : status === "under" ? (cheap ? "addCheap" : hot ? "addWait" : "add") : "ok";
+    const status = driftStatus(!!h, cur, tgt, tol);
+    const action = driftAction(status, zone);
     const trade = (tgt - cur) / 100 * tot;                        // 回到目标需要买(+)卖(−)多少（base 货币）
     const px = price > 0 ? conv(price, currency) : NaN;          // 每股价格折成 base
     const shares = Number.isFinite(px) && px > 0 ? Math.round(trade / px) : NaN;
@@ -1079,7 +1080,7 @@ function accountsStrip(s) {
     const m = BROKER_META[a.broker] || BROKER_META.manual, A = s.perAcc.get(a.id);
     const box = el("div", "pf-acc-chipwrap");
     const chip = el("button", "pf-acc-chip" + (a.lastError ? " err" : "")); chip.type = "button"; chip.setAttribute("aria-haspopup", "menu");
-    const ico = el("span", "pf-acc-ico"); ico.appendChild(ri(m.icon));
+    const ico = el("span", "pf-acc-ico"); ico.appendChild(ri("wallet-3-line")); // 账户统一用钱包图标（券商类型写在菜单里）
     const txt = el("span", "pf-acc-txt");
     txt.append(el("span", "pf-acc-name", a.name), el("span", "pf-acc-v", A && A.value ? `${amt(A.value, 0)} · ${(A.value / s.total * 100).toFixed(1)}%` : "—"));
     chip.append(ico, txt);
