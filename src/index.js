@@ -7,6 +7,7 @@ import { fetchLongbridgeQuotes, fetchLongbridgeNames, fetchLongbridgeFinancials,
 import { fetchDeductedNetIncome } from "./eastmoney.js";
 import { fetchAdjustedEps } from "./finnhub.js";
 import { fetchDividendHistory } from "./dividends.js";
+import { fetchEastmoneyFinancials } from "./financials-em.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
@@ -115,40 +116,48 @@ app.get("/api/logo", async (c) => {
     return c.body(null, 404);
   }
 });
-// 财报（Fundamental）：按需取 + 缓存一天。无凭据/无权限 → financials:null（前端优雅降级）。
+// 财报（Fundamental）：按需取 + 缓存一天。长桥（需凭据）优先；长桥无凭据/失败/空 → 东财 F10 免费兜底（A/港/美）。
+// 两者都取不到 → financials:null（前端优雅降级）。financialsSource 标明来源，便于排查。
 app.get("/api/financials", async (c) => {
   const symbol = (c.req.query("symbol") || "").trim();
   const isAnnual = c.req.query("period") !== "quarter";
   const report = isAnnual ? "af" : "qf";
   const haveCreds = c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN;
-  let financials = null, valuationRefs = null, deducted = null, adjEps = null, dividends = null;
-  if (symbol && haveCreds) {
+  const hasData = (f) => !!(f && (f.IS || f.BS || f.CF));
+  let financials = null, valuationRefs = null, deducted = null, adjEps = null, dividends = null, financialsSource = null;
+  if (symbol) {
     try {
       if (isAnnual) {
         // 扣非(东财·A股)、调整后EPS(Finnhub·美股)、逐年派息(东财·全市场)均与长桥并行拉取;免费、各自失败不影响其余
         const [f, vr, dni, aeps, div] = await Promise.all([
-          fetchLongbridgeFinancials(c.env, symbol, report),
-          fetchValuationRefs(c.env, symbol),
+          haveCreds ? fetchLongbridgeFinancials(c.env, symbol, report) : null,
+          haveCreds ? fetchValuationRefs(c.env, symbol) : null,
           fetchDeductedNetIncome(symbol),
           fetchAdjustedEps(c.env, symbol),
           fetchDividendHistory(symbol),
         ]);
         financials = f; valuationRefs = vr; deducted = dni; adjEps = aeps; dividends = div;
-      } else {
+      } else if (haveCreds) {
         financials = await fetchLongbridgeFinancials(c.env, symbol, report);
       }
     } catch (e) { console.error("financials failed:", e && e.message); financials = null; }
+    if (hasData(financials)) financialsSource = "longbridge";
+    else {
+      financials = await fetchEastmoneyFinancials(symbol, report);
+      if (hasData(financials)) financialsSource = "eastmoney";
+    }
   }
   const latest = pickLatestAnnual(financials);
   if (Number.isFinite(deducted)) latest.deductedNetIncome = deducted;
   if (Number.isFinite(adjEps)) latest.adjustedEps = adjEps;
   // 仅缓存成功结果;失败/空响应不长期缓存,避免一次瞬时失败把基本面钉死 24 小时
-  const ok = financials && (financials.IS || financials.BS || financials.CF);
+  const ok = hasData(financials);
   // 派息支持的市场但本次没取到(东财瞬时失败)→ 缩短缓存,避免把派息钉死 24h,约 1h 后自愈
   const divMissing = isAnnual && /^(sh|sz|bj|hk|us)/i.test(symbol) && !dividends;
-  const maxAge = !ok ? 0 : (divMissing ? 3600 : 86400);
+  // 兜底数据源也缩短缓存:长桥恢复后约 1h 内切回
+  const maxAge = !ok ? 0 : (divMissing || financialsSource !== "longbridge" ? 3600 : 86400);
   c.header("Cache-Control", maxAge ? `public, max-age=${maxAge}` : "no-store");
-  return c.json({ financials, latest, valuationRefs, dividends });
+  return c.json({ financials, latest, valuationRefs, dividends, financialsSource });
 });
 app.get("/api/hints", async (c) => {
   const q = c.req.query("q") || "";
