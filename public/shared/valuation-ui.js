@@ -192,11 +192,11 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     if (bz && BIZ_LABEL[bz.type]) {
       const card = el("div", "vc-picker-biz");
       const head = el("div", "vc-picker-biz-head");
-      head.append(el("span", "vc-picker-biz-lab", lang === "zh" ? "生意画像" : "Business profile"), el("span", "vc-picker-biz-type", BIZ_LABEL[bz.type][lang === "zh" ? 0 : 1]));
+      head.append(el("span", "vc-picker-biz-lab", { textContent: lang === "zh" ? "生意画像" : "Business profile" }), el("span", "vc-picker-biz-type", { textContent: BIZ_LABEL[bz.type][lang === "zh" ? 0 : 1] }));
       card.appendChild(head);
       for (const [k, zhL, enL] of [["model", "怎么赚钱", "How it makes money"], ["drivers", "驱动因素", "Drivers"], ["implication", "对估值的含义", "For valuation"]]) {
         if (!bz[k]) continue;
-        const row = el("div", "vc-picker-biz-row"); row.append(el("span", "vc-picker-biz-k", lang === "zh" ? zhL : enL), el("span", "vc-picker-biz-v", bz[k]));
+        const row = el("div", "vc-picker-biz-row"); row.append(el("span", "vc-picker-biz-k", { textContent: lang === "zh" ? zhL : enL }), el("span", "vc-picker-biz-v", { textContent: bz[k] }));
         card.appendChild(row);
       }
       body.appendChild(card);
