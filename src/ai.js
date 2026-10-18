@@ -730,7 +730,9 @@ export function registerAi(app, { chat = chatComplete } = {}) {
     const lang = body.lang === "en" ? "en" : "zh";
     const { text, res } = await runChat(c, buildMethodPrompt(body, lang), [{ role: "user", content: lang === "en" ? "Which valuation methods fit this company?" : "这家公司适合用哪些估值方法？" }]);
     if (res) return res;
-    return c.json(parsePicks(text, body.methods));
+    const picks = parsePicks(text, body.methods);
+    if (!picks.picks.length && !picks.reply) return c.json({ error: "bad_ai_output" }, 502); // 模型偶尔吐出空的 / 不成形的结果：让前端提示重试，而不是显示一块空白
+    return c.json(picks);
   });
   app.post("/api/my/ai/note", async (c) => {
     const body = await c.req.json().catch(() => null);

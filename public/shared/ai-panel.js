@@ -48,6 +48,7 @@ export function aiErrorText(status, j, lang) {
   if (e === "daily_limit" || status === 429) return zh ? "你今天的 AI 次数已用完，明天再来；在「设置 → AI 模型」里配置自己的模型可不受限制"
     : "You've used today's AI requests; try again tomorrow, or add your own model under Settings → AI models";
   if (e === "bad_ai_output") return zh ? "AI 返回的格式不对，请重试" : "Unexpected AI output, try again";
+  if (/访问量过大|稍后再试/.test((j && j.detail) || "")) return zh ? "智谱免费模型现在太忙（并发有限制），稍等一会儿再试，或在 AI 面板顶部的模型菜单换一个模型" : "The free Zhipu model is busy right now (concurrency is limited); try again shortly or switch models from the menu at the top of the AI panel";
   return String((j && j.detail) || e || status);
 }
 
