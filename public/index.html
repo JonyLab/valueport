@@ -1074,6 +1074,7 @@ import { mountFeedback } from "/shared/feedback.js";
 import { mountValuationCalc } from "/shared/valuation-ui.js";
 import { MODELS, modeFields } from "/shared/valuation/index.js";
 import { verifiedFacts, latestMetrics, assumptionChecks, marketViews, masterLenses } from "/shared/valuation/facts.js";
+import { aiErrorText } from "/shared/ai-panel.js";
 import { holdingFor, driftText } from "/shared/holding.js";
 
 applyI18n(); // 静态文案先按当前语言渲染
@@ -2329,7 +2330,7 @@ function fundBriefEl(item, financials, dividends) {
       };
       const r = await fetch("/api/my/ai/brief", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(req) });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.brief) throw new Error(r.status === 429 ? (zh ? "今天的 AI 次数已用完" : "Daily AI limit reached") : (j.detail || (j.error === "bad_ai_output" ? (zh ? "AI 返回的格式不对，请重试" : "Unexpected AI output, try again") : j.error) || r.status));
+      if (!r.ok || !j.brief) throw new Error(aiErrorText(r.status, j, LANG));
       try { sessionStorage.setItem(key, JSON.stringify(j.brief)); } catch { /* 存不下就不缓存 */ }
       show(j.brief); setBtn(false, true);
     } catch (e) {
@@ -2852,7 +2853,7 @@ function renderValuationPanel(item, panel, idBlock) {
       };
       const r = await fetch("/api/my/ai/review", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.review) throw new Error(r.status === 429 ? (LANG === "zh" ? "今天的 AI 次数已用完" : "Daily AI limit reached") : (j.detail || (j.error === "bad_ai_output" ? (LANG === "zh" ? "AI 返回的格式不对，请重试" : "Unexpected AI output, try again") : j.error) || r.status));
+      if (!r.ok || !j.review) throw new Error(aiErrorText(r.status, j, LANG));
       card.review = j.review;
       saveItem(item);
       showList();
@@ -3149,6 +3150,11 @@ async function initAiSettings() {
     const others = info.workers.filter((w) => !(info.site.provider === "workers-ai" && w.model === info.site.model)).map((w) => w.name); // 和站点默认同一个的不重复列
     body.appendChild(mk("p", "quote-note ai-intro", T(`不用配置就能用：站点默认（${info.site.name}）和 ${others.join("、")}。下面添加你自己的模型，之后在 AI 面板顶部切换用哪个。`,
       `Ready without setup: the site default (${info.site.name}) and ${others.join(", ")}. Add your own models below, then switch between them at the top of the AI panel.`)));
+    const lim = info.dailyLimit || 100, wa = info.site.provider === "workers-ai";
+    body.appendChild(mk("p", "quote-note ai-intro", wa
+      ? T(`这几个都用站点的 Cloudflare 免费额度：全站共用，每天北京时间早上 8 点重置，当天用完就要等到第二天；另外每人每天最多 ${lim} 次。你自己的模型用你自己的 Key，不受这两个限制。`,
+        `These run on the site's free Cloudflare allowance, shared by everyone and reset daily at 00:00 UTC; once it's used up AI stops until the next day. Each person also gets at most ${lim} requests a day. Your own models use your own key and skip both limits.`)
+      : T(`站点默认每人每天最多 ${lim} 次；你自己的模型用你自己的 Key，不受这个限制。`, `The site default allows ${lim} requests per person per day; your own models use your own key and skip this limit.`)));
     const list = mk("div", "ai-mlist");
     for (const m of info.custom) {
       if (editing === m.id) { list.appendChild(form(m)); continue; }

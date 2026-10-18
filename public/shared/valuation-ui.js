@@ -14,7 +14,7 @@ import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/sh
 import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
 import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
-import { mountAiPanel } from "/shared/ai-panel.js";
+import { mountAiPanel, aiErrorText } from "/shared/ai-panel.js";
 import { verifiedFacts, marketViews, masterLenses } from "/shared/valuation/facts.js";
 
 const TX = {
@@ -225,7 +225,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const res = await fetch("/api/my/ai/method", { method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), verified: aiVerified(), ...views, methods }) });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(res.status === 429 ? (lang === "zh" ? "今天的 AI 次数已用完" : "Daily AI limit reached") : (j.detail || j.error || res.status));
+      if (!res.ok) throw new Error(aiErrorText(res.status, j, lang));
       Object.assign(j, views);
       showAiResult(j);
       try { sessionStorage.setItem(aiPickKey(), JSON.stringify(j)); } catch { /* 存不下就算了 */ }
@@ -357,7 +357,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const r = await fetch("/api/my/ai/note", { method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ lang, context: { ...context, ...views }, messages: ai.history(), note: noteInput.value.slice(0, 2000) }) });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.note) throw new Error(r.status === 429 ? (lang === "zh" ? "今天的 AI 次数已用完" : "Daily AI limit reached") : (j.detail || j.error || r.status));
+      if (!r.ok || !j.note) throw new Error(aiErrorText(r.status, j, lang));
       noteBefore = noteInput.value; noteInput.value = j.note; noteUndo.hidden = false;
       noteInput.focus();
     } catch (e) {

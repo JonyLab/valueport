@@ -31,6 +31,18 @@ const TX = {
   },
 };
 
+// AI 接口失败时给用户看的一句话：区分「全站免费额度用完」（Workers AI 每天 10,000 Neurons，UTC 0 点 = 北京时间 8 点重置）
+// 和「个人每天次数用完」，两种都提示可以配置自己的模型（不受限制）
+export function aiErrorText(status, j, lang) {
+  const zh = lang !== "en", e = j && j.error;
+  if (e === "site_quota") return zh ? "站点的免费 AI 额度今天已用完（全站共用），北京时间早上 8 点恢复；也可以在「设置 → AI 模型」里配置自己的模型，不受这个限制"
+    : "The site's free AI allowance is used up for today (shared by everyone); it resets at 00:00 UTC. Add your own model under Settings → AI models to skip this limit";
+  if (e === "daily_limit" || status === 429) return zh ? "你今天的 AI 次数已用完，明天再来；在「设置 → AI 模型」里配置自己的模型可不受限制"
+    : "You've used today's AI requests; try again tomorrow, or add your own model under Settings → AI models";
+  if (e === "bad_ai_output") return zh ? "AI 返回的格式不对，请重试" : "Unexpected AI output, try again";
+  return String((j && j.detail) || e || status);
+}
+
 export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField }) {
   const T = TX[lang] || TX.zh;
   const history = []; // { role, content } —— 发给后端的对话（不含建议卡）
@@ -192,7 +204,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       pending.remove();
       if (!r.ok) {
         history.pop();
-        const m = bubble("ai", r.status === 429 ? T.limit : `${T.err}${j && j.detail ? "：" + j.detail : ""}`);
+        const m = bubble("ai", r.status === 429 ? aiErrorText(r.status, j, lang) : `${T.err}${j && j.detail ? "：" + j.detail : ""}`);
         m.classList.add("error");
         return;
       }

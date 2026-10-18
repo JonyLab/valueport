@@ -437,6 +437,12 @@ async function takeQuota(env, uid) {
   return true;
 }
 
+// 免费额度用完 / 容量不足：4006（daily free allocation of neurons）、3040（Out of Capacity）、429
+export function isWorkersQuotaError(e) {
+  const m = String(e && (e.message || e) || "");
+  return /\b(4006|3040|429)\b/.test(m) || /neurons?|free allocation|out of capacity|capacity temporarily exceeded|rate limit/i.test(m);
+}
+
 export function registerAi(app, { chat = chatComplete } = {}) {
   // 用当前用户的模型配置调用；自己的 Key 不占站点每日额度。返回 { text } 或 { res }（错误响应）
   async function runChat(c, system, messages) {
@@ -444,7 +450,11 @@ export function registerAi(app, { chat = chatComplete } = {}) {
     try { u = await userAi(c.env, c.get("uid")); } catch { return { res: c.json({ error: "ai_settings_unreadable", detail: "saved API key can't be decrypted — re-enter it in settings" }, 500) }; }
     if (!u.own && !(await takeQuota(c.env, c.get("uid")))) return { res: c.json({ error: "daily_limit" }, 429) };
     try { return { text: await chat(c.env, system, messages, undefined, u.cfg) }; }
-    catch (e) { return { res: c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502) }; }
+    catch (e) {
+      // Workers AI 账号每天的免费额度（10,000 Neurons，全站共用）用完：单独报 site_quota，前端提示「早上 8 点恢复 / 配自己的模型」
+      if (u.cfg.provider === "workers-ai" && isWorkersQuotaError(e)) return { res: c.json({ error: "site_quota" }, 429) };
+      return { res: c.json({ error: "ai_failed", detail: String(e && e.message || e).slice(0, 300) }, 502) };
+    }
   }
   // 可选模型列表 + 当前选中（AI 面板的切换器和设置页都用）
   app.get("/api/my/ai/models", async (c) => {
@@ -460,7 +470,7 @@ export function registerAi(app, { chat = chatComplete } = {}) {
     }
     c.header("Cache-Control", "no-store");
     return c.json({
-      active: u.active,
+      active: u.active, dailyLimit: DAILY_LIMIT,
       site: { id: "default", kind: "site", provider: site.provider, model: site.model, name: site.provider === "workers-ai" ? wm(site.model) : site.model },
       workers: WORKERS_MODELS.map((m) => ({ id: "wa:" + m.id, kind: "workers-ai", name: m.label, model: m.id })),
       custom,

@@ -319,3 +319,19 @@ describe("AI fundamentals brief", () => {
     expect((await SELF.fetch("https://x/api/my/ai/brief", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) })).status).toBe(502);
   });
 });
+
+describe("Workers AI quota errors", () => {
+  it("recognises the free-allocation and capacity errors only", async () => {
+    const { isWorkersQuotaError } = await import("../src/ai.js");
+    expect(isWorkersQuotaError(new Error("4006: you have used up your daily free allocation of 10,000 neurons, please upgrade"))).toBe(true);
+    expect(isWorkersQuotaError(new Error("AiError: 3040: Out of capacity"))).toBe(true);
+    expect(isWorkersQuotaError(new Error("InferenceUpstreamError: 429 Too Many Requests"))).toBe(true);
+    expect(isWorkersQuotaError(new Error("empty AI response"))).toBe(false);
+    expect(isWorkersQuotaError(new Error("Workers AI binding (AI) is not configured"))).toBe(false);
+  });
+  it("tells the settings page the per-person daily limit", async () => {
+    const ck = await userCookie("aiuser-limit");
+    const j = await (await SELF.fetch("https://x/api/my/ai/models", { headers: { cookie: ck } })).json();
+    expect(j.dailyLimit).toBe(100);
+  });
+});
