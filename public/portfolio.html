@@ -259,11 +259,9 @@
   .pf-tgt-drift{display:inline-block;font-size:12px;font-variant-numeric:tabular-nums;padding:2px 8px;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft)}
   .pf-tgt-drift.over{background:rgba(240,140,46,.16);color:#a4561a}
   .pf-tgt-drift.under{background:rgba(58,115,238,.12);color:#2c5bc4}
-  /* 建议行：紧贴在它的标的行下面（上移 4px 吃掉行间距），两行拼成一个圆角色块 */
-  .pf-table tr.has-sugg td:first-child{border-bottom-left-radius:0} .pf-table tr.has-sugg td:last-child{border-bottom-right-radius:0}
+  /* 建议行：紧贴在它的标的行下面（上移 4px 吃掉行间距）；本身无底色、不响应悬停 */
   .pf-table tr.has-sugg td{padding-bottom:4px}
   .pf-table tr.pf-sugg td{position:relative;top:-4px;padding:0 10px 10px 56px;text-align:left;white-space:normal;border-radius:0 0 var(--r-md) var(--r-md)}
-  .pf-table tr.link:hover + tr.pf-sugg td{background:rgba(246,207,74,.10)}
   /* 建议区：缩进到名称列下方、只包住内容的浅色小块；减仓偏橙、加仓偏蓝、观望中性 */
   .pf-sugg-line{display:inline-flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:5px 11px 5px 9px;border-radius:var(--r-xs);background:rgba(29,29,27,.04)}
   .pf-sugg-line > i{font-size:14px;color:var(--ink-mute);align-self:center;margin-right:-2px}
@@ -828,7 +826,7 @@ function holdingsCard(sAll) {
   const suggRow = (tr, p, isCash) => {
     if (!planOn || !p || p.status === "ok") return null;
     const key = isCash ? (p.status === "under" ? "cashLow" : p.status === "over" ? "cashHigh" : "ok") : p.action;
-    const sr = el("tr", "pf-sugg " + tr.className);
+    const sr = el("tr", "pf-sugg"); // 只是注释，不可点、不响应悬停
     const td = el("td"); td.colSpan = cols.length;
     const dir = key === "trimHot" || key === "trim" || key === "cashHigh" ? "down" : key === "addCheap" || key === "add" || key === "build" || key === "buildCheap" || key === "cashLow" ? "up" : "hold";
     const line = el("div", "pf-sugg-line " + dir);
@@ -880,7 +878,7 @@ function holdingsCard(sAll) {
     if (planOn) tr.append(...tgtCells(p));
     tr.append(el("td", "pf-pnl " + (pl > 0 ? "up" : pl < 0 ? "down" : ""), pct(pl)));
     const sr = suggRow(tr, p, false);
-    for (const row of [tr, sr].filter(Boolean)) { if (r.onBoard) link(row, r.ticker); else addLink(row, r.symbol, r.name); }
+    if (r.onBoard) link(tr, r.ticker); else addLink(tr, r.symbol, r.name);
     body.appendChild(tr); if (sr) body.appendChild(sr);
   }
   // 计划建仓：设了目标、还没持有
@@ -889,7 +887,7 @@ function holdingsCard(sAll) {
     tr.append(symTd(p.symbol, p.name, `${p.symbol.slice(2).toUpperCase()} · ${T("计划建仓", "Planned")}`), zoneTd(p.zone, true),
       el("td", "hide-sm", "—"), el("td", "", "—"), weightTd(0, p), ...tgtCells(p), el("td", "", "—"));
     const sr = suggRow(tr, p, false);
-    for (const row of [tr, sr].filter(Boolean)) link(row, p.ticker);
+    link(tr, p.ticker);
     body.appendChild(tr); if (sr) body.appendChild(sr);
   }
   // 现金：设了现金目标才单列
