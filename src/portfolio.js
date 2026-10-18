@@ -119,6 +119,27 @@ async function replaceSnapshot(db, accountId, { positions, cash }) {
   await db.batch(stmts);
 }
 
+// 持仓股票默认就在自选里：把还没在用户自选（items）里的持仓标的补进去（未估值，安全边际 / 泡沫阈值取用户设置的默认值），排在最后。返回补了几只
+export async function ensureOnBoard(db, uid) {
+  const [{ results: hs }, { results: its }, { results: st }] = await Promise.all([
+    db.prepare("SELECT h.symbol, h.name FROM holdings h JOIN broker_accounts a ON a.id=h.account_id WHERE a.user_id=?").bind(uid).all(),
+    db.prepare("SELECT symbol, sort_order FROM items WHERE user_id=?").bind(uid).all(),
+    db.prepare("SELECT key, value FROM settings WHERE user_id=? AND key IN ('default_mos','default_ext')").bind(uid).all(),
+  ]);
+  const have = new Set((its || []).map((r) => r.symbol));
+  const missing = new Map();
+  for (const h of hs || []) if (SYM_RE.test(h.symbol) && !have.has(h.symbol) && !missing.has(h.symbol)) missing.set(h.symbol, h.name || "");
+  if (!missing.size) return 0;
+  const set = Object.fromEntries((st || []).map((r) => [r.key, Number(r.value)]));
+  const mos = set.default_mos > 0 ? set.default_mos : 50, ext = set.default_ext > 0 ? set.default_ext : 40;
+  let order = Math.max(-1, ...(its || []).map((r) => Number(r.sort_order) || 0)) + 1;
+  const now = new Date().toISOString();
+  await db.batch([...missing].map(([sym, name]) =>
+    db.prepare("INSERT INTO items (user_id,ticker,name,symbol,fair_low,fair_high,mos,ext,sort_order,valuations,selected_valuation_id,updated_at) VALUES (?,?,?,?,0,0,?,?,?,'[]',NULL,?)")
+      .bind(uid, sym.slice(2).toUpperCase(), name.slice(0, 60), sym, mos, ext, order++, now)));
+  return missing.size;
+}
+
 // 汇率：Frankfurter（欧洲央行参考汇率，免 key），换成 1 单位外币 = ? 单位 base。拿不到就返回 null（前端提示）
 async function fxRates(base, currencies) {
   const need = [...new Set(currencies.filter((c) => c && c !== base))];
@@ -211,6 +232,7 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
       const creds = await decryptJson(env.CREDENTIALS_KEY, acc.cred_enc);
       const snap = await fn(creds);
       await replaceSnapshot(env.DB, acc.id, snap);
+      await ensureOnBoard(env.DB, uid);
       await env.DB.prepare("UPDATE broker_accounts SET last_sync_at=?, last_error=NULL WHERE id=?").bind(now, acc.id).run();
       return { ok: true, positions: snap.positions.length, cash: snap.cash.length, unsupported: (snap.unsupported || []).length };
     } catch (e) {
@@ -233,6 +255,7 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     const v = validateSnapshot(await c.req.json().catch(() => ({})));
     if (v.errors.length) return c.json({ ok: false, errors: v.errors }, 400);
     await replaceSnapshot(c.env.DB, acc.id, v);
+    await ensureOnBoard(c.env.DB, c.get("uid"));
     await c.env.DB.prepare("UPDATE broker_accounts SET last_sync_at=? WHERE id=?").bind(new Date().toISOString(), acc.id).run();
     return c.json({ ok: true });
   });
@@ -248,6 +271,7 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     const { results } = await c.env.DB.prepare("SELECT currency, amount FROM cash_balances WHERE account_id=?").bind(acc.id).all();
     const v = validateSnapshot({ positions: parsed.positions, cash: results || [] });
     await replaceSnapshot(c.env.DB, acc.id, v);
+    await ensureOnBoard(c.env.DB, c.get("uid"));
     await c.env.DB.prepare("UPDATE broker_accounts SET last_sync_at=? WHERE id=?").bind(new Date().toISOString(), acc.id).run();
     return c.json({ ok: true, imported: v.positions.length, unsupported: parsed.unsupported || [], errors: [...(parsed.errors || []), ...v.errors] });
   });
@@ -258,6 +282,7 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     const uid = c.get("uid");
     const base = CUR_RE.test(c.req.query("base") || "") ? c.req.query("base") : "USD";
     const db = c.env.DB;
+    await ensureOnBoard(db, uid); // 兜底：之前的持仓也补进自选
     const [{ results: accs }, { results: hs }, { results: cs }, { results: its }] = await Promise.all([
       db.prepare("SELECT * FROM broker_accounts WHERE user_id=? ORDER BY id ASC").bind(uid).all(),
       db.prepare("SELECT h.* FROM holdings h JOIN broker_accounts a ON a.id=h.account_id WHERE a.user_id=?").bind(uid).all(),

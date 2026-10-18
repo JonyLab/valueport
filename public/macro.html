@@ -59,6 +59,14 @@
   .mc-y10{fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linejoin:round}
   .mc-real{fill:none;stroke:var(--ink-mute);stroke-width:1.5;stroke-dasharray:4 3}
   .mc-gap{fill:rgba(246,207,74,.28);stroke:none}
+  .mc-hline{position:absolute;top:0;bottom:22px;width:1px;background:var(--ink);opacity:.25;pointer-events:none}
+  .mc-hline[hidden],.mc-tip[hidden]{display:none}
+  .mc-tip{position:absolute;top:6px;z-index:2;min-width:190px;padding:9px 12px;border-radius:var(--r-md);background:var(--dark);color:#f3f0e8;font-size:12px;line-height:1.7;pointer-events:none;font-variant-numeric:tabular-nums}
+  .mc-tip-d{color:#bdb7aa;font-size:11px;margin-bottom:2px}
+  .mc-tip-r{display:flex;align-items:center;gap:6px}
+  .mc-tip-r i{width:8px;height:8px;border-radius:2px;flex:none}
+  .mc-tip-r b{margin-left:auto;font-weight:500;color:#fff}
+  .mc-tip-gap{margin-top:3px;padding-top:4px;border-top:1px solid rgba(255,255,255,.12);color:var(--sun)}
   .mc-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--ink-mute)}
   .mc-legend i{display:inline-block;width:16px;height:0;border-top:2.2px solid;vertical-align:middle;margin-right:5px}
   /* 你的击球区 */
@@ -91,9 +99,9 @@
   <header class="topnav">
     <a class="brand" href="/portfolio" id="brand"><span class="brand-word"><b>Value</b>Port</span><span class="brand-beta">beta</span></a>
     <nav class="topnav-tabs" aria-label="导航">
-      <a class="nav-tab" href="/portfolio"><i class="ri-pie-chart-2-line" aria-hidden="true"></i><span data-i18n="nav_portfolio">Portfolio</span></a>
       <a class="nav-tab" id="tabBoard" href="/"><i class="ri-line-chart-line" aria-hidden="true"></i><span data-i18n="nav_watchlist">Watchlist</span></a>
       <a class="nav-tab on" href="/macro" aria-current="page"><i class="ri-earth-line" aria-hidden="true"></i><span data-i18n="nav_macro">宏观看板</span></a>
+      <a class="nav-tab" href="/portfolio"><i class="ri-pie-chart-2-line" aria-hidden="true"></i><span data-i18n="nav_portfolio">Portfolio</span></a>
     </nav>
     <div class="topnav-actions" id="topActions"></div>
   </header>
@@ -258,6 +266,28 @@ function renderGravity(G) {
   const years = [...new Set(months.map((d) => d.slice(0, 4)))]; const every = Math.ceil(years.length / 8);
   years.forEach((yr, i) => { if (i % every) return; const sp = el("span", "", yr); sp.style.left = (X(`${yr}-01`) !== undefined && idx.has(`${yr}-01`) ? X(`${yr}-01`) : X(months.find((d) => d.startsWith(yr)))) / W * 100 + "%"; axis.appendChild(sp); });
   chart.appendChild(axis);
+  // 悬停：竖向辅助线 + 当月三条线的数值与差（风险溢价）
+  const hl = el("div", "mc-hline"); hl.hidden = true;
+  const tip = el("div", "mc-tip"); tip.hidden = true;
+  chart.append(hl, tip);
+  const eyM = new Map(ey), realM = new Map(real);
+  const f = (v) => (Number.isFinite(v) ? v.toFixed(2) + "%" : "—");
+  svg.addEventListener("mousemove", (e) => {
+    const r = svg.getBoundingClientRect(); if (!r.width) return;
+    const i = Math.max(0, Math.min(months.length - 1, Math.round((e.clientX - r.left) / r.width * (months.length - 1))));
+    const d = months[i], a = eyM.get(d), b = yMap.get(d), rl = realM.get(d);
+    const x = X(d) / W * r.width;
+    hl.style.left = (44 + x) + "px"; hl.hidden = false;
+    tip.innerHTML = `<div class="mc-tip-d">${d}</div>`
+      + `<div class="mc-tip-r"><i style="background:var(--chart-2)"></i>${T("盈利收益率", "Earnings yield")}<b>${f(a)}</b></div>`
+      + `<div class="mc-tip-r"><i style="background:var(--ink)"></i>${T("10 年国债", "10-year")}<b>${f(b)}</b></div>`
+      + (real.length ? `<div class="mc-tip-r"><i style="background:var(--ink-mute)"></i>${T("实际利率", "Real yield")}<b>${f(rl)}</b></div>` : "")
+      + (Number.isFinite(a) && Number.isFinite(b) ? `<div class="mc-tip-r mc-tip-gap">${T("差（股票多给的补偿）", "Gap (equity premium)")}<b>${(a - b > 0 ? "+" : "") + (a - b).toFixed(2)}</b></div>` : "");
+    tip.hidden = false;
+    const tw = tip.offsetWidth, left = 44 + x + 14;
+    tip.style.left = (left + tw > chart.clientWidth ? 44 + x - tw - 14 : left) + "px";
+  });
+  svg.addEventListener("mouseleave", () => { hl.hidden = true; tip.hidden = true; });
   const lg = $("mcGravLegend"); lg.innerHTML = "";
   const item = (color, text, dashed) => { const s = el("span"); const i = el("i"); i.style.borderColor = color; if (dashed) i.style.borderTopStyle = "dashed"; s.append(i, document.createTextNode(text)); lg.appendChild(s); };
   item("var(--chart-2)", gMkt === "us" ? T("盈利收益率（1 / CAPE）", "Earnings yield (1/CAPE)") : T("盈利收益率（1 / PE）", "Earnings yield (1/PE)"));

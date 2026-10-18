@@ -39,8 +39,13 @@
   /* 持仓表 */
   .pf-table{width:100%;border-collapse:collapse;font-size:13.5px}
   .pf-table th{text-align:right;font-weight:400;font-size:12px;color:var(--ink-mute);padding:0 10px 10px;white-space:nowrap}
-  .pf-table th:first-child,.pf-table td:first-child{text-align:left;padding-left:0}
-  .pf-table td{text-align:right;padding:11px 10px;border-top:1px dashed var(--border);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pf-table{border-collapse:separate;border-spacing:0 4px}
+  .pf-table th:first-child,.pf-table td:first-child{text-align:left;padding-left:14px}
+  .pf-table th:last-child,.pf-table td:last-child{padding-right:14px}
+  .pf-table td{text-align:right;padding:11px 10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  /* 行之间不画线：有底色的行（偏离 / 悬停）做成圆角色块 */
+  .pf-table td:first-child{border-radius:var(--r-md) 0 0 var(--r-md)}
+  .pf-table td:last-child{border-radius:0 var(--r-md) var(--r-md) 0}
   .pf-table tr.link{cursor:pointer}
   .pf-pxq span{display:block}
   .pf-pxq-q{margin-top:2px;font-size:12px;color:var(--ink-mute)}
@@ -235,7 +240,7 @@
   .pf-radar-dot{stroke:#fff;stroke-width:2}
   .pf-radar-dot.ok{fill:var(--green)} .pf-radar-dot.warn{fill:#f08c2e} .pf-radar-dot.bad{fill:var(--red)}
   .pf-radar-score{font-family:var(--font);font-size:30px;fill:var(--ink);letter-spacing:-.03em}
-  .pf-health-sum{margin:2px 0 14px;font-size:13px;line-height:1.65;color:var(--ink-soft)}
+  .pf-health-sum{margin:2px 0 0;font-size:13px;line-height:1.65;color:var(--ink-soft)}
   /* 体检项：侧栏里一列，点开看依据 */
   /* 持仓表里的目标仓位列 */
   .pf-table th.left,.pf-table td.pf-tgt-act{text-align:left}
@@ -246,7 +251,7 @@
   .pf-tgt-band{position:absolute;top:-2px;bottom:-2px;border-radius:var(--r-pill);background:rgba(246,207,74,.45)}
   .pf-tgt-fill{position:absolute;left:0;top:0;bottom:0;border-radius:var(--r-pill);background:var(--dark)}
   .pf-tgt-bar.over .pf-tgt-fill{background:#f08c2e} .pf-tgt-bar.under .pf-tgt-fill{background:#3a73ee}
-  .pf-tgt-mark{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;border-radius:2px;background:var(--sun-ink)}
+  .pf-tgt-mark{position:absolute;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px var(--sun-ink)} /* 目标：空心圆点（全站的竖线表示现价，别混） */
   .pf-tgt-td{white-space:nowrap}
   .pf-tgt-td.muted{color:var(--ink-mute)}
   .pf-tgt-v{display:block} /* 目标 % 一行、偏离徽章一行 */
@@ -261,7 +266,7 @@
   .pf-tgt-how{display:block;margin-top:2px;font-size:11.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
   .pf-table tr.off td{background:rgba(240,140,46,.045)}
   .pf-table tr.planned td{color:var(--ink-soft)}
-  .pf-table tr.cash td{border-top:1px solid var(--divider)}
+  .pf-table tr.cash td{background:rgba(29,29,27,.03)}
   .pf-logo-cash{display:flex;align-items:center;justify-content:center;background:var(--dark);color:var(--sun);font-size:15px}
   .pf-plan-rows{display:flex;flex-direction:column;gap:6px;margin:14px 0 10px;max-height:44vh;overflow:auto}
   .pf-plan-row{display:grid;grid-template-columns:auto minmax(0,1fr) 120px;gap:10px;align-items:center;padding:8px 12px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
@@ -292,9 +297,9 @@
   <header class="topnav">
     <a class="brand" href="/portfolio" id="brand"><span class="brand-word"><b>Value</b>Port</span><span class="brand-beta">beta</span></a>
     <nav class="topnav-tabs" aria-label="导航">
-      <a class="nav-tab on" href="/portfolio" aria-current="page"><i class="ri-pie-chart-2-line" aria-hidden="true"></i><span data-i18n="nav_portfolio">Portfolio</span></a>
       <a class="nav-tab" id="tabBoard" href="/"><i class="ri-line-chart-line" aria-hidden="true"></i><span data-i18n="nav_watchlist">Watchlist</span></a>
       <a class="nav-tab" href="/macro"><i class="ri-earth-line" aria-hidden="true"></i><span data-i18n="nav_macro">宏观看板</span></a>
+      <a class="nav-tab on" href="/portfolio" aria-current="page"><i class="ri-pie-chart-2-line" aria-hidden="true"></i><span data-i18n="nav_portfolio">Portfolio</span></a>
     </nav>
     <div class="topnav-actions" id="topActions"></div>
   </header>

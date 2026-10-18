@@ -154,3 +154,23 @@ describe("user settings", () => {
     expect((await (await put({ default_mos: "" })).json()).settings).toEqual({ default_ext: "60" }); // 清空 = 恢复默认
   });
 });
+
+describe("held stocks join the watchlist", () => {
+  it("adds missing holdings to the user's items once, with their defaults", async () => {
+    const ck = await userCookie("board_ann"), other = await userCookie("board_ben");
+    await call(ck, "/api/my/settings", "PUT", { default_mos: 30, default_ext: 60 });
+    await call(ck, "/api/my/items", "POST", { ticker: "00700", name: "腾讯", symbol: "hk00700", fairLow: 400, fairHigh: 500, mos: 50, ext: 40 });
+    const { id } = await (await call(ck, "/api/my/portfolio/accounts", "POST", { broker: "manual", name: "M" })).json();
+    const r = await call(ck, `/api/my/portfolio/accounts/${id}/holdings`, "PUT", { positions: [
+      { symbol: "hk00700", name: "腾讯控股", quantity: 100, currency: "HKD" },
+      { symbol: "sh600519", name: "贵州茅台", quantity: 10, currency: "CNY" },
+    ], cash: [] });
+    expect(r.status).toBe(200);
+    const items = (await (await call(ck, "/api/my/items")).json()).items;
+    expect(items.map((i) => i.symbol).sort()).toEqual(["hk00700", "sh600519"]);
+    expect(items.find((i) => i.symbol === "sh600519")).toMatchObject({ ticker: "600519", name: "贵州茅台", fairLow: 0, mos: 30, ext: 60 });
+    await call(ck, "/api/my/portfolio?base=USD"); // 再读一次不会重复添加
+    expect((await (await call(ck, "/api/my/items")).json()).items.length).toBe(2);
+    expect((await (await call(other, "/api/my/items")).json()).items).toEqual([]);
+  });
+});
