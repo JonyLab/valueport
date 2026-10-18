@@ -161,6 +161,10 @@
   .pf-broker{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border:1px solid var(--divider);border-radius:var(--r-lg);background:#fff;cursor:pointer;text-align:left;font-family:var(--font);color:var(--ink)}
   .pf-broker.on{border-color:transparent;box-shadow:0 0 0 2px var(--sun)}
   .pf-broker b{font-weight:500;font-size:14px}
+  .pf-broker .pf-broker-ic{width:30px;height:30px;border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:6px;background:var(--track);color:var(--ink-soft)}
+  .pf-broker .pf-broker-ic.longbridge{background:rgba(58,115,238,.12);color:#2c5bc4}
+  .pf-broker .pf-broker-ic.ibkr{background:rgba(198,65,65,.10);color:#b03a3a}
+  .pf-broker.on .pf-broker-ic{background:var(--sun);color:var(--sun-ink)}
   .pf-broker span{font-size:12px;color:var(--ink-mute);line-height:1.5}
   .pf-help{font-size:12.5px;line-height:1.7;color:var(--ink-soft);background:rgba(246,207,74,.18);border-radius:var(--r-md);padding:10px 14px;margin:4px 0 14px}
   .pf-help-link{display:inline-flex;align-items:center;gap:3px;color:var(--ink);font-weight:500;text-decoration:underline;text-decoration-color:rgba(29,29,27,.25);text-underline-offset:3px;white-space:nowrap}
@@ -407,9 +411,9 @@ async function api(path, opts = {}) {
 const ZONE_NAMES = zh ? ["击球区", "低估", "合理", "高估", "泡沫区"] : ["Strike zone", "Undervalued", "Fair", "Overvalued", "Bubble"];
 const NONE_NAME = T("未估值", "Not valued");
 const BROKER_META = {
-  longbridge: { name: T("长桥", "Longbridge"), icon: "bank-line", desc: T("实时持仓与余额", "Live positions & cash") },
+  longbridge: { name: T("长桥", "Longbridge"), icon: "pulse-line", desc: T("实时持仓与余额", "Live positions & cash") },
   ibkr: { name: "IBKR", icon: "global-line", desc: T("Flex 日终数据", "Flex, end of day") },
-  manual: { name: T("手动 / CSV", "Manual / CSV"), icon: "edit-box-line", desc: T("A 股等没有接口的券商", "For brokers without an API") },
+  manual: { name: T("手动 / CSV", "Manual / CSV"), icon: "file-list-3-line", desc: T("A 股等没有接口的券商", "For brokers without an API") },
 };
 const BASES = ["USD", "HKD", "CNY"];
 let base = localStorage.getItem("pf_base") || (zh ? "CNY" : "USD");
@@ -1215,7 +1219,8 @@ function renderAccForm() {
   bx.style.display = accEditing ? "none" : "";
   for (const k of ["longbridge", "ibkr", "manual"]) {
     const m = BROKER_META[k]; const b = el("button", "pf-broker" + (k === accBroker ? " on" : "")); b.type = "button";
-    b.append(el("b", "", m.name), el("span", "", m.desc));
+    const ic = el("span", "pf-broker-ic " + k); ic.appendChild(ri(m.icon));
+    b.append(ic, el("b", "", m.name), el("span", "", m.desc));
     b.addEventListener("click", () => { accBroker = k; renderAccForm(); });
     bx.appendChild(b);
   }
