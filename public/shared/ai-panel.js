@@ -1,11 +1,17 @@
 /**
  * ai-panel.js — 估值工作台的 AI 助手抽屉（右侧滑出）。
  * 和 AI 聊估值假设；AI 回复若带建议参数，消息下方出现「建议参数」卡：逐项列出 当前 → 建议 + 理由，点「应用」才写入表单，可撤销。
+ * 回复还可带最多 2 个交互组件（敏感性表 / 倍数对比条 / 一键改值按钮），见下方 widgets。
  * 导出：mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField })
  *   getContext() → { stock, method, mode, fields:[{k,label,col,unit,money,value}], facts }  —— 每次发送时现取，始终是当前方法与当前表单
  *   onApply(params) → snapshot   —— 写入表单，返回写入前的快照
  *   onUndo(snapshot)             —— 恢复快照
  *   fmtField(field, value) → 文本 —— 金额字段用 B/亿 等单位显示
+ *   widgets（可选）—— AI 回复里的交互组件由宿主现算数值，模型只给组件类型和字段：
+ *     sweep(fieldKey, steps) → { rows:[{ step, value, low, high, current }] } | null   「敏感性」
+ *     peers(multiple)        → { unit, items:[{ key, label, value, pct }] } | null     「倍数对比」，null = 数据缺失不显示
+ *     fmtPrice(n) → 文本                                                              合理价显示
+ *   「一键改值」组件走 onApply / onUndo，和建议参数卡一样可撤销。未知组件直接忽略。
  * 返回 { open(), close(), toggle() }
  */
 
@@ -20,6 +26,7 @@ const TX = {
     thinking: "思考中…", suggest: "建议参数", field: "字段", now: "当前", next: "建议", apply: "应用到表单", applied: "已应用", undo: "撤销",
     cons: "保守", opt: "乐观", err: "AI 暂时不可用", limit: "今天的 AI 对话次数已用完，明天再来", clear: "清空对话",
     disclaimer: "AI 建议仅供参考，不构成投资建议",
+    sens: "敏感性", sensLow: "合理价 低", sensHigh: "高", peers: "倍数对比", setTo: (x, y) => `把 ${x} 改成 ${y}`, setDone: "已改",
   },
   en: {
     title: "AI valuation assistant", sub: "Talk it through and let AI fill in assumptions", close: "Close", ph: "Ask about growth, margins, WACC…", send: "Send",
@@ -28,6 +35,7 @@ const TX = {
     thinking: "Thinking…", suggest: "Suggested inputs", field: "Field", now: "Now", next: "Suggested", apply: "Apply to form", applied: "Applied", undo: "Undo",
     cons: "Cons.", opt: "Opt.", err: "AI is unavailable right now", limit: "Daily AI limit reached — try again tomorrow", clear: "Clear chat",
     disclaimer: "AI suggestions are for reference only, not investment advice",
+    sens: "Sensitivity", sensLow: "Fair value low", sensHigh: "High", peers: "Multiple check", setTo: (x, y) => `Set ${x} to ${y}`, setDone: "Changed",
   },
 };
 
@@ -43,7 +51,7 @@ export function aiErrorText(status, j, lang) {
   return String((j && j.detail) || e || status);
 }
 
-export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField }) {
+export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField, widgets: wx }) {
   const T = TX[lang] || TX.zh;
   const history = []; // { role, content } —— 发给后端的对话（不含建议卡）
   let busy = false;
@@ -184,6 +192,79 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     return card;
   }
 
+  // ── 交互组件：数值全部由宿主现算，模型只决定放哪个组件 ──
+  const unitOf = (f) => (f.unit === "%" ? "%" : "");
+  function sensitivityWidget(w, f) {
+    const data = wx && wx.sweep && wx.sweep(w.field, w.steps);
+    if (!data || !data.rows.some((r) => r.low !== null)) return null;
+    const card = el("div", "vc-ai-widget");
+    const top = el("div", "vc-ai-sugg-head"); top.append(ri("line-chart-line"), el("span", "", `${T.sens} · ${f.label}`));
+    const tbl = el("div", "vc-ai-wsens");
+    const head = el("div", "vc-ai-wsrow head");
+    head.append(el("span", "", f.label + (f.unit === "%" ? " %" : "")), el("span", "", T.sensLow), el("span", "", T.sensHigh));
+    tbl.appendChild(head);
+    const price = (n) => (n === null ? "—" : (wx.fmtPrice ? wx.fmtPrice(n) : String(Math.round(n * 100) / 100)));
+    for (const r of data.rows) {
+      const row = el("div", "vc-ai-wsrow" + (r.current ? " cur" : ""));
+      row.append(el("span", "", showVal(f, r.value) + unitOf(f)), el("span", "", price(r.low)), el("span", "", price(r.high)));
+      tbl.appendChild(row);
+    }
+    card.append(top, tbl);
+    return card;
+  }
+  function peersWidget(w) {
+    const data = wx && wx.peers && wx.peers(w.multiple);
+    if (!data) return null;
+    const card = el("div", "vc-ai-widget");
+    const top = el("div", "vc-ai-sugg-head"); top.append(ri("bar-chart-horizontal-line"), el("span", "", `${T.peers} · ${{ pe: "P/E", pb: "P/B", ps: "P/S" }[w.multiple]}`));
+    card.appendChild(top);
+    for (const it of data.items) {
+      const row = el("div", "vc-ai-wbar" + (it.key === "current" ? " cur" : ""));
+      const track = el("div", "vc-ai-wtrack"); const fill = el("div", "vc-ai-wfill"); fill.style.width = Math.max(4, it.pct * 100) + "%"; track.appendChild(fill);
+      row.append(el("span", "vc-ai-wblab", it.label), track, el("span", "vc-ai-wbval", it.value.toFixed(1) + data.unit));
+      card.appendChild(row);
+    }
+    return card;
+  }
+  function setWidget(w, f) {
+    const same = f.col === "dual" ? (f.value && w.value.c === f.value.c && w.value.o === f.value.o) : w.value === f.value;
+    if (same) return null;
+    const wrap = el("div", "vc-ai-wset");
+    const btn = el("button", "vc-ai-chip vc-ai-setchip"); btn.type = "button";
+    const label = T.setTo(f.label, showVal(f, w.value) + unitOf(f));
+    btn.append(ri("edit-2-line"), document.createTextNode(label));
+    if (w.label) btn.title = w.label;
+    const undo = el("button", "vc-ai-undo", T.undo); undo.type = "button"; undo.hidden = true;
+    let snap = null;
+    btn.addEventListener("click", () => {
+      snap = onApply({ [w.field]: w.value });
+      btn.disabled = true; btn.replaceChildren(ri("check-line"), document.createTextNode(`${T.setDone} · ${label}`));
+      undo.hidden = false;
+    });
+    undo.addEventListener("click", () => {
+      if (snap) onUndo(snap);
+      snap = null; undo.hidden = true;
+      btn.disabled = false; btn.replaceChildren(ri("edit-2-line"), document.createTextNode(label));
+    });
+    wrap.append(btn, undo);
+    return wrap;
+  }
+  // 前端再校验一遍：字段必须在当前方法里，类型必须在目录里；渲染失败的组件直接不显示（正文照常）
+  function renderWidgets(list, fields) {
+    const byKey = new Map(fields.map((f) => [f.k, f]));
+    const out = [];
+    for (const w of (Array.isArray(list) ? list : []).slice(0, 2)) {
+      let node = null;
+      try {
+        if (w.type === "sensitivity" && byKey.has(w.field)) node = sensitivityWidget(w, byKey.get(w.field));
+        else if (w.type === "peers") node = peersWidget(w);
+        else if (w.type === "set" && byKey.has(w.field)) node = setWidget(w, byKey.get(w.field));
+      } catch { node = null; }
+      if (node) out.push(node);
+    }
+    return out;
+  }
+
   async function send(text) {
     text = (text || "").trim();
     if (!text || busy) return;
@@ -208,11 +289,16 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
         m.classList.add("error");
         return;
       }
-      const reply = j.reply || (j.params ? "" : "…");
-      history.push({ role: "assistant", content: reply + (j.params ? "\n" + JSON.stringify({ params: j.params }) : "") });
+      const extra = renderWidgets(j.widgets, context.fields);
+      const reply = j.reply || (j.params || extra.length ? "" : "…");
+      const tail = {};
+      if (j.params) tail.params = j.params;
+      if (Array.isArray(j.widgets) && j.widgets.length) tail.widgets = j.widgets;
+      history.push({ role: "assistant", content: reply + (Object.keys(tail).length ? "\n" + JSON.stringify(tail) : "") });
       const m = reply ? bubble("ai", reply) : bubble("ai", "");
       if (!reply) m.querySelector(".vc-ai-bubble").remove();
       if (j.params) m.appendChild(suggestionCard(j.params, j.reasons, context.fields));
+      for (const node of extra) m.appendChild(node);
       log.scrollTop = log.scrollHeight;
     } catch {
       pending.remove(); history.pop();

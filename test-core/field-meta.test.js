@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FIELD_META, fieldReference } from "../public/shared/field-meta.js";
+import { FIELD_META, fieldReference, multipleCompare } from "../public/shared/field-meta.js";
 
 const data = {
   financials: {
@@ -47,5 +47,18 @@ describe("fieldReference", () => {
   it("returns null when data missing", () => {
     expect(fieldReference("revGrowth", { financials: null }, {}, "zh")).toBe(null);
     expect(fieldReference("pb", data, {}, "zh")).toBe(null); // pb has no usable values
+  });
+});
+
+describe("multipleCompare", () => {
+  it("compares current, own 5y average and industry median as bar lengths", () => {
+    const r = multipleCompare({ valuationRefs: { pe: { current: 20, own5y: 25, industryMedian: 10 } } }, "pe", "zh");
+    expect(r.unit).toBe("x");
+    expect(r.items.map((x) => [x.key, x.label, x.pct])).toEqual([["current", "当前", 0.8], ["own5y", "自身5年均", 1], ["industryMedian", "行业中位", 0.4]]);
+  });
+  it("hides when current is missing or there is nothing to compare", () => {
+    expect(multipleCompare({ valuationRefs: { pe: { own5y: 25, industryMedian: 10 } } }, "pe", "zh")).toBeNull();
+    expect(multipleCompare({ valuationRefs: { pb: { current: 2, own5y: null, industryMedian: -1 } } }, "pb", "zh")).toBeNull();
+    expect(multipleCompare({}, "ps", "en")).toBeNull();
   });
 });

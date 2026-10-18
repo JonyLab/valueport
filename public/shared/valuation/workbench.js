@@ -126,3 +126,33 @@ function cloneForm(form) {
 function round(n) {
   return Math.round(n * 100) / 100;
 }
+
+// AI 助手的「敏感性」组件：只改一个字段、其他输入保持当前值，逐档跑模型。
+// steps 是加减量：金额字段（money）按 % 变动，其余按字段单位加减（百分数字段 1 = 1 个百分点）；
+// 两档字段的保守 / 乐观同时平移，保留两档间距。返回 { rows:[{ step, value, low, high, current }] } 或 null
+export function fieldSweep({ model, form, ctx, run, field, steps, money }) {
+  if (!model || !field || typeof run !== "function" || !Array.isArray(steps)) return null;
+  const cur = form && form[field.k];
+  const shift = (v, s) => (money ? v * (1 + s / 100) : v + s);
+  let base;
+  if (field.col === "dual") {
+    const c = cur && typeof cur === "object" ? Number(cur.c) : NaN;
+    const o = cur && typeof cur === "object" ? Number(cur.o) : NaN;
+    if (!finite(c) || !finite(o)) return null;
+    base = { c, o };
+  } else {
+    base = Number(cur);
+    if (!finite(base)) return null;
+  }
+  const rows = steps.filter(finite).map((s) => {
+    const value = field.col === "dual" ? { c: round(shift(base.c, s)), o: round(shift(base.o, s)) } : round(shift(base, s));
+    const varied = cloneForm(form);
+    varied[field.k] = value;
+    let r = null;
+    try { r = run(model, varied, ctx); } catch { r = null; }
+    const low = r && finite(Number(r.low)) ? Number(r.low) : null;
+    const high = r && finite(Number(r.high)) ? Number(r.high) : null;
+    return { step: s, value, low, high, current: s === 0 };
+  });
+  return rows.length ? { rows } : null;
+}

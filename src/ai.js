@@ -132,13 +132,55 @@ export function buildSystemPrompt(context, lang) {
     "2. 基于已知数据与行业常识给出合理假设；数据不足时说明你的假设前提，不要编造具体财务数字。" + GROUNDING,
     "3. 当你建议具体参数时，在回复最后附一个 ```json 代码块，格式严格如下（只含需要修改的字段）：",
     '```json\n{"params": {"单值字段k": 数字, "两档字段k": {"c": 保守数字, "o": 乐观数字}}, "reasons": {"字段k": "一句话理由"}}\n```',
-    "4. 如果用户只是提问、还不需要改参数，就不要附代码块。",
+    "4. 如果用户只是提问、还不需要改参数，就不要放 params；只想给交互组件时代码块里只放 {\"widgets\": [...]}；两者都不需要就不要附代码块。",
     "5. 界面会把代码块渲染成参数表，所以正文里不要逐项罗列参数和数值，只用几句话讲清整体思路和关键判断（200 字以内）；只建议需要改动的字段。",
     "6. 这只是估值辅助，不构成投资建议；不要给出买卖建议。",
+    "",
+    "可选的交互组件（放在同一个 ```json 代码块的 \"widgets\" 数组里，每次最多 2 个；不需要就不放）。组件只指定字段和步长，数值由界面用估值模型现算，你不要在组件或正文里写出计算结果：",
+    '- 敏感性：{"type":"sensitivity","field":"字段k","steps":[-2,-1,0,1,2]} —— 只改这一个字段、其他输入不变，逐档算合理价。steps 是加减量，单位同字段（百分数字段 1 = 1 个百分点；金额字段按 % 变动）。用户问「X 变一点影响多大」「哪个假设最关键」时用。',
+    '- 倍数对比：{"type":"peers","multiple":"pe"|"pb"|"ps"} —— 当前倍数 vs 自身 5 年均值 vs 行业中位。讨论目标倍数取多少、贵不贵时用。',
+    '- 一键改值：{"type":"set","field":"字段k","value":数字 或 {"c":保守,"o":乐观},"label":"不超过 12 字的说明"} —— 生成「把 X 改成 Y」按钮，用户点了才写入、可撤销。只改一两个字段时用它代替 params。',
+    "只能用上面三种 type 和上面列出的字段 k；组件之外正文保持简短（150 字以内）。",
   ].join("\n");
 }
 
-// 从回复里取出最后一个 ```json 代码块，按字段表校验；返回 { reply（去掉代码块后的正文）, params, reasons }
+// ── 交互组件：模型只挑组件和字段，数值由前端算；未知或不合法的组件丢弃，最多 2 个 ──
+const MAX_WIDGETS = 2;
+const MULTIPLES = new Set(["pe", "pb", "ps"]);
+export function parseWidgets(raw, fields) {
+  if (!Array.isArray(raw)) return null;
+  const byKey = new Map(fields.map((f) => [f.k, f]));
+  const toNum = (v) => { const n = typeof v === "string" ? Number(v.replace(/[,%\s]/g, "")) : v; return (typeof n === "number" && Number.isFinite(n)) ? n : null; };
+  const out = [];
+  for (const w of raw) {
+    if (out.length >= MAX_WIDGETS) break;
+    if (!w || typeof w !== "object") continue;
+    if (w.type === "sensitivity") {
+      if (!byKey.has(w.field)) continue;
+      let steps = Array.isArray(w.steps) ? w.steps.map(toNum).filter((n) => n !== null && Math.abs(n) <= 100) : [];
+      steps = [...new Set([0, ...steps.map((n) => Math.round(n * 100) / 100)])].sort((a, b) => a - b);
+      if (steps.length < 3 || steps.length > 9) steps = [-2, -1, 0, 1, 2];
+      out.push({ type: "sensitivity", field: w.field, steps });
+    } else if (w.type === "peers") {
+      const m = typeof w.multiple === "string" ? w.multiple.toLowerCase() : "";
+      if (!MULTIPLES.has(m) || out.some((x) => x.type === "peers" && x.multiple === m)) continue;
+      out.push({ type: "peers", multiple: m });
+    } else if (w.type === "set") {
+      const f = byKey.get(w.field); if (!f) continue;
+      let value = null;
+      if (f.col === "dual") {
+        if (w.value && typeof w.value === "object") { const c = toNum(w.value.c), o = toNum(w.value.o); if (c !== null && o !== null) value = { c, o }; }
+        else { const n = toNum(w.value); if (n !== null) value = { c: n, o: n }; }
+      } else value = toNum(w.value && typeof w.value === "object" ? w.value.c : w.value);
+      if (value === null) continue;
+      const label = typeof w.label === "string" ? w.label.trim().slice(0, 40) : "";
+      out.push({ type: "set", field: w.field, value, ...(label ? { label } : {}) });
+    }
+  }
+  return out.length ? out : null;
+}
+
+// 从回复里取出最后一个 ```json 代码块，按字段表校验；返回 { reply（去掉代码块后的正文）, params, reasons, widgets? }
 export function parseSuggestion(text, fields) {
   const re = /```(?:json)?\s*([\s\S]*?)```/gi;
   let m, last = null;
@@ -149,6 +191,7 @@ export function parseSuggestion(text, fields) {
   const reply = plain(text.slice(0, last.index) + text.slice(last.index + last[0].length));
   const raw = obj && typeof obj === "object" ? (obj.params && typeof obj.params === "object" ? obj.params : obj) : null;
   if (!raw) return { reply, params: null, reasons: null };
+  const widgets = parseWidgets(obj.widgets, fields);
   const byKey = new Map(fields.map((f) => [f.k, f]));
   const toNum = (v) => { const n = typeof v === "string" ? Number(v.replace(/[,%\s]/g, "")) : v; return (typeof n === "number" && Number.isFinite(n)) ? n : null; };
   const params = {};
@@ -167,7 +210,9 @@ export function parseSuggestion(text, fields) {
   if (obj.reasons && typeof obj.reasons === "object") {
     for (const [k, v] of Object.entries(obj.reasons)) if (params[k] !== undefined && typeof v === "string") reasons[k] = v.slice(0, 300);
   }
-  return { reply, params: Object.keys(params).length ? params : null, reasons: Object.keys(reasons).length ? reasons : null };
+  const res = { reply, params: Object.keys(params).length ? params : null, reasons: Object.keys(reasons).length ? reasons : null };
+  if (widgets) res.widgets = widgets; // 没有组件时不带这个键，老前端 / 老测试不受影响
+  return res;
 }
 
 // ── 选方法：根据公司特点推荐估值方法 ──

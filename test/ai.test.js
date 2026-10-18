@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { env, SELF, fetchMock } from "cloudflare:test";
-import { validateModel, aiConfig, chatComplete, validateChat, buildSystemPrompt, parseSuggestion, validateMethodReq, parsePicks } from "../src/ai.js";
+import { validateModel, aiConfig, chatComplete, validateChat, buildSystemPrompt, parseSuggestion, parseWidgets, validateMethodReq, parsePicks } from "../src/ai.js";
 
 beforeAll(async () => {
   const ddl = [
@@ -36,6 +36,38 @@ describe("parseSuggestion", () => {
   });
 });
 
+describe("parseWidgets", () => {
+  it("keeps catalog widgets, drops unknown types and fields, caps at 2", () => {
+    const text = '看两种情形。\n```json\n{"widgets":[{"type":"chart","x":1},{"type":"sensitivity","field":"bogus"},{"type":"sensitivity","field":"wacc","steps":[1,-1,"2",-2]},{"type":"peers","multiple":"PE"},{"type":"set","field":"n","value":7}]}\n```';
+    const r = parseSuggestion(text, FIELDS);
+    expect(r.reply).toBe("看两种情形。");
+    expect(r.params).toBeNull();
+    expect(r.widgets).toEqual([
+      { type: "sensitivity", field: "wacc", steps: [-2, -1, 0, 1, 2] },
+      { type: "peers", multiple: "pe" },
+    ]);
+  });
+  it("normalizes set values to the field shape and rejects bad ones", () => {
+    expect(parseWidgets([
+      { type: "set", field: "growth", value: 12, label: "  稍微保守  " },
+      { type: "set", field: "n", value: { c: 8, o: 9 } },
+    ], FIELDS)).toEqual([
+      { type: "set", field: "growth", value: { c: 12, o: 12 }, label: "稍微保守" },
+      { type: "set", field: "n", value: 8 },
+    ]);
+    expect(parseWidgets([{ type: "set", field: "wacc", value: { c: "x", o: 9 } }, { type: "set", field: "nope", value: 1 }, { type: "peers", multiple: "evebitda" }], FIELDS)).toBeNull();
+    expect(parseWidgets("nope", FIELDS)).toBeNull();
+  });
+  it("falls back to default steps when steps are missing or out of range", () => {
+    expect(parseWidgets([{ type: "sensitivity", field: "growth" }], FIELDS)[0].steps).toEqual([-2, -1, 0, 1, 2]);
+    expect(parseWidgets([{ type: "sensitivity", field: "growth", steps: [500, 1] }], FIELDS)[0].steps).toEqual([-2, -1, 0, 1, 2]);
+    expect(parseWidgets([{ type: "sensitivity", field: "growth", steps: [-3, 3, 0, 1.5] }], FIELDS)[0].steps).toEqual([-3, 0, 1.5, 3]);
+  });
+  it("leaves the widgets key off when there are none", () => {
+    expect("widgets" in parseSuggestion('```json\n{"params":{"n":5}}\n```', FIELDS)).toBe(false);
+  });
+});
+
 describe("validateChat / prompt / config", () => {
   it("rejects malformed bodies", () => {
     expect(validateChat(null)).toBeTruthy();
@@ -50,6 +82,10 @@ describe("validateChat / prompt / config", () => {
     expect(p).toContain("小米集团");
     expect(p).toContain("growth｜营收增速｜保守/乐观两档");
     expect(p).toContain('"params"');
+    expect(p).toContain('"type":"sensitivity"');
+    expect(p).toContain('"type":"peers"');
+    expect(p).toContain('"type":"set"');
+    expect(p).toContain("最多 2 个");
   });
   it("defaults to Workers AI and rejects unknown providers", () => {
     expect(aiConfig({}).provider).toBe("workers-ai");

@@ -9,8 +9,8 @@
  *   stock: { name, code, mountLogo(el), rows: [[标签, 值], …] } —— 右栏标的资料（可选）
  */
 import { METHOD_MENU_GROUPS, MODELS, methodMenuMeta, runModel, modeFields } from "/shared/valuation/index.js";
-import { midpointForm, scheduleSeries, sensitivityMatrix } from "/shared/valuation/workbench.js";
-import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef } from "/shared/field-meta.js";
+import { midpointForm, scheduleSeries, sensitivityMatrix, fieldSweep } from "/shared/valuation/workbench.js";
+import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef, multipleCompare } from "/shared/field-meta.js";
 import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
 import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
@@ -1356,6 +1356,16 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       for (const k of Object.keys(derivations)) delete derivations[k];
       Object.assign(derivations, snap.derivations);
       seedInputs = snap.inputs; renderForm();
+    },
+    // 交互组件的数值都在这里现算：模型只给字段和步长
+    widgets: {
+      sweep: (k, steps) => {
+        const model = MODELS[activeIdx]; if (!model) return null;
+        const field = modeFields(model, currentMode).find((f) => f.k === k); if (!field) return null;
+        return fieldSweep({ model, form: lastForm, ctx, run: runModel, field, steps, money: MONEY_METAS.has(field.meta) });
+      },
+      peers: (multiple) => multipleCompare(refData, multiple, lang),
+      fmtPrice: (n) => fmt(n, tx("dash")),
     },
   });
   aiBtn.addEventListener("click", () => ai.toggle());

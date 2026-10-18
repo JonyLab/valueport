@@ -136,3 +136,18 @@ export function fieldReference(refTag, data, ctx, lang) {
     default: return null;
   }
 }
+
+// AI 助手的「倍数对比」组件：当前 vs 自身 5 年均值 vs 行业中位（来自 /api/financials 的 valuationRefs）。
+// 只取正的有限值；当前值缺失或可比项不足两个时返回 null（组件不显示）。pct = 相对最大值的长度，画横条用
+export function multipleCompare(data, multiple, lang) {
+  const t = TX[lang] || TX.zh;
+  const vr = data && data.valuationRefs && data.valuationRefs[multiple];
+  if (!vr) return null;
+  const ok = (v) => Number.isFinite(v) && v > 0;
+  if (!ok(vr.current)) return null;
+  const items = [["current", t.now, vr.current], ["own5y", t.own5y, vr.own5y], ["industryMedian", t.indMed, vr.industryMedian]]
+    .filter(([, , v]) => ok(v)).map(([key, label, value]) => ({ key, label, value }));
+  if (items.length < 2) return null;
+  const max = Math.max(...items.map((x) => x.value));
+  return { unit: "x", items: items.map((x) => ({ ...x, pct: x.value / max })) };
+}

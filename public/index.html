@@ -640,6 +640,23 @@
   .vc-ai-apply:disabled{background:var(--track);color:var(--ink-soft);cursor:default}
   .vc-ai-undo{height:34px;padding:0 13px;border:0;border-radius:var(--r-pill);background:none;color:var(--ink-soft);cursor:pointer;font-family:var(--font);font-size:13px;text-decoration:underline;text-underline-offset:2px}
   .vc-ai-undo[hidden]{display:none}
+  /* AI 交互组件：数值由前端现算；白卡同建议参数卡，当前档 / 当前倍数用暖黄 */
+  .vc-ai-widget{width:100%;background:#fff;border-radius:var(--r-lg);box-shadow:inset 0 0 0 1px var(--divider);padding:14px 14px 12px}
+  .vc-ai-wsens{display:grid;gap:3px}
+  .vc-ai-wsrow{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px;padding:6px 8px;border-radius:var(--r-sm);font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+  .vc-ai-wsrow span:not(:first-child){text-align:right}
+  .vc-ai-wsrow.head{font-size:11.5px;color:var(--ink-mute);padding-top:0;padding-bottom:4px;border-bottom:1px dashed var(--border);border-radius:0}
+  .vc-ai-wsrow.cur{background:var(--sun);color:var(--sun-ink);font-weight:500}
+  .vc-ai-wbar{display:grid;grid-template-columns:72px 1fr 52px;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:var(--ink-soft)}
+  .vc-ai-wtrack{height:8px;border-radius:var(--r-pill);background:var(--track)}
+  .vc-ai-wfill{height:100%;border-radius:var(--r-pill);background:var(--ink-mute)}
+  .vc-ai-wbar.cur .vc-ai-wfill{background:var(--sun)}
+  .vc-ai-wbar.cur{color:var(--ink);font-weight:500}
+  .vc-ai-wbval{text-align:right;font-variant-numeric:tabular-nums}
+  .vc-ai-wset{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+  .vc-ai-setchip{display:inline-flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
+  .vc-ai-setchip i{color:var(--sun-ink)}
+  .vc-ai-setchip:disabled{background:var(--sun-soft);border-color:transparent;box-shadow:none;cursor:default}
   .vc-ai-foot{padding:10px 14px 12px;border-top:1px dashed var(--border)}
   .vc-ai-box{display:flex;align-items:flex-end;gap:8px;background:#fff;border-radius:22px;box-shadow:inset 0 0 0 1px var(--divider);padding:6px 6px 6px 14px}
   .vc-ai-box:focus-within{box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 4px var(--ring)}
