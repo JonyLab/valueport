@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS activation_codes (
 CREATE TABLE IF NOT EXISTS broker_accounts (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id       INTEGER NOT NULL,
-  broker        TEXT    NOT NULL,              -- longbridge | ibkr | manual
+  broker        TEXT    NOT NULL,              -- longbridge | ibkr | tiger | manual
   name          TEXT    NOT NULL DEFAULT '',
   cred_enc      TEXT,                          -- AES-GCM 加密的凭证 JSON（manual 为空），见 src/crypto.js
   last_sync_at  TEXT,

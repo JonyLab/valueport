@@ -16,6 +16,7 @@ import { registerResearch } from "./research.js";
 import { registerMacro, refreshIfStale } from "./macro.js";
 import { fetchLongbridgeAssets } from "./brokers/longbridge-assets.js";
 import { fetchIbkrFlex } from "./brokers/ibkr-flex.js";
+import { fetchTigerAssets } from "./brokers/tiger.js";
 import { parseHoldingsCsv } from "./brokers/csv.js";
 
 const app = new Hono();
@@ -222,7 +223,7 @@ registerAi(app);
 registerResearch(app); // 分析师评级 / 目标价 / 一致预期（公开，按标的缓存 6 小时）
 registerMacro(app);
 const portfolio = registerPortfolio(app, {
-  adapters: { longbridge: (cr) => fetchLongbridgeAssets(cr), ibkr: (cr) => fetchIbkrFlex(cr), csv: (text) => parseHoldingsCsv(text) },
+  adapters: { longbridge: (cr) => fetchLongbridgeAssets(cr), ibkr: (cr) => fetchIbkrFlex(cr), tiger: (cr) => fetchTigerAssets(cr), csv: (text) => parseHoldingsCsv(text) },
   getQuotes,
 });
 

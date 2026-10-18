@@ -3,16 +3,19 @@
 // 凭证只写不读：加密存库（src/crypto.js），接口永远不返回明文，只返回是否已配置 + 末四位提示。
 import { encryptJson, decryptJson } from "./crypto.js";
 
-export const BROKERS = ["longbridge", "ibkr", "manual"];
+export const BROKERS = ["longbridge", "ibkr", "tiger", "manual"];
 const SYMBOL_RE = /^(us|hk|sh|sz)[A-Za-z0-9.]{1,12}$/;
 const CUR_RE = /^[A-Z]{3}$/;
 const MAX_POSITIONS = 500, MAX_CASH = 20;
 
-// 各券商需要的凭证字段（都是字符串）
+// 各券商需要的凭证字段（都是字符串）；OPTIONAL_FIELDS 可留空
 const CRED_FIELDS = {
   longbridge: ["appKey", "appSecret", "accessToken"],
   ibkr: ["token", "queryId"],
+  tiger: ["tigerId", "account", "privateKey"],
 };
+const OPTIONAL_FIELDS = { tiger: ["token"] };
+const MAX_CRED_LEN = { privateKey: 8192 }; // RSA 私钥 PEM 比别的凭证长
 
 export function validateCreds(broker, creds) {
   const fields = CRED_FIELDS[broker];
@@ -21,8 +24,13 @@ export function validateCreds(broker, creds) {
   const out = {};
   for (const f of fields) {
     const v = typeof creds[f] === "string" ? creds[f].trim() : "";
-    if (!v || v.length > 4096) return { ok: false, error: `invalid ${f}` };
+    if (!v || v.length > (MAX_CRED_LEN[f] || 4096)) return { ok: false, error: `invalid ${f}` };
     out[f] = v;
+  }
+  for (const f of OPTIONAL_FIELDS[broker] || []) {
+    const v = typeof creds[f] === "string" ? creds[f].trim() : "";
+    if (v.length > 4096) return { ok: false, error: `invalid ${f}` };
+    if (v) out[f] = v;
   }
   return { ok: true, value: out };
 }
@@ -94,7 +102,7 @@ async function readPlan(db, uid) {
 
 function credHint(broker, creds) {
   if (!creds) return "";
-  const v = broker === "longbridge" ? creds.appKey : broker === "ibkr" ? creds.queryId : "";
+  const v = broker === "longbridge" ? creds.appKey : broker === "ibkr" ? creds.queryId : broker === "tiger" ? creds.account : "";
   return v ? "…" + String(v).slice(-4) : "";
 }
 
@@ -157,7 +165,7 @@ async function fxRates(base, currencies) {
 /**
  * 注册 Portfolio 路由。
  * @param app       Hono 实例（/api/my/* 的登录中间件需已挂好）
- * @param adapters  { longbridge(creds), ibkr(creds), csv(text) } → { positions, cash, unsupported, errors? }
+ * @param adapters  { longbridge(creds), ibkr(creds), tiger(creds), csv(text) } → { positions, cash, unsupported, errors? }
  * @param getQuotes async (env, symbols) → { quotes: {sym: price}, prevClose: {sym: price}, source }
  */
 export function registerPortfolio(app, { adapters, getQuotes }) {
@@ -176,12 +184,12 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     return c.json({ accounts: out });
   });
 
-  // 新建账户：长桥 / IBKR 需带凭证（加密后入库，随后立即尝试同步一次）；manual 不需要
+  // 新建账户：长桥 / IBKR / 老虎需带凭证（加密后入库，随后立即尝试同步一次）；manual 不需要
   app.post("/api/my/portfolio/accounts", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const broker = String(body.broker || "");
     if (!BROKERS.includes(broker)) return c.json({ ok: false, error: "unknown broker" }, 400);
-    const name = String(body.name || "").trim().slice(0, 40) || (broker === "longbridge" ? "Longbridge" : broker === "ibkr" ? "IBKR" : "Manual");
+    const name = String(body.name || "").trim().slice(0, 40) || ({ longbridge: "Longbridge", ibkr: "IBKR", tiger: "Tiger" }[broker] || "Manual");
     const v = validateCreds(broker, body.creds);
     if (!v.ok) return c.json({ ok: false, error: v.error }, 400);
     let enc = null;
