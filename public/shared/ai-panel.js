@@ -226,5 +226,6 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
 
   function open() { panel.hidden = false; document.body.classList.add("vc-ai-open"); requestAnimationFrame(() => panel.classList.add("on")); setTimeout(() => input.focus(), 50); }
   function close() { panel.classList.remove("on"); document.body.classList.remove("vc-ai-open"); setTimeout(() => { if (!panel.classList.contains("on")) panel.hidden = true; }, 220); }
-  return { open, close, toggle: () => (panel.hidden ? open() : close()) };
+  // history()：给备注草稿用的对话摘录（只读副本）
+  return { open, close, toggle: () => (panel.hidden ? open() : close()), history: () => history.slice(-20) };
 }

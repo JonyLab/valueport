@@ -332,10 +332,40 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
 
   // ── 备注（右栏底部，和保存按钮一起）──
   const noteWrap = el("div", "vc-note");
-  const noteLabel = el("div", "vc-note-label"); noteLabel.textContent = tx("note");
+  const noteLabel = el("div", "vc-note-label");
+  const noteLabelText = el("span"); noteLabelText.textContent = tx("note");
+  // AI 起草：根据当前假设 + 已核实事实 + 与 AI 的对话写一版「为什么给这个估值」，填进备注框，用户改完再存；可撤销
+  const noteDraftBtn = el("button", "vc-note-ai", { type: "button" });
+  const noteUndo = el("button", "vc-note-undo", { type: "button" }); noteUndo.hidden = true;
+  noteUndo.textContent = lang === "zh" ? "撤销" : "Undo";
+  const noteErr = el("div", "vc-note-err"); noteErr.hidden = true;
+  const setDraftBtn = (busy) => {
+    noteDraftBtn.disabled = busy;
+    noteDraftBtn.replaceChildren(ri(busy ? "loader-4-line" : "sparkling-2-fill"), document.createTextNode(busy ? (lang === "zh" ? "起草中…" : "Drafting…") : (lang === "zh" ? "AI 起草" : "Draft with AI")));
+  };
+  setDraftBtn(false);
+  noteLabel.append(noteLabelText, noteUndo, noteDraftBtn);
   const noteInput = el("textarea", "vc-note-input"); noteInput.placeholder = tx("notePh");
   if (initialNote) noteInput.value = initialNote;
-  noteWrap.append(noteLabel, noteInput);
+  noteWrap.append(noteLabel, noteInput, noteErr);
+  let noteBefore = null;
+  noteDraftBtn.addEventListener("click", async () => {
+    const context = aiContext(); if (!context) return;
+    setDraftBtn(true); noteErr.hidden = true;
+    try {
+      const views = await aiViews();
+      const r = await fetch("/api/my/ai/note", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ lang, context: { ...context, ...views }, messages: ai.history(), note: noteInput.value.slice(0, 2000) }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.note) throw new Error(r.status === 429 ? (lang === "zh" ? "今天的 AI 次数已用完" : "Daily AI limit reached") : (j.detail || j.error || r.status));
+      noteBefore = noteInput.value; noteInput.value = j.note; noteUndo.hidden = false;
+      noteInput.focus();
+    } catch (e) {
+      noteErr.textContent = (lang === "zh" ? "起草失败：" : "Draft failed: ") + (e && e.message || e); noteErr.hidden = false;
+    } finally { setDraftBtn(false); }
+  });
+  noteUndo.addEventListener("click", () => { if (noteBefore === null) return; noteInput.value = noteBefore; noteBefore = null; noteUndo.hidden = true; });
+  noteInput.addEventListener("input", () => { if (noteBefore !== null) { noteBefore = null; noteUndo.hidden = true; } }); // 用户开始改了，就不再提供撤销
 
   // ── 中栏顶部：大号估值结果（区间 / 现价）+ 判定 + 区间 vs 现价条 ──
   const summaryLabel = el("div", "vc-summary-label");

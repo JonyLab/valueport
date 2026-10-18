@@ -280,6 +280,94 @@ export function parseReview(text, fields) {
   return { overall: obj.overall, summary: typeof obj.summary === "string" ? plain(obj.summary).slice(0, 400) : "", checks };
 }
 
+// ── 投资逻辑备注草稿：保存估值前，根据当前假设 + 与 AI 的对话，起草「为什么给这个估值」，用户改完再存 ──
+const MAX_NOTE = 2000;
+export function validateNoteReq(body) {
+  if (!body || typeof body !== "object") return "bad body";
+  const { context, messages, note } = body;
+  if (!context || typeof context !== "object" || !Array.isArray(context.fields) || !context.fields.length || context.fields.length > 40) return "context.fields required";
+  for (const f of context.fields) if (!f || typeof f.k !== "string" || (f.col !== "single" && f.col !== "dual")) return "bad field";
+  if (badVerified(context.verified) || badVerified(context.market) || badVerified(context.lenses)) return "bad facts";
+  if (messages !== undefined) {
+    if (!Array.isArray(messages) || messages.length > MAX_MSGS) return "bad messages";
+    for (const m of messages) if (!m || (m.role !== "user" && m.role !== "assistant") || typeof m.content !== "string" || m.content.length > MAX_CHARS) return "bad message";
+  }
+  if (note !== undefined && (typeof note !== "string" || note.length > MAX_NOTE)) return "bad note";
+  if (JSON.stringify(body).length > 40000) return "body too large";
+  return null;
+}
+export function buildNotePrompt(body, lang) {
+  const c = body.context, zh = lang !== "en";
+  const fieldLines = c.fields.map((f) => `- ${f.label || f.k}｜${f.unit === "%" ? "百分数" : f.money ? "金额" : (f.unit || "数字")}｜${fmtVal(f.value)}`).join("\n");
+  const convo = Array.isArray(body.messages) && body.messages.length
+    ? body.messages.map((m) => `${m.role === "user" ? "用户" : "AI"}：${String(m.content).replace(/```[\s\S]*?```/g, "（参数建议）").slice(0, 600)}`).join("\n") : "";
+  return [
+    "你是一位严谨的价值投资分析师，正在帮用户起草一张估值卡的「投资逻辑备注」：用户自己的话，记下为什么给这个估值，方便以后复核。",
+    zh ? "用中文写。" : "Write in English.",
+    "",
+    `标的：${c.stock && c.stock.name || ""}（${c.stock && c.stock.code || ""}）　币种：${c.stock && c.stock.currency || "未知"}　现价：${c.stock && c.stock.price || "未知"}`,
+    `估值方法：${c.method && c.method.label || ""}${c.facts && c.facts.currentConclusion ? "　当前结论：合理价 " + c.facts.currentConclusion : ""}`,
+    "",
+    "用户填的假设（名称｜单位｜值；两档为 保守 / 乐观）：",
+    fieldLines,
+    ...verifiedBlock(c.verified),
+    ...viewsBlock(c.market, c.lenses),
+    ...(convo ? ["", "用户和 AI 在估值工作台里的对话（摘录）：", convo] : []),
+    ...(body.note && body.note.trim() ? ["", "用户已经写的备注（保留其中的观点，在此基础上补全）：", body.note.trim()] : []),
+    "",
+    "要求：",
+    "1. 第一人称、写给未来的自己看，三到五行，每行一句，不要标题、不要 Markdown、不要编号以外的符号。",
+    "2. 依次写：这是一家什么样的公司 / 为什么选这个方法；关键假设和依据（只挑最影响结论的一两个，写出数值）；什么情况出现说明逻辑不成立（可观察的信号，如「营收增速连续两年低于 X%」）。",
+    "3. " + GROUNDING + "对话里用户表达过的判断优先保留。",
+    zh ? "4. 总共 200 字以内。" : "4. Under 120 words in total.",
+    "5. 只写备注本身，不给买卖建议，不要开场白。",
+  ].join("\n");
+}
+export function parseNote(text) {
+  const t = plain(String(text || "").replace(/```[\s\S]*?```/g, "")).replace(/\n{3,}/g, "\n\n").trim();
+  return t ? t.slice(0, MAX_NOTE) : null;
+}
+
+// ── 基本面解读：把十年财报浓缩成三条要点 + 一两个风险（只用系统算好的事实，不做估值、不给买卖建议）──
+export function validateBriefReq(body) {
+  if (!body || typeof body !== "object") return "bad body";
+  if (!body.stock || typeof body.stock.name !== "string") return "stock required";
+  if (badVerified(body.verified) || badVerified(body.metrics) || badVerified(body.market) || badVerified(body.lenses)) return "bad facts";
+  if (!(Array.isArray(body.verified) && body.verified.length) && !(Array.isArray(body.metrics) && body.metrics.length)) return "facts required";
+  if (JSON.stringify(body).length > 20000) return "body too large";
+  return null;
+}
+export function buildBriefPrompt(body, lang) {
+  const { stock, verified, metrics, market, lenses } = body, zh = lang !== "en";
+  return [
+    "你是一位严谨的价值投资分析师。用户正在看一家公司的十年财报，想快速判断它值不值得深入研究。",
+    zh ? "用中文回答。" : "Answer in English.",
+    "",
+    `公司：${stock.name}（${stock.code || ""}）　币种：${stock.currency || "未知"}`,
+    ...verifiedBlock(verified),
+    ...(Array.isArray(metrics) && metrics.length ? ["", "最新实际数据（系统根据财报计算，以此为准）：", ...metrics.map((x) => "- " + x)] : []),
+    ...viewsBlock(market, lenses),
+    "",
+    "规则：",
+    "1. 只依据上面的数据：" + GROUNDING,
+    "2. 三条要点：分别讲生意质量（盈利能力 / 现金含量）、增长、财务稳健度，每条一句话并带上关键数字；数据里没有的方面换成数据里最突出的特点。",
+    "3. 一到两个风险：只写数据里能看出来的（如现金流波动、负债上升、增速放缓、盈利依赖少数年份），不要泛泛而谈行业风险。",
+    "4. 不估值、不给买卖建议、不预测股价。",
+    "5. 全部放进回复最后的 ```json 代码块，格式严格如下：",
+    '```json\n{"points": ["要点一", "要点二", "要点三"], "risks": ["风险一"]}\n```',
+  ].join("\n");
+}
+export function parseBrief(text) {
+  const re = /```(?:json)?\s*([\s\S]*?)```/gi;
+  let m, last = null;
+  while ((m = re.exec(text))) last = m;
+  let obj = null;
+  try { obj = JSON.parse(last ? last[1] : text); } catch { return null; }
+  const list = (a, n) => (Array.isArray(a) ? a : []).filter((x) => typeof x === "string" && x.trim()).slice(0, n).map((x) => plain(x).slice(0, 240));
+  const points = list(obj && obj.points, 3), risks = list(obj && obj.risks, 2);
+  return points.length ? { points, risks } : null;
+}
+
 // ── 用户的模型：设置页只管「配置了哪些」（ai_models 表，可多条），AI 面板里切「用哪个」（settings 内部键 _ai_active）──
 // 不用配置就能选的：站点默认（"default"）+ 几个 Workers AI 模型（"wa:<模型 id>"，走站点的 Workers AI 额度）
 // 用户自己加的 OpenAI 兼容 / Anthropic 模型：id 为 "m:<行 id>"，Key 用 CREDENTIALS_KEY 加密，接口永不返回明文
@@ -453,6 +541,28 @@ export function registerAi(app, { chat = chatComplete } = {}) {
     const { text, res } = await runChat(c, buildMethodPrompt(body, lang), [{ role: "user", content: lang === "en" ? "Which valuation methods fit this company?" : "这家公司适合用哪些估值方法？" }]);
     if (res) return res;
     return c.json(parsePicks(text, body.methods));
+  });
+  app.post("/api/my/ai/note", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const err = validateNoteReq(body);
+    if (err) return c.json({ error: err }, 400);
+    const lang = body.lang === "en" ? "en" : "zh";
+    const { text, res } = await runChat(c, buildNotePrompt(body, lang), [{ role: "user", content: lang === "en" ? "Draft the investment-thesis note for this valuation." : "帮我起草这张估值卡的投资逻辑备注。" }]);
+    if (res) return res;
+    const note = parseNote(text);
+    if (!note) return c.json({ error: "bad_ai_output" }, 502);
+    return c.json({ note });
+  });
+  app.post("/api/my/ai/brief", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const err = validateBriefReq(body);
+    if (err) return c.json({ error: err }, 400);
+    const lang = body.lang === "en" ? "en" : "zh";
+    const { text, res } = await runChat(c, buildBriefPrompt(body, lang), [{ role: "user", content: lang === "en" ? "Summarize these fundamentals." : "帮我解读这家公司的基本面。" }]);
+    if (res) return res;
+    const brief = parseBrief(text);
+    if (!brief) return c.json({ error: "bad_ai_output" }, 502);
+    return c.json({ brief: { ...brief, at: new Date().toISOString() } });
   });
   app.post("/api/my/ai/review", async (c) => {
     const body = await c.req.json().catch(() => null);

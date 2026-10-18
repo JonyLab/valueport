@@ -262,3 +262,60 @@ describe("market research and master lenses in prompts", () => {
     expect(parsePicks('首选 **fcf**。\n```json\n{"picks":[{"key":"pb","reason":"**账面**"}]}\n```', METHODS)).toEqual({ reply: "首选 fcf。", picks: [{ key: "pb", role: "primary", reason: "账面" }] });
   });
 });
+
+describe("AI note draft", () => {
+  const BODY = { lang: "zh", context: { ...CONTEXT, verified: ["最近三年均盈利"] }, messages: [{ role: "user", content: "我觉得增速 10% 偏乐观" }, { role: "assistant", content: "可以下调\n```json\n{\"params\":{}}\n```" }], note: "IoT 是关键" };
+  it("builds a grounded prompt with the conversation and existing note", async () => {
+    const { buildNotePrompt, parseNote, validateNoteReq } = await import("../src/ai.js");
+    const p = buildNotePrompt(BODY, "zh");
+    expect(p).toContain("营收增速｜百分数｜保守 10 / 乐观 10");
+    expect(p).toContain("已核实的事实");
+    expect(p).toContain("用户：我觉得增速 10% 偏乐观");
+    expect(p).toContain("（参数建议）"); // 对话里的参数代码块不原样塞进去
+    expect(p).toContain("IoT 是关键");
+    expect(p).toContain("不给买卖建议");
+    expect(parseNote("**小米**是一家硬件公司。\n\n\n\n关键假设：增速 8%")).toBe("小米是一家硬件公司。\n\n关键假设：增速 8%");
+    expect(parseNote("```json\n{}\n```")).toBeNull();
+    expect(validateNoteReq(BODY)).toBeNull();
+    expect(validateNoteReq({ ...BODY, note: "x".repeat(2001) })).toBeTruthy();
+    expect(validateNoteReq({ ...BODY, messages: [{ role: "system", content: "x" }] })).toBeTruthy();
+    expect(validateNoteReq({ context: { fields: [] } })).toBeTruthy();
+  });
+  it("returns the drafted note", async () => {
+    const ck = await userCookie("aiuser-note");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" })
+      .reply(200, { choices: [{ message: { content: "小米靠手机和 IoT 赚钱，用 P/E 估。\n关键假设：增速保守 8%。" } }] });
+    const r = await SELF.fetch("https://x/api/my/ai/note", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) });
+    expect(r.status).toBe(200);
+    expect((await r.json()).note).toBe("小米靠手机和 IoT 赚钱，用 P/E 估。\n关键假设：增速保守 8%。");
+    expect((await SELF.fetch("https://x/api/my/ai/note", { method: "POST", headers: J, body: JSON.stringify(BODY) })).status).toBe(401);
+  });
+});
+
+describe("AI fundamentals brief", () => {
+  const BODY = { lang: "zh", stock: { name: "腾讯控股", code: "00700", currency: "HKD" }, verified: ["自由现金流 2016–2025：各年均为正"], metrics: ["营收增速：最新年同比 +7.0%"] };
+  it("builds a grounded prompt and parses points and risks", async () => {
+    const { buildBriefPrompt, parseBrief, validateBriefReq } = await import("../src/ai.js");
+    const p = buildBriefPrompt(BODY, "zh");
+    expect(p).toContain("自由现金流 2016–2025：各年均为正");
+    expect(p).toContain("最新年同比 +7.0%");
+    expect(p).toContain("不估值、不给买卖建议");
+    expect(parseBrief('```json\n{"points":["**a**","b","c","d"],"risks":["r1","r2","r3"]}\n```')).toEqual({ points: ["a", "b", "c"], risks: ["r1", "r2"] });
+    expect(parseBrief('```json\n{"points":[],"risks":["r"]}\n```')).toBeNull();
+    expect(parseBrief("随便聊聊")).toBeNull();
+    expect(validateBriefReq(BODY)).toBeNull();
+    expect(validateBriefReq({ stock: { name: "x" } })).toBeTruthy(); // 没有任何事实就不调用
+  });
+  it("returns the brief from the provider", async () => {
+    const ck = await userCookie("aiuser-brief");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" })
+      .reply(200, { choices: [{ message: { content: '```json\n{"points":["现金流十年为正","增速放缓到 7%","净现金"],"risks":["增速放缓"]}\n```' } }] });
+    const r = await SELF.fetch("https://x/api/my/ai/brief", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) });
+    expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j.brief).toMatchObject({ points: ["现金流十年为正", "增速放缓到 7%", "净现金"], risks: ["增速放缓"] });
+    expect(typeof j.brief.at).toBe("string");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, { choices: [{ message: { content: "随便聊聊" } }] });
+    expect((await SELF.fetch("https://x/api/my/ai/brief", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) })).status).toBe(502);
+  });
+});

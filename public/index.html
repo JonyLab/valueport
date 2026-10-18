@@ -553,7 +553,13 @@
   /* 备注 + 保存 */
   .vc-savebar{position:sticky;bottom:-26px;z-index:2;margin:auto -26px -26px;padding:18px 26px 22px;border-top:1px dashed var(--border);background:#fdfcf9;border-radius:0 0 var(--r-xl) var(--r-xl);display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:14px}
   .vc-note{margin:0}
-  .vc-note-label{font-size:13.5px;color:var(--ink-soft);margin-bottom:8px}
+  .vc-note-label{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-soft);margin-bottom:8px}
+  .vc-note-label > span{flex:1}
+  .vc-note-ai{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 11px;border:0;border-radius:var(--r-pill);background:rgba(246,207,74,.28);color:var(--sun-ink);font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer}
+  .vc-note-ai:hover{background:rgba(246,207,74,.45)} .vc-note-ai:disabled{opacity:.7;cursor:default}
+  .vc-note-ai i{font-size:13px} .vc-note-ai .ri-loader-4-line{animation:vcSpin 1s linear infinite}
+  .vc-note-undo{border:0;background:none;padding:0;font-family:var(--font);font-size:12px;color:var(--ink-mute);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+  .vc-note-err{margin-top:6px;font-size:12px;color:var(--red)}
   .vc-note-input{width:100%;min-height:84px;padding:11px 14px;border:0;border-radius:var(--r-md);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:13.5px;line-height:1.6;color:var(--ink);resize:vertical}
   .vc-note-input::placeholder{color:var(--ink-mute)}
   .vc-note-input:focus{outline:none;box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 4px var(--ring)}
@@ -778,6 +784,16 @@
   .fin-table tr:hover td{background:rgba(246,207,74,.12)}
   /* 基本面 tab：客观体检（英雄数字 + 10 年趋势） */
   .fd-sec{border-radius:var(--r-xl);padding:22px 24px;margin-bottom:14px}
+  .fd-brief-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+  .fd-brief-title{display:flex;align-items:center;gap:7px;font-size:15px;font-weight:500;color:var(--ink)}
+  .fd-brief-title i{color:#c99a12;font-size:15px}
+  .fd-brief-sub{margin-top:4px;font-size:12.5px;color:var(--ink-mute)}
+  .fd-brief-body:empty{display:none}
+  .fd-brief-list{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .fd-brief-list li{display:flex;gap:10px;align-items:baseline;font-size:13.5px;line-height:1.6;color:var(--ink)}
+  .fd-brief-list li i{flex:none;font-size:7px;color:var(--ink-mute);position:relative;top:-2px}
+  .fd-brief-list li.risk{color:#8a4a17} .fd-brief-list li.risk i{font-size:14px;top:2px;color:#d0782a}
+  .fd-brief-foot{margin-top:12px;font-size:11.5px;color:var(--ink-mute)}
   .fd-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
   .fd-num{font-family:var(--mono);font-size:11px;color:var(--ink-mute);flex:none}
   .fd-title{font-size:17px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
@@ -2271,6 +2287,58 @@ function fdChartWrap(svg, years, series, opts) {
 }
 
 // 基本面面板：01 盈利与现金 / 02 回报与利润率 / 03 资产负债表 / 04 资本配置
+// AI 解读：十年财报 → 三条要点 + 一两个风险；用户点了才调用，结果按「标的 + 语言」缓存在本次会话
+function fundBriefEl(item, financials, dividends) {
+  const zh = LANG === "zh", st = item.statics || {}, sym = item.cfg.symbol || "";
+  const key = "fd_brief_" + sym + "_" + LANG;
+  const box = document.createElement("div"); box.className = "fd-sec fd-brief";
+  const head = document.createElement("div"); head.className = "fd-brief-head";
+  const ttl = document.createElement("div"); ttl.className = "fd-brief-title";
+  ttl.append(ri("sparkling-2-fill"), document.createTextNode(zh ? "AI 解读" : "AI summary"));
+  const sub = document.createElement("div"); sub.className = "fd-brief-sub";
+  sub.textContent = zh ? "把十年财报浓缩成三条要点和风险，帮你判断值不值得深入研究" : "Ten years of statements in three points and the risks — is it worth a deeper look?";
+  const btn = document.createElement("button"); btn.type = "button"; btn.className = "vc-note-ai";
+  const body = document.createElement("div"); body.className = "fd-brief-body";
+  const err = document.createElement("div"); err.className = "vc-note-err"; err.hidden = true;
+  const txt = document.createElement("div"); txt.append(ttl, sub);
+  head.append(txt, btn); box.append(head, body, err);
+  const setBtn = (busy, again) => { btn.disabled = busy; btn.replaceChildren(ri(busy ? "loader-4-line" : again ? "refresh-line" : "sparkling-2-fill"), document.createTextNode(busy ? (zh ? "解读中…" : "Reading…") : again ? (zh ? "重新生成" : "Regenerate") : (zh ? "生成解读" : "Summarize"))); };
+  const show = (b) => {
+    body.replaceChildren();
+    const ul = document.createElement("ul"); ul.className = "fd-brief-list";
+    for (const p of b.points) { const li = document.createElement("li"); li.append(ri("checkbox-blank-circle-fill"), document.createTextNode(p)); ul.appendChild(li); }
+    for (const r of b.risks) { const li = document.createElement("li"); li.className = "risk"; li.append(ri("error-warning-line"), document.createTextNode(r)); ul.appendChild(li); }
+    const foot = document.createElement("div"); foot.className = "fd-brief-foot";
+    foot.textContent = zh ? "AI 根据财报数据生成，可能有误；不构成投资建议" : "Generated by AI from the statements; may be wrong. Not investment advice.";
+    body.append(ul, foot);
+  };
+  let cached = null; try { cached = JSON.parse(sessionStorage.getItem(key) || "null"); } catch { cached = null; }
+  if (cached && cached.points) { show(cached); setBtn(false, true); } else setBtn(false, false);
+  btn.addEventListener("click", async () => {
+    setBtn(true); err.hidden = true;
+    try {
+      const [quarter, research] = await Promise.all([loadFinancials(item, "quarter").catch(() => null),
+        fetch("/api/research?symbol=" + encodeURIComponent(sym)).then((r) => r.json()).then((j) => j.research).catch(() => null)]);
+      const req = {
+        lang: LANG,
+        stock: { name: displayName(item), code: (item.cfg.ticker || "").toUpperCase(), currency: st.currency || "" },
+        verified: verifiedFacts({ financials, dividends, dps: parseFloat(st.dividendYield), lang: LANG }),
+        metrics: latestMetrics({ financials, financialsQ: quarter && quarter.financials, lang: LANG }),
+        market: marketViews({ research, financials, price: item.cfg.price, market: sym.slice(0, 2), lang: LANG }),
+        lenses: masterLenses({ financials, research, price: item.cfg.price, eps: parseFloat(st.epsTtm), bps: parseFloat(st.bps), lang: LANG }),
+      };
+      const r = await fetch("/api/my/ai/brief", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(req) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.brief) throw new Error(r.status === 429 ? (zh ? "今天的 AI 次数已用完" : "Daily AI limit reached") : (j.detail || (j.error === "bad_ai_output" ? (zh ? "AI 返回的格式不对，请重试" : "Unexpected AI output, try again") : j.error) || r.status));
+      try { sessionStorage.setItem(key, JSON.stringify(j.brief)); } catch { /* 存不下就不缓存 */ }
+      show(j.brief); setBtn(false, true);
+    } catch (e) {
+      err.textContent = (zh ? "解读失败：" : "Summary failed: ") + (e && e.message || e); err.hidden = false;
+      setBtn(false, !!body.firstChild);
+    }
+  });
+  return box;
+}
 function renderFundamentalsPanel(item, panel) {
   const skc = (h) => `<div class="sk-card" style="margin-bottom:14px" aria-hidden="true"><div class="sk-row"><span class="sk sk-line" style="width:140px;height:16px"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:70px;height:28px"></span></div><span class="sk" style="height:${h}px;border-radius:16px"></span><span class="sk sk-line" style="width:55%"></span></div>`;
   panel.innerHTML = skc(180) + skc(120) + skc(150);
@@ -2279,6 +2347,7 @@ function renderFundamentalsPanel(item, panel) {
     panel.innerHTML = "";
     if (!financials || !financials.IS) { panel.innerHTML = `<div class="fd-empty">${t("d_no_fundamentals")}</div>`; return; }
     const zh = LANG === "zh";
+    if (owner) panel.appendChild(fundBriefEl(item, financials, dividends));
     const sec = (n, title, sub, heroV, heroJ, heroCls) => {
       const s = document.createElement("div"); s.className = "fd-sec";
       const h = document.createElement("div"); h.className = "fd-head";
