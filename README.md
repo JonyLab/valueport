@@ -233,7 +233,7 @@ The site default provider is configured with:
 | `AI_BASE_URL` | Official endpoint | For `openai` / `anthropic`; point at any compatible service |
 | `AI_API_KEY` | — | Secret, for `openai` / `anthropic`: `npx wrangler secret put AI_API_KEY` |
 
-Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`. Each user gets 100 AI messages per day on the site default / Workers AI. Workers AI runs on your Cloudflare account even in `wrangler dev`, so local chats count toward usage.
+Set `AI_PROVIDER` / `AI_MODEL` / `AI_BASE_URL` under `[vars]` in `wrangler.toml`. Optionally set `ZHIPU_API_KEY` (`npx wrangler secret put ZHIPU_API_KEY`, a free key from open.bigmodel.cn) to offer **Zhipu GLM-4.7-Flash** to everyone as an extra free model (`SITE_KEY_MODELS` in `src/ai.js`; requests to bigmodel.cn send `thinking: {type: "disabled"}`). The "add a model" form also has one-click templates for GLM-4.7-Flash and DeepSeek. Each user gets 100 AI messages per day on the site default / Workers AI. Workers AI runs on your Cloudflare account even in `wrangler dev`, so local chats count toward usage.
 
 ## Macro
 

@@ -24,6 +24,7 @@ export function aiConfig(env) {
   return { provider, model: env.AI_MODEL || d.model, baseUrl: (env.AI_BASE_URL || d.baseUrl || "").replace(/\/+$/, ""), apiKey: env.AI_API_KEY || "" };
 }
 
+const hostOf = (u) => { try { return new URL(u).hostname; } catch { return ""; } };
 // 推理类模型会把思考过程包在 <think> 里，只留最终回答
 const clean = (t) => t.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
@@ -47,7 +48,8 @@ async function rawComplete(env, system, messages, fetchImpl, cfg) {
     const res = await fetchImpl(cfg.baseUrl + "/chat/completions", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer " + cfg.apiKey },
-      body: JSON.stringify({ model: cfg.model, max_tokens: MAX_TOKENS, messages: [{ role: "system", content: system }, ...messages] }),
+      body: JSON.stringify({ model: cfg.model, max_tokens: MAX_TOKENS, messages: [{ role: "system", content: system }, ...messages],
+        ...(/(^|\.)bigmodel\.cn$/.test(hostOf(cfg.baseUrl)) ? { thinking: { type: "disabled" } } : {}) }), // 智谱 GLM：关掉深度思考，更快，也不让思考吃掉输出长度
     });
     const j = await res.json().catch(() => null);
     if (!res.ok) throw new Error((j && j.error && j.error.message) || `AI HTTP ${res.status}`);
@@ -538,6 +540,11 @@ export const WORKERS_MODELS = [
   { id: "@cf/meta/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout 17B" },
   { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", label: "Mistral Small 3.1 24B" },
 ];
+// 站点 Key 的免费模型：站长配了对应的 secret 才出现在列表里（走站点的 Key，同样受每人每天次数限制）
+export const SITE_KEY_MODELS = [
+  { id: "zhipu-glm-4.7-flash", label: "智谱 GLM-4.7-Flash", model: "glm-4.7-flash", baseUrl: "https://open.bigmodel.cn/api/paas/v4", keyEnv: "ZHIPU_API_KEY" },
+];
+export const siteKeyModels = (env) => SITE_KEY_MODELS.filter((m) => env && env[m.keyEnv]);
 const MODEL_RE = /^[\w@.:\/-]{1,100}$/;
 const MAX_MODELS = 10;
 function cleanBaseUrl(raw) {
@@ -578,6 +585,10 @@ export async function userAi(env, uid) {
   if (active.startsWith("wa:")) {
     const m = WORKERS_MODELS.find((x) => x.id === active.slice(3));
     if (m) return { cfg: { provider: "workers-ai", model: m.id, baseUrl: "", apiKey: "" }, own: false, active };
+  }
+  if (active.startsWith("sk:")) {
+    const m = siteKeyModels(env).find((x) => x.id === active.slice(3));
+    if (m) return { cfg: { provider: "openai", model: m.model, baseUrl: m.baseUrl, apiKey: env[m.keyEnv] }, own: false, active };
   }
   if (active.startsWith("m:")) {
     const r = (await listModelRows(env, uid)).find((x) => String(x.id) === active.slice(2));
@@ -635,6 +646,7 @@ export function registerAi(app, { chat = chatComplete } = {}) {
       active: u.active, dailyLimit: DAILY_LIMIT,
       site: { id: "default", kind: "site", provider: site.provider, model: site.model, name: site.provider === "workers-ai" ? wm(site.model) : site.model },
       workers: WORKERS_MODELS.map((m) => ({ id: "wa:" + m.id, kind: "workers-ai", name: m.label, model: m.id })),
+      siteKey: siteKeyModels(c.env).map((m) => ({ id: "sk:" + m.id, kind: "site-key", name: m.label, model: m.model })),
       custom,
     });
   });
@@ -643,6 +655,7 @@ export function registerAi(app, { chat = chatComplete } = {}) {
     const uid = c.get("uid"), b = await c.req.json().catch(() => ({}));
     const id = typeof b.id === "string" ? b.id : "";
     const ok = id === "default" || (id.startsWith("wa:") && WORKERS_MODELS.some((m) => "wa:" + m.id === id))
+      || (id.startsWith("sk:") && siteKeyModels(c.env).some((m) => "sk:" + m.id === id))
       || (id.startsWith("m:") && (await listModelRows(c.env, uid)).some((r) => "m:" + r.id === id));
     if (!ok) return c.json({ error: "unknown model" }, 400);
     await c.env.DB.prepare("INSERT INTO settings (user_id,key,value) VALUES (?, '_ai_active', ?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value").bind(uid, id).run();

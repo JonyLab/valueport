@@ -418,3 +418,18 @@ describe("short method summaries", () => {
     expect(parsePicks('银行股看净资产。\n```json\n{"picks":[{"key":"pb"}]}\n```', M).reply).toBe("银行股看净资产。");
   });
 });
+
+describe("site-key free models (Zhipu GLM-4.7-Flash)", () => {
+  it("lists GLM only when the site has a key and turns off Zhipu's thinking mode", async () => {
+    const { siteKeyModels, SITE_KEY_MODELS, chatComplete } = await import("../src/ai.js");
+    expect(siteKeyModels({})).toEqual([]);
+    expect(siteKeyModels({ ZHIPU_API_KEY: "k" }).map((m) => m.model)).toEqual(["glm-4.7-flash"]);
+    let sent = null;
+    const fetchImpl = async (url, init) => { sent = { url, body: JSON.parse(init.body) }; return new Response(JSON.stringify({ choices: [{ message: { content: "好的" } }] })); };
+    await chatComplete({}, "sys", [{ role: "user", content: "hi" }], fetchImpl, { provider: "openai", model: "glm-4.7-flash", baseUrl: SITE_KEY_MODELS[0].baseUrl, apiKey: "zk" });
+    expect(sent.url).toBe("https://open.bigmodel.cn/api/paas/v4/chat/completions");
+    expect(sent.body.thinking).toEqual({ type: "disabled" });
+    await chatComplete({}, "sys", [{ role: "user", content: "hi" }], fetchImpl, { provider: "openai", model: "deepseek-chat", baseUrl: "https://api.deepseek.com/v1", apiKey: "k" });
+    expect(sent.body.thinking).toBeUndefined();
+  });
+});

@@ -74,7 +74,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   let models = null;
   const slug = (location.pathname.match(/^\/b\/([^/]+)/) || [])[1];
   function drawModels() {
-    const all = [models.site, ...models.workers, ...models.custom];
+    const all = [models.site, ...models.workers, ...(models.siteKey || []), ...models.custom];
     const cur = all.find((m) => m.id === models.active) || models.site;
     modelName.textContent = (lang === "zh" ? "模型：" : "Model: ") + cur.name;
     modelMenu.innerHTML = "";
@@ -95,6 +95,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     };
     group(lang === "zh" ? "站点默认" : "Site default", [models.site]);
     group("Workers AI", models.workers.filter((w) => w.model !== (models.site.provider === "workers-ai" ? models.site.model : "")));
+    group(lang === "zh" ? "免费模型" : "Free models", models.siteKey || []); // 站点配了 Key 的免费模型（如智谱 GLM-4.7-Flash）
     group(lang === "zh" ? "我的模型" : "My models", models.custom);
     const manage = document.createElement("a"); manage.className = "vc-ai-manage";
     manage.textContent = models.custom.length ? (lang === "zh" ? "管理模型…" : "Manage models…") : (lang === "zh" ? "添加自己的模型（OpenAI 兼容 / Anthropic）…" : "Add your own model…");

@@ -16,6 +16,7 @@ database_id = "0be2e6bd-01f6-4b58-8112-516b9a1034db"
 #   LONGBRIDGE_APP_KEY        长桥 OpenAPI App Key（实时行情，可选）
 #   LONGBRIDGE_APP_SECRET     长桥 OpenAPI App Secret
 #   LONGBRIDGE_ACCESS_TOKEN   长桥 OpenAPI Access Token（有有效期，过期需更新）
+#   ZHIPU_API_KEY             智谱开放平台 Key（可选）：配了之后 AI 模型列表里多一个免费的「智谱 GLM-4.7-Flash」，全站共用
 #   GITHUB_TOKEN              反馈直接建 GitHub issue（可选；fine-grained PAT，仓库 Issues: Read and write）
 #                             目标仓库默认 JonyLab/watchlist，可在 [vars] 设 FEEDBACK_REPO = "owner/repo"
 

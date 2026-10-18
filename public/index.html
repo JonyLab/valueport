@@ -928,6 +928,10 @@
   .share-url a:hover{text-decoration:underline}
   .share-url .btn{flex:none}
   .hidden{display:none}
+  .ai-tpls{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}
+  .ai-tpls .f-lab{margin-right:4px}
+  .ai-tpl{height:30px;padding:0 12px;border:0;border-radius:var(--r-pill);background:rgba(246,207,74,.28);color:var(--sun-ink);cursor:pointer;font-family:var(--font);font-size:12.5px}
+  .ai-tpl:hover{background:rgba(246,207,74,.45)}
 </style>
   <!-- 模块依赖整棵树先声明：浏览器一次并行拉取，不用等上一层下载完才发现下一层（线上每个文件都要回源校验，层层等很慢） -->
   <link rel="modulepreload" href="/shared/ai-panel.js">
@@ -3218,6 +3222,13 @@ document.getElementById("btnLogout").addEventListener("click", async () => {
 
 /* ---------- 主人模式初始化 ---------- */
 // ---------- AI 模型（设置页只管配置；在 AI 面板里切换用哪个） ----------
+// 添加模型的常用模板：点一下填好协议、名称、模型和接口地址，只需再填自己的 Key
+const AI_TEMPLATES = [
+  { zh: "智谱 GLM-4.7-Flash（免费）", en: "Zhipu GLM-4.7-Flash (free)", provider: "openai", name: "智谱 GLM-4.7-Flash", model: "glm-4.7-flash", baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    noteZh: "免费模型：在 open.bigmodel.cn 注册后到「API Keys」创建一个 Key 填进来即可。", noteEn: "Free model: sign up at open.bigmodel.cn and create a key under API Keys." },
+  { zh: "DeepSeek", en: "DeepSeek", provider: "openai", name: "DeepSeek", model: "deepseek-chat", baseUrl: "https://api.deepseek.com/v1",
+    noteZh: "在 platform.deepseek.com 创建 Key，按用量计费。", noteEn: "Create a key at platform.deepseek.com; billed per use." },
+];
 // 站点默认与 Workers AI 模型不用配置；这里增删改自己的 OpenAI 兼容 / Anthropic 模型（Key 加密保存，接口不返回明文）
 async function initAiSettings() {
   const zh = LANG === "zh", T = (a, b) => (zh ? a : b);
@@ -3233,7 +3244,7 @@ async function initAiSettings() {
   }
   function draw() {
     body.innerHTML = "";
-    const others = info.workers.filter((w) => !(info.site.provider === "workers-ai" && w.model === info.site.model)).map((w) => w.name); // 和站点默认同一个的不重复列
+    const others = [...info.workers.filter((w) => !(info.site.provider === "workers-ai" && w.model === info.site.model)), ...(info.siteKey || [])].map((w) => w.name); // 和站点默认同一个的不重复列
     body.appendChild(mk("p", "quote-note ai-intro", T(`不用配置就能用：站点默认（${info.site.name}）和 ${others.join("、")}。下面添加你自己的模型，之后在 AI 面板顶部切换用哪个。`,
       `Ready without setup: the site default (${info.site.name}) and ${others.join(", ")}. Add your own models below, then switch between them at the top of the AI panel.`)));
     const lim = info.dailyLimit || 100, wa = info.site.provider === "workers-ai";
@@ -3241,6 +3252,8 @@ async function initAiSettings() {
       ? T(`这几个都用站点的 Cloudflare 免费额度：全站共用，每天北京时间早上 8 点重置，当天用完就要等到第二天；另外每人每天最多 ${lim} 次。你自己的模型用你自己的 Key，不受这两个限制。`,
         `These run on the site's free Cloudflare allowance, shared by everyone and reset daily at 00:00 UTC; once it's used up AI stops until the next day. Each person also gets at most ${lim} requests a day. Your own models use your own key and skip both limits.`)
       : T(`站点默认每人每天最多 ${lim} 次；你自己的模型用你自己的 Key，不受这个限制。`, `The site default allows ${lim} requests per person per day; your own models use your own key and skip this limit.`)));
+    if ((info.siteKey || []).length) body.appendChild(mk("p", "quote-note ai-intro", T(`${info.siteKey.map((m) => m.name).join("、")} 用站点在智谱申请的免费 Key，不占 Cloudflare 额度，同样每人每天最多 ${lim} 次；智谱对免费模型有并发限制，用的人多时可能要稍后重试。`,
+      `${info.siteKey.map((m) => m.name).join(", ")} use the site's free Zhipu key — no Cloudflare allowance, still ${lim} requests per person per day; Zhipu limits concurrency on free models, so retry if it's busy.`)));
     const list = mk("div", "ai-mlist");
     for (const m of info.custom) {
       if (editing === m.id) { list.appendChild(form(m)); continue; }
@@ -3289,6 +3302,15 @@ async function initAiSettings() {
         : T("Anthropic Messages API；接口地址留空即官方地址。", "Anthropic Messages API; leave the base URL blank for the official endpoint."))
         + T(" Key 加密保存，只用于你自己的 AI 请求，不会再显示明文；用自己的 Key 不占站点每日额度，费用由该服务商按用量计。", " The key is stored encrypted, used only for your requests and never shown again; it doesn't count toward the site quota and is billed by that provider.");
     };
+    if (!m) {
+      const tpl = mk("div", "ai-tpls"); tpl.appendChild(mk("span", "f-lab", T("常用模板", "Templates")));
+      for (const t of AI_TEMPLATES) {
+        const b = mk("button", "ai-tpl", zh ? t.zh : t.en); b.type = "button";
+        b.addEventListener("click", () => { Object.assign(st, { provider: t.provider, name: t.name, model: t.model, baseUrl: t.baseUrl }); fields(); note.textContent = (zh ? t.noteZh : t.noteEn) + " " + note.textContent; });
+        tpl.appendChild(b);
+      }
+      box.appendChild(tpl);
+    }
     for (const [k, lab] of Object.entries(KIND)) {
       const b = mk("button", "ai-prov", lab); b.type = "button"; b.dataset.k = k;
       b.addEventListener("click", () => { if (st.provider !== k) { st.provider = k; fields(); } });
