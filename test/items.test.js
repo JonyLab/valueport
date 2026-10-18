@@ -58,9 +58,9 @@ describe("validateItem with valuations", () => {
   const card = { id: "v1", method: "pe", inputs: { revenue: 4e11, growth: { c: 8, o: 15 } }, low: 211.29, high: 460.13, updatedAt: "2026-06-16T00:00:00Z" };
 
   it("keeps a sanitised AI review on a card and drops a malformed one", () => {
-    const review = { overall: "watch", summary: "增速放缓", at: "2026-10-17T00:00:00Z", checks: [{ k: "growth", status: "watch", reason: "最新同比 +3%" }, { k: "x", status: "nope" }], extra: 1 };
+    const review = { overall: "watch", summary: "增速放缓", at: "2026-10-17T00:00:00Z", checks: [{ k: "growth", status: "watch", reason: "最新同比 +3%", metric: "revenue" }, { k: "targetPE", status: "ok", reason: "", metric: "toString" }, { k: "x", status: "nope" }], extra: 1 };
     const r = validateItem({ ...base, valuations: [{ ...card, review }], selectedValuationId: "v1" });
-    expect(r.value.valuations[0].review).toEqual({ overall: "watch", summary: "增速放缓", at: "2026-10-17T00:00:00Z", checks: [{ k: "growth", status: "watch", reason: "最新同比 +3%" }] });
+    expect(r.value.valuations[0].review).toEqual({ overall: "watch", summary: "增速放缓", at: "2026-10-17T00:00:00Z", checks: [{ k: "growth", status: "watch", reason: "最新同比 +3%", metric: "revenue" }, { k: "targetPE", status: "ok", reason: "" }] });
     const bad = validateItem({ ...base, valuations: [{ ...card, review: { overall: "great" } }], selectedValuationId: "v1" });
     expect(bad.value.valuations[0].review).toBeUndefined();
   });

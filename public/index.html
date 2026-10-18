@@ -758,7 +758,7 @@
   .vrev-row{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px dashed var(--border)}
   .vrev-dot{flex:none;width:8px;height:8px;margin-top:6px;border-radius:50%}
   .vrev-dot.ok{background:var(--green)} .vrev-dot.watch{background:#f08c2e} .vrev-dot.broken{background:var(--red)}
-  .vrev-main{min-width:0}
+  .vrev-main{min-width:0;flex:1}
   .vrev-k{font-size:12.5px;color:var(--ink)}
   .vrev-v{margin-left:8px;font-size:11.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
   .vrev-why{margin-top:2px;font-size:12px;line-height:1.55;color:var(--ink-soft)}
@@ -801,6 +801,20 @@
   .fd-brief-list li{display:flex;gap:10px;align-items:baseline;font-size:13.5px;line-height:1.6;color:var(--ink)}
   .fd-brief-list li i{flex:none;font-size:7px;color:var(--ink-mute);position:relative;top:-2px}
   .fd-brief-list li.risk{color:#8a4a17} .fd-brief-list li.risk i{font-size:14px;top:2px;color:#d0782a}
+  .fd-brief-list li > span{flex:1;min-width:0}
+  /* AI 结论旁的迷你图：64×20，墨黑线 + 浅面积 + 暖黄末点；悬停显示最新值与年份，点击跳到基本面对应分节 */
+  .ai-spark{position:relative;flex:none;align-self:flex-start;width:64px;height:20px;margin-top:2px;padding:0;border:0;border-radius:4px;background:none;cursor:pointer}
+  .ai-spark svg{display:block;overflow:visible}
+  .ai-spark .sp-area{fill:rgba(42,42,41,.06)}
+  .ai-spark .sp-line{fill:none;stroke:var(--chart-1);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+  .ai-spark .sp-zero{stroke:var(--track-edge);stroke-width:1;stroke-dasharray:2 2}
+  .ai-spark .sp-dot{fill:var(--chart-2);stroke:#fff;stroke-width:1.5}
+  .ai-spark::after{content:attr(data-tip);position:absolute;right:0;bottom:calc(100% + 6px);padding:5px 8px;border-radius:var(--r-sm);background:var(--dark);color:#fff;font-size:11px;font-family:var(--mono);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .12s;z-index:5}
+  .ai-spark:hover::after,.ai-spark:focus-visible::after{opacity:1}
+  .ai-spark:hover .sp-line{stroke-width:2}
+  .ai-spark:focus-visible{outline:2px solid var(--chart-2);outline-offset:2px}
+  .fd-sec[data-fd-sec]{scroll-margin-top:76px}
+  .fd-sec.fd-flash{box-shadow:0 0 0 2px rgba(227,178,31,.55);transition:box-shadow .6s}
   .fd-brief-foot{margin-top:12px;font-size:11.5px;color:var(--ink-mute)}
   .fd-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px}
   .fd-num{font-family:var(--mono);font-size:11px;color:var(--ink-mute);flex:none}
@@ -910,6 +924,7 @@
   <link rel="modulepreload" href="/shared/feedback.js">
   <link rel="modulepreload" href="/shared/feedback-core.js">
   <link rel="modulepreload" href="/shared/market.js">
+  <link rel="modulepreload" href="/shared/metric-spark.js">
   <link rel="modulepreload" href="/shared/valuation-ui.js">
   <link rel="modulepreload" href="/shared/valuation/derivations.js">
   <link rel="modulepreload" href="/shared/valuation/facts.js">
@@ -1083,6 +1098,7 @@ import { mountValuationCalc } from "/shared/valuation-ui.js";
 import { MODELS, modeFields } from "/shared/valuation/index.js";
 import { verifiedFacts, latestMetrics, assumptionChecks, marketViews, masterLenses, businessFacts } from "/shared/valuation/facts.js";
 import { aiErrorText } from "/shared/ai-panel.js";
+import { METRICS, metricKey, metricSeries, sparkGeom } from "/shared/metric-spark.js";
 import { holdingFor, driftText } from "/shared/holding.js";
 
 applyI18n(); // 静态文案先按当前语言渲染
@@ -1805,6 +1821,7 @@ const viewValEdit = document.getElementById("viewValEdit");
 const pageHeadEl = document.querySelector(".page-head");
 const btnSettings = document.getElementById("btnSettings");
 let detailGauge = null, detailItem = null, detailGwrap = null, detailIdBlock = null, detailValRefresh = null, detailAddValuation = null, detailDistEl = null;
+let detailGoFund = null; // 切到基本面 tab 并滚到某一分节（AI 结论旁的迷你图点击用）
 
 // ---------- 详情页「我的持仓」：资产页持仓表里这只股票的信息（数量、成本、盈亏、占比、目标偏离与建议、各账户） ----------
 // 数据优先用资产页的会话缓存（同一份 /api/my/portfolio 返回），没有才请求一次；没持有也没设目标就不显示
@@ -2029,6 +2046,16 @@ function renderDetail(item, initialTab = "val") {
     tabsNav.appendChild(b); panels.appendChild(p); tabEls.push(b); panelEls.push(p);
   });
   const panelOf = (kind) => panelEls[defs.findIndex((d) => d.kind === kind)];
+  detailGoFund = (sec) => {
+    tabEls[defs.findIndex((d) => d.kind === "fund")].click();
+    const p = panelOf("fund");
+    // 基本面面板在年报到达后才画出分节；它的 then 先注册，所以这里拿到时分节已在
+    loadFinancials(item, "annual").then(() => requestAnimationFrame(() => {
+      const s = sec ? p.querySelector(`[data-fd-sec="${sec}"]`) : null;
+      (s || p).scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+      if (s) { s.classList.add("fd-flash"); setTimeout(() => s.classList.remove("fd-flash"), 1200); }
+    }));
+  };
   renderValuationPanel(item, panelOf("val"), idBlock);
   renderFundamentalsPanel(item, panelOf("fund"));
   renderFinancialsPanel(item, panelOf("fin"));
@@ -2295,6 +2322,27 @@ function fdChartWrap(svg, years, series, opts) {
   return wrap;
 }
 
+// AI 结论旁的迷你图：模型只给白名单里的指标 key，曲线和数字取自已加载的财报；没有指标或数据不足两年 → 返回 null（只显示文字）
+function aiSparkEl(metric, financials, dividends, cur) {
+  const key = metricKey(metric), m = key && METRICS[key];
+  if (!m) return null;
+  const series = metricSeries(key, financials, dividends), g = sparkGeom(series, 64, 20, 2);
+  if (!g) return null;
+  const zh = LANG === "zh", v = g.latest.value, dcur = (m.kind === "DIV" && dividends && dividends.currency) || cur;
+  const val = m.unit === "money" ? fdMoney(v, cur) : m.unit === "pct" ? v.toFixed(1) + "%" : v.toFixed(2) + (dcur ? " " + dcur : "");
+  const tip = `${zh ? m.zh : m.en} · ${g.latest.year} ${val}`;
+  const b = document.createElement("button"); b.type = "button"; b.className = "ai-spark"; b.dataset.tip = tip;
+  b.setAttribute("aria-label", tip + (m.sec ? (zh ? "，查看基本面" : ", view in Fundamentals") : ""));
+  const svg = fdEl("svg", { width: 64, height: 20, viewBox: "0 0 64 20", "aria-hidden": "true" });
+  if (g.zero != null) svg.appendChild(fdEl("line", { class: "sp-zero", x1: 0, x2: 64, y1: g.zero, y2: g.zero }));
+  svg.appendChild(fdEl("polygon", { class: "sp-area", points: g.area }));
+  svg.appendChild(fdEl("polyline", { class: "sp-line", points: g.line }));
+  svg.appendChild(fdEl("circle", { class: "sp-dot", cx: g.last[0], cy: g.last[1], r: 2.4 }));
+  b.appendChild(svg);
+  b.addEventListener("click", () => { if (detailGoFund) detailGoFund(m.sec); });
+  return b;
+}
+
 // 基本面面板：01 盈利与现金 / 02 回报与利润率 / 03 资产负债表 / 04 资本配置
 // AI 解读：十年财报 → 三条要点 + 一两个风险；用户点了才调用，结果按「标的 + 语言」缓存在本次会话
 function fundBriefEl(item, financials, dividends) {
@@ -2315,8 +2363,17 @@ function fundBriefEl(item, financials, dividends) {
   const show = (b) => {
     body.replaceChildren();
     const ul = document.createElement("ul"); ul.className = "fd-brief-list";
-    for (const p of b.points) { const li = document.createElement("li"); li.append(ri("checkbox-blank-circle-fill"), document.createTextNode(p)); ul.appendChild(li); }
-    for (const r of b.risks) { const li = document.createElement("li"); li.className = "risk"; li.append(ri("error-warning-line"), document.createTextNode(r)); ul.appendChild(li); }
+    // 每条 {text, metric?}（会话里缓存的老结果是纯字符串）；有指标且有数据就在右侧挂迷你图
+    const row = (x, cls, icon) => {
+      const it = typeof x === "string" ? { text: x } : x || {};
+      const li = document.createElement("li"); if (cls) li.className = cls;
+      const tx = document.createElement("span"); tx.textContent = it.text || "";
+      li.append(ri(icon), tx);
+      const sp = aiSparkEl(it.metric, financials, dividends, st.currency || ""); if (sp) li.appendChild(sp);
+      ul.appendChild(li);
+    };
+    for (const p of b.points) row(p, "", "checkbox-blank-circle-fill");
+    for (const r of b.risks) row(r, "risk", "error-warning-line");
     const foot = document.createElement("div"); foot.className = "fd-brief-foot";
     foot.textContent = zh ? "AI 根据财报数据生成，可能有误；不构成投资建议" : "Generated by AI from the statements; may be wrong. Not investment advice.";
     body.append(ul, foot);
@@ -2358,7 +2415,7 @@ function renderFundamentalsPanel(item, panel) {
     const zh = LANG === "zh";
     if (owner) panel.appendChild(fundBriefEl(item, financials, dividends));
     const sec = (n, title, sub, heroV, heroJ, heroCls) => {
-      const s = document.createElement("div"); s.className = "fd-sec";
+      const s = document.createElement("div"); s.className = "fd-sec"; s.dataset.fdSec = n;
       const h = document.createElement("div"); h.className = "fd-head";
       h.innerHTML = `<span class="fd-num">${n}</span><span class="fd-title">${title}${sub ? `<span class="sub">· ${sub}</span>` : ""}</span>`
         + (heroV ? `<span class="fd-hero"><span class="fd-herov">${heroV}</span><div class="fd-heroj ${heroCls || ""}">${heroJ || ""}</div></span>` : "");
@@ -2903,6 +2960,9 @@ function renderValuationPanel(item, panel, idBlock) {
         const why = document.createElement("div"); why.className = "vrev-why"; why.textContent = ck.reason || ST[ck.status];
         main.append(k, why);
         row.append(dot, main);
+        if (metricKey(ck.metric)) loadFinancials(item, "annual").then((a) => {
+          const sp = aiSparkEl(ck.metric, a && a.financials, a && a.dividends, (item.statics && item.statics.currency) || ""); if (sp) row.appendChild(sp);
+        });
         list.appendChild(row);
       }
       box.appendChild(list);

@@ -163,8 +163,13 @@ describe("AI review", () => {
     const p2 = buildReviewPrompt({ ...BODY, comparisons: ["targetPE（目标 PE）：当初 保守 18 / 乐观 25；当前倍数 20.0 → 落在两档之间"] }, "zh");
     expect(p2).toContain("假设对照");
     expect(p2).toContain("落在两档之间");
-    const r = parseReview('```json\n{"overall":"watch","summary":"增速跌到保守假设以下","checks":[{"k":"growth","status":"broken","reason":"近三年复合 6.1% 低于保守 8%"},{"k":"nope","status":"ok"},{"k":"targetPE","status":"great"}]}\n```', FIELDS2);
-    expect(r).toEqual({ overall: "watch", summary: "增速跌到保守假设以下", checks: [{ k: "growth", status: "broken", reason: "近三年复合 6.1% 低于保守 8%" }] });
+    expect(p).toContain("revenue（营收）");
+    expect(p).toContain('"metric": "revenue"');
+    const r = parseReview('```json\n{"overall":"watch","summary":"增速跌到保守假设以下","checks":[{"k":"growth","status":"broken","reason":"近三年复合 6.1% 低于保守 8%","metric":"revenue"},{"k":"nope","status":"ok"},{"k":"targetPE","status":"great"}]}\n```', FIELDS2);
+    expect(r).toEqual({ overall: "watch", summary: "增速跌到保守假设以下", checks: [{ k: "growth", status: "broken", reason: "近三年复合 6.1% 低于保守 8%", metric: "revenue" }] });
+    // 白名单以外的 metric（含原型链上的名字）丢掉，只留文字
+    const r2 = parseReview('```json\n{"overall":"hold","checks":[{"k":"growth","status":"ok","reason":"a","metric":"peRatio"},{"k":"targetPE","status":"ok","reason":"b","metric":"constructor"}]}\n```', FIELDS2);
+    expect(r2.checks).toEqual([{ k: "growth", status: "ok", reason: "a" }, { k: "targetPE", status: "ok", reason: "b" }]);
     expect(parseReview('```json\n{"overall":"fine"}\n```', FIELDS2)).toBeNull();
     expect(parseReview("没有代码块", FIELDS2)).toBeNull();
     expect(validateReviewReq({ ...BODY, result: {} })).toBeTruthy();
@@ -300,7 +305,13 @@ describe("AI fundamentals brief", () => {
     expect(p).toContain("自由现金流 2016–2025：各年均为正");
     expect(p).toContain("最新年同比 +7.0%");
     expect(p).toContain("不估值、不给买卖建议");
-    expect(parseBrief('```json\n{"points":["**a**","b","c","d"],"risks":["r1","r2","r3"]}\n```')).toEqual({ points: ["a", "b", "c"], risks: ["r1", "r2"] });
+    expect(p).toContain("netDebt（净负债）");
+    expect(p).toContain("不要为了配图硬选");
+    // 老格式：纯字符串照收，统一成 {text}
+    expect(parseBrief('```json\n{"points":["**a**","b","c","d"],"risks":["r1","r2","r3"]}\n```')).toEqual({ points: [{ text: "a" }, { text: "b" }, { text: "c" }], risks: [{ text: "r1" }, { text: "r2" }] });
+    // 新格式：带白名单 metric；未知 / 非字符串 metric 丢掉；空文字整条丢掉
+    expect(parseBrief('```json\n{"points":[{"text":"ROE 稳定在 20% 左右","metric":"roe"},{"text":"营收复合 8%","metric":"pe"},"现金充裕",{"text":"  ","metric":"fcf"}],"risks":[{"text":"净负债上升","metric":"netDebt"},{"text":"x","metric":["roe"]}]}\n```'))
+      .toEqual({ points: [{ text: "ROE 稳定在 20% 左右", metric: "roe" }, { text: "营收复合 8%" }, { text: "现金充裕" }], risks: [{ text: "净负债上升", metric: "netDebt" }, { text: "x" }] });
     expect(parseBrief('```json\n{"points":[],"risks":["r"]}\n```')).toBeNull();
     expect(parseBrief("随便聊聊")).toBeNull();
     expect(validateBriefReq(BODY)).toBeNull();
@@ -313,7 +324,7 @@ describe("AI fundamentals brief", () => {
     const r = await SELF.fetch("https://x/api/my/ai/brief", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) });
     expect(r.status).toBe(200);
     const j = await r.json();
-    expect(j.brief).toMatchObject({ points: ["现金流十年为正", "增速放缓到 7%", "净现金"], risks: ["增速放缓"] });
+    expect(j.brief).toMatchObject({ points: [{ text: "现金流十年为正" }, { text: "增速放缓到 7%" }, { text: "净现金" }], risks: [{ text: "增速放缓" }] });
     expect(typeof j.brief.at).toBe("string");
     fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, { choices: [{ message: { content: "随便聊聊" } }] });
     expect((await SELF.fetch("https://x/api/my/ai/brief", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) })).status).toBe(502);

@@ -1,3 +1,5 @@
+import { metricKey } from "../public/shared/metric-spark.js";
+
 // 估值方法白名单（与 public/shared/valuation/* 的 model.key 一致）
 const METHODS = new Set(["fcff", "fcf", "fcfe", "ddm", "pe", "peg", "pb", "ps", "evebitda"]);
 
@@ -8,7 +10,7 @@ function cleanReview(r) {
   if (!r || typeof r !== "object" || !REVIEW_OVERALL.has(r.overall)) return undefined;
   const checks = (Array.isArray(r.checks) ? r.checks : []).slice(0, 40)
     .filter((c) => c && typeof c.k === "string" && REVIEW_STATUS.has(c.status))
-    .map((c) => ({ k: c.k.slice(0, 40), status: c.status, reason: typeof c.reason === "string" ? c.reason.slice(0, 240) : "" }));
+    .map((c) => ({ k: c.k.slice(0, 40), status: c.status, reason: typeof c.reason === "string" ? c.reason.slice(0, 240) : "", ...(metricKey(c.metric) ? { metric: c.metric } : {}) }));
   return { overall: r.overall, summary: typeof r.summary === "string" ? r.summary.slice(0, 400) : "", checks, at: typeof r.at === "string" ? r.at.slice(0, 40) : "" };
 }
 function validateValuations(raw) {

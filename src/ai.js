@@ -2,6 +2,7 @@
 // 不依赖各家的原生 tool calling（Workers AI 开源模型支持参差），统一用「约定格式的 JSON 代码块」，三种协议通用。
 //
 import { encryptJson, decryptJson } from "./crypto.js";
+import { METRICS, METRIC_KEYS, metricKey } from "../public/shared/metric-spark.js";
 
 // 模型服务：用户在设置页配置自己的模型（ai_models 表）、在 AI 面板里切换（见 userAi()）；没选就用站点默认（wrangler.toml [vars] / secret）：
 //   AI_PROVIDER  workers-ai（默认，用 [ai] 绑定，无需 Key）| openai（OpenAI 兼容协议）| anthropic
@@ -253,6 +254,10 @@ export function parsePicks(text, methods) {
   return { reply: (summary || briefOf(reply)).slice(0, 240), picks, business };
 }
 
+// 结论旁的迷你图：模型只能从白名单里挑指标 key，前端用真实财报画图（数字永远不由模型给）
+const METRIC_RULE = "可选带一个 metric：从这份白名单里选这句话正在讲的那个指标，前端会在旁边画出它的历年迷你图供用户核对——"
+  + METRIC_KEYS.map((k) => `${k}（${METRICS[k].zh}）`).join("、")
+  + "。这句话讲的不是其中某个指标（如估值倍数、折现率、行业）就不要带 metric，不要为了配图硬选，也不要编造白名单以外的 key。";
 // ── AI 复核：用最新财报检查一张估值卡当初的假设还成不成立 ──
 const REVIEW_OVERALL = new Set(["hold", "watch", "broken"]), REVIEW_STATUS = new Set(["ok", "watch", "broken"]);
 export function validateReviewReq(body) {
@@ -290,8 +295,9 @@ export function buildReviewPrompt(body, lang) {
     "1. 有「假设对照」的字段，状态必须和对照结果一致：落在两档之间或高于两档（增速、利润率）→ ok；低于两档 → watch 或 broken（差得多才算 broken）；倍数类看当前与自身历史是否支持当初的目标倍数。其余逐项对照关键假设和最新实际数据：增速、利润率、倍数、折现率等是否还说得通。实际表现落在保守与乐观之间或更好 → ok；接近保守下沿或趋势在变差 → watch；明显跌破保守假设、或前提已经变了 → broken。没有对应数据的假设（如折现率、永续增速）只在有明确理由时才评价，不必每项都写。",
     "2. " + GROUNDING + SYNTHESIS + "可以对照分析师目标价区间和当初的合理价区间，差得很远时在总结里点出来。",
     "3. 不给买卖建议，只说假设是否成立、哪里需要调整。",
-    "4. 正文不要罗列，结论全部放进回复最后的 ```json 代码块，格式严格如下：",
-    '```json\n{"overall": "hold|watch|broken", "summary": "两三句话的总体判断（100 字以内）", "checks": [{"k": "字段k", "status": "ok|watch|broken", "reason": "一句话依据，写出最新实际数字和当初的假设，如：近三年营收复合 10.0%，低于保守 12%"}]}\n```',
+    "4. 每项 check " + METRIC_RULE,
+    "5. 正文不要罗列，结论全部放进回复最后的 ```json 代码块，格式严格如下：",
+    '```json\n{"overall": "hold|watch|broken", "summary": "两三句话的总体判断（100 字以内）", "checks": [{"k": "字段k", "status": "ok|watch|broken", "reason": "一句话依据，写出最新实际数字和当初的假设，如：近三年营收复合 10.0%，低于保守 12%", "metric": "revenue"}]}\n```',
   ].join("\n");
 }
 export function parseReview(text, fields) {
@@ -305,7 +311,8 @@ export function parseReview(text, fields) {
   for (const ck of Array.isArray(obj.checks) ? obj.checks : []) {
     if (!ck || !keys.has(ck.k) || seen.has(ck.k) || !REVIEW_STATUS.has(ck.status)) continue;
     seen.add(ck.k);
-    checks.push({ k: ck.k, status: ck.status, reason: typeof ck.reason === "string" ? plain(ck.reason).slice(0, 240) : "" });
+    const metric = metricKey(ck.metric);
+    checks.push({ k: ck.k, status: ck.status, reason: typeof ck.reason === "string" ? plain(ck.reason).slice(0, 240) : "", ...(metric ? { metric } : {}) });
   }
   return { overall: obj.overall, summary: typeof obj.summary === "string" ? plain(obj.summary).slice(0, 400) : "", checks };
 }
@@ -383,8 +390,9 @@ export function buildBriefPrompt(body, lang) {
     "2. 三条要点：分别讲生意质量（盈利能力 / 现金含量）、增长、财务稳健度，每条一句话并带上关键数字；数据里没有的方面换成数据里最突出的特点。",
     "3. 一到两个风险：只写数据里能看出来的（如现金流波动、负债上升、增速放缓、盈利依赖少数年份），不要泛泛而谈行业风险。",
     "4. 不估值、不给买卖建议、不预测股价。",
-    "5. 全部放进回复最后的 ```json 代码块，格式严格如下：",
-    '```json\n{"points": ["要点一", "要点二", "要点三"], "risks": ["风险一"]}\n```',
+    "5. 每条要点和风险" + METRIC_RULE,
+    "6. 全部放进回复最后的 ```json 代码块，格式严格如下：",
+    '```json\n{"points": [{"text": "要点一", "metric": "roe"}, {"text": "要点二", "metric": "revenue"}, {"text": "要点三"}], "risks": [{"text": "风险一", "metric": "netDebt"}]}\n```',
   ].join("\n");
 }
 export function parseBrief(text) {
@@ -393,7 +401,14 @@ export function parseBrief(text) {
   while ((m = re.exec(text))) last = m;
   let obj = null;
   try { obj = JSON.parse(last ? last[1] : text); } catch { return null; }
-  const list = (a, n) => (Array.isArray(a) ? a : []).filter((x) => typeof x === "string" && x.trim()).slice(0, n).map((x) => plain(x).slice(0, 240));
+  // 每条统一成 {text, metric?}；老格式的纯字符串照收，未知 metric 丢掉只留文字
+  const item = (x) => {
+    const t = typeof x === "string" ? x : x && typeof x === "object" && typeof x.text === "string" ? x.text : "";
+    if (!t.trim()) return null;
+    const metric = typeof x === "object" ? metricKey(x.metric) : null;
+    return { text: plain(t).slice(0, 240), ...(metric ? { metric } : {}) };
+  };
+  const list = (a, n) => (Array.isArray(a) ? a : []).map(item).filter(Boolean).slice(0, n);
   const points = list(obj && obj.points, 3), risks = list(obj && obj.risks, 2);
   return points.length ? { points, risks } : null;
 }
