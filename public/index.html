@@ -901,6 +901,11 @@
   .cfg-name{font-size:17px;font-weight:500}
   /* AI 模型设置 */
   .ai-intro{margin:0 0 12px}
+  .ai-default{margin:4px 0 16px}
+  .ai-default-sel{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:38px}
+  .ai-default .ai-default-sel,.ai-default .ai-default-sel:focus{background-repeat:no-repeat;background-position:right 14px center;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a776f' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")}
+  .ai-default-hint{font-size:12px;color:var(--ink-mute)}
   .ai-mlist{display:flex;flex-direction:column;gap:8px}
   .ai-mrow{display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
   .ai-mid{flex:1;min-width:0}
@@ -3254,13 +3259,42 @@ async function initAiSettings() {
       : T(`站点默认每人每天最多 ${lim} 次；你自己的模型用你自己的 Key，不受这个限制。`, `The site default allows ${lim} requests per person per day; your own models use your own key and skip this limit.`)));
     if ((info.siteKey || []).length) body.appendChild(mk("p", "quote-note ai-intro", T(`${info.siteKey.map((m) => m.name).join("、")} 用站点在智谱申请的免费 Key，不占 Cloudflare 额度，同样每人每天最多 ${lim} 次；智谱对免费模型有并发限制，用的人多时可能要稍后重试。`,
       `${info.siteKey.map((m) => m.name).join(", ")} use the site's free Zhipu key — no Cloudflare allowance, still ${lim} requests per person per day; Zhipu limits concurrency on free models, so retry if it's busy.`)));
+    // 默认模型：AI 面板打开时用哪个（和面板顶部的切换是同一个设置，在哪边改都会记住）
+    const defLab = mk("label", "field ai-default");
+    defLab.appendChild(mk("span", "f-lab", T("默认模型", "Default model")));
+    const sel = mk("select", "input ai-default-sel");
+    const addGroup = (label, items) => {
+      if (!items.length) return;
+      const g = document.createElement("optgroup"); g.label = label;
+      for (const [id, name] of items) { const o = document.createElement("option"); o.value = id; o.textContent = name; g.appendChild(o); }
+      sel.appendChild(g);
+    };
+    addGroup(T("站点提供（免配置）", "Provided by the site"), [
+      [info.site.id, T(`站点默认 · ${info.site.name}`, `Site default · ${info.site.name}`)],
+      ...info.workers.filter((w) => !(info.site.provider === "workers-ai" && w.model === info.site.model)).map((w) => [w.id, w.name]),
+      ...(info.siteKey || []).map((m) => [m.id, m.name]),
+    ]);
+    addGroup(T("我的模型", "My models"), info.custom.map((m) => [m.id, m.name]));
+    sel.value = info.active;
+    if (sel.value !== info.active) sel.value = "default"; // 存的那个已经不在了（比如被删）→ 显示站点默认
+    sel.addEventListener("change", async () => {
+      setState("", T("保存中…", "Saving…"));
+      try {
+        const r = await fetch("/api/my/ai/active", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: sel.value }) });
+        if (!r.ok) throw new Error(r.status);
+        info.active = sel.value; setState("ok", T("已保存", "Saved")); draw();
+      } catch { setState("bad", T("保存失败", "Couldn't save")); sel.value = info.active; }
+    });
+    defLab.appendChild(sel);
+    defLab.appendChild(mk("span", "ai-default-hint", T("打开 AI 面板时默认用它；在面板顶部临时切换也会改这里。", "Used whenever the AI panel opens; switching at the top of the panel updates it too.")));
+    body.appendChild(defLab);
     const list = mk("div", "ai-mlist");
     for (const m of info.custom) {
       if (editing === m.id) { list.appendChild(form(m)); continue; }
       const row = mk("div", "ai-mrow");
       const id = mk("div", "ai-mid");
       id.append(mk("div", "ai-mname", m.name), mk("div", "ai-mmeta", `${KIND[m.kind] || m.kind} · ${m.model}${m.baseUrl ? " · " + m.baseUrl.replace(/^https:\/\//, "") : ""} · Key ${m.keyHint || "••••"}`));
-      if (info.active === m.id) id.firstChild.appendChild(mk("span", "ai-inuse", T("使用中", "In use")));
+      if (info.active === m.id) id.firstChild.appendChild(mk("span", "ai-inuse", T("默认", "Default")));
       const edit = mk("button", "btn sm", T("编辑", "Edit")); edit.type = "button"; edit.addEventListener("click", () => { editing = m.id; draw(); });
       const del = mk("button", "btn sm ghost", T("删除", "Delete")); del.type = "button";
       del.addEventListener("click", async () => {
