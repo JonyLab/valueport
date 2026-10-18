@@ -36,7 +36,30 @@ describe("verifiedFacts", () => {
     expect(f).toContain("盈利较稳定");
     expect(f).toContain("连续派息 3 年");
     const en = verifiedFacts({ financials: steady, dividends: null, dps: 0.3, lang: "en" }).join("\n");
-    expect(en).toContain("Pays a dividend of ~0.3");
+    expect(en).toContain("~0.3 per share (no full history)");
+  });
+  it("says DDM doesn't fit a low-payout buyback company like Apple, but fits a high-payout steady payer", () => {
+    // 苹果：EPS 6.1→7.5、净利 ~1000 亿，股数逐年下降；每股股息 ~1 美元，分红率 ~14%、股息率 ~0.4%
+    const apple = {
+      IS: [acct("NetProfit", [[2020, 57.4], [2021, 94.7], [2022, 99.8], [2023, 97.0], [2024, 93.7], [2025, 112.0]]),
+           { field: "EPS", values: [[2025, 7.46], [2024, 6.08], [2023, 6.13], [2022, 6.11], [2021, 5.61], [2020, 3.28]].map(([year, value]) => ({ year, value })) }],
+    };
+    const div = { currency: "USD", years: [2019, 2020, 2021, 2022, 2023, 2024, 2025].map((y, i) => ({ year: y, perShare: 0.75 + i * 0.05 })).concat([{ year: 2099, perShare: 0.27 }]) };
+    const f = verifiedFacts({ financials: apple, dividends: div, dps: 1.05, price: 260, eps: 7.46, lang: "zh" }).join("\n");
+    expect(f).toMatch(/流通股数 2020–2025 减少 \d+%（持续回购）/);
+    expect(f).toContain("股息率约 0.4%");
+    expect(f).toContain("分红率（股息 / 每股收益）约 14%");
+    expect(f).toContain("股息折现（DDM）不适合做主方法");
+    expect(f).not.toContain("2099"); // 当年没派完的不算最近完整年度
+    // 年报 EPS 只在美元派息时用（无行情数据）
+    const f2 = verifiedFacts({ financials: apple, dividends: div, lang: "zh" }).join("\n");
+    expect(f2).toContain("分红率（股息 / 每股收益）约 14%");
+    const hk = verifiedFacts({ financials: apple, dividends: { ...div, currency: "HKD" }, lang: "zh" }).join("\n");
+    expect(hk).not.toContain("分红率（股息"); // 港币派息不和年报 EPS 相除
+    expect(hk).toContain("DDM 只宜作交叉验证");
+    // 高分红稳定派息：分红率 60%、股息率 5%、连续 7 年
+    const utility = verifiedFacts({ financials: null, dividends: div, dps: 1.2, price: 24, eps: 2, lang: "zh" }).join("\n");
+    expect(utility).toContain("股息折现（DDM）可以作为主方法");
   });
   it("copes with no financials", () => {
     expect(verifiedFacts({ financials: null, dividends: null, dps: NaN })).toEqual(["没有查到现金分红记录：视为不分红，不要说它「分红稳定」，也不要推荐股息折现（DDM）"]);

@@ -1,10 +1,10 @@
 /**
  * valuation/facts.js — 从财报算出「已核实的事实」，交给 AI 当判断依据，避免它凭印象编（如把不分红的公司说成「分红稳定」）。
  * 纯函数，浏览器与 node 测试共用。
- * verifiedFacts({ financials, dividends, dps, lang }) → string[]
+ * verifiedFacts({ financials, dividends, dps, price, eps, lang }) → string[]
  *   financials：长桥年报 { IS:[{field, values:[{year, value}]}], BS, CF }（values 最新在前）
  *   dividends：{ years:[{year, perShare}], currency } | null（null 可能是不分红，也可能是没查到）
- *   dps：行情里的每股股利（拿不到为 NaN）
+ *   dps / price / eps：行情里的每股股利、现价、每股收益 TTM（同一报价币种，用来算股息率与分红率；拿不到为 NaN）
  */
 
 function series(financials, kind, field) {
@@ -28,7 +28,7 @@ function cv(vals) {
 }
 const span = (s) => `${s[0].year}–${s[s.length - 1].year}`;
 
-export function verifiedFacts({ financials, dividends, dps, lang = "zh" } = {}) {
+export function verifiedFacts({ financials, dividends, dps, price, eps, lang = "zh" } = {}) {
   const zh = lang !== "en";
   const out = [];
   const REV = series(financials, "IS", "OperatingRevenue");
@@ -84,16 +84,44 @@ export function verifiedFacts({ financials, dividends, dps, lang = "zh" } = {}) 
       : (last.value < 0 ? `Net cash of ${money(-last.value)} at end of ${last.year}` : `Net debt of ${money(last.value)} at end of ${last.year}`));
   }
 
-  // 分红：历史记录与行情每股股利都没有 → 视为不分红（别说「分红稳定」）
+  // 分红：是否派息、派多少（分红率 / 股息率）、是否主要靠回购。分红率低的公司不适合用股息折现做主方法
   const years = dividends && Array.isArray(dividends.years) ? dividends.years.filter((y) => y.perShare > 0) : [];
-  if (years.length) {
+  const cur = dividends && dividends.currency ? " " + dividends.currency : "";
+  // 当年还没派完的不算「最近一年」：取最后一个完整年度
+  const thisYear = new Date().getUTCFullYear();
+  const full = years.filter((y) => y.year < thisYear);
+  const lastFull = full.length ? full[full.length - 1] : years[years.length - 1];
+  // 分红率：优先用行情里同币种的每股股利 / EPS；没有时只在美元派息时用年报 EPS（港股常见年报人民币、派息港币，直接相除会错）
+  let payout = NaN, yieldPct = NaN;
+  if (Number.isFinite(dps) && dps > 0 && Number.isFinite(eps) && eps > 0) payout = dps / eps * 100;
+  else if (lastFull && dividends && dividends.currency === "USD") {
+    const e = series(financials, "IS", "EPS").find((x) => x.year === lastFull.year);
+    if (e && e.value > 0) payout = lastFull.perShare / e.value * 100;
+  }
+  if (Number.isFinite(dps) && dps > 0 && Number.isFinite(price) && price > 0) yieldPct = dps / price * 100;
+  // 回购：流通股数 ≈ 净利润 / EPS（同一份年报，币种一致）
+  const EPS = series(financials, "IS", "EPS");
+  const SH = NI.map((x) => { const e = EPS.find((y) => y.year === x.year); return e && e.value > 0 && x.value > 0 ? { year: x.year, value: x.value / e.value } : null; }).filter(Boolean);
+  if (SH.length >= 4) {
+    const a = SH[Math.max(0, SH.length - 6)], b = SH[SH.length - 1], d = (b.value / a.value - 1) * 100;
+    if (Math.abs(d) >= 3) out.push(zh ? `流通股数 ${a.year}–${b.year} ${d < 0 ? "减少" : "增加"} ${Math.abs(d).toFixed(0)}%（${d < 0 ? "持续回购" : "有增发稀释"}）` : `Share count ${d < 0 ? "fell" : "rose"} ${Math.abs(d).toFixed(0)}% over ${a.year}–${b.year} (${d < 0 ? "buybacks" : "dilution"})`);
+  }
+  if (years.length || (Number.isFinite(dps) && dps > 0)) {
     let streak = 0, prev = null;
-    for (let i = years.length - 1; i >= 0; i--) { if (prev === null || years[i].year === prev - 1) { streak++; prev = years[i].year; } else break; }
-    const lastY = years[years.length - 1];
-    out.push(zh ? `有现金分红记录：最近 ${lastY.year} 年每股 ${lastY.perShare}${dividends.currency ? " " + dividends.currency : ""}，连续派息 ${streak} 年`
-      : `Pays cash dividends: ${lastY.perShare}${dividends.currency ? " " + dividends.currency : ""} per share in ${lastY.year}, ${streak} consecutive years`);
-  } else if (Number.isFinite(dps) && dps > 0) {
-    out.push(zh ? `有现金分红：最近每股股利约 ${dps}（没有完整历史，无法判断是否稳定）` : `Pays a dividend of ~${dps} per share (no full history, so stability is unknown)`);
+    for (let i = full.length - 1; i >= 0; i--) { if (prev === null || full[i].year === prev - 1) { streak++; prev = full[i].year; } else break; }
+    const parts = [];
+    if (lastFull) parts.push(zh ? `最近完整年度 ${lastFull.year} 每股 ${lastFull.perShare}${cur}` : `${lastFull.perShare}${cur} per share in ${lastFull.year}`);
+    else if (Number.isFinite(dps)) parts.push(zh ? `每股股利约 ${dps}（没有完整历史）` : `~${dps} per share (no full history)`);
+    if (streak) parts.push(zh ? `连续派息 ${streak} 年` : `${streak} consecutive years`);
+    if (Number.isFinite(yieldPct)) parts.push(zh ? `股息率约 ${yieldPct.toFixed(1)}%` : `yield ~${yieldPct.toFixed(1)}%`);
+    if (Number.isFinite(payout)) parts.push(zh ? `分红率（股息 / 每股收益）约 ${payout.toFixed(0)}%` : `payout ratio ~${payout.toFixed(0)}%`);
+    const low = (Number.isFinite(payout) && payout < 30) || (Number.isFinite(yieldPct) && yieldPct < 1.5);
+    const core = Number.isFinite(payout) && payout >= 40 && streak >= 5 && !(Number.isFinite(yieldPct) && yieldPct < 2);
+    const verdict = low
+      ? (zh ? "判断：分红只占盈利的一小部分，股东回报主要靠回购或再投资，股息折现（DDM）不适合做主方法，最多作参考" : "Verdict: dividends are a small share of earnings — returns come mainly from buybacks or reinvestment, so DDM is not suitable as the primary method")
+      : core ? (zh ? "判断：分红是股东回报的主要方式且长期稳定，股息折现（DDM）可以作为主方法" : "Verdict: dividends are the main, long-running form of shareholder return, so DDM can be a primary method")
+      : (zh ? "判断：有分红，但分红率 / 股息率不足以说明分红是主要回报方式，DDM 只宜作交叉验证" : "Verdict: pays dividends, but not enough to make DDM the primary method; use it only as a cross-check");
+    out.push((zh ? "有现金分红：" : "Pays cash dividends: ") + parts.join(zh ? "，" : ", ") + (zh ? "。" : ". ") + verdict);
   } else {
     out.push(zh ? "没有查到现金分红记录：视为不分红，不要说它「分红稳定」，也不要推荐股息折现（DDM）" : "No cash dividend record found: treat it as a non-payer; do not call its dividends stable or recommend DDM");
   }

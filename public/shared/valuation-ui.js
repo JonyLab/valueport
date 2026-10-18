@@ -161,7 +161,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   if (!stock || !stock.name) pickAi.hidden = true;
   pickHead.append(pickTop, pickSub, pickWarn, pickAi);
   let aiPicks = [];
-  const aiPickKey = () => "ai_method_v2_" + ((stock && stock.code) || "") + "_" + lang;
+  const aiPickKey = () => "ai_method_v3_" + ((stock && stock.code) || "") + "_" + lang;
   function applyPicks() {
     methodBar.querySelectorAll(".vc-pcard").forEach((b) => {
       b.classList.remove("ai-pick", "ai-primary");
@@ -1239,7 +1239,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   }
   // 已核实的事实：由财报算出（现金流 / 盈利是否稳定、负值年份、是否分红等），提示词要求 AI 以此为准、不得凭印象编
   function aiVerified() {
-    try { return verifiedFacts({ financials: refData && refData.financials, dividends: refData && refData.dividends, dps: ctx.dividendYield, lang }); } catch { return []; }
+    try { return verifiedFacts({ financials: refData && refData.financials, dividends: refData && refData.dividends, dps: ctx.dividendYield, price: ctx.price, eps: ctx.epsTtm, lang }); } catch { return []; }
   }
   function aiContext() {
     const model = MODELS[activeIdx]; if (!model) return null;
