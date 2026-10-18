@@ -262,9 +262,12 @@
   /* 建议行：紧贴在它的标的行下面（上移 4px 吃掉行间距），两行拼成一个圆角色块 */
   .pf-table tr.has-sugg td:first-child{border-bottom-left-radius:0} .pf-table tr.has-sugg td:last-child{border-bottom-right-radius:0}
   .pf-table tr.has-sugg td{padding-bottom:4px}
-  .pf-table tr.pf-sugg td{position:relative;top:-4px;padding:0 14px 11px;text-align:left;white-space:normal;border-radius:0 0 var(--r-md) var(--r-md)}
-  .pf-sugg-line{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .pf-table tr.pf-sugg td{position:relative;top:-4px;padding:2px 10px 10px;text-align:left;white-space:normal;border-radius:0 0 var(--r-md) var(--r-md)}
+  /* 建议区：行内再嵌一块浅色底，和标的行区分开；减仓偏橙、加仓偏蓝 */
+  .pf-sugg-line{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:7px 12px;border-radius:var(--r-xs);background:rgba(29,29,27,.045)}
   .pf-sugg-line > i{font-size:14px;color:var(--ink-mute);align-self:center}
+  .pf-sugg-line.down{background:rgba(240,140,46,.10)} .pf-sugg-line.down > i{color:#a4561a}
+  .pf-sugg-line.up{background:rgba(58,115,238,.08)} .pf-sugg-line.up > i{color:#2c5bc4}
   .pf-sugg-line .pf-tgt-say{display:inline}
   .pf-sugg-line .pf-tgt-how{display:inline;margin:0}
   .pf-tgt-say{display:block;font-size:12.5px;line-height:1.45;color:var(--ink)}
@@ -826,8 +829,9 @@ function holdingsCard(sAll) {
     const key = isCash ? (p.status === "under" ? "cashLow" : p.status === "over" ? "cashHigh" : "ok") : p.action;
     const sr = el("tr", "pf-sugg " + tr.className);
     const td = el("td"); td.colSpan = cols.length;
-    const line = el("div", "pf-sugg-line");
-    line.append(ri(key === "trimHot" || key === "trim" || key === "cashHigh" ? "arrow-down-circle-line" : key === "addCheap" || key === "add" || key === "build" || key === "buildCheap" || key === "cashLow" ? "arrow-up-circle-line" : "pause-circle-line"),
+    const dir = key === "trimHot" || key === "trim" || key === "cashHigh" ? "down" : key === "addCheap" || key === "add" || key === "build" || key === "buildCheap" || key === "cashLow" ? "up" : "hold";
+    const line = el("div", "pf-sugg-line " + dir);
+    line.append(ri(dir === "down" ? "arrow-down-circle-line" : dir === "up" ? "arrow-up-circle-line" : "pause-circle-line"),
       el("span", "pf-tgt-say " + key, DRIFT_TEXT[key]));
     const how = tradeText(p, isCash); if (how) line.append(el("span", "pf-tgt-how", how));
     td.appendChild(line); sr.appendChild(td);
