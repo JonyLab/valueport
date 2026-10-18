@@ -37,7 +37,8 @@
   .mc-ind-k i{color:var(--ink-mute);font-size:13px;cursor:help}
   .mc-ind-v{font-size:14px;font-variant-numeric:tabular-nums;text-align:right}
   .mc-pbar{grid-column:1 / -1;position:relative;display:flex;gap:2px;height:6px;margin-top:3px}
-  .mc-pbar span{border-radius:var(--r-pill);opacity:.28}
+  .mc-pbar span{border-radius:var(--r-pill);opacity:.22}
+  .mc-pbar span.on{opacity:1}
   .mc-pbar b{position:absolute;top:-3px;width:3px;height:12px;margin-left:-1.5px;border-radius:2px;background:var(--ink)}
   .mc-ind-note{grid-column:1 / -1;font-size:11.5px;color:var(--ink-mute)}
   .mc-pending{flex:1;display:flex;align-items:center;justify-content:center;min-height:220px;padding:20px;border-radius:var(--r-md);text-align:center;
@@ -215,7 +216,8 @@ function renderMarkets(d) {
       row.append(k, el("span", "mc-ind-v", `${x.value}${x.unit === "%" ? "%" : x.unit === "pp" ? " pp" : ""}`));
       // 五段条：位置 = 「贵的程度」分位（风险溢价类已反向）
       const bar = el("div", "mc-pbar");
-      for (const [w, z] of [[10, 0], [20, 1], [40, 2], [20, 3], [10, 4]]) { const sgm = el("span"); sgm.style.flex = String(w); sgm.style.background = ZONES[z].hex; bar.appendChild(sgm); }
+      const curZone = x.expensive < 10 ? 0 : x.expensive < 30 ? 1 : x.expensive < 70 ? 2 : x.expensive < 90 ? 3 : 4;
+      for (const [w, z] of [[10, 0], [20, 1], [40, 2], [20, 3], [10, 4]]) { const sgm = el("span", z === curZone ? "on" : ""); sgm.style.flex = String(w); sgm.style.background = ZONES[z].hex; bar.appendChild(sgm); } // 当前所在区间实色，其余淡
       const mark = el("b"); mark.style.left = x.expensive + "%"; bar.appendChild(mark);
       row.append(bar, el("span", "mc-ind-note", T(`${x.since.slice(0, 4)} 年至今的 ${x.pct} 分位${x.cheapHigh ? "（越低越贵）" : ""} · ${x.date}`, `${x.pct}th percentile since ${x.since.slice(0, 4)}${x.cheapHigh ? " (lower = pricier)" : ""} · ${x.date}`)));
       inds.appendChild(row);
