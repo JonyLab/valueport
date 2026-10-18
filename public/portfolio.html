@@ -576,8 +576,8 @@ let curveRange = "ALL", curveAcc = 0; // 0 = 全部账户合计
 function curveSection() {
   const c = el("div", "pf-curve-sec");
   const head = el("div", "pf-cardhead pf-curve-head");
-  const titles = el("div", "pf-curve-titles"); titles.appendChild(el("span", "pf-subhead", T("资产曲线", "Asset curve")));
-  head.appendChild(titles);
+  // 一行：左边切换（账户 / 区间），右边区间涨跌与日期；不再单独写「资产曲线」标题
+  const titles = el("div", "pf-curve-titles");
   const ctl = el("div", "pf-curve-ctl");
   const seg = (opts, cur, onPick) => {
     const box = el("div", "pf-seg");
@@ -586,7 +586,7 @@ function curveSection() {
   };
   if (data.accounts.length > 1) ctl.appendChild(seg([[0, T("合计", "Total")], ...data.accounts.map((a) => [a.id, a.name])], curveAcc, (k) => { curveAcc = k; }));
   ctl.appendChild(seg(CURVE_RANGES.map(([k]) => [k, k === "ALL" ? T("全部", "All") : k]), curveRange, (k) => { curveRange = k; }));
-  head.appendChild(ctl);
+  head.append(ctl, titles);
   c.appendChild(head);
   const days = (CURVE_RANGES.find(([k]) => k === curveRange) || [0, 0])[1];
   const since = days ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) : "";
@@ -602,7 +602,7 @@ function curveSection() {
   }
   const v0 = pts[0][1], v1 = pts[pts.length - 1][1], ch = v1 - v0;
   const sum = el("div", "pf-curve-sum " + (ch > 0 ? "up" : ch < 0 ? "down" : ""), `${hideAmt ? "" : signed(ch) + " "}(${pct(v0 ? ch / v0 * 100 : NaN, 2)}) · ${pts[0][0]} – ${pts[pts.length - 1][0]}`);
-  titles.appendChild(sum); // 区间涨跌挂在「资产曲线」标题后面，省一行
+  titles.appendChild(sum); // 区间涨跌与日期放在切换的右侧
   const W = 1000, H = 190, PL = 4, PR = hideAmt ? 8 : 74, PT = 14, PB = 26;
   let lo = Math.min(...pts.map((p) => p[1])), hi = Math.max(...pts.map((p) => p[1]));
   const pad = (hi - lo) * 0.12 || hi * 0.02 || 1; lo -= pad; hi += pad;
