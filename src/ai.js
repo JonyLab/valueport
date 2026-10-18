@@ -75,6 +75,16 @@ function verifiedBlock(v) {
   if (!Array.isArray(v) || !v.length) return [];
   return ["", "已核实的事实（系统根据财报计算，以此为准）：", ...v.map((x) => "- " + x)];
 }
+// 界面不渲染 Markdown：去掉 **粗体**、__粗体__、`代码`、行首 # 标题
+export const plain = (t) => String(t || "").replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1").replace(/`([^`]+)`/g, "$1").replace(/^#{1,6}\s+/gm, "").trim();
+// 市场投研（分析师评级 / 目标价 / 一致预期）与大师方法视角（格雷厄姆 / 林奇 / 巴菲特式指标），都由前端按数据算好
+function viewsBlock(market, lenses) {
+  const out = [];
+  if (Array.isArray(market) && market.length) out.push("", "市场投研（来自长桥：分析师评级、目标价、一致预期）：", ...market.map((x) => "- " + x));
+  if (Array.isArray(lenses) && lenses.length) out.push("", "大师方法视角（系统按公开方法论计算）：", ...lenses.map((x) => "- " + x));
+  return out;
+}
+const SYNTHESIS = "综合三方面判断：基本面事实、市场投研、大师方法视角；它们不一致时说清你更看重哪一方、为什么（例如分析师看多但大师指标显示偏贵）。不要声称某位大师本人对这只股票说过什么或怎么估值，只能说「按 X 的方法看」。";
 const GROUNDING = "凡是涉及现金流 / 盈利是否稳定、是否分红、增长快慢、负债多少的判断，都必须与「已核实的事实」一致；事实里没有的不要断言，不要编造任何数字或经营情况。";
 export function validateChat(body) {
   if (!body || typeof body !== "object") return "bad body";
@@ -132,10 +142,10 @@ export function parseSuggestion(text, fields) {
   const re = /```(?:json)?\s*([\s\S]*?)```/gi;
   let m, last = null;
   while ((m = re.exec(text))) last = m;
-  if (!last) return { reply: text.trim(), params: null, reasons: null };
+  if (!last) return { reply: plain(text), params: null, reasons: null };
   let obj = null;
-  try { obj = JSON.parse(last[1]); } catch { return { reply: text.trim(), params: null, reasons: null }; }
-  const reply = (text.slice(0, last.index) + text.slice(last.index + last[0].length)).trim();
+  try { obj = JSON.parse(last[1]); } catch { return { reply: plain(text), params: null, reasons: null }; }
+  const reply = plain(text.slice(0, last.index) + text.slice(last.index + last[0].length));
   const raw = obj && typeof obj === "object" ? (obj.params && typeof obj.params === "object" ? obj.params : obj) : null;
   if (!raw) return { reply, params: null, reasons: null };
   const byKey = new Map(fields.map((f) => [f.k, f]));
@@ -166,12 +176,12 @@ export function validateMethodReq(body) {
   if (!stock || typeof stock !== "object" || typeof stock.name !== "string") return "stock required";
   if (!Array.isArray(methods) || !methods.length || methods.length > 30) return "methods required";
   for (const m of methods) if (!m || typeof m.key !== "string" || typeof m.title !== "string") return "bad method";
-  if (badVerified(body.verified)) return "bad verified facts";
+  if (badVerified(body.verified) || badVerified(body.market) || badVerified(body.lenses)) return "bad verified facts";
   if (JSON.stringify(body).length > 20000) return "body too large";
   return null;
 }
 export function buildMethodPrompt(body, lang) {
-  const { stock, facts, methods, verified } = body;
+  const { stock, facts, methods, verified, market, lenses } = body;
   const zh = lang !== "en";
   const factLines = facts && typeof facts === "object"
     ? Object.entries(facts).filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k, v]) => `- ${k}: ${v}`).join("\n") : "";
@@ -182,6 +192,7 @@ export function buildMethodPrompt(body, lang) {
     `标的：${stock.name}（${stock.code || ""}）　币种：${stock.currency || "未知"}　现价：${stock.price || "未知"}`,
     "已知数据：", factLines || "（无）",
     ...verifiedBlock(verified),
+    ...viewsBlock(market, lenses),
     "",
     "可选方法（key｜名称｜适用场景）：",
     methods.map((m) => `- ${m.key}｜${m.title}｜${m.subtitle || ""}`).join("\n"),
@@ -189,8 +200,8 @@ export function buildMethodPrompt(body, lang) {
     "规则：",
     "1. 推荐 1 个首选方法 + 1~2 个用来交叉验证的方法，只能从上面的 key 里选。",
     "2. 依据公司实际情况：银行保险等看账面价值；股息折现（DDM）只在分红是主要回报方式时才作主方法（分红率约 40% 以上、股息率不低、长期稳定派息）——分红率低、主要靠回购或再投资的公司（多数科技成长股）不要首选 DDM，以「已核实的事实」里的分红判断为准；现金流各年为正且稳定可预测才首选现金流折现；自由现金流有负值年份或大幅波动时，优先用盈利倍数（多业务公司可用 P/E 的「分业务」口径，按业务分别估）或市销率，现金流折现最多作交叉验证；尚未盈利的成长股用市销率；最近三年都盈利的公司不要首选市销率（盈利有波动就用 P/E 并说明取哪年口径）；资源类看资产重估。",
-    "3. " + GROUNDING,
-    zh ? "4. 正文用两三句话讲清这家公司的特点和选择依据（120 字以内），引用一两条已核实的事实作依据，不要逐项罗列方法。" : "4. Keep the prose to two or three sentences (under 70 words): what kind of company this is and why the primary method fits, citing one or two verified facts. Don't walk through every method.",
+    "3. " + GROUNDING + SYNTHESIS + "大师视角里某个指标「不满足」不等于方法不能用，要结合公司类型解释。",
+    zh ? "4. 正文用两三句话讲清这家公司的特点和选择依据（120 字以内），引用一两条已核实的事实作依据，不要逐项罗列方法；提到方法时用上面的方法名称（如「DCF 自由现金流」），不要写 key。" : "4. Keep the prose to two or three sentences (under 70 words): what kind of company this is and why the primary method fits, citing one or two verified facts. Don't walk through every method; refer to methods by their names (e.g. "DCF free cash flow"), never by key.",
     "5. 回复最后附一个 ```json 代码块，格式严格如下：",
     '```json\n{"picks": [{"key": "方法key", "role": "primary", "reason": "一句话理由"}, {"key": "方法key", "role": "check", "reason": "一句话理由"}]}\n```',
   ].join("\n");
@@ -199,15 +210,15 @@ export function parsePicks(text, methods) {
   const re = /```(?:json)?\s*([\s\S]*?)```/gi;
   let m, last = null;
   while ((m = re.exec(text))) last = m;
-  if (!last) return { reply: text.trim(), picks: [] };
-  const reply = (text.slice(0, last.index) + text.slice(last.index + last[0].length)).trim();
+  if (!last) return { reply: plain(text), picks: [] };
+  const reply = plain(text.slice(0, last.index) + text.slice(last.index + last[0].length));
   let obj = null; try { obj = JSON.parse(last[1]); } catch { return { reply, picks: [] }; }
   const keys = new Set(methods.map((x) => x.key));
   const seen = new Set(), picks = [];
   for (const p of (obj && Array.isArray(obj.picks) ? obj.picks : [])) {
     if (!p || !keys.has(p.key) || seen.has(p.key)) continue;
     seen.add(p.key);
-    picks.push({ key: p.key, role: picks.length ? "check" : "primary", reason: typeof p.reason === "string" ? p.reason.slice(0, 200) : "" });
+    picks.push({ key: p.key, role: picks.length ? "check" : "primary", reason: typeof p.reason === "string" ? plain(p.reason).slice(0, 200) : "" });
     if (picks.length >= 3) break;
   }
   return { reply, picks };
@@ -223,12 +234,12 @@ export function validateReviewReq(body) {
   if (!Array.isArray(fields) || !fields.length || fields.length > 40) return "fields required";
   for (const f of fields) if (!f || typeof f.k !== "string" || (f.col !== "single" && f.col !== "dual")) return "bad field";
   if (!result || !Number.isFinite(Number(result.low)) || !Number.isFinite(Number(result.high))) return "result required";
-  if (badVerified(body.verified) || badVerified(body.metrics) || badVerified(body.comparisons)) return "bad facts";
+  if (badVerified(body.verified) || badVerified(body.metrics) || badVerified(body.comparisons) || badVerified(body.market) || badVerified(body.lenses)) return "bad facts";
   if (JSON.stringify(body).length > 20000) return "body too large";
   return null;
 }
 export function buildReviewPrompt(body, lang) {
-  const { stock, method, fields, result, valuedAt, verified, metrics, comparisons } = body;
+  const { stock, method, fields, result, valuedAt, verified, metrics, comparisons, market, lenses } = body;
   const zh = lang !== "en";
   const fieldLines = fields.map((f) => `- ${f.k}｜${f.label || f.k}｜${f.unit === "%" ? "百分数" : f.money ? "金额" : (f.unit || "数字")}｜当初填的：${fmtVal(f.value)}`).join("\n");
   return [
@@ -242,11 +253,12 @@ export function buildReviewPrompt(body, lang) {
     fieldLines,
     ...verifiedBlock(verified),
     ...(Array.isArray(metrics) && metrics.length ? ["", "最新实际数据（系统根据财报计算，以此为准）：", ...metrics.map((x) => "- " + x)] : []),
+    ...viewsBlock(market, lenses),
     ...(Array.isArray(comparisons) && comparisons.length ? ["", "假设对照（系统已把最新实际值和两档假设比好，以此为准，不要自己重新比较数字）：", ...comparisons.map((x) => "- " + x)] : []),
     "",
     "规则：",
     "1. 有「假设对照」的字段，状态必须和对照结果一致：落在两档之间或高于两档（增速、利润率）→ ok；低于两档 → watch 或 broken（差得多才算 broken）；倍数类看当前与自身历史是否支持当初的目标倍数。其余逐项对照关键假设和最新实际数据：增速、利润率、倍数、折现率等是否还说得通。实际表现落在保守与乐观之间或更好 → ok；接近保守下沿或趋势在变差 → watch；明显跌破保守假设、或前提已经变了 → broken。没有对应数据的假设（如折现率、永续增速）只在有明确理由时才评价，不必每项都写。",
-    "2. " + GROUNDING,
+    "2. " + GROUNDING + SYNTHESIS + "可以对照分析师目标价区间和当初的合理价区间，差得很远时在总结里点出来。",
     "3. 不给买卖建议，只说假设是否成立、哪里需要调整。",
     "4. 正文不要罗列，结论全部放进回复最后的 ```json 代码块，格式严格如下：",
     '```json\n{"overall": "hold|watch|broken", "summary": "两三句话的总体判断（100 字以内）", "checks": [{"k": "字段k", "status": "ok|watch|broken", "reason": "一句话依据，写出最新实际数字和当初的假设，如：近三年营收复合 10.0%，低于保守 12%"}]}\n```',
@@ -263,9 +275,9 @@ export function parseReview(text, fields) {
   for (const ck of Array.isArray(obj.checks) ? obj.checks : []) {
     if (!ck || !keys.has(ck.k) || seen.has(ck.k) || !REVIEW_STATUS.has(ck.status)) continue;
     seen.add(ck.k);
-    checks.push({ k: ck.k, status: ck.status, reason: typeof ck.reason === "string" ? ck.reason.slice(0, 240) : "" });
+    checks.push({ k: ck.k, status: ck.status, reason: typeof ck.reason === "string" ? plain(ck.reason).slice(0, 240) : "" });
   }
-  return { overall: obj.overall, summary: typeof obj.summary === "string" ? obj.summary.slice(0, 400) : "", checks };
+  return { overall: obj.overall, summary: typeof obj.summary === "string" ? plain(obj.summary).slice(0, 400) : "", checks };
 }
 
 // ── 用户的模型：设置页只管「配置了哪些」（ai_models 表，可多条），AI 面板里切「用哪个」（settings 内部键 _ai_active）──

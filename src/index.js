@@ -12,6 +12,7 @@ import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
 import { registerPortfolio } from "./portfolio.js";
 import { registerAi } from "./ai.js";
+import { registerResearch } from "./research.js";
 import { registerMacro, refreshIfStale } from "./macro.js";
 import { fetchLongbridgeAssets } from "./brokers/longbridge-assets.js";
 import { fetchIbkrFlex } from "./brokers/ibkr-flex.js";
@@ -218,6 +219,7 @@ app.use("/api/my/*", async (c, next) => {
 
 /* ---------- Portfolio（券商账户 / 持仓汇总，按 uid 隔离，见 src/portfolio.js） ---------- */
 registerAi(app);
+registerResearch(app); // 分析师评级 / 目标价 / 一致预期（公开，按标的缓存 6 小时）
 registerMacro(app);
 const portfolio = registerPortfolio(app, {
   adapters: { longbridge: (cr) => fetchLongbridgeAssets(cr), ibkr: (cr) => fetchIbkrFlex(cr), csv: (text) => parseHoldingsCsv(text) },

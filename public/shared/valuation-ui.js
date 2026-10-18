@@ -15,7 +15,7 @@ import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
 import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
 import { mountAiPanel } from "/shared/ai-panel.js";
-import { verifiedFacts } from "/shared/valuation/facts.js";
+import { verifiedFacts, marketViews, masterLenses } from "/shared/valuation/facts.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -161,7 +161,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   if (!stock || !stock.name) pickAi.hidden = true;
   pickHead.append(pickTop, pickSub, pickWarn, pickAi);
   let aiPicks = [];
-  const aiPickKey = () => "ai_method_v3_" + ((stock && stock.code) || "") + "_" + lang;
+  const aiPickKey = () => "ai_method_v4_" + ((stock && stock.code) || "") + "_" + lang;
   function applyPicks() {
     methodBar.querySelectorAll(".vc-pcard").forEach((b) => {
       b.classList.remove("ai-pick", "ai-primary");
@@ -185,6 +185,29 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const lab = el("div", "vc-picker-ailab"); lab.textContent = lang === "zh" ? "AI 建议" : "AI suggestion";
     const txt = el("div", "vc-picker-aitxt"); txt.textContent = r.reply || "";
     body.append(lab, txt);
+    // 推荐的方法直接给按钮：首选在前（暖黄），交叉验证在后；点了等同于点对应的方法卡
+    if (aiPicks.length) {
+      const row = el("div", "vc-picker-aipicks");
+      aiPicks.forEach((p) => {
+        const idx = MODELS.findIndex((m) => m.key === p.key); if (idx < 0) return;
+        const meta = methodMenuMeta(MODELS[idx]);
+        const b = el("button", "vc-picker-aipick" + (p.role === "primary" ? " primary" : ""), { type: "button" });
+        b.append(el("span", "vc-picker-aipick-role"), document.createTextNode(textFor(meta && meta.title, lang, modelTitle(MODELS[idx], lang))), ri("arrow-right-line"));
+        b.firstChild.textContent = p.role === "primary" ? (lang === "zh" ? "首选" : "Primary") : (lang === "zh" ? "交叉验证" : "Cross-check");
+        if (p.reason) b.title = p.reason;
+        b.addEventListener("click", () => { const card = methodBar.querySelector(`.vc-pcard[data-idx="${idx}"]`); if (card) card.click(); });
+        row.appendChild(b);
+      });
+      body.appendChild(row);
+    }
+    // 参考依据：市场投研 + 大师方法视角（折叠，点开看）
+    const refs = [...(r.market || []), ...(r.lenses || [])];
+    if (refs.length) {
+      const det = el("details", "vc-picker-refs");
+      const sm = el("summary"); sm.textContent = lang === "zh" ? `参考依据：市场投研与大师方法视角（${refs.length} 条）` : `Basis: market research and master lenses (${refs.length})`;
+      const ul = el("ul"); refs.forEach((x) => { const li = el("li"); li.textContent = x; ul.appendChild(li); });
+      det.append(sm, ul); body.appendChild(det);
+    }
     pickAiOut.replaceChildren(badge, body);
     pickAiOut.className = "vc-picker-aiout" + (r.reply ? " on" : "");
     pickAiBtn.hidden = true;
@@ -195,13 +218,15 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     pickAiBtn.disabled = true;
     pickAiBtn.replaceChildren(ri("loader-4-line"), document.createTextNode(lang === "zh" ? "AI 正在分析这家公司…" : "Analysing the company…"));
     pickAiBtn.classList.add("busy");
+    const views = await aiViews();
     const methods = METHOD_MENU_GROUPS.flatMap((g) => g.methods).filter((m) => MODELS.some((x) => x.key === m.key))
       .map((m) => ({ key: m.key, title: textFor(m.title, lang, m.key), subtitle: textFor(m.subtitle, lang, "") }));
     try {
       const res = await fetch("/api/my/ai/method", { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), verified: aiVerified(), methods }) });
+        body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), verified: aiVerified(), ...views, methods }) });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(res.status === 429 ? (lang === "zh" ? "今天的 AI 次数已用完" : "Daily AI limit reached") : (j.detail || j.error || res.status));
+      Object.assign(j, views);
       showAiResult(j);
       try { sessionStorage.setItem(aiPickKey(), JSON.stringify(j)); } catch { /* 存不下就算了 */ }
     } catch (e) {
@@ -1223,6 +1248,18 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const fin = refData && refData.financials;
     const a = fin && fin[kind] && fin[kind].find((x) => x.field === field);
     return a && Array.isArray(a.values) ? a.values.slice(0, 6).filter((x) => Number.isFinite(x.value)).map((x) => `${x.year}: ${fmtMoney(x.value)}`).join(", ") : null;
+  }
+  // 市场投研（/api/research，服务端缓存 6 小时）+ 大师方法视角；拿不到就只用基本面
+  async function aiViews() {
+    const sym = stock && stock.symbol;
+    let research = null;
+    if (sym) { try { research = (await fetch("/api/research?symbol=" + encodeURIComponent(sym)).then((r) => r.json())).research; } catch { research = null; } }
+    try {
+      return {
+        market: marketViews({ research, financials: refData && refData.financials, price: ctx.price, market: sym ? sym.slice(0, 2) : "", lang }),
+        lenses: masterLenses({ financials: refData && refData.financials, research, price: ctx.price, eps: ctx.epsTtm, bps: ctx.bps, lang }),
+      };
+    } catch { return { market: [], lenses: [] }; }
   }
   function aiStock() {
     return { name: (stock && stock.name) || "", code: (stock && stock.code) || "", currency: (stock && stock.currency) || "", price: finiteOr(ctx.price) };

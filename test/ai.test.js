@@ -247,3 +247,18 @@ describe("per-user AI models", () => {
     expect((await (await R(ck, "GET", "/api/my/ai/models")).json()).custom).toEqual([]); // 测试不会保存
   });
 });
+
+describe("market research and master lenses in prompts", () => {
+  it("adds both blocks and the synthesis rule, and strips markdown from replies", async () => {
+    const { buildMethodPrompt, buildReviewPrompt, parsePicks, plain } = await import("../src/ai.js");
+    const market = ["分析师评级（46 家）：看多 25"], lenses = ["按林奇的方法：PEG = 1.63"];
+    const mp = buildMethodPrompt({ stock: { name: "苹果" }, methods: METHODS, market, lenses }, "zh");
+    expect(mp).toContain("市场投研（来自长桥");
+    expect(mp).toContain("大师方法视角");
+    expect(mp).toContain("不要声称某位大师本人");
+    const rp = buildReviewPrompt({ stock: { name: "苹果" }, method: { key: "pe" }, fields: [{ k: "g", col: "single", value: 1 }], result: { low: 1, high: 2 }, market, lenses }, "zh");
+    expect(rp).toContain("分析师评级（46 家）");
+    expect(plain("用 **DCF** 做主方法，`pe` 交叉验证")).toBe("用 DCF 做主方法，pe 交叉验证");
+    expect(parsePicks('首选 **fcf**。\n```json\n{"picks":[{"key":"pb","reason":"**账面**"}]}\n```', METHODS)).toEqual({ reply: "首选 fcf。", picks: [{ key: "pb", role: "primary", reason: "账面" }] });
+  });
+});

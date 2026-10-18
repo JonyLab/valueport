@@ -241,3 +241,91 @@ export function assumptionChecks({ fields, financials, financialsQ, valuationRef
   }
   return out;
 }
+
+/**
+ * marketViews({ research, financials, price, market, lang }) → string[]
+ * 市场投研：分析师评级分布、目标价区间（与目标价同币种的昨收比）、一致预期 EPS（与年报 EPS 同为报告币种，算增速）。
+ * research 来自 /api/research：{ rating:{buy,over,hold,under,sell,total,targetHigh,targetLow,prevClose,industry}, forecastEps:{median,mean,low,high} }
+ * market："us" 时价格与报表同为美元，才算远期市盈率。
+ */
+export function marketViews({ research, financials, price, market, lang = "zh" } = {}) {
+  const zh = lang !== "en";
+  const out = [];
+  const r = research && research.rating, f = research && research.forecastEps;
+  if (r && r.total > 0) {
+    const bull = r.buy + r.over, bear = r.under + r.sell;
+    let line = zh ? `分析师评级（${r.total} 家）：看多 ${bull}（买入 ${r.buy}、增持 ${r.over}），中性 ${r.hold}，看空 ${bear}（看多占 ${Math.round(bull / r.total * 100)}%）`
+      : `Analyst ratings (${r.total}): ${bull} bullish (${r.buy} buy, ${r.over} overweight), ${r.hold} hold, ${bear} bearish (${Math.round(bull / r.total * 100)}% bullish)`;
+    if (Number.isFinite(r.targetHigh) && Number.isFinite(r.targetLow) && r.targetHigh > 0) {
+      const mid = (r.targetHigh + r.targetLow) / 2, ref = Number.isFinite(r.prevClose) && r.prevClose > 0 ? r.prevClose : price;
+      const vs = ref > 0 ? (mid / ref - 1) * 100 : NaN;
+      line += zh ? `；目标价 ${r.targetLow}–${r.targetHigh}，中值 ${mid.toFixed(2)}` + (Number.isFinite(vs) ? `（较现价 ${vs >= 0 ? "+" : ""}${vs.toFixed(1)}%）` : "")
+        : `; target range ${r.targetLow}–${r.targetHigh}, midpoint ${mid.toFixed(2)}` + (Number.isFinite(vs) ? ` (${vs >= 0 ? "+" : ""}${vs.toFixed(1)}% vs price)` : "");
+    }
+    out.push(line);
+  }
+  if (f && Number.isFinite(f.median)) {
+    const EPS = series(financials, "IS", "EPS"), last = EPS[EPS.length - 1];
+    let line = zh ? `一致预期 EPS 中位 ${f.median}` + (Number.isFinite(f.low) && Number.isFinite(f.high) ? `（区间 ${f.low}–${f.high}）` : "")
+      : `Consensus EPS median ${f.median}` + (Number.isFinite(f.low) && Number.isFinite(f.high) ? ` (range ${f.low}–${f.high})` : "");
+    if (last && last.value > 0) {
+      const g = (f.median / last.value - 1) * 100;
+      line += zh ? `，较最新年报 EPS ${last.value}（FY${last.year}）${g >= 0 ? "增长" : "下降"} ${Math.abs(g).toFixed(1)}%` : `, ${g >= 0 ? "+" : ""}${g.toFixed(1)}% vs latest annual EPS ${last.value} (FY${last.year})`;
+    }
+    if (market === "us" && price > 0 && f.median > 0) line += zh ? `；远期市盈率约 ${(price / f.median).toFixed(1)}` : `; forward P/E ~${(price / f.median).toFixed(1)}`;
+    out.push(line);
+  }
+  if (out.length) out.push(zh ? "（卖方观点普遍偏乐观，只作参考，不能替代自己的判断）" : "(Sell-side views tend to be optimistic — reference only)");
+  return out;
+}
+
+/**
+ * masterLenses({ financials, research, price, eps, bps, lang }) → string[]
+ * 按投资大师公开的方法论算一遍（不代表大师本人对这只股的看法）：
+ *   格雷厄姆：PE ≤ 15、PB ≤ 1.5、PE × PB ≤ 22.5；格雷厄姆数 √(22.5 × EPS × BPS)
+ *   林奇：PEG = PE / 盈利增速（优先用一致预期 EPS 增速，否则净利润三年复合），< 1 便宜、1–2 合理、> 2 偏贵
+ *   巴菲特式：所有者收益率 ≈ 自由现金流 / 净利润 × 盈利收益率（EPS / 价格），近五年 ROE 是否持续 > 15%，有无净现金
+ * price / eps / bps 来自行情（同一报价币种）；跨币种的量只用无单位的比值。
+ */
+export function masterLenses({ financials, research, price, eps, bps, lang = "zh" } = {}) {
+  const zh = lang !== "en";
+  const out = [];
+  const pe = price > 0 && eps > 0 ? price / eps : NaN, pb = price > 0 && bps > 0 ? price / bps : NaN;
+  if (Number.isFinite(pe) && Number.isFinite(pb)) {
+    const gn = Math.sqrt(22.5 * eps * bps), ok = pe <= 15 && pb <= 1.5 && pe * pb <= 22.5;
+    out.push(zh ? `按格雷厄姆的方法：PE ${pe.toFixed(1)}、PB ${pb.toFixed(1)}，PE×PB = ${(pe * pb).toFixed(0)}（标准 ≤ 22.5）；格雷厄姆数 ${gn.toFixed(2)}，${price / gn >= 2 ? `现价是它的 ${(price / gn).toFixed(1)} 倍` : `现价${price > gn ? "高于" : "低于"}它 ${(Math.abs(price / gn - 1) * 100).toFixed(0)}%`}。${ok ? "满足防御型投资者的标准" : "不满足（这套标准针对低估值的防御型股票，对高 ROE 的轻资产公司偏严）"}`
+      : `By Graham's method: P/E ${pe.toFixed(1)}, P/B ${pb.toFixed(1)}, P/E×P/B = ${(pe * pb).toFixed(0)} (limit 22.5); Graham number ${gn.toFixed(2)} vs price ${price}. ${ok ? "Meets the defensive-investor criteria" : "Fails them (the criteria target cheap defensive stocks and are harsh on high-ROE, asset-light firms)"}`);
+  }
+  // 林奇：增速优先用一致预期（与年报 EPS 同币种），否则净利润三年复合
+  const EPS = series(financials, "IS", "EPS"), NI = series(financials, "IS", "NetProfit");
+  let g = NaN, gSrc = "";
+  const f = research && research.forecastEps, lastEps = EPS[EPS.length - 1];
+  if (f && Number.isFinite(f.median) && lastEps && lastEps.value > 0) { g = (f.median / lastEps.value - 1) * 100; gSrc = zh ? "一致预期 EPS 增速" : "consensus EPS growth"; }
+  else if (NI.length >= 4 && NI[NI.length - 4].value > 0 && NI[NI.length - 1].value > 0) { g = (Math.pow(NI[NI.length - 1].value / NI[NI.length - 4].value, 1 / 3) - 1) * 100; gSrc = zh ? "净利润近三年复合增速" : "3-year net income CAGR"; }
+  if (Number.isFinite(pe) && Number.isFinite(g)) {
+    if (g > 0) {
+      const peg = pe / g;
+      out.push(zh ? `按林奇的方法：PEG = PE ${pe.toFixed(1)} ÷ ${gSrc} ${g.toFixed(1)}% = ${peg.toFixed(2)}（< 1 便宜、1–2 合理、> 2 偏贵 → ${peg < 1 ? "便宜" : peg <= 2 ? "合理" : "偏贵"}）`
+        : `By Lynch's method: PEG = P/E ${pe.toFixed(1)} ÷ ${gSrc} ${g.toFixed(1)}% = ${peg.toFixed(2)} (${peg < 1 ? "cheap" : peg <= 2 ? "fair" : "expensive"})`);
+    } else out.push(zh ? `按林奇的方法：${gSrc} 为 ${g.toFixed(1)}%，不增长，PEG 不适用` : `By Lynch's method: ${gSrc} is ${g.toFixed(1)}%, so PEG doesn't apply`);
+  }
+  // 巴菲特式：所有者收益率、ROE 持续性、净现金
+  const FCF = series(financials, "CF", "NetFreeCashFlow"), ROE = series(financials, "IS", "ROEDf").length ? series(financials, "IS", "ROEDf") : series(financials, "IS", "ROE");
+  const parts = [];
+  const pairs = FCF.slice(-3).filter((x) => NI.some((y) => y.year === x.year));
+  const sumF = pairs.reduce((a, x) => a + x.value, 0), sumN = pairs.reduce((a, x) => a + NI.find((y) => y.year === x.year).value, 0);
+  if (Number.isFinite(pe) && pairs.length && sumN > 0) {
+    const oy = sumF / sumN / pe * 100;
+    parts.push(zh ? `所有者收益率约 ${oy.toFixed(1)}%（自由现金流 / 市值，近三年口径）` : `owner-earnings yield ~${oy.toFixed(1)}% (FCF / market cap, 3-year basis)`);
+  }
+  const r5 = ROE.slice(-5).map((x) => x.value);
+  if (r5.length >= 3) {
+    const min = Math.min(...r5), avg = r5.reduce((a, b) => a + b, 0) / r5.length;
+    parts.push(zh ? `近 ${r5.length} 年 ROE 均值 ${avg.toFixed(0)}%、最低 ${min.toFixed(0)}%（${min > 15 ? "持续高于 15%" : "没能持续高于 15%"}）` : `ROE averaged ${avg.toFixed(0)}% over ${r5.length} years, min ${min.toFixed(0)}% (${min > 15 ? "consistently above 15%" : "not consistently above 15%"})`);
+  }
+  const ND = series(financials, "BS", "NetDebt"), nd = ND[ND.length - 1];
+  if (nd) parts.push(zh ? (nd.value < 0 ? "账上净现金" : "有净负债") : (nd.value < 0 ? "net cash" : "net debt"));
+  if (parts.length) out.push((zh ? "按巴菲特看重的：" : "By Buffett's yardsticks: ") + parts.join(zh ? "，" : ", "));
+  if (out.length) out.push(zh ? "（以上是按大师公开的方法论计算，不代表他们本人对这只股票的看法）" : "(Computed from the masters' published methods; not their own views on this stock)");
+  return out;
+}

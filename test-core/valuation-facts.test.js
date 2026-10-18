@@ -113,3 +113,33 @@ describe("assumptionChecks", () => {
     expect(m.some((x) => x.startsWith("wacc"))).toBe(false);
   });
 });
+
+import { marketViews, masterLenses } from "../public/shared/valuation/facts.js";
+describe("marketViews / masterLenses", () => {
+  const research = { rating: { buy: 19, over: 6, hold: 13, under: 3, sell: 3, total: 46, targetHigh: 405, targetLow: 215, prevClose: 343.46 }, forecastEps: { median: 9.235, mean: 9.287, low: 8.292, high: 10.454 } };
+  const fin = {
+    IS: [{ field: "EPS", values: [[2025, 7.46], [2024, 6.08], [2023, 6.13]].map(([year, value]) => ({ year, value })) },
+         { field: "ROEDf", values: [[2025, 171.4], [2024, 157.4], [2023, 171.9], [2022, 175.5], [2021, 150.1]].map(([year, value]) => ({ year, value })) },
+         acct("NetProfit", [[2022, 99.8], [2023, 97.0], [2024, 93.7], [2025, 112.0]])],
+    CF: [acct("NetFreeCashFlow", [[2023, 99.6], [2024, 108.8], [2025, 98.8]])],
+    BS: [acct("NetDebt", [[2025, -20.0]])],
+  };
+  it("summarises analyst ratings, targets and consensus EPS", () => {
+    const m = marketViews({ research, financials: fin, price: 343.46, market: "us", lang: "zh" }).join("\n");
+    expect(m).toContain("分析师评级（46 家）：看多 25（买入 19、增持 6），中性 13，看空 6（看多占 54%）");
+    expect(m).toContain("目标价 215–405，中值 310.00（较现价 -9.7%）");
+    expect(m).toContain("较最新年报 EPS 7.46（FY2025）增长 23.8%");
+    expect(m).toContain("远期市盈率约 37.2");
+    expect(marketViews({ research, financials: fin, price: 417.8, market: "hk", lang: "zh" }).join("\n")).not.toContain("远期市盈率");
+    expect(marketViews({ research: null })).toEqual([]);
+  });
+  it("applies Graham, Lynch and Buffett yardsticks with a disclaimer", () => {
+    const m = masterLenses({ financials: fin, research, price: 343.46, eps: 8.83, bps: 7.37, lang: "zh" }).join("\n");
+    expect(m).toMatch(/按格雷厄姆的方法：PE 38\.9、PB 46\.6，PE×PB = \d+（标准 ≤ 22\.5）/);
+    expect(m).toContain("不满足");
+    expect(m).toContain("按林奇的方法：PEG = PE 38.9 ÷ 一致预期 EPS 增速 23.8% = 1.63（< 1 便宜、1–2 合理、> 2 偏贵 → 合理）");
+    expect(m).toMatch(/按巴菲特看重的：所有者收益率约 2\.6%.*ROE 均值 165%、最低 150%（持续高于 15%），账上净现金/);
+    expect(m).toContain("不代表他们本人对这只股票的看法");
+    expect(masterLenses({})).toEqual([]);
+  });
+});
