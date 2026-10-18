@@ -218,10 +218,16 @@ export function buildMethodPrompt(body, lang) {
     "1. 先根据「生意本身」和你对这家公司的了解判断它怎么赚钱、收入利润的驱动因素（量、价、商品价格、利率、用户数等）、周期性与资本密集度，归入上面的一个生意类型。周期性和类型要以生意本身为准：利润增速高不等于高速成长，如果增长主要来自商品价格上涨，它仍是资源与周期类。",
     "2. 再按该类型的估值做法选 1 个首选 + 1~2 个交叉验证方法，只能从可选方法的 key 里选；用已核实的事实、市场投研、大师方法视角去细化和检验（例如分红率决定 DDM 能不能用、现金流稳不稳定决定 DCF 的可靠性）。大师方法里不适用于该类型的指标（如周期股的 PEG）要明确忽略。",
     "3. " + GROUNDING + SYNTHESIS + "不确定的业务细节不要编，说「从公开资料看」即可。",
-    zh ? "4. 正文用两三句话讲清选择依据（100 字以内），不要重复生意画像，不要逐项罗列方法；提到方法时用方法名称（如「DCF 自由现金流」），不要写 key。" : "4. Keep the prose to two or three sentences (under 60 words) on why these methods fit; don't repeat the business profile or walk through every method; refer to methods by name (e.g. \"DCF free cash flow\"), never by key.",
-    "5. 回复最后附一个 ```json 代码块，格式严格如下（business 里的字段各一句话，type 用上面的 key）：",
-    '```json\n{"business": {"type": "生意类型key", "model": "它怎么赚钱", "drivers": "收入和利润主要由什么驱动", "implication": "这对估值意味着什么"}, "picks": [{"key": "方法key", "role": "primary", "reason": "一句话理由"}, {"key": "方法key", "role": "check", "reason": "一句话理由"}]}\n```',
+    zh ? "4. 只输出下面这个 ```json 代码块，不要写代码块以外的文字、标题或列表。summary 用两句话说清为什么选这几个方法（100 字以内），不要重复生意画像；提到方法时用方法名称（如「DCF 自由现金流」），不要写 key。" : "4. Output only the ```json block below — no prose, headings or lists outside it. summary: two sentences (under 60 words) on why these methods fit; don't repeat the business profile; refer to methods by name (e.g. \"DCF free cash flow\"), never by key.",
+    "5. 格式严格如下（business 里的字段各一句话，type 用上面的 key）：",
+    '```json\n{"business": {"type": "生意类型key", "model": "它怎么赚钱", "drivers": "收入和利润主要由什么驱动", "implication": "这对估值意味着什么"}, "summary": "为什么选这几个方法", "picks": [{"key": "方法key", "role": "primary", "reason": "一句话理由"}, {"key": "方法key", "role": "check", "reason": "一句话理由"}]}\n```',
   ].join("\n");
+}
+// 长篇正文 → 第一段像样的句子（跳过「估值方法选择」这类小标题、列表符号和「JSON 代码块」字样）
+function briefOf(t) {
+  const paras = String(t || "").split(/\n\s*\n/).map((x) => x.replace(/^\s*([-*•]|\d+\.)\s+/gm, "").replace(/JSON\s*代码块|JSON block/gi, "").trim()).filter(Boolean);
+  const first = paras.find((x) => x.length > 20) || paras[0] || "";
+  return first.length > 200 ? first.slice(0, 200).replace(/[，,；;][^，,；;]*$/, "") + "…" : first;
 }
 export function parsePicks(text, methods) {
   const re = /```(?:json)?\s*([\s\S]*?)```/gi;
@@ -242,7 +248,9 @@ export function parsePicks(text, methods) {
   }
   const str = (v) => (typeof v === "string" ? plain(v).slice(0, 200) : "");
   const business = bz ? { type: bz.type, model: str(bz.model), drivers: str(bz.drivers), implication: str(bz.implication) } : null;
-  return { reply, picks, business };
+  // 正文以 JSON 里的 summary 为准；小模型常无视字数、写长篇带标题的正文，没给 summary 时只取正文第一段并截断
+  const summary = obj && typeof obj.summary === "string" ? plain(obj.summary) : "";
+  return { reply: (summary || briefOf(reply)).slice(0, 240), picks, business };
 }
 
 // ── AI 复核：用最新财报检查一张估值卡当初的假设还成不成立 ──

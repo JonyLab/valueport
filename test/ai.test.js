@@ -360,3 +360,14 @@ describe("business-first method recommendation", () => {
     expect(unknown.picks.map((p) => p.key)).toEqual(["peg"]);
   });
 });
+
+describe("short method summaries", () => {
+  it("prefers the JSON summary and otherwise keeps only the first real paragraph of long prose", async () => {
+    const { parsePicks } = await import("../src/ai.js");
+    const M = [{ key: "navsotp", title: "NAV" }, { key: "pb", title: "P/B" }];
+    expect(parsePicks('长篇\n```json\n{"summary":"金属价格决定利润，按资源储量估最稳。","picks":[{"key":"navsotp"}]}\n```', M).reply).toBe("金属价格决定利润，按资源储量估最稳。");
+    const long = "估值方法选择\n\n紫金矿业主要从事矿产资源勘查、金矿采选与铜冶炼，属于资源与周期型。\n\n1. 首选方法：NAV\n\nJSON 代码块\n```json\n{\"picks\":[{\"key\":\"navsotp\"}]}\n```";
+    expect(parsePicks(long, M).reply).toBe("紫金矿业主要从事矿产资源勘查、金矿采选与铜冶炼，属于资源与周期型。");
+    expect(parsePicks('银行股看净资产。\n```json\n{"picks":[{"key":"pb"}]}\n```', M).reply).toBe("银行股看净资产。");
+  });
+});
