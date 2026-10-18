@@ -11,11 +11,11 @@
   .mc-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:0 4px 22px}
   .mc-hero h1{font-size:clamp(36px,5vw,56px);margin:0}
   /* 一句话判定拆成几颗短胶囊：每个市场的区间与分位 + 自选里的机会数 */
-  .mc-chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 10px}
+  .mc-chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
   .mc-chip{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px 0 11px;border-radius:var(--r-pill);background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 1px var(--card-edge);font-size:13px;color:var(--ink-soft);white-space:nowrap}
   .mc-chip i{width:8px;height:8px;border-radius:50%;flex:none}
   .mc-chip b{font-weight:500;color:var(--ink)}
-  .mc-meta{font-size:13px;color:var(--ink-mute)}
+  .mc-meta{font-size:13px;color:var(--ink-mute);margin-top:8px}
   .mc-badge{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 15px;border-radius:var(--r-pill);font-size:13px;white-space:nowrap;background:var(--track);color:var(--ink-soft)}
   .mc-badge.go{background:var(--sun);color:var(--sun-ink)}
   .mc-grid{display:flex;flex-direction:column;gap:16px}
@@ -112,8 +112,8 @@
     <div>
       <p class="eyebrow" id="mcEyebrow"></p>
       <h1 data-i18n="nav_macro">宏观看板</h1>
-      <div class="mc-chips" id="mcVerdict"></div>
       <div class="mc-meta" id="mcMeta"></div>
+      <div class="mc-chips" id="mcVerdict"></div>
     </div>
     <span class="mc-badge" id="mcBadge" hidden></span>
   </div>

@@ -191,7 +191,8 @@
   /* 目标仓位 */
   .pf-titlewrap{display:flex;flex-direction:column;gap:4px;min-width:0}
   /* 标题行：「资产」+ 偏离提醒胶囊 */
-  .pf-titlerow{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .pf-titlerow{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+  .pf-titlerow #pfAlert{position:relative;top:-11.5px} /* 胶囊底边与标题基线对齐 */
   .pf-alert{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border:0;border-radius:var(--r-pill);background:rgba(240,140,46,.16);color:#a4561a;
     cursor:pointer;font-family:var(--font);font-size:13px;white-space:nowrap}
   .pf-alert i:first-child{font-size:16px}
