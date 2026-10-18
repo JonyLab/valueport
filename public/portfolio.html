@@ -42,6 +42,8 @@
   .pf-table th:first-child,.pf-table td:first-child{text-align:left;padding-left:0}
   .pf-table td{text-align:right;padding:11px 10px;border-top:1px dashed var(--border);font-variant-numeric:tabular-nums;white-space:nowrap}
   .pf-table tr.link{cursor:pointer}
+  .pf-pxq span{display:block}
+  .pf-pxq-q{margin-top:2px;font-size:12px;color:var(--ink-mute)}
   .pf-zone.add{color:var(--ink-soft);background:none;box-shadow:inset 0 0 0 1px var(--divider)}
   .pf-zone.add i{font-size:13px}
   .pf-table tr.link:hover td{background:rgba(246,207,74,.10)}
@@ -247,7 +249,8 @@
   .pf-tgt-mark{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;border-radius:2px;background:var(--sun-ink)}
   .pf-tgt-td{white-space:nowrap}
   .pf-tgt-td.muted{color:var(--ink-mute)}
-  .pf-tgt-v{margin-right:8px}
+  .pf-tgt-v{display:block} /* 目标 % 一行、偏离徽章一行 */
+  .pf-tgt-td .pf-tgt-drift{margin-top:3px}
   .pf-tgt-drift{display:inline-block;font-size:12px;font-variant-numeric:tabular-nums;padding:2px 8px;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft)}
   .pf-tgt-drift.over{background:rgba(240,140,46,.16);color:#a4561a}
   .pf-tgt-drift.under{background:rgba(58,115,238,.12);color:#2c5bc4}
@@ -812,7 +815,7 @@ function holdingsCard(sAll) {
   const wrap = el("div", "pf-tablewrap");
   const tb = el("table", "pf-table" + (planOn ? " with-plan" : ""));
   const hr = el("tr");
-  const cols = [[T("标的", "Symbol")], [T("区间", "Zone")], [T("现价", "Price"), "hide-sm"], [T("数量", "Qty"), "hide-sm"], [T("市值", "Value")], [T("占比", "Weight")]];
+  const cols = [[T("标的", "Symbol")], [T("区间", "Zone")], [T("现价 · 数量", "Price · Qty"), "hide-sm"], [T("市值", "Value")], [T("占比", "Weight")]];
   if (planOn) cols.push([T("目标 · 偏离", "Target · drift")], [T("建议", "Suggestion"), "hide-sm left"]);
   cols.push([T("盈亏", "P/L")]);
   for (const [h, cls] of cols) hr.appendChild(el("th", cls || "", h));
@@ -831,6 +834,8 @@ function holdingsCard(sAll) {
     const id = el("div", "pf-sym-id"); id.append(el("span", "pf-sym-name", name), el("span", "pf-sym-sub", sub));
     box.append(logo, id); td.appendChild(box); return td;
   };
+  // 现价与数量合成一列：现价一行，数量灰字一行
+  const pxQtyTd = (px, qty) => { const td = el("td", "hide-sm pf-pxq"); td.append(el("span", "pf-pxq-px", px), el("span", "pf-pxq-q", T(`${qtyText(qty)} 股`, `${qtyText(qty)} sh`))); return td; };
   const weightTd = (w, p) => { const td = el("td", "pf-w"); const v = el("span", "pf-w-v", Number.isFinite(w) ? w.toFixed(1) + "%" : "—"); td.appendChild(v); if (planOn) td.appendChild(bar(Number.isFinite(w) ? w : 0, p)); return td; };
   // 不在自选里的持仓：点了去自选页打开预填好的添加弹窗，加进来后就有详情页、能估值
   const addLink = (tr, symbol, name) => {
@@ -844,7 +849,7 @@ function holdingsCard(sAll) {
     const w = Number.isFinite(r.value) && s.total ? r.value / s.total * 100 : NaN;
     const pl = r.costKnown && r.cost > 0 && Number.isFinite(r.value) ? (r.value / r.cost - 1) * 100 : NaN;
     tr.append(symTd(r.symbol, r.boardName || r.name || r.symbol, `${r.symbol.slice(2).toUpperCase()} · ${[...r.accounts].filter(Boolean).join(" / ")}`), zoneTd(r.zone, r.onBoard),
-      el("td", "hide-sm", r.price > 0 ? `${money(r.price)} ${r.currency}` : "—"), el("td", "hide-sm", qtyText(r.qty)), el("td", "", amt(r.value, 0)), weightTd(w, p));
+      pxQtyTd(r.price > 0 ? `${money(r.price)} ${r.currency}` : "—", r.qty), el("td", "", amt(r.value, 0)), weightTd(w, p));
     if (planOn) tr.append(...tgtCells(p, false));
     tr.append(el("td", "pf-pnl " + (pl > 0 ? "up" : pl < 0 ? "down" : ""), pct(pl)));
     if (r.onBoard) link(tr, r.ticker);
@@ -855,14 +860,14 @@ function holdingsCard(sAll) {
   for (const p of pv.rows.filter((x) => x.status === "build")) {
     const tr = el("tr", "planned");
     tr.append(symTd(p.symbol, p.name, `${p.symbol.slice(2).toUpperCase()} · ${T("计划建仓", "Planned")}`), zoneTd(p.zone, true),
-      el("td", "hide-sm", "—"), el("td", "hide-sm", "—"), el("td", "", "—"), weightTd(0, p), ...tgtCells(p, false), el("td", "", "—"));
+      el("td", "hide-sm", "—"), el("td", "", "—"), weightTd(0, p), ...tgtCells(p, false), el("td", "", "—"));
     link(tr, p.ticker);
     body.appendChild(tr);
   }
   // 现金：设了现金目标才单列
   if (pv.cash) {
     const tr = el("tr", "cash" + (pv.cash.status !== "ok" ? " off" : ""));
-    tr.append(symTd("", T("现金", "Cash"), T("各账户合计", "All accounts"), true), el("td", "", ""), el("td", "hide-sm", ""), el("td", "hide-sm", ""),
+    tr.append(symTd("", T("现金", "Cash"), T("各账户合计", "All accounts"), true), el("td", "", ""), el("td", "hide-sm", ""),
       el("td", "", amt(s.cashValue, 0)), weightTd(pv.cash.cur, pv.cash), ...tgtCells(pv.cash, true), el("td", "", ""));
     body.appendChild(tr);
   }
