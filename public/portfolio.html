@@ -163,6 +163,9 @@
   .pf-broker b{font-weight:500;font-size:14px}
   .pf-broker span{font-size:12px;color:var(--ink-mute);line-height:1.5}
   .pf-help{font-size:12.5px;line-height:1.7;color:var(--ink-soft);background:rgba(246,207,74,.18);border-radius:var(--r-md);padding:10px 14px;margin:4px 0 14px}
+  .pf-help-link{display:inline-flex;align-items:center;gap:3px;color:var(--ink);font-weight:500;text-decoration:underline;text-decoration-color:rgba(29,29,27,.25);text-underline-offset:3px;white-space:nowrap}
+  .pf-help-link:hover{text-decoration-color:currentColor}
+  .pf-help-link i{font-size:13px}
   .pf-fields{display:grid;gap:12px}
   .pf-paste-hint{font-size:12.5px;color:var(--ink-soft);display:flex;gap:6px}
   .pf-paste-ok{font-size:12.5px;color:var(--green)}
@@ -1156,8 +1159,9 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeOverl
 
 const CRED_UI = {
   longbridge: {
-    help: T("在长桥开放平台（open.longportapp.com）的开发者中心获取 App Key、App Secret 和 Access Token。Access Token 有有效期，过期后在这里更新即可。",
-      "Get the App Key, App Secret and Access Token from the Longbridge developer center (open.longportapp.com). The access token expires; update it here when it does."),
+    help: T("在长桥开放平台的开发者中心获取 App Key、App Secret 和 Access Token。Access Token 有有效期，过期后在这里更新即可。",
+      "Get the App Key, App Secret and Access Token from the Longbridge developer center. The access token expires; update it here when it does."),
+    link: ["https://open.longbridge.com/dashboard/tokens", T("打开长桥开发者中心", "Open Longbridge developer center")],
     fields: [["appKey", "App Key"], ["appSecret", "App Secret"], ["accessToken", "Access Token"]],
   },
   ibkr: {
@@ -1217,6 +1221,11 @@ function renderAccForm() {
   }
   const ui = CRED_UI[accBroker];
   $("accHelp").textContent = ui.help;
+  if (ui.link) {
+    const a = el("a", "pf-help-link"); a.href = ui.link[0]; a.target = "_blank"; a.rel = "noopener noreferrer";
+    a.append(document.createTextNode(ui.link[1]), ri("external-link-line"));
+    $("accHelp").append(" ", a);
+  }
   const f = $("accFields"); f.innerHTML = "";
   const nameLab = el("label", "field"); nameLab.append(el("span", "f-lab", T("账户名称", "Account name")));
   const nameIn = el("input", "plain"); nameIn.id = "accName"; nameIn.value = accEditing ? accEditing.name : BROKER_META[accBroker].name; nameIn.maxLength = 40; nameLab.appendChild(nameIn); f.appendChild(nameLab);
