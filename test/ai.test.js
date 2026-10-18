@@ -432,4 +432,12 @@ describe("site-key free models (Zhipu GLM-4.7-Flash)", () => {
     await chatComplete({}, "sys", [{ role: "user", content: "hi" }], fetchImpl, { provider: "openai", model: "deepseek-chat", baseUrl: "https://api.deepseek.com/v1", apiKey: "k" });
     expect(sent.body.thinking).toBeUndefined();
   });
+  it("retries Zhipu's busy responses", async () => {
+    const { SITE_KEY_MODELS, chatComplete } = await import("../src/ai.js");
+    let n = 0;
+    const fetchImpl = async () => (++n < 3 ? new Response(JSON.stringify({ error: { code: "1305", message: "该模型当前访问量过大，请您稍后再试" } }), { status: 429 })
+      : new Response(JSON.stringify({ choices: [{ message: { content: "好的" } }] })));
+    expect(await chatComplete({}, "sys", [{ role: "user", content: "hi" }], fetchImpl, { provider: "openai", model: "glm-4.7-flash", baseUrl: SITE_KEY_MODELS[0].baseUrl, apiKey: "zk" })).toBe("好的");
+    expect(n).toBe(3);
+  }, 15000);
 });

@@ -45,13 +45,18 @@ async function rawComplete(env, system, messages, fetchImpl, cfg) {
   }
   if (!cfg.apiKey) throw new Error("AI_API_KEY is not configured");
   if (cfg.provider === "openai") {
-    const res = await fetchImpl(cfg.baseUrl + "/chat/completions", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer " + cfg.apiKey },
-      body: JSON.stringify({ model: cfg.model, max_tokens: MAX_TOKENS, messages: [{ role: "system", content: system }, ...messages],
-        ...(/(^|\.)bigmodel\.cn$/.test(hostOf(cfg.baseUrl)) ? { thinking: { type: "disabled" } } : {}) }), // 智谱 GLM：关掉深度思考，更快，也不让思考吃掉输出长度
-    });
-    const j = await res.json().catch(() => null);
+    const zhipu = /(^|\.)bigmodel\.cn$/.test(hostOf(cfg.baseUrl));
+    const body = JSON.stringify({ model: cfg.model, max_tokens: MAX_TOKENS, messages: [{ role: "system", content: system }, ...messages],
+      ...(zhipu ? { thinking: { type: "disabled" } } : {}) }); // 智谱 GLM：关掉深度思考，更快，也不让思考吃掉输出长度
+    let res, j;
+    // 智谱免费模型常报「访问量过大」（并发限制），隔一会儿重试两次
+    for (let attempt = 0; ; attempt++) {
+      res = await fetchImpl(cfg.baseUrl + "/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + cfg.apiKey }, body });
+      j = await res.json().catch(() => null);
+      const busy = !res.ok && zhipu && (res.status === 429 || /访问量过大|稍后再试|rate limit|concurrency/i.test((j && j.error && j.error.message) || ""));
+      if (!busy || attempt >= 2) break;
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+    }
     if (!res.ok) throw new Error((j && j.error && j.error.message) || `AI HTTP ${res.status}`);
     const text = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
     if (typeof text !== "string") throw new Error("empty AI response");
