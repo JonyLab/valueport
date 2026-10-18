@@ -623,6 +623,14 @@
   .vc-ai-msg.ai .vc-ai-bubble{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 1px var(--divider);border-bottom-left-radius:6px}
   .vc-ai-msg.pending .vc-ai-bubble{color:var(--ink-mute);animation:vcAiPulse 1.2s ease-in-out infinite}
   .vc-ai-msg.error .vc-ai-bubble{color:var(--red);background:rgba(198,65,65,.07);box-shadow:none}
+  /* 消息操作行：复制 / 重试，平时淡，悬停这条消息时变清楚；失败消息的操作一直清楚 */
+  .vc-ai-macts{display:flex;gap:2px;margin-top:-4px;opacity:.45;transition:opacity .15s}
+  .vc-ai-msg:hover .vc-ai-macts,.vc-ai-msg.error .vc-ai-macts,.vc-ai-macts:focus-within{opacity:1}
+  .vc-ai-mact{width:26px;height:26px;border:0;border-radius:50%;background:none;color:var(--ink-mute);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:14px}
+  .vc-ai-mact:hover{background:var(--track);color:var(--ink)}
+  .vc-ai-mact.done{color:var(--green)}
+  .vc-ai-mact.fail{color:#c26a1c}
+  .vc-ai-msg.error .vc-ai-mact{color:var(--red)}
   @keyframes vcAiPulse{50%{opacity:.45}}
   .vc-ai-sugg{width:100%;background:#fff;border-radius:var(--r-lg);box-shadow:inset 0 0 0 1px var(--divider);padding:14px 14px 12px}
   /* 情景分析：保守（灰点）/ 乐观（暖黄点）各一块，故事 + 关键假设列表 + 可能错在哪 / 跟踪信号 */

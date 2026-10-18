@@ -23,7 +23,7 @@ const TX = {
     title: "AI 估值助手", sub: "聊聊这家公司，让 AI 帮你填假设", close: "关闭", ph: "问点什么，如「增速给多少合适？」", send: "发送",
     intro: "我会结合这只股票的数据和当前估值方法，给出保守 / 乐观两档假设和理由。建议的参数需要你确认后才会写入表单。",
     quick: ["帮我给出一套完整的保守 / 乐观假设", "看看我现在的假设是否合理", "折现率 / WACC 该取多少？"],
-    thinking: "思考中…", suggest: "建议参数", field: "字段", now: "当前", next: "建议", apply: "应用到表单", applied: "已应用", undo: "撤销",
+    thinking: "思考中…", copy: "复制", copied: "已复制", copyFail: "复制失败，可以手动选中文字复制", retry: "重试", suggest: "建议参数", field: "字段", now: "当前", next: "建议", apply: "应用到表单", applied: "已应用", undo: "撤销",
     cons: "保守", opt: "乐观", scenC: "保守情景", scenO: "乐观情景", scenDrivers: "关键假设", scenBreaks: "可能错在哪", scenSignals: "跟踪信号", err: "AI 暂时不可用", limit: "今天的 AI 对话次数已用完，明天再来", clear: "清空对话",
     disclaimer: "AI 建议仅供参考，不构成投资建议",
     sens: "敏感性", sensLow: "合理价 低", sensHigh: "高", peers: "倍数对比", setTo: (x, y) => `把 ${x} 改成 ${y}`, setDone: "已改",
@@ -32,7 +32,7 @@ const TX = {
     title: "AI valuation assistant", sub: "Talk it through and let AI fill in assumptions", close: "Close", ph: "Ask about growth, margins, WACC…", send: "Send",
     intro: "I'll use this stock's data and the current method to suggest conservative / optimistic assumptions with reasons. Nothing is written to the form until you apply it.",
     quick: ["Suggest a full set of conservative / optimistic assumptions", "Are my current assumptions reasonable?", "What discount rate / WACC should I use?"],
-    thinking: "Thinking…", suggest: "Suggested inputs", field: "Field", now: "Now", next: "Suggested", apply: "Apply to form", applied: "Applied", undo: "Undo",
+    thinking: "Thinking…", copy: "Copy", copied: "Copied", copyFail: "Couldn't copy — select the text to copy it", retry: "Retry", suggest: "Suggested inputs", field: "Field", now: "Now", next: "Suggested", apply: "Apply to form", applied: "Applied", undo: "Undo",
     cons: "Cons.", opt: "Opt.", scenC: "Conservative case", scenO: "Optimistic case", scenDrivers: "Key assumptions", scenBreaks: "Where it could be wrong", scenSignals: "Signals to watch", err: "AI is unavailable right now", limit: "Daily AI limit reached — try again tomorrow", clear: "Clear chat",
     disclaimer: "AI suggestions are for reference only, not investment advice",
     sens: "Sensitivity", sensLow: "Fair value low", sensHigh: "High", peers: "Multiple check", setTo: (x, y) => `Set ${x} to ${y}`, setDone: "Changed",
@@ -145,6 +145,56 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     m.appendChild(b); log.appendChild(m);
     log.scrollTop = log.scrollHeight;
     return m;
+  }
+
+  // 每条消息下的小操作行：复制（所有消息）、重试（失败的消息），和常见 AI 应用一样
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch {
+      const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch { ok = false; } ta.remove(); return ok;
+    }
+  }
+  function msgActions(m, { copy, retry } = {}) {
+    const row = el("div", "vc-ai-macts");
+    const iconBtn = (icon, label) => { const b = el("button", "vc-ai-mact"); b.type = "button"; b.title = label; b.setAttribute("aria-label", label); b.appendChild(ri(icon)); return b; };
+    if (copy) {
+      const b = iconBtn("file-copy-line", T.copy);
+      b.addEventListener("click", async () => {
+        const ok = await copyText(typeof copy === "function" ? copy() : copy);
+        b.replaceChildren(ri(ok ? "check-line" : "error-warning-line")); b.title = ok ? T.copied : T.copyFail; b.classList.add(ok ? "done" : "fail");
+        setTimeout(() => { b.replaceChildren(ri("file-copy-line")); b.title = T.copy; b.classList.remove("done", "fail"); }, ok ? 1500 : 2500);
+      });
+      row.appendChild(b);
+    }
+    if (retry) { const b = iconBtn("refresh-line", T.retry); b.addEventListener("click", retry); row.appendChild(b); }
+    m.appendChild(row);
+    return row;
+  }
+  // AI 回复复制成纯文本：正文 + 两个情景 + 建议参数（字段：保守 / 乐观 — 理由）
+  function replyAsText(reply, j, fields) {
+    const parts = [];
+    if (reply) parts.push(reply);
+    const byKey = new Map(fields.map((f) => [f.k, f]));
+    const sc = j.scenarios || {};
+    for (const [k, title] of [["c", T.scenC], ["o", T.scenO]]) {
+      const x = sc[k]; if (!x) continue;
+      const lines = [title + (x.story ? "：" + x.story : "")];
+      if (x.drivers && x.drivers.length) lines.push(T.scenDrivers + "：", ...x.drivers.map((d) => "· " + d));
+      if (x.breaks) lines.push(T.scenBreaks + "：" + x.breaks);
+      if (x.signals) lines.push(T.scenSignals + "：" + x.signals);
+      parts.push(lines.join("\n"));
+    }
+    if (j.params) {
+      const lines = [T.suggest + "："];
+      for (const [k, v] of Object.entries(j.params)) {
+        const f = byKey.get(k); if (!f) continue;
+        const val = f.col === "dual" && v && typeof v === "object" ? `${T.cons} ${fmtField(f, v.c)} / ${T.opt} ${fmtField(f, v.o)}` : showVal(f, v);
+        lines.push(`· ${f.label}${f.unit === "%" ? "（%）" : ""}：${val}` + (j.reasons && j.reasons[k] ? " — " + j.reasons[k] : ""));
+      }
+      parts.push(lines.join("\n"));
+    }
+    return parts.join("\n\n");
   }
 
   const showVal = (f, v) => {
@@ -299,9 +349,15 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     if (!context || !context.fields || !context.fields.length) return;
     busy = true; sendBtn.disabled = true;
     input.value = ""; autosize();
-    bubble("user", text);
+    const um = bubble("user", text);
+    msgActions(um, { copy: text });
     history.push({ role: "user", content: text });
     const pending = bubble("ai", T.thinking); pending.classList.add("pending");
+    // 失败时：错误消息带「重试」——去掉这一问一答，用同样的问题重新发
+    const failed = (msg) => {
+      const m = bubble("ai", msg); m.classList.add("error");
+      msgActions(m, { copy: msg, retry: () => { if (busy) return; m.remove(); um.remove(); send(text); } });
+    };
     try {
       const r = await fetch("/api/my/ai/valuation", {
         method: "POST", headers: { "content-type": "application/json" },
@@ -311,8 +367,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       pending.remove();
       if (!r.ok) {
         history.pop();
-        const m = bubble("ai", r.status === 429 ? aiErrorText(r.status, j, lang) : `${T.err}${j && j.detail ? "：" + j.detail : ""}`);
-        m.classList.add("error");
+        failed(r.status === 429 ? aiErrorText(r.status, j, lang) : `${T.err}${j && j.detail ? "：" + j.detail : ""}`);
         return;
       }
       const extra = renderWidgets(j.widgets, context.fields);
@@ -325,10 +380,11 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       if (!reply) m.querySelector(".vc-ai-bubble").remove();
       if (j.params) m.appendChild(suggestionCard(j.params, j.reasons, context.fields, j.scenarios));
       for (const node of extra) m.appendChild(node);
+      msgActions(m, { copy: () => replyAsText(reply === "…" ? "" : reply, j, context.fields) });
       log.scrollTop = log.scrollHeight;
     } catch {
       pending.remove(); history.pop();
-      bubble("ai", T.err).classList.add("error");
+      failed(T.err);
     } finally {
       busy = false; sendBtn.disabled = false; input.focus();
     }
