@@ -26,6 +26,16 @@
     if (hasCache) document.documentElement.classList.add("has-cache");
   } catch (e) { /* ignore */ }
   var host = document.getElementById("topActions");
+  // ⑤ 资产 / 宏观等一级页也放设置按钮（设置页在自选看板里：/b/<slug>#settings）；身份稍后才知道的页面调 __mountSettingsBtn(slug)
+  window.__mountSettingsBtn = function (slug) {
+    if (!host || !slug || document.getElementById("btnSettings")) return;
+    var a = document.createElement("a"); a.className = "btn icon"; a.id = "btnSettings";
+    a.href = "/b/" + encodeURIComponent(slug) + "#settings";
+    var t = lang === "zh" ? "设置" : "Settings"; a.title = t; a.setAttribute("aria-label", t);
+    a.innerHTML = '<i class="ri-equalizer-line" aria-hidden="true"></i>';
+    host.insertBefore(a, host.firstChild);
+  };
+  if (!m && ownerSlug) window.__mountSettingsBtn(ownerSlug);
   if (host && !host.querySelector(".lang-menu")) {
     var w = document.createElement("div"); w.className = "lang-menu"; w.setAttribute("data-static", "");
     w.innerHTML = '<button type="button" class="btn icon lang-btn" aria-label="切换语言 / Switch language"><i class="ri-global-line" aria-hidden="true"></i></button>';

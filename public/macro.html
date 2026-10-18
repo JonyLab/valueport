@@ -303,6 +303,7 @@ async function renderMine() {
   const me = await fetch("/api/me").then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const slug = me && me.board && me.board.slug;
   if (!slug) return;
+  if (window.__mountSettingsBtn) window.__mountSettingsBtn(slug);
   $("tabBoard").href = "/b/" + encodeURIComponent(slug);
   let data = null, prices = {};
   try { const c = JSON.parse(sessionStorage.getItem("board_cache_" + slug) || "null"); if (c && c.data) { data = c.data; prices = c.prices || {}; } } catch { /* 没缓存 */ }

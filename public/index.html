@@ -1413,6 +1413,7 @@ async function init() {
       fetchQuotes();
     }
   }
+  if (owner && location.hash === "#settings") { showSettings(); history.replaceState(history.state, "", location.pathname + location.search); }
   if (owner && location.hash === "#ai") { showSettings(); requestAnimationFrame(() => document.getElementById("aiCfg").scrollIntoView({ block: "start" })); }
 }
 

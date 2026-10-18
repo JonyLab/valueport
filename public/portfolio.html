@@ -426,7 +426,7 @@ let me = { ok: true, data: { username: sessionStorage.getItem("pf_user") || "", 
 let slug = "";
 function applyIdentity() {
   slug = (me.data.board && me.data.board.slug) || "";
-  if (slug) sessionStorage.setItem("owner_slug", slug); // 切到「自选」时导航可以立即显示
+  if (slug) { sessionStorage.setItem("owner_slug", slug); if (window.__mountSettingsBtn) window.__mountSettingsBtn(slug); } // 切到「自选」时导航可以立即显示；顺手补上设置按钮
   if (me.data.username) sessionStorage.setItem("pf_user", me.data.username);
   $("tabBoard").href = "/b/" + encodeURIComponent(slug);
   $("greet").textContent = me.data.username ? T(`${me.data.username} 的全部账户`, `All accounts of ${me.data.username}`) : "";
