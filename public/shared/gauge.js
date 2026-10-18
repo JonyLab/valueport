@@ -152,16 +152,26 @@ export class Gauge {
     };
     this.raf = requestAnimationFrame(step);
   }
+  // 入场摆动：阻尼余弦。三点让它不在最高点「卡一下」：
+  //   ① 带初速度进场（相位 PHASE），不是从最高点静止释放（那样开头一百多毫秒几乎不动）
+  //   ② 时钟从第一帧开始、每帧最多推进 1/30 秒：页面忙时帧来得晚，动画只是放慢，不会先停在顶点再跳
+  //   ③ 摆动开始前指针隐藏，避免先画在终点、再跳到起点
   swingIn() {
     if (REDUCE) { this.current = this.target; this.paint(this.current); return; }
     if (this.raf) cancelAnimationFrame(this.raf);
     this.swinging = true;
-    const to = this.target, start = to >= 90 ? 8 : 172;
-    const lambda = 0.9, omega = 3.0, t0 = performance.now();
+    this.gNeedle.style.visibility = "hidden";
+    const to = this.target, side = to >= 90 ? -1 : 1;         // 从远离目标的一侧摆进来
+    const amp = Math.min(70, Math.max(35, Math.abs(to - 90) + 40)); // 振幅随目标位置自适应，不必每次都从水平位开始
+    const lambda = 1.15, omega = 3.4, PHASE = 0.55;
+    let t = 0, last = null;
     const step = (now) => {
-      const t = (now - t0) / 1000, env = Math.exp(-lambda * t);
-      this.current = Math.max(0, Math.min(180, to + (start - to) * env * Math.cos(omega * t)));
+      if (last !== null) t += Math.min(1 / 30, (now - last) / 1000);
+      last = now;
+      const env = Math.exp(-lambda * t);
+      this.current = Math.max(0, Math.min(180, to + side * amp * env * Math.cos(omega * t + PHASE)));
       this.paint(this.current);
+      this.gNeedle.style.visibility = "";
       if (env > 0.012) { this.raf = requestAnimationFrame(step); }
       else { this.current = to; this.paint(to); this.raf = null; this.swinging = false; if (this.target !== to) this.follow(); }
     };

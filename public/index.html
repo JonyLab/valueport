@@ -1823,10 +1823,18 @@ async function renderHolding(item, card) {
 // 详情页钟摆区：已设区间→渲染完整钟摆；未设→占位卡片（直接填或加估值卡片）
 function mountDetailPendulum(item) {
   if (!detailGwrap) return;
+  // 同一只股票再次渲染（报价刷新、静态信息到达后整页重画）：沿用原钟摆，搬进新容器、只把指针挪到新价格。
+  // 重建会让钟摆从头再摆一遍，看起来像「在最高点卡一下」
+  if (detailGauge && detailGauge._sym === item.cfg.symbol && hasFairRange(item.cfg)) { // 按代码认（数据刷新后标的对象会重建）
+    if (!detailGwrap.contains(detailGauge.svg)) { detailGwrap.innerHTML = ""; detailGwrap.appendChild(detailGauge.svg); }
+    detailGauge.setName(displayName(item));
+    detailGauge.set(item.cfg, true);
+    return;
+  }
   if (detailGauge) { detailGauge.destroy && detailGauge.destroy(); detailGauge = null; }
   detailGwrap.innerHTML = "";
   if (hasFairRange(item.cfg)) {
-    detailGauge = new Gauge(detailGwrap);
+    detailGauge = new Gauge(detailGwrap); detailGauge._sym = item.cfg.symbol;
     detailGauge.setName(displayName(item));
     detailGauge.set(item.cfg, false);
     if (item.cfg.price > 0) detailGauge.swingIn();
@@ -1912,7 +1920,7 @@ function niceStep(raw) {
 function renderDetail(item, initialTab = "val") {
   const c = item.cfg, s = item.statics || {};
   viewDetail.innerHTML = "";
-  if (detailGauge) { detailGauge.destroy && detailGauge.destroy(); detailGauge = null; }
+  // 钟摆不在这里销毁：mountDetailPendulum 会判断是不是同一只股票（同一只就沿用，避免重摆）
   detailItem = item;
 
   // 顶栏：返回 / 语言（「编辑」挪进了侧栏钟摆卡的标题栏：区间、安全边际、泡沫阈值都是钟摆的设定）

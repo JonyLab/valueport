@@ -243,7 +243,6 @@
   .pf-health-sum{margin:2px 0 0;font-size:13px;line-height:1.65;color:var(--ink-soft)}
   /* 体检项：侧栏里一列，点开看依据 */
   /* 持仓表里的目标仓位列 */
-  .pf-table th.left,.pf-table td.pf-tgt-act{text-align:left}
   .pf-table td.pf-w{min-width:96px}
   .pf-w-v{display:block}
   .pf-table .pf-tgt-bar{margin:6px 0 0 auto;width:100%;max-width:120px}
@@ -259,7 +258,14 @@
   .pf-tgt-drift{display:inline-block;font-size:12px;font-variant-numeric:tabular-nums;padding:2px 8px;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft)}
   .pf-tgt-drift.over{background:rgba(240,140,46,.16);color:#a4561a}
   .pf-tgt-drift.under{background:rgba(58,115,238,.12);color:#2c5bc4}
-  .pf-table td.pf-tgt-act{white-space:normal;min-width:180px;max-width:280px}
+  /* 建议行：紧贴在它的标的行下面（上移 4px 吃掉行间距），两行拼成一个圆角色块 */
+  .pf-table tr.has-sugg td:first-child{border-bottom-left-radius:0} .pf-table tr.has-sugg td:last-child{border-bottom-right-radius:0}
+  .pf-table tr.has-sugg td{padding-bottom:4px}
+  .pf-table tr.pf-sugg td{position:relative;top:-4px;padding:0 14px 11px;text-align:left;white-space:normal;border-radius:0 0 var(--r-md) var(--r-md)}
+  .pf-sugg-line{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .pf-sugg-line > i{font-size:14px;color:var(--ink-mute);align-self:center}
+  .pf-sugg-line .pf-tgt-say{display:inline}
+  .pf-sugg-line .pf-tgt-how{display:inline;margin:0}
   .pf-tgt-say{display:block;font-size:12.5px;line-height:1.45;color:var(--ink)}
   .pf-tgt-say.ok{color:var(--ink-mute)}
   .pf-tgt-say.trimHot{color:var(--red)} .pf-tgt-say.addCheap,.pf-tgt-say.buildCheap{color:var(--green)}
@@ -805,23 +811,33 @@ function holdingsCard(sAll) {
     if (isCash) return T(buy ? `约需补 ${amt(p.trade, 0)}` : `约多出 ${amt(-p.trade, 0)}`, buy ? `≈ ${amt(p.trade, 0)} short` : `≈ ${amt(-p.trade, 0)} extra`);
     return T(`约${buy ? "买入" : "卖出"} ${amt(Math.abs(p.trade), 0)}`, `≈ ${buy ? "buy" : "sell"} ${amt(Math.abs(p.trade), 0)}`) + (Number.isFinite(p.shares) && p.shares ? T(`（${qtyText(Math.abs(p.shares))} 股）`, ` (${qtyText(Math.abs(p.shares))} sh)`) : "");
   };
-  const tgtCells = (p, isCash) => {
+  const tgtCells = (p) => {
     const t1 = el("td", "pf-tgt-td");
-    const t2 = el("td", "pf-tgt-act hide-sm");
-    if (!p) { t1.textContent = "—"; t1.classList.add("muted"); return [t1, t2]; }
+    if (!p) { t1.textContent = "—"; t1.classList.add("muted"); return [t1]; }
     const tv = el("span", "pf-tgt-v", p.tgt.toFixed(1) + "%");
     const dr = el("span", "pf-tgt-drift " + p.status, p.status === "build" ? T("未持有", "Not held") : (p.drift > 0 ? "+" : p.drift < 0 ? "−" : "") + Math.abs(p.drift).toFixed(1) + "pp");
     t1.append(tv, dr);
+    return [t1];
+  };
+  // 有建议（偏离 / 计划建仓 / 现金偏离）时在该行下方单独一行写建议，不再占一整列；在容忍带内的不写
+  const suggRow = (tr, p, isCash) => {
+    if (!planOn || !p || p.status === "ok") return null;
     const key = isCash ? (p.status === "under" ? "cashLow" : p.status === "over" ? "cashHigh" : "ok") : p.action;
-    t2.append(el("span", "pf-tgt-say " + key, DRIFT_TEXT[key]));
-    const how = tradeText(p, isCash); if (how) t2.append(el("span", "pf-tgt-how", how));
-    return [t1, t2];
+    const sr = el("tr", "pf-sugg " + tr.className);
+    const td = el("td"); td.colSpan = cols.length;
+    const line = el("div", "pf-sugg-line");
+    line.append(ri(key === "trimHot" || key === "trim" || key === "cashHigh" ? "arrow-down-circle-line" : key === "addCheap" || key === "add" || key === "build" || key === "buildCheap" || key === "cashLow" ? "arrow-up-circle-line" : "pause-circle-line"),
+      el("span", "pf-tgt-say " + key, DRIFT_TEXT[key]));
+    const how = tradeText(p, isCash); if (how) line.append(el("span", "pf-tgt-how", how));
+    td.appendChild(line); sr.appendChild(td);
+    tr.classList.add("has-sugg");
+    return sr;
   };
   const wrap = el("div", "pf-tablewrap");
   const tb = el("table", "pf-table" + (planOn ? " with-plan" : ""));
   const hr = el("tr");
   const cols = [[T("标的", "Symbol")], [T("区间", "Zone")], [T("现价 · 数量", "Price · Qty"), "hide-sm"], [T("市值", "Value")], [T("占比", "Weight")]];
-  if (planOn) cols.push([T("目标 · 偏离", "Target · drift")], [T("建议", "Suggestion"), "hide-sm left"]);
+  if (planOn) cols.push([T("目标 · 偏离", "Target · drift")]);
   cols.push([T("盈亏", "P/L")]);
   for (const [h, cls] of cols) hr.appendChild(el("th", cls || "", h));
   const thead = el("thead"); thead.appendChild(hr); tb.appendChild(thead);
@@ -855,26 +871,28 @@ function holdingsCard(sAll) {
     const pl = r.costKnown && r.cost > 0 && Number.isFinite(r.value) ? (r.value / r.cost - 1) * 100 : NaN;
     tr.append(symTd(r.symbol, r.boardName || r.name || r.symbol, `${r.symbol.slice(2).toUpperCase()} · ${[...r.accounts].filter(Boolean).join(" / ")}`), zoneTd(r.zone, r.onBoard),
       pxQtyTd(r.price > 0 ? `${money(r.price)} ${r.currency}` : "—", r.qty), el("td", "", amt(r.value, 0)), weightTd(w, p));
-    if (planOn) tr.append(...tgtCells(p, false));
+    if (planOn) tr.append(...tgtCells(p));
     tr.append(el("td", "pf-pnl " + (pl > 0 ? "up" : pl < 0 ? "down" : ""), pct(pl)));
-    if (r.onBoard) link(tr, r.ticker);
-    else addLink(tr, r.symbol, r.name);
-    body.appendChild(tr);
+    const sr = suggRow(tr, p, false);
+    for (const row of [tr, sr].filter(Boolean)) { if (r.onBoard) link(row, r.ticker); else addLink(row, r.symbol, r.name); }
+    body.appendChild(tr); if (sr) body.appendChild(sr);
   }
   // 计划建仓：设了目标、还没持有
   for (const p of pv.rows.filter((x) => x.status === "build")) {
     const tr = el("tr", "planned");
     tr.append(symTd(p.symbol, p.name, `${p.symbol.slice(2).toUpperCase()} · ${T("计划建仓", "Planned")}`), zoneTd(p.zone, true),
-      el("td", "hide-sm", "—"), el("td", "", "—"), weightTd(0, p), ...tgtCells(p, false), el("td", "", "—"));
-    link(tr, p.ticker);
-    body.appendChild(tr);
+      el("td", "hide-sm", "—"), el("td", "", "—"), weightTd(0, p), ...tgtCells(p), el("td", "", "—"));
+    const sr = suggRow(tr, p, false);
+    for (const row of [tr, sr].filter(Boolean)) link(row, p.ticker);
+    body.appendChild(tr); if (sr) body.appendChild(sr);
   }
   // 现金：设了现金目标才单列
   if (pv.cash) {
     const tr = el("tr", "cash" + (pv.cash.status !== "ok" ? " off" : ""));
     tr.append(symTd("", T("现金", "Cash"), T("各账户合计", "All accounts"), true), el("td", "", ""), el("td", "hide-sm", ""),
-      el("td", "", amt(s.cashValue, 0)), weightTd(pv.cash.cur, pv.cash), ...tgtCells(pv.cash, true), el("td", "", ""));
-    body.appendChild(tr);
+      el("td", "", amt(s.cashValue, 0)), weightTd(pv.cash.cur, pv.cash), ...tgtCells(pv.cash), el("td", "", ""));
+    const sr = suggRow(tr, pv.cash, true);
+    body.appendChild(tr); if (sr) body.appendChild(sr);
   }
   tb.appendChild(body); wrap.appendChild(tb); c.appendChild(wrap);
   if (!s.rows.length && !pv.rows.length) c.appendChild(el("div", "pf-note", T("这些账户里还没有持仓。", "No holdings in these accounts yet.")));
