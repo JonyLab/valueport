@@ -259,7 +259,11 @@
   .pf-tgt-drift{display:inline-block;font-size:12px;font-variant-numeric:tabular-nums;padding:2px 8px;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft)}
   .pf-tgt-drift.over{background:rgba(240,140,46,.16);color:#a4561a}
   .pf-tgt-drift.under{background:rgba(58,115,238,.12);color:#2c5bc4}
-  /* 建议行：紧贴在它的标的行下面（上移 4px 吃掉行间距）；本身无底色、不响应悬停 */
+  /* 建议行：紧贴在它的标的行下面（上移 4px 吃掉行间距），和标的行拼成一个圆角块；悬停时两行一起亮，建议行自己没有单独的悬停态 */
+  .pf-table tr.has-sugg td:first-child{border-bottom-left-radius:0} .pf-table tr.has-sugg td:last-child{border-bottom-right-radius:0}
+  .pf-table tr.link + tr.pf-sugg{cursor:pointer}
+  .pf-table tr.link.hov td,.pf-table tr.link.hov + tr.pf-sugg td{background:rgba(246,207,74,.10)}
+  .pf-table tr.pf-sugg.cash td{background:rgba(29,29,27,.03)}
   .pf-table tr.has-sugg td{padding-bottom:4px}
   .pf-table tr.pf-sugg td{position:relative;top:-4px;padding:0 10px 10px 56px;text-align:left;white-space:normal;border-radius:0 0 var(--r-md) var(--r-md)}
   /* 建议区：缩进到名称列下方、只包住内容的浅色小块；减仓偏橙、加仓偏蓝、观望中性 */
@@ -826,7 +830,10 @@ function holdingsCard(sAll) {
   const suggRow = (tr, p, isCash) => {
     if (!planOn || !p || p.status === "ok") return null;
     const key = isCash ? (p.status === "under" ? "cashLow" : p.status === "over" ? "cashHigh" : "ok") : p.action;
-    const sr = el("tr", "pf-sugg"); // 只是注释，不可点、不响应悬停
+    const sr = el("tr", "pf-sugg" + (tr.classList.contains("cash") ? " cash" : "")); // 和标的行算一个整体：悬停同亮、点击同去
+    const hov = (on) => { tr.classList.toggle("hov", on); sr.classList.toggle("hov", on); };
+    for (const r of [tr, sr]) { r.addEventListener("mouseenter", () => hov(true)); r.addEventListener("mouseleave", () => hov(false)); }
+    sr.addEventListener("click", () => { if (tr.classList.contains("link")) tr.click(); });
     const td = el("td"); td.colSpan = cols.length;
     const dir = key === "trimHot" || key === "trim" || key === "cashHigh" ? "down" : key === "addCheap" || key === "add" || key === "build" || key === "buildCheap" || key === "cashLow" ? "up" : "hold";
     const line = el("div", "pf-sugg-line " + dir);
