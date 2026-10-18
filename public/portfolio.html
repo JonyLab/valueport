@@ -312,6 +312,40 @@
   .pf-plan-sum{margin-top:14px;font-size:13.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
   .pf-plan-sum.bad{color:var(--red)}
   @media (max-width:560px){ .pf-plan-opts{grid-template-columns:1fr} }
+  /* 提问：持仓卡标题右侧「问一问」（白底描边胶囊 + 暖黄星标，同 AI 复核），展开一行输入；回答用本页自己的组件画 */
+  .pf-head-acts{display:flex;align-items:center;gap:8px}
+  .pf-ask-btn{box-shadow:inset 0 0 0 1px var(--divider)}
+  .pf-ask-btn i{color:var(--sun-ink);font-size:14px}
+  .pf-ask-btn:hover,.pf-ask-btn[aria-expanded="true"]{box-shadow:inset 0 0 0 1px var(--sun),0 0 0 3px rgba(246,207,74,.25)}
+  .pf-ask{margin:-4px 0 16px}
+  .pf-ask[hidden]{display:none}
+  .pf-ask-form{display:flex;align-items:center;gap:8px;height:44px;padding:0 6px 0 16px;border-radius:var(--r-pill);background:#fff;box-shadow:inset 0 0 0 1px var(--divider)}
+  .pf-ask-form:focus-within{box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 4px var(--ring)}
+  .pf-ask-form > i{color:var(--sun-ink);font-size:15px;flex:none}
+  .pf-ask-input{flex:1;min-width:0;height:100%;border:0;background:none;font-family:var(--font);font-size:14px;color:var(--ink)}
+  .pf-ask-input:focus{outline:none}
+  .pf-ask-input::placeholder{color:var(--ink-mute)}
+  .pf-ask-form .btn i.ri-loader-4-line{animation:pfSpin 1s linear infinite}
+  @keyframes pfSpin{to{transform:rotate(360deg)}}
+  .pf-ask-examples{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .pf-ask-ex{height:30px;padding:0 12px;border:0;border-radius:var(--r-pill);background:var(--track);cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-soft)}
+  .pf-ask-ex:hover{background:var(--track-edge);color:var(--ink)}
+  .pf-ask-note{margin-top:10px;font-size:12.5px;color:var(--ink-mute)}
+  .pf-ask-err{margin-top:10px;font-size:12.5px;line-height:1.6;color:var(--red)}
+  .pf-ask-ans{margin-top:14px;padding:14px 16px 6px;border-radius:var(--r-lg);background:rgba(255,255,255,.55);box-shadow:inset 0 0 0 1px var(--divider)}
+  .pf-ask-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .pf-ask-clear{border:0;background:none;padding:0;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);text-decoration:underline;text-decoration-color:rgba(29,29,27,.25);text-underline-offset:3px}
+  .pf-ask-clear:hover{color:var(--ink);text-decoration-color:currentColor}
+  .pf-ask-chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 8px}
+  .pf-ask-chip{display:inline-flex;align-items:center;gap:2px;height:26px;padding:0 4px 0 11px;border-radius:var(--r-pill);background:var(--sun-soft);color:var(--sun-ink);font-size:12px;font-variant-numeric:tabular-nums}
+  .pf-ask-chip.plain{padding-right:11px;background:var(--track);color:var(--ink-soft)}
+  .pf-ask-chip-x{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:0;border-radius:50%;background:none;cursor:pointer;color:inherit;font-size:13px}
+  .pf-ask-chip-x:hover{background:rgba(59,48,0,.12)}
+  .pf-ask-stat{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:6px 0 12px}
+  .pf-ask-stat-v{font-size:40px;font-weight:400;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+  .pf-ask-stat-k{font-size:13px;color:var(--ink-mute)}
+  .pf-ask-ans .pf-donut-body{margin:4px 0 12px}
+  .pf-ask-ans .pf-note{margin:4px 0 10px}
   html.has-cache #pfSkel{visibility:hidden} /* 有会话缓存：马上画缓存，首帧不画骨架 */
 </style>
   <!-- 模块依赖整棵树先声明：浏览器一次并行拉取，不用等上一层下载完才发现下一层（线上每个文件都要回源校验，层层等很慢） -->
@@ -321,6 +355,8 @@
   <link rel="modulepreload" href="/shared/langmenu.js">
   <link rel="modulepreload" href="/shared/feedback.js">
   <link rel="modulepreload" href="/shared/feedback-core.js">
+  <link rel="modulepreload" href="/shared/pf-query.js">
+  <link rel="modulepreload" href="/shared/ai-panel.js">
   <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页，点击后几乎立即切换（Chrome 系浏览器支持，其他浏览器忽略） -->
   <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"},{"href_matches":"/macro"}]},"eagerness":"moderate"}]}</script>
 </head>
@@ -381,6 +417,8 @@ import { mountLangMenu } from "/shared/langmenu.js";
 import { mountFeedback } from "/shared/feedback.js";
 import { computeAnchors, priceToPhi, structValid, ZONES } from "/shared/core.js";
 import { driftText, driftTolerance, driftStatus, driftAction } from "/shared/holding.js";
+import { validatePfQuery, runPfQuery, dropFilter } from "/shared/pf-query.js";
+import { aiErrorText } from "/shared/ai-panel.js";
 
 applyI18n();
 const zh = LANG === "zh";
@@ -479,9 +517,12 @@ function summarize(d) {
   for (const h of d.holdings) {
     const price = d.quotes[h.symbol], prev = d.prevClose[h.symbol];
     if (!(price > 0)) noPrice++;
-    const row = bySym.get(h.symbol) || { symbol: h.symbol, name: h.name, currency: h.currency, market: h.market, qty: 0, value: 0, cost: 0, costKnown: true, day: 0, price, accounts: new Set() };
+    const row = bySym.get(h.symbol) || { symbol: h.symbol, name: h.name, currency: h.currency, market: h.market, qty: 0, value: 0, cost: 0, costKnown: true, day: 0, price, accounts: new Set(), byAcc: {} };
     row.qty += h.quantity;
-    row.value += price > 0 ? conv(h.quantity * price, h.currency) : NaN;
+    const hv = price > 0 ? conv(h.quantity * price, h.currency) : NaN;
+    row.value += hv;
+    const an = accName.get(h.accountId) || "";
+    if (Number.isFinite(hv)) row.byAcc[an] = (row.byAcc[an] || 0) + hv; // 提问按账户分组时用
     if (Number.isFinite(h.costPrice) && h.costPrice > 0) row.cost += conv(h.quantity * h.costPrice, h.currency); else row.costKnown = false;
     if (price > 0 && prev > 0) row.day += conv(h.quantity * (price - prev), h.currency);
     row.accounts.add(accName.get(h.accountId) || "");
@@ -824,8 +865,10 @@ function holdingsCard(sAll) {
     el("span", "pf-cardsub", T(`${s.rows.length} 只 · 金额单位 ${base}`, `${s.rows.length} · amounts in ${base}`) + (planOn ? T(` · 目标容忍带 ±${pv.plan.band}pp 或目标的 ${pv.plan.rel}%`, ` · band ±${pv.plan.band}pp or ${pv.plan.rel}% of target`) : "")));
   const edit = el("button", "btn sm"); edit.type = "button"; edit.append(ri(planOn ? "focus-3-line" : "add-line"), document.createTextNode(planOn ? T("调整目标仓位", "Edit targets") : T("设置目标仓位", "Set targets")));
   edit.addEventListener("click", () => openPlan(sAll));
-  head.append(ttl, edit);
+  const acts = el("div", "pf-head-acts"); acts.append(askToggle(), edit);
+  head.append(ttl, acts);
   c.appendChild(head);
+  c.appendChild(askBlock(sAll)); // 提问框与回答（回答始终基于全部账户）
   if (data.accounts.length > 1) {
     const tabs = el("div", "pf-seg pf-hold-tabs");
     for (const [id, label] of [[0, T("全部", "All")], ...data.accounts.map((a) => [a.id, a.name])]) {
@@ -950,6 +993,182 @@ function holdingsCard(sAll) {
   }
   c.appendChild(el("div", "pf-note", foot.join(" ")));
   return c;
+}
+
+// ---------- 提问：自然语言 → 固定词表查询（/shared/pf-query.js），在本地用真实数据执行 ----------
+// 发给后端的只有问题、账户名和币种；金额、数量、持仓列表都不离开浏览器。回答用本页自己的组件画：持仓表 / 环形图 / 单个数字
+const ask = { open: false, busy: false, err: "", question: "", query: null };
+let askS = null; // 最近一次的汇总（全部账户），局部重绘提问区用
+const ASK_EXAMPLES = zh ? ["我有哪些持仓在高估区还超配了？", "港股占比多少？", "哪些股票还没估值？"]
+  : ["Which holdings are overvalued and overweight?", "How much is in Hong Kong stocks?", "Which holdings have no valuation?"];
+const FIELD_LABEL = { zone: ["区间", "Zone"], market: ["市场", "Market"], currency: ["币种", "Currency"], account: ["账户", "Account"], weight: ["占比", "Weight"],
+  target: ["目标", "Target"], drift: ["偏离", "Drift"], driftStatus: ["目标状态", "Target status"], action: ["建议", "Suggestion"], pnlPct: ["盈亏", "P/L"],
+  value: ["市值", "Value"], valued: ["估值", "Valuation"], held: ["持有", "Held"], name: ["名称", "Name"], ticker: ["代码", "Ticker"] };
+const OP_LABEL = { eq: "=", ne: "≠", in: "=", gt: ">", gte: "≥", lt: "<", lte: "≤", contains: T("包含", "contains") };
+const VALUE_LABEL = {
+  market: { US: T("美股", "US"), HK: T("港股", "HK"), CN: T("A 股", "China A") },
+  driftStatus: { over: T("超配", "Overweight"), under: T("低配", "Underweight"), ok: T("在容忍带内", "Within band"), build: T("计划建仓", "Planned"), none: T("未设目标", "No target") },
+  action: { trimHot: T("超配且高估", "Overweight & expensive"), trimHold: T("超配但低估", "Overweight but cheap"), trim: T("超配", "Overweight"), addCheap: T("低配且便宜", "Underweight & cheap"),
+    addWait: T("低配但贵", "Underweight but expensive"), add: T("低配", "Underweight"), build: T("计划建仓", "Planned"), buildCheap: T("计划建仓 · 便宜", "Planned · cheap"), ok: T("在容忍带内", "Within band"), none: T("未设目标", "No target") },
+  valued: { true: T("已估值", "Valued"), false: T("未估值", "Not valued") },
+  held: { true: T("已持有", "Held"), false: T("计划建仓", "Planned") },
+};
+const zoneLabel = (k) => { const i = ZONES.findIndex((z) => z.key === k); return i >= 0 ? ZONE_NAMES[i] : NONE_NAME; };
+function askValueText(field, v) {
+  if (Array.isArray(v)) return v.map((x) => askValueText(field, x)).join(" / ");
+  if (field === "zone") return zoneLabel(v);
+  if (VALUE_LABEL[field]) return VALUE_LABEL[field][String(v)] ?? String(v);
+  if (field === "value") return amt(v, 0);                       // 金额同样受小眼睛控制
+  if (field === "drift") return (v > 0 ? "+" : "") + v + "pp";
+  if (field === "weight" || field === "target" || field === "pnlPct") return v + "%";
+  return String(v);
+}
+const askCatalog = () => ({
+  accounts: [...new Set(data.accounts.map((a) => a.name))].filter((n) => /^[^\n\r`]{1,40}$/.test(n)).slice(0, 20),
+  currencies: [...new Set([...data.holdings.map((h) => h.currency), ...data.cash.map((c) => c.currency)])].filter((c) => /^[A-Z]{3}$/.test(c)).slice(0, 10),
+});
+// 每只持仓（含计划建仓）一行，字段与 pf-query.js 的词表一一对应
+function askRows(s) {
+  const plan = new Map(s.plan.rows.map((p) => [p.symbol, p]));
+  const mk = (sym) => (sym.startsWith("us") ? "US" : sym.startsWith("hk") ? "HK" : "CN");
+  const zk = (z) => (z >= 0 ? ZONES[z].key : "none");
+  const rows = s.rows.map((r) => {
+    const p = plan.get(r.symbol);
+    return { symbol: r.symbol, name: r.boardName || r.name || r.symbol.slice(2).toUpperCase(), ticker: r.ticker || r.symbol.slice(2).toUpperCase(), link: r.onBoard ? r.ticker : "",
+      zone: zk(r.zone), zoneIdx: r.zone, onBoard: r.onBoard, market: mk(r.symbol), currency: r.currency, accounts: [...r.accounts].filter(Boolean), byAccount: r.byAcc,
+      weight: Number.isFinite(r.value) && s.total ? r.value / s.total * 100 : NaN, target: p ? p.tgt : NaN, drift: p ? p.drift : NaN, driftStatus: p ? p.status : "none", action: p ? p.action : "none",
+      pnlPct: r.costKnown && r.cost > 0 && Number.isFinite(r.value) ? (r.value / r.cost - 1) * 100 : NaN, value: r.value, valued: r.zone >= 0, held: true };
+  });
+  for (const p of s.plan.rows.filter((x) => x.status === "build")) {
+    rows.push({ symbol: p.symbol, name: p.name, ticker: p.ticker || p.symbol.slice(2).toUpperCase(), link: p.ticker, zone: zk(p.zone), zoneIdx: p.zone, onBoard: true, market: mk(p.symbol), currency: p.currency,
+      accounts: [], byAccount: {}, weight: 0, target: p.tgt, drift: p.drift, driftStatus: p.status, action: p.action, pnlPct: NaN, value: 0, valued: p.zone >= 0, held: false });
+  }
+  return rows;
+}
+const refreshAsk = () => { const old = $("pfAsk"); if (old && askS) old.replaceWith(askBlock(askS)); };
+function askToggle() {
+  const b = el("button", "btn sm pf-ask-btn"); b.type = "button";
+  b.setAttribute("aria-expanded", ask.open ? "true" : "false");
+  b.append(ri("sparkling-2-fill"), document.createTextNode(T("问一问", "Ask")));
+  b.addEventListener("click", () => {
+    ask.open = !ask.open; b.setAttribute("aria-expanded", ask.open ? "true" : "false"); refreshAsk();
+    if (ask.open) { const i = document.querySelector("#pfAsk input"); if (i) i.focus(); }
+  });
+  return b;
+}
+async function askSubmit(question) {
+  question = question.trim();
+  if (!question || ask.busy) return;
+  const cat = askCatalog();
+  Object.assign(ask, { busy: true, err: "", question, query: null }); refreshAsk();
+  try {
+    const r = await api("/api/my/ai/portfolio-query", { method: "POST", body: JSON.stringify({ lang: LANG, question, ...cat }) });
+    const v = r.ok && r.data.query ? validatePfQuery(r.data.query, cat) : null; // 前端执行前再校验一遍
+    if (v && v.query) ask.query = v.query;
+    else ask.err = aiErrorText(r.ok ? 502 : r.status, r.ok ? { error: "bad_ai_output" } : r.data, LANG);
+  } catch { ask.err = T("网络出错了，请重试", "Network error, try again"); }
+  ask.busy = false; refreshAsk();
+}
+function askBlock(s) {
+  askS = s;
+  const box = el("div", "pf-ask"); box.id = "pfAsk";
+  if (!ask.open && !ask.query && !ask.busy && !ask.err) { box.hidden = true; return box; }
+  if (ask.open || ask.busy) {
+    const form = el("form", "pf-ask-form");
+    const ico = ri("sparkling-2-fill");
+    const input = el("input", "pf-ask-input"); input.type = "text"; input.maxLength = 200; input.value = ask.question; input.disabled = ask.busy;
+    input.placeholder = T("问问你的持仓，比如：哪些在高估区还超配了？", "Ask about your holdings, e.g. which are overvalued and overweight?");
+    input.setAttribute("aria-label", T("用一句话问你的持仓", "Ask about your holdings"));
+    input.addEventListener("keydown", (e) => { if (e.key === "Escape" && !input.value) { ask.open = false; refreshAsk(); } });
+    const go = el("button", "btn sm primary icon"); go.type = "submit"; go.disabled = ask.busy; go.setAttribute("aria-label", T("提问", "Ask"));
+    go.appendChild(ri(ask.busy ? "loader-4-line" : "arrow-up-line"));
+    form.append(ico, input, go);
+    form.addEventListener("submit", (e) => { e.preventDefault(); askSubmit(input.value); });
+    box.appendChild(form);
+    if (!ask.query && !ask.busy && !ask.err) {
+      const ex = el("div", "pf-ask-examples");
+      for (const q of ASK_EXAMPLES) { const b = el("button", "pf-ask-ex", q); b.type = "button"; b.addEventListener("click", () => askSubmit(q)); ex.appendChild(b); }
+      box.appendChild(ex);
+    }
+  }
+  if (ask.busy) box.appendChild(el("div", "pf-ask-note", T("正在把问题翻译成筛选条件…", "Turning your question into filters…")));
+  if (ask.err) box.appendChild(el("div", "pf-ask-err", ask.err));
+  if (ask.query) box.appendChild(askAnswer(s, ask.query));
+  return box;
+}
+function askAnswer(s, query) {
+  const wrap = el("div", "pf-ask-ans");
+  const head = el("div", "pf-ask-head");
+  head.appendChild(el("span", "pf-subhead", query.title || ask.question));
+  const clear = el("button", "pf-ask-clear", T("清除", "Clear")); clear.type = "button";
+  clear.addEventListener("click", () => { Object.assign(ask, { open: false, err: "", question: "", query: null }); refreshAsk(); });
+  head.appendChild(clear);
+  wrap.appendChild(head);
+  if (query.view === "none") { wrap.appendChild(el("div", "pf-callout", query.say || T("这个问题没法用持仓数据回答。", "That question can't be answered from your holdings."))); return wrap; }
+  // 筛选条件胶囊：让人看清到底筛了什么，× 去掉某一条后在本地重算
+  const chips = el("div", "pf-ask-chips");
+  query.filter.forEach((f, i) => {
+    const chip = el("span", "pf-ask-chip");
+    chip.append(el("span", "", `${(FIELD_LABEL[f.field] || [f.field, f.field])[zh ? 0 : 1]} ${OP_LABEL[f.op]} ${askValueText(f.field, f.value)}`));
+    const x = el("button", "pf-ask-chip-x"); x.type = "button"; x.setAttribute("aria-label", T("去掉这个条件", "Remove this filter")); x.appendChild(ri("close-line"));
+    x.addEventListener("click", () => { ask.query = dropFilter(ask.query, i); refreshAsk(); });
+    chip.appendChild(x); chips.appendChild(chip);
+  });
+  if (!query.filter.length) chips.appendChild(el("span", "pf-ask-chip plain", T("全部持仓", "All holdings")));
+  if (query.sort) chips.appendChild(el("span", "pf-ask-chip plain", T(`按${FIELD_LABEL[query.sort.field][0]}${query.sort.dir === "asc" ? "从低到高" : "从高到低"}`, `by ${FIELD_LABEL[query.sort.field][1].toLowerCase()} ${query.sort.dir}`) + (query.limit ? T(` · 前 ${query.limit}`, ` · top ${query.limit}`) : "")));
+  wrap.appendChild(chips);
+  const res = runPfQuery(query, askRows(s));
+  if (res.view === "stat") {
+    const st = el("div", "pf-ask-stat");
+    const v = el("span", "pf-ask-stat-v");
+    setNum(v, res.metric === "count" ? String(res.value) : res.metric === "weight" ? res.value.toFixed(1) + "%" : amt(res.value, 0));
+    const unit = res.metric === "count" ? T("只", res.value === 1 ? "holding" : "holdings") : res.metric === "value" ? base : T("占总资产", "of total assets");
+    st.append(v, el("span", "pf-ask-stat-k", unit + (res.metric !== "count" ? T(` · ${res.n} 只`, ` · ${res.n} holding(s)`) : "")));
+    wrap.appendChild(st);
+  } else if (res.view === "donut") {
+    const label = (k) => (res.groupBy === "zone" ? zoneLabel(k) : VALUE_LABEL[res.groupBy] ? (VALUE_LABEL[res.groupBy][k] ?? k) : k || "—");
+    const map = new Map(), colors = new Map();
+    for (const [k, v] of res.groups) {
+      const name = label(k); map.set(name, (map.get(name) || 0) + v);
+      if (res.groupBy === "zone") { const z = ZONES.find((x) => x.key === k); colors.set(name, z ? z.hex : "#d8d2c4"); }
+    }
+    if (map.size) wrap.appendChild(donut("", map, res.groupBy === "zone" ? colors : null));
+    else wrap.appendChild(el("div", "pf-note", T("没有符合条件的持仓。", "No holdings match.")));
+  } else {
+    if (!res.rows.length) wrap.appendChild(el("div", "pf-note", T("没有符合条件的持仓。", "No holdings match.")));
+    else wrap.appendChild(askTable(res.rows));
+  }
+  return wrap;
+}
+// 回答里的持仓表：沿用持仓表的行样式（logo · 名称、区间徽章、市值、占比、目标 · 偏离、盈亏）
+function askTable(rows) {
+  const withTgt = rows.some((r) => Number.isFinite(r.target));
+  const tw = el("div", "pf-tablewrap"), tb = el("table", "pf-table"), hr = el("tr");
+  const cols = [[T("标的", "Symbol")], [T("区间", "Zone")], [T("市值", "Value")], [T("占比", "Weight")], ...(withTgt ? [[T("目标 · 偏离", "Target · drift"), "hide-sm"]] : []), [T("盈亏", "P/L")]];
+  for (const [h, cls] of cols) hr.appendChild(el("th", cls || "", h));
+  const thead = el("thead"); thead.appendChild(hr); tb.appendChild(thead);
+  const body = el("tbody");
+  for (const r of rows) {
+    const tr = el("tr", r.held ? "" : "planned");
+    const td0 = el("td"), sym = el("div", "pf-sym"), lg = el("span", "pf-logo"); mountLogo(lg, r.symbol, r.name);
+    const id = el("div", "pf-sym-id"); id.append(el("span", "pf-sym-name", r.name), el("span", "pf-sym-sub", r.held ? `${r.ticker} · ${r.accounts.join(" / ")}` : `${r.ticker} · ${T("计划建仓", "Planned")}`));
+    sym.append(lg, id); td0.appendChild(sym);
+    const zt = el("td"), zp = el("span", "pf-zone");
+    if (r.zoneIdx >= 0) { const zd = el("i"); zd.style.background = ZONES[r.zoneIdx].hex; zp.append(zd, document.createTextNode(ZONE_NAMES[r.zoneIdx])); } else zp.textContent = NONE_NAME;
+    zt.appendChild(zp);
+    tr.append(td0, zt, el("td", "", r.held ? amt(r.value, 0) : "—"), el("td", "", Number.isFinite(r.weight) ? r.weight.toFixed(1) + "%" : "—"));
+    if (withTgt) {
+      const t = el("td", "pf-tgt-td hide-sm");
+      if (Number.isFinite(r.target)) t.append(el("span", "pf-tgt-v", r.target.toFixed(1) + "%"), el("span", "pf-tgt-drift " + r.driftStatus, r.driftStatus === "build" ? T("未持有", "Not held") : (r.drift > 0 ? "+" : r.drift < 0 ? "−" : "") + Math.abs(r.drift).toFixed(1) + "pp"));
+      else { t.textContent = "—"; t.classList.add("muted"); }
+      tr.appendChild(t);
+    }
+    tr.appendChild(el("td", "pf-pnl " + (r.pnlPct > 0 ? "up" : r.pnlPct < 0 ? "down" : ""), pct(r.pnlPct)));
+    if (r.link) { tr.classList.add("link"); tr.addEventListener("click", () => { location.href = "/b/" + encodeURIComponent(slug) + "/" + encodeURIComponent(r.link.toUpperCase()); }); }
+    body.appendChild(tr);
+  }
+  tb.appendChild(body); tw.appendChild(tb);
+  return tw;
 }
 
 // ---------- 目标仓位 ----------
