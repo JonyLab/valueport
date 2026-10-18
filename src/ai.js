@@ -15,7 +15,7 @@ const DEFAULTS = {
   openai: { model: "gpt-4o-mini", baseUrl: "https://api.openai.com/v1" },
   anthropic: { model: "claude-sonnet-5-5", baseUrl: "https://api.anthropic.com" },
 };
-const MAX_TOKENS = 1500;
+const MAX_TOKENS = 4000; // 情景分析写得比较长，留足输出长度（不够时 JSON 会被截断）
 
 export function aiConfig(env) {
   const provider = (env.AI_PROVIDER || "workers-ai").trim().toLowerCase();
@@ -103,9 +103,9 @@ export function validateChat(body) {
   }
   if (messages[messages.length - 1].role !== "user") return "last message must be from user";
   if (!context || typeof context !== "object" || !Array.isArray(context.fields) || !context.fields.length || context.fields.length > 40) return "context.fields required";
-  if (badVerified(context.verified)) return "bad verified facts";
+  if (badVerified(context.verified) || badVerified(context.market) || badVerified(context.lenses) || badVerified(context.business) || badVerified(context.metrics)) return "bad verified facts";
   for (const f of context.fields) if (!f || typeof f.k !== "string" || (f.col !== "single" && f.col !== "dual")) return "bad field";
-  if (JSON.stringify(context).length > 20000) return "context too large";
+  if (JSON.stringify(context).length > 28000) return "context too large";
   return null;
 }
 
@@ -117,7 +117,7 @@ export function buildSystemPrompt(context, lang) {
   const c = context;
   const zh = lang !== "en";
   const fieldLines = c.fields.map((f) =>
-    `- ${f.k}｜${f.label || f.k}｜${f.col === "dual" ? "保守/乐观两档" : "单值"}｜单位：${f.unit === "%" ? "百分数（填 12 表示 12%）" : (f.money ? "金额（原始数值，不带单位缩写）" : (f.unit || "数字"))}｜当前：${fmtVal(f.value)}`).join("\n");
+    `- ${f.k}｜${f.label || f.k}｜${f.col === "dual" ? "保守/乐观两档" : "单值"}｜单位：${f.unit === "%" ? "百分数（填 12 表示 12%）" : (f.money ? "金额（原始数值，不带单位缩写）" : (f.unit || "数字"))}｜当前：${fmtVal(f.value)}${f.isDefault ? "（方法默认值，还没按这家公司调整）" : ""}`).join("\n");
   const facts = c.facts && typeof c.facts === "object"
     ? Object.entries(c.facts).filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k, v]) => `- ${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join("\n") : "";
   return [
@@ -129,7 +129,10 @@ export function buildSystemPrompt(context, lang) {
     "",
     "已知数据：",
     facts || "（无）",
+    ...(Array.isArray(c.business) && c.business.length ? ["", "生意本身（公司简介与收入构成）：", ...c.business.map((x) => "- " + x)] : []),
     ...verifiedBlock(c.verified),
+    ...(Array.isArray(c.metrics) && c.metrics.length ? ["", "最新实际数据与历史区间（系统根据财报计算，以此为准）：", ...c.metrics.map((x) => "- " + x)] : []),
+    ...viewsBlock(c.market, c.lenses),
     "",
     "当前方法的输入字段（k｜名称｜类型｜单位｜当前值）：",
     fieldLines,
@@ -138,9 +141,17 @@ export function buildSystemPrompt(context, lang) {
     "1. 只能建议上面列出的字段，不要发明字段；保守值应比乐观值更谨慎（增速、利润率、倍数更低；折现率更高）。",
     "2. 基于已知数据与行业常识给出合理假设；数据不足时说明你的假设前提，不要编造具体财务数字。" + GROUNDING,
     "3. 当你建议具体参数时，在回复最后附一个 ```json 代码块，格式严格如下（只含需要修改的字段）：",
-    '```json\n{"params": {"单值字段k": 数字, "两档字段k": {"c": 保守数字, "o": 乐观数字}}, "reasons": {"字段k": "一句话理由"}}\n```',
-    "4. 如果用户只是提问、还不需要改参数，就不要放 params；只想给交互组件时代码块里只放 {\"widgets\": [...]}；两者都不需要就不要附代码块。",
-    "5. 界面会把代码块渲染成参数表，所以正文里不要逐项罗列参数和数值，只用几句话讲清整体思路和关键判断（200 字以内）；只建议需要改动的字段。",
+    '```json\n{"params": {"单值字段k": 数字, "两档字段k": {"c": 保守数字, "o": 乐观数字}}, "reasons": {"字段k": "一句话理由"}, "scenarios": {"c": {"story": "保守情景的故事", "drivers": ["关键假设一", "关键假设二"], "breaks": "这个情景最可能在哪里被证明错了", "signals": "后续要跟踪的信号"}, "o": {"story": "…", "drivers": ["…"], "breaks": "…", "signals": "…"}}}\n```',
+    "   建议了保守 / 乐观两档参数时必须写 scenarios，分别对两个情景做有深度的分析，不要互相复制：",
+    "   - story：2~3 句，这个情景下公司的生意会怎样发展——收入和利润由什么驱动、行业与竞争会怎样、管理层会怎么做，要和「生意本身」对得上，说清它发生的前提。",
+    "   - drivers：2~4 条，每条对应一个关键假设，写清取这个值的依据（对照历史区间、一致预期、行业或大师视角），以及几个假设之间为什么自洽（如高增速需要更多再投资、利润率扩张需要规模效应）。不要只复述参数，要写「取多少 + 和实际 / 历史比怎样 + 为什么」，例如：「营收增速保守取 8%：低于近三年复合 10.6%，因为广告恢复放缓、游戏新品节奏不确定」。",
+    "   - 每个假设都以「最新实际数据与历史区间」为锚：明显偏离最新实际值时（如利润率只有实际的一半、增速是历史的两倍），必须在 drivers 里写明为什么会偏离；没有理由就不要偏离。",
+    "   - breaks：一句话，这个情景最可能落空的地方——保守情景说「哪里可能其实太悲观」，乐观情景说「哪里最容易兑现不了」。",
+    "   - signals：一句话，未来几个季度财报或经营数据里，哪些具体指标会证实或证伪这个情景。",
+    "   数字只能引用上面给出的数据和你建议的参数，不要编造新的财务数字；scenarios 里提到的每个假设值必须和 params 里的完全一致。",
+    "   用户要「一套完整的假设」时：标了「方法默认值」的字段都要按这家公司重新判断并写进 params；两档字段的保守值和乐观值一般应该不同，相同时要在 drivers 里说明为什么。",
+    "4. 如果用户只是提问、还不需要改参数，就不要放 params；只想给交互组件时代码块里只放 {\"widgets\": [...]}；两者都不需要就不要附代码块。不用组件时不要写 widgets 键；代码块一定要用三个反引号开头和结尾。",
+    "5. 界面会把代码块渲染成参数表和两个情景卡片，所以正文里不要逐项罗列参数、也不要重复情景分析，只用两三句话讲清整体判断（150 字以内）；只建议需要改动的字段。",
     "6. 这只是估值辅助，不构成投资建议；不要给出买卖建议。",
     "",
     "可选的交互组件（放在同一个 ```json 代码块的 \"widgets\" 数组里，每次最多 2 个；不需要就不放）。组件只指定字段和步长，数值由界面用估值模型现算，你不要在组件或正文里写出计算结果：",
@@ -187,15 +198,64 @@ export function parseWidgets(raw, fields) {
   return out.length ? out : null;
 }
 
+// 模型输出被截断或围栏不规整时，尽量把最后一个 JSON 对象救回来：围栏少一个反引号、没有收尾围栏、
+// 末尾截在半个字符串或半个键值上都能补齐（去掉最后一个不完整的成员，再补上缺的引号和括号）
+export function salvageJson(text) {
+  const t = String(text || "");
+  const start = t.search(/\{\s*"(params|picks|business|overall|points|view|summary|widgets)"/);
+  if (start < 0) return null;
+  let body = t.slice(start).replace(/`{2,3}\s*$/, "");
+  try { return JSON.parse(body); } catch { /* 往下修 */ }
+  // 扫一遍记录括号栈和最后一个「安全切点」（深度内的逗号）
+  const stack = []; let inStr = false, esc = false, cut = -1;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; continue; }
+    if (ch === '"') inStr = true;
+    else if (ch === "{" || ch === "[") stack.push(ch);
+    else if (ch === "}" || ch === "]") { stack.pop(); if (!stack.length) { try { return JSON.parse(body.slice(0, i + 1)); } catch { return null; } } }
+    else if (ch === "," ) cut = i;
+  }
+  if (cut < 0) return null;
+  const head = body.slice(0, cut);
+  const st = []; inStr = false; esc = false;
+  for (const ch of head) {
+    if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === '"') inStr = false; continue; }
+    if (ch === '"') inStr = true; else if (ch === "{" || ch === "[") st.push(ch); else if (ch === "}" || ch === "]") st.pop();
+  }
+  const closed = head + (inStr ? '"' : "") + st.reverse().map((c) => (c === "{" ? "}" : "]")).join("");
+  try { return JSON.parse(closed); } catch { return null; }
+}
+// 保守 / 乐观两个情景的分析：{ c: {story, drivers[], breaks, signals}, o: {…} }；两个都缺就不要
+export function parseScenarios(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const str = (v, n) => (typeof v === "string" ? plain(v).slice(0, n) : "");
+  const one = (x) => {
+    if (!x || typeof x !== "object") return null;
+    const out = { story: str(x.story, 400), drivers: (Array.isArray(x.drivers) ? x.drivers : []).map((d) => str(d, 220)).filter(Boolean).slice(0, 4),
+      breaks: str(x.breaks || x.risks, 220), signals: str(x.signals || x.watch, 220) };
+    return out.story || out.drivers.length ? out : null;
+  };
+  const ro = raw.o || raw.optimistic;
+  if (ro && typeof ro === "object") { if (!ro.breaks && typeof raw.breaks === "string") ro.breaks = raw.breaks; if (!ro.signals && typeof raw.signals === "string") ro.signals = raw.signals; }
+  const c = one(raw.c || raw.conservative), o = one(ro);
+  return c || o ? { ...(c ? { c } : {}), ...(o ? { o } : {}) } : null;
+}
 // 从回复里取出最后一个 ```json 代码块，按字段表校验；返回 { reply（去掉代码块后的正文）, params, reasons, widgets? }
 export function parseSuggestion(text, fields) {
   const re = /```(?:json)?\s*([\s\S]*?)```/gi;
   let m, last = null;
   while ((m = re.exec(text))) last = m;
-  if (!last) return { reply: plain(text), params: null, reasons: null };
-  let obj = null;
-  try { obj = JSON.parse(last[1]); } catch { return { reply: plain(text), params: null, reasons: null }; }
-  const reply = plain(text.slice(0, last.index) + text.slice(last.index + last[0].length));
+  let obj = null, reply;
+  if (last) { try { obj = JSON.parse(last[1]); } catch { obj = null; } }
+  if (obj) reply = plain(text.slice(0, last.index) + text.slice(last.index + last[0].length));
+  else {
+    // 没有完整围栏 / 被截断：从正文里救出 JSON，正文只留 JSON 之前的部分
+    obj = salvageJson(text);
+    if (!obj) return { reply: plain(text), params: null, reasons: null };
+    const at = text.search(/`{0,3}\s*(json)?\s*\{\s*"(params|widgets|scenarios|reasons)"/);
+    reply = plain(at >= 0 ? text.slice(0, at) : "");
+  }
   const raw = obj && typeof obj === "object" ? (obj.params && typeof obj.params === "object" ? obj.params : obj) : null;
   if (!raw) return { reply, params: null, reasons: null };
   const widgets = parseWidgets(obj.widgets, fields);
@@ -219,6 +279,8 @@ export function parseSuggestion(text, fields) {
   }
   const res = { reply, params: Object.keys(params).length ? params : null, reasons: Object.keys(reasons).length ? reasons : null };
   if (widgets) res.widgets = widgets; // 没有组件时不带这个键，老前端 / 老测试不受影响
+  const scenarios = res.params ? parseScenarios(obj.scenarios) : null;
+  if (scenarios) res.scenarios = scenarios;
   return res;
 }
 

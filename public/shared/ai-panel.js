@@ -24,7 +24,7 @@ const TX = {
     intro: "我会结合这只股票的数据和当前估值方法，给出保守 / 乐观两档假设和理由。建议的参数需要你确认后才会写入表单。",
     quick: ["帮我给出一套完整的保守 / 乐观假设", "看看我现在的假设是否合理", "折现率 / WACC 该取多少？"],
     thinking: "思考中…", suggest: "建议参数", field: "字段", now: "当前", next: "建议", apply: "应用到表单", applied: "已应用", undo: "撤销",
-    cons: "保守", opt: "乐观", err: "AI 暂时不可用", limit: "今天的 AI 对话次数已用完，明天再来", clear: "清空对话",
+    cons: "保守", opt: "乐观", scenC: "保守情景", scenO: "乐观情景", scenDrivers: "关键假设", scenBreaks: "可能错在哪", scenSignals: "跟踪信号", err: "AI 暂时不可用", limit: "今天的 AI 对话次数已用完，明天再来", clear: "清空对话",
     disclaimer: "AI 建议仅供参考，不构成投资建议",
     sens: "敏感性", sensLow: "合理价 低", sensHigh: "高", peers: "倍数对比", setTo: (x, y) => `把 ${x} 改成 ${y}`, setDone: "已改",
   },
@@ -33,7 +33,7 @@ const TX = {
     intro: "I'll use this stock's data and the current method to suggest conservative / optimistic assumptions with reasons. Nothing is written to the form until you apply it.",
     quick: ["Suggest a full set of conservative / optimistic assumptions", "Are my current assumptions reasonable?", "What discount rate / WACC should I use?"],
     thinking: "Thinking…", suggest: "Suggested inputs", field: "Field", now: "Now", next: "Suggested", apply: "Apply to form", applied: "Applied", undo: "Undo",
-    cons: "Cons.", opt: "Opt.", err: "AI is unavailable right now", limit: "Daily AI limit reached — try again tomorrow", clear: "Clear chat",
+    cons: "Cons.", opt: "Opt.", scenC: "Conservative case", scenO: "Optimistic case", scenDrivers: "Key assumptions", scenBreaks: "Where it could be wrong", scenSignals: "Signals to watch", err: "AI is unavailable right now", limit: "Daily AI limit reached — try again tomorrow", clear: "Clear chat",
     disclaimer: "AI suggestions are for reference only, not investment advice",
     sens: "Sensitivity", sensLow: "Fair value low", sensHigh: "High", peers: "Multiple check", setTo: (x, y) => `Set ${x} to ${y}`, setDone: "Changed",
   },
@@ -52,7 +52,7 @@ export function aiErrorText(status, j, lang) {
   return String((j && j.detail) || e || status);
 }
 
-export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField, widgets: wx }) {
+export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField, widgets: wx, checkParams }) {
   const T = TX[lang] || TX.zh;
   const history = []; // { role, content } —— 发给后端的对话（不含建议卡）
   let busy = false;
@@ -152,13 +152,35 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     return fmtField(f, v);
   };
 
-  function suggestionCard(params, reasons, fields) {
+  // 保守 / 乐观两个情景的分析：故事 + 关键假设 + 可能错在哪 + 跟踪信号
+  function scenarioBlock(key, sc) {
+    const box = el("div", "vc-ai-scen " + key);
+    box.appendChild(el("div", "vc-ai-scen-head", key === "c" ? T.scenC : T.scenO));
+    if (sc.story) box.appendChild(el("p", "vc-ai-scen-story", sc.story));
+    if (sc.drivers && sc.drivers.length) {
+      box.appendChild(el("div", "vc-ai-scen-k", T.scenDrivers));
+      const ul = el("ul", "vc-ai-scen-list"); sc.drivers.forEach((d) => ul.appendChild(el("li", "", d))); box.appendChild(ul);
+    }
+    for (const [k, lab] of [["breaks", T.scenBreaks], ["signals", T.scenSignals]]) {
+      if (!sc[k]) continue;
+      const row = el("div", "vc-ai-scen-row"); row.append(el("span", "vc-ai-scen-k", lab), el("span", "", sc[k])); box.appendChild(row);
+    }
+    return box;
+  }
+  function suggestionCard(params, reasons, fields, scenarios) {
     const byKey = new Map(fields.map((f) => [f.k, f]));
     const card = el("div", "vc-ai-sugg");
     const top = el("div", "vc-ai-sugg-head");
     top.append(ri("magic-line"), el("span", "", T.suggest));
     card.appendChild(top);
+    if (scenarios && (scenarios.c || scenarios.o)) {
+      const wrap = el("div", "vc-ai-scens");
+      if (scenarios.c) wrap.appendChild(scenarioBlock("c", scenarios.c));
+      if (scenarios.o) wrap.appendChild(scenarioBlock("o", scenarios.o));
+      card.appendChild(wrap);
+    }
     const same = (f, v) => f.col === "dual" ? (v && f.value && v.c === f.value.c && v.o === f.value.o) : v === f.value;
+    let checks = {}; try { checks = (checkParams && checkParams(params)) || {}; } catch { checks = {}; }
     Object.entries(params).forEach(([k, v]) => {
       const f = byKey.get(k); if (!f || same(f, v)) return; // 和当前值一样的不列
       const row = el("div", "vc-ai-srow");
@@ -173,6 +195,8 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       vals.append(now, arrow, next);
       row.append(lab, vals);
       if (reasons && reasons[k]) row.appendChild(el("div", "vc-ai-sreason", reasons[k]));
+      // 系统核对：建议值相对最新实际值的位置（代码算的，不依赖模型怎么说）
+      if (checks[k]) { const ck = el("div", "vc-ai-scheck"); ck.append(ri("scales-3-line"), el("span", "", (lang === "zh" ? "系统核对：" : "Check: ") + checks[k])); row.appendChild(ck); }
       card.appendChild(row);
     });
     const actions = el("div", "vc-ai-sact");
@@ -299,7 +323,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       history.push({ role: "assistant", content: reply + (Object.keys(tail).length ? "\n" + JSON.stringify(tail) : "") });
       const m = reply ? bubble("ai", reply) : bubble("ai", "");
       if (!reply) m.querySelector(".vc-ai-bubble").remove();
-      if (j.params) m.appendChild(suggestionCard(j.params, j.reasons, context.fields));
+      if (j.params) m.appendChild(suggestionCard(j.params, j.reasons, context.fields, j.scenarios));
       for (const node of extra) m.appendChild(node);
       log.scrollTop = log.scrollHeight;
     } catch {

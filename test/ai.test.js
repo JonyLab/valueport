@@ -441,3 +441,26 @@ describe("site-key free models (Zhipu GLM-4.7-Flash)", () => {
     expect(n).toBe(3);
   }, 15000);
 });
+
+describe("scenario analysis in the chat", () => {
+  const F = [{ k: "growth", label: "营收增速", col: "dual", unit: "%", value: { c: 10, o: 10 }, isDefault: true }, { k: "n", label: "年数", col: "single", value: 10 }];
+  it("asks for per-scenario analysis anchored to actuals and flags method defaults", async () => {
+    const { buildSystemPrompt } = await import("../src/ai.js");
+    const p = buildSystemPrompt({ stock: { name: "腾讯" }, method: { key: "fcff" }, fields: F, metrics: ["营收增速：近三年复合 +8.6%"], business: ["所属行业：互联网"] }, "zh");
+    expect(p).toContain('"scenarios": {"c": {"story"');
+    expect(p).toContain("（方法默认值，还没按这家公司调整）");
+    expect(p).toContain("最新实际数据与历史区间");
+    expect(p).toContain("生意本身（公司简介与收入构成）");
+    expect(p).toContain("scenarios 里提到的每个假设值必须和 params 里的完全一致");
+  });
+  it("parses scenarios, salvages truncated JSON and puts misplaced fields back", async () => {
+    const { parseSuggestion } = await import("../src/ai.js");
+    const t = '结论一句。\n\n``json\n{"params": {"n": 10, "growth": {"c": 8, "o": 12}}, "scenarios": {"c": {"story": "稳住", "drivers": ["增速 8%"]}, "o": {"story": "AI 驱动", "drivers": ["增速 12%"]}, "breaks": "宏观不好", "signals": "广告增速"}}, "widgets":';
+    const r = parseSuggestion(t, F);
+    expect(r.reply).toBe("结论一句。");
+    expect(r.params).toEqual({ n: 10, growth: { c: 8, o: 12 } });
+    expect(r.scenarios).toEqual({ c: { story: "稳住", drivers: ["增速 8%"], breaks: "", signals: "" }, o: { story: "AI 驱动", drivers: ["增速 12%"], breaks: "宏观不好", signals: "广告增速" } });
+    expect(parseSuggestion('```json\n{"params": {"growth": {"c": 8, "o": 12}}, "scenarios": {"c": {"story": "稳住", "drivers": ["增速 8%", "利润率 2', F).scenarios.c.drivers).toEqual(["增速 8%"]);
+    expect(parseSuggestion("只是聊聊", F).params).toBeNull();
+  });
+});

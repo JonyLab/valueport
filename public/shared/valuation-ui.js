@@ -15,7 +15,7 @@ import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
 import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
 import { mountAiPanel, aiErrorText } from "/shared/ai-panel.js";
-import { verifiedFacts, marketViews, masterLenses, businessFacts } from "/shared/valuation/facts.js";
+import { verifiedFacts, marketViews, masterLenses, businessFacts, latestMetrics, assumptionChecks } from "/shared/valuation/facts.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -1299,8 +1299,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // 市场投研（/api/research，服务端缓存 6 小时）+ 大师方法视角；拿不到就只用基本面
   async function aiViews() {
     const sym = stock && stock.symbol;
-    let research = null;
-    if (sym) { try { research = (await fetch("/api/research?symbol=" + encodeURIComponent(sym)).then((r) => r.json())).research; } catch { research = null; } }
+    const research = await researchP;
     try {
       return {
         market: marketViews({ research, financials: refData && refData.financials, price: ctx.price, market: sym ? sym.slice(0, 2) : "", lang }),
@@ -1322,6 +1321,11 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       revenueHistory: seriesOf("IS", "OperatingRevenue"), netIncomeHistory: seriesOf("IS", "NetProfit"), fcfHistory: seriesOf("CF", "NetFreeCashFlow"),
     };
   }
+  // 市场投研 + 公司简介 / 收入构成：工作台打开时取一次（服务端按标的缓存 6 小时），选方法和对话都用
+  let researchData = null;
+  const researchP = stock && stock.symbol
+    ? fetch("/api/research?symbol=" + encodeURIComponent(stock.symbol)).then((r) => r.json()).then((j) => (researchData = j.research || null)).catch(() => null)
+    : Promise.resolve(null);
   // 已核实的事实：由财报算出（现金流 / 盈利是否稳定、负值年份、是否分红等），提示词要求 AI 以此为准、不得凭印象编
   function aiVerified() {
     try { return verifiedFacts({ financials: refData && refData.financials, dividends: refData && refData.dividends, dps: ctx.dividendYield, price: ctx.price, eps: ctx.epsTtm, lang }); } catch { return []; }
@@ -1331,19 +1335,45 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const meta = methodMenuMeta(model);
     const fields = modeFields(model, currentMode).map((f) => {
       const v = lastForm[f.k];
+      // isDefault：还停在方法自带的默认值（如增速 10%、利润率 15%），不是对这家公司的判断——提示词会让 AI 重新判断
+      const d = f.default, isDefault = d !== undefined && (f.col === "dual" ? (v && v.c === d && v.o === d) : v === d);
       return { k: f.k, label: textFor(f.label, lang, f.k), col: f.col, unit: f.unit || "", money: MONEY_METAS.has(f.meta),
-        value: f.col === "dual" ? { c: finiteOr(v && v.c), o: finiteOr(v && v.o) } : finiteOr(v) };
+        value: f.col === "dual" ? { c: finiteOr(v && v.c), o: finiteOr(v && v.o) } : finiteOr(v), ...(isDefault ? { isDefault: true } : {}) };
     });
     const facts = {
       ...stockFacts(),
       currentConclusion: Number.isFinite(lastLow) && Number.isFinite(lastHigh) ? `${fmt(Math.min(lastLow, lastHigh), "—")} ~ ${fmt(Math.max(lastLow, lastHigh), "—")}` : null,
     };
-    return { stock: aiStock(), verified: aiVerified(),
+    // 生意、历史区间、市场投研与大师视角一起给，AI 才能分别把保守 / 乐观情景讲透
+    const fin = refData && refData.financials, sym = (stock && stock.symbol) || "";
+    const extra = {};
+    try {
+      extra.business = businessFacts({ research: researchData, lang });
+      extra.metrics = latestMetrics({ financials: fin, financialsQ: refData && refData.financialsQ, valuationRefs: refData && refData.valuationRefs, lang });
+      extra.market = marketViews({ research: researchData, financials: fin, price: ctx.price, market: sym.slice(0, 2), lang });
+      extra.lenses = masterLenses({ financials: fin, research: researchData, price: ctx.price, eps: ctx.epsTtm, bps: ctx.bps, lang });
+    } catch { /* 缺数据时只用基本面 */ }
+    return { stock: aiStock(), verified: aiVerified(), ...extra,
       method: { key: model.key, label: textFor(meta && meta.title, lang, modelTitle(model, lang)) }, mode: currentMode || null, fields, facts };
+  }
+  // AI 建议的参数 vs 最新实际值：由代码比较（小模型常把 10% 说成「低于 8.6%」），在建议卡每行下面显示 → { 字段k: 一句话 }
+  function checkParams(params) {
+    const model = MODELS[activeIdx]; if (!model) return {};
+    const fields = modeFields(model, currentMode).filter((f) => params[f.k] !== undefined)
+      .map((f) => ({ k: f.k, label: textFor(f.label, lang, f.k), meta: f.meta, col: f.col, unit: f.unit || "", value: params[f.k] }));
+    const out = {};
+    try {
+      for (const line of assumptionChecks({ fields, financials: refData && refData.financials, valuationRefs: refData && refData.valuationRefs, dividends: refData && refData.dividends, lang })) {
+        const k = line.split(/（|\(| \(/)[0], body = line.slice(line.search(/[：:]/) + 1).trim();
+        out[k] = body.replace(/^当初 保守 [^；]*；/, "").replace(/^was [^;]*; /, "").replace(/^当初填/, lang === "zh" ? "建议" : "suggested").replace(/^was /, "suggested ");
+      }
+    } catch { /* 缺数据就不显示 */ }
+    return out;
   }
   const ai = mountAiPanel(mount, {
     lang,
     getContext: aiContext,
+    checkParams,
     fmtField: (f, v) => !Number.isFinite(v) ? "—" : f.money ? fmtMoney(v) : String(Math.round(v * 1000) / 1000),
     onApply: (params) => {
       const snap = { inputs: cleanForm(lastForm), derivations: JSON.parse(JSON.stringify(derivations)) };
