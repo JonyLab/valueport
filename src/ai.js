@@ -176,52 +176,73 @@ export function validateMethodReq(body) {
   if (!stock || typeof stock !== "object" || typeof stock.name !== "string") return "stock required";
   if (!Array.isArray(methods) || !methods.length || methods.length > 30) return "methods required";
   for (const m of methods) if (!m || typeof m.key !== "string" || typeof m.title !== "string") return "bad method";
-  if (badVerified(body.verified) || badVerified(body.market) || badVerified(body.lenses)) return "bad verified facts";
-  if (JSON.stringify(body).length > 20000) return "body too large";
+  if (badVerified(body.verified) || badVerified(body.market) || badVerified(body.lenses) || badVerified(body.business)) return "bad verified facts";
+  if (JSON.stringify(body).length > 24000) return "body too large";
   return null;
 }
+// 生意类型：先看懂公司怎么赚钱，再按类型选方法（参考林奇的六类公司 + 金融、公用事业）。
+// avoid：这类公司不该用的方法——即使模型选了，也在服务端剔除（开源模型常无视规则）。
+export const BUSINESS_TYPES = {
+  cyclical: { zh: "资源与周期", en: "Cyclical / commodity", desc: "矿业、油气、航运、钢铁、化工、养殖等，盈利随商品价格或行业周期大起大落", play: "首选资源股 NAV / SOTP（有可估储量的资源资产）或 EV/EBITDA（用中周期口径）；P/E 只能用正常化的中周期利润；不要用 PEG、不要用当期高景气利润外推增速——林奇也把周期股单列，周期股市盈率最低时往往是周期顶点", avoid: ["peg", "ps"] },
+  financial: { zh: "金融", en: "Financial", desc: "银行、保险、券商等，资产负债表就是生意本身", play: "首选 P/B（结合 ROE 看能撑多高的 PB）；长期高分红的可用 DDM；P/E 作交叉验证；不用自由现金流类和 EV/EBITDA、P/S", avoid: ["fcff", "fcf", "fcfe", "evebitda", "ps"] },
+  utility: { zh: "公用事业 / 类债券", en: "Utility / bond-like", desc: "电力、水务、燃气、收费公路、电信运营等，价格受管制、现金流稳定", play: "首选 DDM 或 DCF 自由现金流；P/E 作交叉验证；不用 PEG、P/S", avoid: ["peg", "ps"] },
+  stalwart: { zh: "成熟稳健", en: "Stalwart", desc: "行业龙头，增长中低速、盈利与现金流稳定", play: "首选 DCF 自由现金流或 P/E；分红率高的可加 DDM 交叉验证；不用 P/S", avoid: ["ps"] },
+  fast_grower: { zh: "高速成长", en: "Fast grower", desc: "已经盈利、收入利润快速增长", play: "首选分阶段的 FCFF / DCF 或 P/E（配合增速）；PEG 作交叉验证；不用 DDM、P/B", avoid: ["ddm", "pb"] },
+  unprofitable: { zh: "未盈利成长 / 困境反转", en: "Unprofitable / turnaround", desc: "尚未盈利或刚经历大亏、正在扭转", play: "首选 P/S 或 EV/收入类倍数；FCFF 用情景假设作交叉验证；不用 P/E、PEG、DDM", avoid: ["pe", "peg", "ddm"] },
+  asset_play: { zh: "资产型 / 多元控股", en: "Asset play / holding", desc: "价值主要在资产或多项业务（地产、控股集团、多元化公司）", play: "首选 NAV / SOTP 分部加总或 P/B；P/E 作交叉验证；不用 PEG、P/S", avoid: ["peg", "ps"] },
+  platform: { zh: "轻资产平台 / 品牌", en: "Asset-light platform / brand", desc: "高 ROE、强现金流的平台、软件、消费品牌", play: "首选 DCF 自由现金流或 FCFF；P/E 作交叉验证；分红率低时不用 DDM；不用 P/B", avoid: ["pb"] },
+};
 export function buildMethodPrompt(body, lang) {
-  const { stock, facts, methods, verified, market, lenses } = body;
+  const { stock, facts, methods, verified, market, lenses, business } = body;
   const zh = lang !== "en";
   const factLines = facts && typeof facts === "object"
     ? Object.entries(facts).filter(([, v]) => v !== null && v !== undefined && v !== "").map(([k, v]) => `- ${k}: ${v}`).join("\n") : "";
+  const types = Object.entries(BUSINESS_TYPES).map(([k, t]) => `- ${k}｜${t.zh}｜${t.desc}｜估值做法：${t.play}`).join("\n");
   return [
-    "你是一位严谨的价值投资分析师。用户要给一只股票做估值，请根据这家公司的业务类型、盈利与现金流特征、分红情况，从下面的估值方法里推荐最合适的。",
+    "你是一位严谨的价值投资分析师。像巴菲特、芒格、林奇那样，先弄懂这门生意——它靠什么赚钱、收入和利润由什么驱动、周期性强不强、要不要大量资本投入、护城河在哪——再结合财务状况决定用什么方法估值，而不是只看利润增速或几个指标。",
     zh ? "用中文回答。" : "Answer in English.",
     "",
     `标的：${stock.name}（${stock.code || ""}）　币种：${stock.currency || "未知"}　现价：${stock.price || "未知"}`,
-    "已知数据：", factLines || "（无）",
+    ...(Array.isArray(business) && business.length ? ["", "生意本身（来自长桥：公司简介与收入构成）：", ...business.map((x) => "- " + x)] : []),
+    "", "已知数据：", factLines || "（无）",
     ...verifiedBlock(verified),
     ...viewsBlock(market, lenses),
+    "",
+    "生意类型（type｜名称｜特征｜估值做法）：",
+    types,
     "",
     "可选方法（key｜名称｜适用场景）：",
     methods.map((m) => `- ${m.key}｜${m.title}｜${m.subtitle || ""}`).join("\n"),
     "",
-    "规则：",
-    "1. 推荐 1 个首选方法 + 1~2 个用来交叉验证的方法，只能从上面的 key 里选。",
-    "2. 依据公司实际情况：银行保险等看账面价值；股息折现（DDM）只在分红是主要回报方式时才作主方法（分红率约 40% 以上、股息率不低、长期稳定派息）——分红率低、主要靠回购或再投资的公司（多数科技成长股）不要首选 DDM，以「已核实的事实」里的分红判断为准；现金流各年为正且稳定可预测才首选现金流折现；自由现金流有负值年份或大幅波动时，优先用盈利倍数（多业务公司可用 P/E 的「分业务」口径，按业务分别估）或市销率，现金流折现最多作交叉验证；尚未盈利的成长股用市销率；最近三年都盈利的公司不要首选市销率（盈利有波动就用 P/E 并说明取哪年口径）；资源类看资产重估。",
-    "3. " + GROUNDING + SYNTHESIS + "大师视角里某个指标「不满足」不等于方法不能用，要结合公司类型解释。",
-    zh ? "4. 正文用两三句话讲清这家公司的特点和选择依据（120 字以内），引用一两条已核实的事实作依据，不要逐项罗列方法；提到方法时用上面的方法名称（如「DCF 自由现金流」），不要写 key。" : "4. Keep the prose to two or three sentences (under 70 words): what kind of company this is and why the primary method fits, citing one or two verified facts. Don't walk through every method; refer to methods by their names (e.g. \"DCF free cash flow\"), never by key.",
-    "5. 回复最后附一个 ```json 代码块，格式严格如下：",
-    '```json\n{"picks": [{"key": "方法key", "role": "primary", "reason": "一句话理由"}, {"key": "方法key", "role": "check", "reason": "一句话理由"}]}\n```',
+    "步骤与规则：",
+    "1. 先根据「生意本身」和你对这家公司的了解判断它怎么赚钱、收入利润的驱动因素（量、价、商品价格、利率、用户数等）、周期性与资本密集度，归入上面的一个生意类型。周期性和类型要以生意本身为准：利润增速高不等于高速成长，如果增长主要来自商品价格上涨，它仍是资源与周期类。",
+    "2. 再按该类型的估值做法选 1 个首选 + 1~2 个交叉验证方法，只能从可选方法的 key 里选；用已核实的事实、市场投研、大师方法视角去细化和检验（例如分红率决定 DDM 能不能用、现金流稳不稳定决定 DCF 的可靠性）。大师方法里不适用于该类型的指标（如周期股的 PEG）要明确忽略。",
+    "3. " + GROUNDING + SYNTHESIS + "不确定的业务细节不要编，说「从公开资料看」即可。",
+    zh ? "4. 正文用两三句话讲清选择依据（100 字以内），不要重复生意画像，不要逐项罗列方法；提到方法时用方法名称（如「DCF 自由现金流」），不要写 key。" : "4. Keep the prose to two or three sentences (under 60 words) on why these methods fit; don't repeat the business profile or walk through every method; refer to methods by name (e.g. \"DCF free cash flow\"), never by key.",
+    "5. 回复最后附一个 ```json 代码块，格式严格如下（business 里的字段各一句话，type 用上面的 key）：",
+    '```json\n{"business": {"type": "生意类型key", "model": "它怎么赚钱", "drivers": "收入和利润主要由什么驱动", "implication": "这对估值意味着什么"}, "picks": [{"key": "方法key", "role": "primary", "reason": "一句话理由"}, {"key": "方法key", "role": "check", "reason": "一句话理由"}]}\n```',
   ].join("\n");
 }
 export function parsePicks(text, methods) {
   const re = /```(?:json)?\s*([\s\S]*?)```/gi;
   let m, last = null;
   while ((m = re.exec(text))) last = m;
-  if (!last) return { reply: plain(text), picks: [] };
+  if (!last) return { reply: plain(text), picks: [], business: null };
   const reply = plain(text.slice(0, last.index) + text.slice(last.index + last[0].length));
-  let obj = null; try { obj = JSON.parse(last[1]); } catch { return { reply, picks: [] }; }
+  let obj = null; try { obj = JSON.parse(last[1]); } catch { return { reply, picks: [], business: null }; }
   const keys = new Set(methods.map((x) => x.key));
+  const bz = obj && obj.business && typeof obj.business === "object" && BUSINESS_TYPES[obj.business.type] ? obj.business : null;
+  const avoid = new Set(bz ? BUSINESS_TYPES[bz.type].avoid : []);
   const seen = new Set(), picks = [];
   for (const p of (obj && Array.isArray(obj.picks) ? obj.picks : [])) {
-    if (!p || !keys.has(p.key) || seen.has(p.key)) continue;
+    if (!p || !keys.has(p.key) || seen.has(p.key) || avoid.has(p.key)) continue; // 不适合该生意类型的方法直接剔除
     seen.add(p.key);
     picks.push({ key: p.key, role: picks.length ? "check" : "primary", reason: typeof p.reason === "string" ? plain(p.reason).slice(0, 200) : "" });
     if (picks.length >= 3) break;
   }
-  return { reply, picks };
+  const str = (v) => (typeof v === "string" ? plain(v).slice(0, 200) : "");
+  const business = bz ? { type: bz.type, model: str(bz.model), drivers: str(bz.drivers), implication: str(bz.implication) } : null;
+  return { reply, picks, business };
 }
 
 // ── AI 复核：用最新财报检查一张估值卡当初的假设还成不成立 ──
@@ -234,12 +255,12 @@ export function validateReviewReq(body) {
   if (!Array.isArray(fields) || !fields.length || fields.length > 40) return "fields required";
   for (const f of fields) if (!f || typeof f.k !== "string" || (f.col !== "single" && f.col !== "dual")) return "bad field";
   if (!result || !Number.isFinite(Number(result.low)) || !Number.isFinite(Number(result.high))) return "result required";
-  if (badVerified(body.verified) || badVerified(body.metrics) || badVerified(body.comparisons) || badVerified(body.market) || badVerified(body.lenses)) return "bad facts";
+  if (badVerified(body.verified) || badVerified(body.metrics) || badVerified(body.comparisons) || badVerified(body.market) || badVerified(body.lenses) || badVerified(body.business)) return "bad facts";
   if (JSON.stringify(body).length > 20000) return "body too large";
   return null;
 }
 export function buildReviewPrompt(body, lang) {
-  const { stock, method, fields, result, valuedAt, verified, metrics, comparisons, market, lenses } = body;
+  const { stock, method, fields, result, valuedAt, verified, metrics, comparisons, market, lenses, business } = body;
   const zh = lang !== "en";
   const fieldLines = fields.map((f) => `- ${f.k}｜${f.label || f.k}｜${f.unit === "%" ? "百分数" : f.money ? "金额" : (f.unit || "数字")}｜当初填的：${fmtVal(f.value)}`).join("\n");
   return [
@@ -249,6 +270,7 @@ export function buildReviewPrompt(body, lang) {
     `标的：${stock.name}（${stock.code || ""}）　币种：${stock.currency || "未知"}　现价：${stock.price || "未知"}`,
     `估值方法：${method.label || method.key}　估值日期：${valuedAt || "未知"}　当初结论：合理价 ${result.low} ~ ${result.high}`,
     "",
+    ...(Array.isArray(business) && business.length ? ["生意本身（公司简介与收入构成）：", ...business.map((x) => "- " + x), ""] : []),
     "当初的假设（k｜名称｜单位｜当初填的值；两档为 保守 / 乐观）：",
     fieldLines,
     ...verifiedBlock(verified),

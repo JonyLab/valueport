@@ -329,3 +329,19 @@ export function masterLenses({ financials, research, price, eps, bps, lang = "zh
   if (out.length) out.push(zh ? "（以上是按大师公开的方法论计算，不代表他们本人对这只股票的看法）" : "(Computed from the masters' published methods; not their own views on this stock)");
   return out;
 }
+
+/**
+ * businessFacts({ research, lang }) → string[]
+ * 生意本身：经营范围 / 业务描述、按业务与地区的收入构成（含同比）、所属行业。给 AI 先看懂「怎么赚钱」再选估值方法。
+ */
+export function businessFacts({ research, lang = "zh" } = {}) {
+  const zh = lang !== "en";
+  const out = [];
+  const p = research && research.profile, sg = research && research.segments, ind = research && research.rating && research.rating.industry;
+  if (ind && ind.name) out.push(zh ? `所属行业：${ind.name}` : `Industry: ${ind.name}`);
+  if (p && p.profile) { const t = p.profile.length > 260 ? p.profile.slice(0, 260) + "…" : p.profile; out.push((zh ? "业务描述：" : "Business: ") + t + (p.employees ? (zh ? `（员工约 ${p.employees} 人）` : ` (~${p.employees} employees)`) : "")); }
+  const mix = (arr) => arr.slice(0, 6).map((x) => `${x.name} ${x.percent.toFixed(1)}%` + (Number.isFinite(x.yoy) && x.yoy !== 0 ? (zh ? `（同比 ${x.yoy >= 0 ? "+" : ""}${x.yoy.toFixed(1)}%）` : ` (${x.yoy >= 0 ? "+" : ""}${x.yoy.toFixed(1)}% YoY)`) : "")).join(zh ? "、" : ", ");
+  if (sg && sg.business && sg.business.length) out.push((zh ? `收入构成（${sg.period}，按业务）：` : `Revenue mix (${sg.period}, by business): `) + mix(sg.business));
+  if (sg && sg.regions && sg.regions.length) out.push((zh ? `收入构成（${sg.period}，按地区）：` : `Revenue mix (${sg.period}, by region): `) + mix(sg.regions));
+  return out;
+}

@@ -15,7 +15,7 @@ import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
 import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
 import { mountAiPanel, aiErrorText } from "/shared/ai-panel.js";
-import { verifiedFacts, marketViews, masterLenses } from "/shared/valuation/facts.js";
+import { verifiedFacts, marketViews, masterLenses, businessFacts } from "/shared/valuation/facts.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -161,7 +161,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   if (!stock || !stock.name) pickAi.hidden = true;
   pickHead.append(pickTop, pickSub, pickWarn, pickAi);
   let aiPicks = [];
-  const aiPickKey = () => "ai_method_v4_" + ((stock && stock.code) || "") + "_" + lang;
+  // 生意类型标签（与 src/ai.js 的 BUSINESS_TYPES 对应）
+  const BIZ_LABEL = { cyclical: ["资源与周期", "Cyclical / commodity"], financial: ["金融", "Financial"], utility: ["公用事业 / 类债券", "Utility / bond-like"], stalwart: ["成熟稳健", "Stalwart"],
+    fast_grower: ["高速成长", "Fast grower"], unprofitable: ["未盈利成长 / 困境反转", "Unprofitable / turnaround"], asset_play: ["资产型 / 多元控股", "Asset play / holding"], platform: ["轻资产平台 / 品牌", "Asset-light platform / brand"] };
+  const aiPickKey = () => "ai_method_v5_" + ((stock && stock.code) || "") + "_" + lang;
   function applyPicks() {
     methodBar.querySelectorAll(".vc-pcard").forEach((b) => {
       b.classList.remove("ai-pick", "ai-primary");
@@ -184,7 +187,21 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const body = el("div", "vc-picker-aibody");
     const lab = el("div", "vc-picker-ailab"); lab.textContent = lang === "zh" ? "AI 建议" : "AI suggestion";
     const txt = el("div", "vc-picker-aitxt"); txt.textContent = r.reply || "";
-    body.append(lab, txt);
+    body.appendChild(lab);
+    const bz = r.business && typeof r.business === "object" && !Array.isArray(r.business) ? r.business : null;
+    if (bz && BIZ_LABEL[bz.type]) {
+      const card = el("div", "vc-picker-biz");
+      const head = el("div", "vc-picker-biz-head");
+      head.append(el("span", "vc-picker-biz-lab", lang === "zh" ? "生意画像" : "Business profile"), el("span", "vc-picker-biz-type", BIZ_LABEL[bz.type][lang === "zh" ? 0 : 1]));
+      card.appendChild(head);
+      for (const [k, zhL, enL] of [["model", "怎么赚钱", "How it makes money"], ["drivers", "驱动因素", "Drivers"], ["implication", "对估值的含义", "For valuation"]]) {
+        if (!bz[k]) continue;
+        const row = el("div", "vc-picker-biz-row"); row.append(el("span", "vc-picker-biz-k", lang === "zh" ? zhL : enL), el("span", "vc-picker-biz-v", bz[k]));
+        card.appendChild(row);
+      }
+      body.appendChild(card);
+    }
+    body.appendChild(txt);
     // 推荐的方法直接给按钮：首选在前（暖黄），交叉验证在后；点了等同于点对应的方法卡
     if (aiPicks.length) {
       const row = el("div", "vc-picker-aipicks");
@@ -201,10 +218,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       body.appendChild(row);
     }
     // 参考依据：市场投研 + 大师方法视角（折叠，点开看）
-    const refs = [...(r.market || []), ...(r.lenses || [])];
+    const refs = [...(r.businessFacts || []), ...(r.market || []), ...(r.lenses || [])];
     if (refs.length) {
       const det = el("details", "vc-picker-refs");
-      const sm = el("summary"); sm.textContent = lang === "zh" ? `参考依据：市场投研与大师方法视角（${refs.length} 条）` : `Basis: market research and master lenses (${refs.length})`;
+      const sm = el("summary"); sm.textContent = lang === "zh" ? `参考依据：生意、市场投研与大师方法视角（${refs.length} 条）` : `Basis: business, market research and master lenses (${refs.length})`;
       const ul = el("ul"); refs.forEach((x) => { const li = el("li"); li.textContent = x; ul.appendChild(li); });
       det.append(sm, ul); body.appendChild(det);
     }
@@ -226,7 +243,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), verified: aiVerified(), ...views, methods }) });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(aiErrorText(res.status, j, lang));
-      Object.assign(j, views);
+      Object.assign(j, { market: views.market, lenses: views.lenses, businessFacts: views.business });
       showAiResult(j);
       try { sessionStorage.setItem(aiPickKey(), JSON.stringify(j)); } catch { /* 存不下就算了 */ }
     } catch (e) {
@@ -1288,8 +1305,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       return {
         market: marketViews({ research, financials: refData && refData.financials, price: ctx.price, market: sym ? sym.slice(0, 2) : "", lang }),
         lenses: masterLenses({ financials: refData && refData.financials, research, price: ctx.price, eps: ctx.epsTtm, bps: ctx.bps, lang }),
+        business: businessFacts({ research, lang }),
       };
-    } catch { return { market: [], lenses: [] }; }
+    } catch { return { market: [], lenses: [], business: [] }; }
   }
   function aiStock() {
     return { name: (stock && stock.name) || "", code: (stock && stock.code) || "", currency: (stock && stock.currency) || "", price: finiteOr(ctx.price) };

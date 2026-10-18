@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { parseRating, parseForecastEps, fetchResearch } from "../src/research.js";
+import { parseRating, parseForecastEps, parseProfile, parseSegments, fetchResearch } from "../src/research.js";
+import { businessFacts } from "../public/shared/valuation/facts.js";
 
 describe("research parsing", () => {
   it("parses the institution rating snapshot", () => {
@@ -18,9 +19,21 @@ describe("research parsing", () => {
     const calls = [];
     const get = async (e, path, q) => { calls.push([path, q]); if (path.includes("forecast")) throw new Error("throttled"); return { data: { evaluate: { buy: 1, total: 1 }, target: {} } }; };
     const r = await fetchResearch(env, "hk00700", get);
-    expect(calls.map((c) => c[1])).toEqual(["symbol=700.HK", "symbol=700.HK"]);
+    expect(calls.map((c) => c[1])).toEqual(["symbol=700.HK", "symbol=700.HK", "symbol=700.HK", "symbol=700.HK"]);
     expect(r.rating.total).toBe(1);
     expect(r.forecastEps).toBeNull();
     expect(await fetchResearch({}, "usAAPL", get)).toBeNull(); // 没配长桥凭据
+  });
+});
+
+describe("company profile and revenue mix", () => {
+  it("parses the profile and segments, dropping eliminations, and states them as business facts", () => {
+    const profile = parseProfile({ data: { name: "紫金矿业", company_name: "紫金矿业集团股份有限公司", profile: "矿产资源勘查;金矿采选;铜矿采选", employees: "69559" } });
+    expect(profile).toMatchObject({ name: "紫金矿业集团股份有限公司", profile: "矿产资源勘查;金矿采选;铜矿采选", employees: 69559 });
+    const segments = parseSegments({ data: { report_txt: "2026.H1", business: [{ name: "矿产品", percent: "33.71", yoy: "57.9" }, { name: "部门间冲销", percent: "", yoy: "-48" }], regionals: [{ name: "中国大陆", percent: "65", yoy: "7.5" }] } });
+    expect(segments).toEqual({ period: "2026.H1", business: [{ name: "矿产品", percent: 33.71, yoy: 57.9 }], regions: [{ name: "中国大陆", percent: 65, yoy: 7.5 }] });
+    const f = businessFacts({ research: { rating: { industry: { name: "黄金" } }, profile, segments }, lang: "zh" });
+    expect(f).toEqual(["所属行业：黄金", "业务描述：矿产资源勘查;金矿采选;铜矿采选（员工约 69559 人）", "收入构成（2026.H1，按业务）：矿产品 33.7%（同比 +57.9%）", "收入构成（2026.H1，按地区）：中国大陆 65.0%（同比 +7.5%）"]);
+    expect(businessFacts({ research: { profile: { profile: "x".repeat(400) } } })[0].length).toBeLessThan(300);
   });
 });

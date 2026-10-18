@@ -335,3 +335,28 @@ describe("Workers AI quota errors", () => {
     expect(j.dailyLimit).toBe(100);
   });
 });
+
+describe("business-first method recommendation", () => {
+  const M = ["fcff", "fcf", "ddm", "navsotp", "pe", "peg", "pb", "ps", "evebitda"].map((key) => ({ key, title: key }));
+  it("asks for a business profile and type before methods", async () => {
+    const { buildMethodPrompt } = await import("../src/ai.js");
+    const p = buildMethodPrompt({ stock: { name: "紫金矿业" }, methods: M, business: ["收入构成（2026.H1，按业务）：矿产品 33.7%"] }, "zh");
+    expect(p).toContain("先弄懂这门生意");
+    expect(p).toContain("生意本身（来自长桥");
+    expect(p).toContain("cyclical｜资源与周期");
+    expect(p).toContain("利润增速高不等于高速成长");
+    expect(p).toContain('"business": {"type"');
+  });
+  it("drops methods that don't fit the business type and keeps the profile", async () => {
+    const { parsePicks } = await import("../src/ai.js");
+    const text = '金价驱动。\n```json\n{"business":{"type":"cyclical","model":"开采并冶炼金铜","drivers":"金价、铜价与产量","implication":"利润随金属价格波动，不能外推增速"},"picks":[{"key":"peg","reason":"增速高"},{"key":"navsotp","reason":"储量资产"},{"key":"evebitda","reason":"中周期"}]}\n```';
+    const r = parsePicks(text, M);
+    expect(r.business).toEqual({ type: "cyclical", model: "开采并冶炼金铜", drivers: "金价、铜价与产量", implication: "利润随金属价格波动，不能外推增速" });
+    expect(r.picks).toEqual([{ key: "navsotp", role: "primary", reason: "储量资产" }, { key: "evebitda", role: "check", reason: "中周期" }]);
+    const fin = parsePicks('```json\n{"business":{"type":"financial"},"picks":[{"key":"fcf"},{"key":"pb"}]}\n```', M);
+    expect(fin.picks.map((p) => p.key)).toEqual(["pb"]);
+    const unknown = parsePicks('```json\n{"business":{"type":"alien"},"picks":[{"key":"peg"}]}\n```', M);
+    expect(unknown.business).toBeNull();
+    expect(unknown.picks.map((p) => p.key)).toEqual(["peg"]);
+  });
+});
