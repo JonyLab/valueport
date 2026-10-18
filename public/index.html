@@ -56,14 +56,16 @@
   .chart-item[style*="cursor"]:hover{transform:translateY(-2px);background:rgba(255,255,255,.78);
     box-shadow:0 1px 2px rgba(60,50,20,.05),0 18px 40px -18px rgba(60,50,20,.28)}
   .chart-info{min-width:0}
-  .ci-id{display:flex;align-items:center;gap:9px;margin-bottom:14px;min-width:0;padding-right:84px}
+  .ci-id{display:flex;align-items:center;gap:10px;margin-bottom:14px;min-width:0;padding-right:84px}
   /* 标的 logo：圆形，首字母占位；图片加载后填满（白底，透明 logo 也清楚） */
   .ci-logo,.vd-avatar,.peer-av,.vc-prof-av{overflow:hidden;flex:none}
   .ci-logo img,.vd-avatar img,.peer-av img,.vc-prof-av img{width:100%;height:100%;object-fit:contain;display:block}
   .has-img{background:#fff !important;box-shadow:inset 0 0 0 1px var(--divider)}
-  .ci-logo{width:30px;height:30px;border-radius:50%;background:var(--track-edge);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500}
+  .ci-logo{width:36px;height:36px;border-radius:50%;background:var(--track-edge);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500}
   .ci-name{font-size:20px;font-weight:400;letter-spacing:-.01em;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ci-code{flex:none;font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.04em;color:var(--ink-mute)}
+  .ci-idtext{display:flex;flex-direction:column;gap:3px;min-width:0} /* 名称一行、代码一行 */
+  .ci-name{line-height:1.15}
+  .ci-code{font-size:12px;line-height:1.2;color:var(--ink-mute)}
   .chart-info .verdict{display:flex;align-items:center;gap:12px;flex-wrap:wrap;text-align:left;margin:0;line-height:1}
   .chart-info .verdict .px{font-size:44px;font-weight:400;letter-spacing:-.035em}
   .chart-info .verdict .lbl{display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:var(--r-pill);
@@ -165,11 +167,11 @@
   .vd-meta{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13px;color:var(--ink-mute)}
   .vd-code{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--ink-soft);background:var(--track);border-radius:var(--r-pill);padding:2px 9px}
   .vd-quote{display:grid;grid-template-columns:auto auto;align-items:baseline;justify-items:end;column-gap:12px;row-gap:8px}
-  .vd-price{grid-row:1 / 3;align-self:center;font-weight:400;font-size:clamp(44px,5vw,64px);line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+  .vd-price{grid-row:1 / 3;align-self:end;margin-bottom:-.133em; /* 基线落在网格底边：右侧标签底部与数字视觉底部对齐 */font-weight:400;font-size:clamp(44px,5vw,64px);line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
   .vd-chg{font-size:14px;font-weight:500;color:var(--ink-mute);font-variant-numeric:tabular-nums;justify-self:start}
   .vd-chg.up{color:var(--green)} .vd-chg.down{color:var(--red)}
   .vd-chg:empty{display:none}
-  .vd-verdict{justify-self:start;display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:var(--r-pill);
+  .vd-verdict{justify-self:start;align-self:end;display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:var(--r-pill);
     background:var(--track);font-size:12.5px;font-weight:500;color:var(--ink-soft)}
   .vd-verdict.v-under{color:var(--green);background:rgba(31,143,84,.12)} .vd-verdict.v-over{color:var(--red);background:rgba(198,65,65,.10)}
   /* 两栏 */
@@ -1197,7 +1199,9 @@ function addChart(cfg) {
   const logoEl = document.createElement("span"); logoEl.className = "ci-logo"; logoEl.setAttribute("aria-hidden", "true");
   const nameEl = document.createElement("span"); nameEl.className = "ci-name";
   const codeEl = document.createElement("span"); codeEl.className = "ci-code";
-  idRow.append(logoEl, nameEl, codeEl);
+  const idText = document.createElement("span"); idText.className = "ci-idtext";
+  idText.append(nameEl, codeEl);
+  idRow.append(logoEl, idText);
   const verdict = document.createElement("p");
   verdict.className = "verdict v-fair";
   info.append(idRow, verdict);
