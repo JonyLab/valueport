@@ -15,6 +15,17 @@
 
   /* ===== 概览区：问候 + 大标题 / 大号统计 / 估值分布胶囊条 ===== */
   .page-head{margin:0 4px 30px}
+  .strike-banner{display:flex;align-items:flex-start;gap:12px;margin:-14px 4px 22px;padding:14px 14px 14px 16px;border-radius:var(--r-lg);background:rgba(46,163,93,.09);box-shadow:inset 0 0 0 1px rgba(46,163,93,.18)}
+  .strike-banner.hidden,.strike-banner.offview{display:none}
+  .sb-ico{flex:none;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px}
+  .sb-body{flex:1;min-width:0}
+  .sb-head{font-size:14.5px;font-weight:500;color:var(--ink);line-height:30px}
+  .sb-names{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .sb-name{border:0;cursor:pointer;font-family:var(--font);font-size:12.5px;color:#1f7a45;background:#fff;border-radius:var(--r-pill);padding:4px 11px;box-shadow:inset 0 0 0 1px rgba(46,163,93,.25)}
+  .sb-name:hover{background:rgba(46,163,93,.12)}
+  .sb-say{margin-top:8px;font-size:12.5px;line-height:1.55;color:var(--ink-soft)}
+  .sb-close{flex:none;width:28px;height:28px;border:0;border-radius:50%;background:none;color:var(--ink-mute);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .sb-close:hover{background:rgba(29,29,27,.06);color:var(--ink)}
   .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;flex-wrap:wrap}
   .hero-main{min-width:0;flex:1 1 360px}
   .hero-main h1{font-size:clamp(36px,5vw,56px);margin:0}
@@ -1055,6 +1066,9 @@
   </div>
 
 
+  <!-- 有标的落进击球区时的一行提示（名称可点进详情；可关掉，进击球区的标的变了会再出现） -->
+  <div class="strike-banner hidden" id="strikeBanner" role="status"></div>
+
   <div class="layout">
     <div class="charts" id="charts"><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div></div>
   </div>
@@ -1375,6 +1389,39 @@ function renderOverview() {
   document.getElementById("statBubble").textContent = bubble;
   document.getElementById("icoStrike").style.background = ZONES[0].hex;
   document.getElementById("icoBubble").style.background = ZONES[ZONES.length - 1].hex;
+  renderStrikeBanner(real.filter((i) => extremeOf(i.cfg) === "strike"));
+}
+// 击球区提示：列出现价低于「低点 ×(1 − 安全边际)」的标的；关掉后按这组标的记在本次会话，组合变了再出现
+function renderStrikeBanner(list) {
+  const el = document.getElementById("strikeBanner"); if (!el) return;
+  const zh = LANG === "zh";
+  const key = "strike_banner_off_" + boardSlug, sig = list.map((i) => i.cfg.symbol).sort().join(",");
+  let off = ""; try { off = sessionStorage.getItem(key) || ""; } catch { off = ""; }
+  if (!list.length || off === sig) { el.classList.add("hidden"); el.replaceChildren(); return; }
+  const ico = document.createElement("span"); ico.className = "sb-ico"; ico.style.background = ZONES[0].hex; ico.appendChild(ri("focus-3-line"));
+  const body = document.createElement("div"); body.className = "sb-body";
+  const head = document.createElement("div"); head.className = "sb-head";
+  head.textContent = zh ? `${list.length} 只标的进入击球区` : `${list.length} ${list.length > 1 ? "names are" : "name is"} in the strike zone`;
+  const names = document.createElement("div"); names.className = "sb-names";
+  for (const it of list) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "sb-name";
+    const pct = it.cfg.price > 0 ? Math.round((1 - it.cfg.price / computeAnchors(it.cfg)[1]) * 100) : NaN;
+    b.textContent = displayName(it) + (Number.isFinite(pct) ? (zh ? ` · 低于击球线 ${pct}%` : ` · ${pct}% below the line`) : "");
+    b.addEventListener("click", () => {
+      const code = (it.cfg.ticker || "").toUpperCase(); if (!code) return;
+      history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug) + "/" + encodeURIComponent(code));
+      showDetail(it);
+    });
+    names.appendChild(b);
+  }
+  const say = document.createElement("div"); say.className = "sb-say";
+  say.textContent = zh ? "现价已低于你按安全边际设的买点。这不是买入信号：先复核估值假设还成不成立，再决定。" : "Prices are below the buy line set by your margin of safety. Not a buy signal — re-check that your assumptions still hold first.";
+  body.append(head, names, say);
+  const x = document.createElement("button"); x.type = "button"; x.className = "sb-close"; x.setAttribute("aria-label", zh ? "关闭提示" : "Dismiss");
+  x.appendChild(ri("close-line"));
+  x.addEventListener("click", () => { try { sessionStorage.setItem(key, sig); } catch { /* 存不了就只关这一次 */ } el.classList.add("hidden"); });
+  el.replaceChildren(ico, body, x);
+  el.classList.remove("hidden");
 }
 
 /* ---------- 行情 ---------- */
@@ -2024,6 +2071,7 @@ function showView(v) { // "list" | "settings" | "detail" | "valedit"
   const isList = v === "list", isSettings = v === "settings", isDetail = v === "detail", isValEdit = v === "valedit";
   if (!isValEdit) valEditReturn = null; // 离开编辑器视图即清状态
   pageHeadEl.classList.toggle("hidden", !isList);
+  document.getElementById("strikeBanner").classList.toggle("offview", !isList); // 只在列表视图显示
   layoutEl.classList.toggle("hidden", !isList);
   viewSettings.classList.toggle("hidden", !isSettings);
   viewDetail.classList.toggle("hidden", !isDetail);
