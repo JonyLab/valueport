@@ -36,7 +36,7 @@
 统一用 **Remix Icon**（jsDelivr 上的 `remixicon@4.9.1`，字体图标）：`<i class="ri-xxx-line" aria-hidden="true">`，颜色跟随 `currentColor`，大小用 `font-size` 控制。默认用 `-line` 线性款。JS 里用 `ri("name")` 生成。不要再手写内联 SVG，也不要用 ↗ ✕ ⓘ ▾ 这类文字符号当图标。常用的几个：导航 `line-chart` / `earth`，设置 `equalizer`，语言 `global`，反馈 `feedback`，分享 `share-box`，进详情 `arrow-right-up`，返回 `arrow-left`，添加 `add`，删除 `close`，提示 `information`，展开 `arrow-down-s`，外链 `external-link`。
 
 ### 标的 logo
-通过本站的 `/api/logo?symbol=` 代理：先 FinancialModelingPrep 的公开图片（免 key，美股、港股、A 股都有），没有再退到长桥图标库 `assets.lbkrs.com/ticker/ST/<市场>/<代码>.png`（含北交所；长桥对没有图标的代码返回首字符占位图，小于 5KB 的当占位丢掉），缓存 7 天，浏览器不直接请求第三方。前端 `mountLogo(el, item)` 先放首字母占位，图片加载成功再替换（白底圆形）；查不到时（如北交所）保留首字母。用在看板卡片、详情页头像、同看板列表、估值工作台的标的胶囊。
+通过本站的 `/api/logo?symbol=` 代理：先长桥图标库 `assets.lbkrs.com/ticker/ST/<市场>/<代码>.png`（美股 / 港股 / 沪深 / 北交所；长桥对没有图标的代码返回首字符占位图，小于 5KB 的当占位丢掉），没有再退到 FinancialModelingPrep 的公开图片，缓存 7 天，浏览器不直接请求第三方。前端 `mountLogo(el, item)` 先放首字母占位，图片加载成功再替换（白底圆形）；查不到时（如北交所）保留首字母。用在看板卡片、详情页头像、同看板列表、估值工作台的标的胶囊。
 
 ---
 

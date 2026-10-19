@@ -111,7 +111,7 @@ app.get("/api/names", async (c) => {
 });
 // 标的 logo：代理 FinancialModelingPrep 的公开图片（免 key，美/港/A 股都有），浏览器只请求本站，
 // 避免把用户看了哪些股票直接暴露给第三方；成功缓存 7 天，找不到返回 404（前端退回首字母头像）。
-// 标的 logo：先 FinancialModelingPrep（没有就 404），再退到长桥的图标库（覆盖北交所等；长桥对没有图标的代码返回首字符占位图，小于 LB_MIN_BYTES 的当作占位丢掉）
+// 标的 logo：先长桥的图标库（美股 / 港股 / 沪深 / 北交所；对没有图标的代码会返回首字符占位图，小于 LB_MIN_BYTES 的当作占位丢掉），再退到 FinancialModelingPrep（没有就 404）
 const LB_MIN_BYTES = 5000;
 async function fetchLogo(url, minBytes = 0) {
   const res = await fetch(url, { cf: { cacheTtl: 604800, cacheEverything: true } });
@@ -125,8 +125,8 @@ app.get("/api/logo", async (c) => {
   const t = logoTicker(sym), lb = lbLogoPath(sym);
   if (!t && !lb) return c.body(null, 404);
   try {
-    const img = (t && await fetchLogo(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(t)}.png`).catch(() => null))
-      || (lb && await fetchLogo(`https://assets.lbkrs.com/ticker/ST/${lb}.png`, LB_MIN_BYTES).catch(() => null));
+    const img = (lb && await fetchLogo(`https://assets.lbkrs.com/ticker/ST/${lb}.png`, LB_MIN_BYTES).catch(() => null))
+      || (t && await fetchLogo(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(t)}.png`).catch(() => null));
     if (!img) return c.body(null, 404, { "Cache-Control": "public, max-age=86400" });
     return new Response(img.buf, { headers: { "Content-Type": img.type, "Cache-Control": "public, max-age=604800" } });
   } catch {
