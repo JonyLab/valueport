@@ -71,3 +71,10 @@ export function verdictOf(cfg, msgs = VERDICT_MSGS_ZH) {
   }
   return { cls: "v-fair", text: msgs.fair, px: msgs.px(cfg.price) };
 }
+
+// 标的所在市场的短名（卡片 / 持仓列表的代码旁边用）：us 美股、hk 港股、sh 沪市、sz 深市、bj 北交所
+export function marketLabel(symbol, lang = "zh") {
+  const m = String(symbol || "").slice(0, 2).toLowerCase();
+  const zh = { us: "美股", hk: "港股", sh: "沪市", sz: "深市", bj: "北交所" }, en = { us: "US", hk: "HK", sh: "Shanghai", sz: "Shenzhen", bj: "Beijing" };
+  return (lang === "en" ? en : zh)[m] || "";
+}

@@ -76,6 +76,16 @@ export function logoTicker(sym) {
   return code + (mkt === "sh" ? ".SS" : ".SZ");
 }
 
+// 长桥的标的图标：assets.lbkrs.com/ticker/ST/<市场>/<代码>.png（港股去掉前导 0）。没有图标的代码会返回首字符占位图（2–4KB），调用方按体积过滤
+export function lbLogoPath(sym) {
+  const m = /^(us|hk|sh|sz|bj)([A-Za-z0-9.]{1,12})$/.exec(sym || "");
+  if (!m) return null;
+  const [, mkt, code] = m;
+  if (mkt === "us") return /^[A-Za-z.]{1,8}$/.test(code) ? "US/" + code.toUpperCase() : null;
+  if (!/^\d+$/.test(code)) return null;
+  return mkt.toUpperCase() + "/" + (mkt === "hk" ? String(Number(code)) : code);
+}
+
 // smartbox 把名称按 \uXXXX 或 %uXXXX 转义返回（如 万科 → 万科）；两种都解码回真实字符。
 function decodeHintName(s) {
   if (s.indexOf("u") < 0) return s;

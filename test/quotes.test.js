@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseTencentQuotes, parseTencentHints, parseTencentStatics, parseTencentPrevClose, logoTicker } from "../src/quotes.js";
+import { parseTencentQuotes, parseTencentHints, parseTencentStatics, parseTencentPrevClose, logoTicker, lbLogoPath } from "../src/quotes.js";
 
 describe("parseTencentQuotes", () => {
   it("extracts price (field index 3) per symbol", () => {
@@ -98,5 +98,16 @@ describe("logoTicker", () => {
   });
   it("rejects unknown markets and malformed codes", () => {
     for (const s of ["bj430047", "hkABC", "us../x", "", "xx123"]) expect(logoTicker(s)).toBeNull();
+  });
+});
+
+describe("lbLogoPath", () => {
+  it("maps symbols to Longbridge icon paths, including Beijing", () => {
+    expect(lbLogoPath("usAAPL")).toBe("US/AAPL");
+    expect(lbLogoPath("hk00700")).toBe("HK/700");
+    expect(lbLogoPath("sh600519")).toBe("SH/600519");
+    expect(lbLogoPath("sz000338")).toBe("SZ/000338");
+    expect(lbLogoPath("bj430047")).toBe("BJ/430047");
+    for (const s of ["hkABC", "us../x", "", "xx123"]) expect(lbLogoPath(s)).toBeNull();
   });
 });

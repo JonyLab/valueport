@@ -1188,7 +1188,7 @@
 <script type="module">
 import { Gauge } from "/shared/gauge.js";
 import { Bar } from "/shared/bar.js";
-import { verdictOf, structValid, hasFairRange, applyZoneColors, computeAnchors, priceToPhi, ZONES } from "/shared/core.js";
+import { verdictOf, structValid, hasFairRange, applyZoneColors, computeAnchors, priceToPhi, ZONES, marketLabel } from "/shared/core.js";
 import { MKT_LABEL } from "/shared/market.js";
 import { t, applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
@@ -1333,7 +1333,7 @@ async function loadNames(syms) {
 function renderItemHead(item) {
   if (item.nameEl) item.nameEl.textContent = displayName(item);
   if (item.logoEl && item._logoSym !== item.cfg.symbol) { item._logoSym = item.cfg.symbol; mountLogo(item.logoEl, item); } // 换了标的才重取图片
-  if (item.codeEl) item.codeEl.textContent = (item.cfg.ticker || "").toUpperCase();
+  if (item.codeEl) { const mk = marketLabel(item.cfg.symbol, LANG); item.codeEl.textContent = (item.cfg.ticker || "").toUpperCase() + (mk ? " · " + mk : ""); } // 代码 · 市场
 }
 function addChart(cfg) {
   const wrap = document.createElement("div");

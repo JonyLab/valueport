@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { signToken, verifyToken } from "./auth.js";
 import { validateItem, rowToItem } from "./items.js";
-import { parseTencentQuotes, parseTencentHints, parseTencentStatics, parseTencentPrevClose, logoTicker } from "./quotes.js";
+import { parseTencentQuotes, parseTencentHints, parseTencentStatics, parseTencentPrevClose, logoTicker, lbLogoPath } from "./quotes.js";
 import { fetchLongbridgeQuotes, fetchLongbridgeNames, fetchLongbridgeFinancials, pickLatestAnnual, fetchValuationRefs } from "./longbridge.js";
 import { fetchDeductedNetIncome } from "./eastmoney.js";
 import { fetchAdjustedEps } from "./finnhub.js";
@@ -111,14 +111,24 @@ app.get("/api/names", async (c) => {
 });
 // 标的 logo：代理 FinancialModelingPrep 的公开图片（免 key，美/港/A 股都有），浏览器只请求本站，
 // 避免把用户看了哪些股票直接暴露给第三方；成功缓存 7 天，找不到返回 404（前端退回首字母头像）。
+// 标的 logo：先 FinancialModelingPrep（没有就 404），再退到长桥的图标库（覆盖北交所等；长桥对没有图标的代码返回首字符占位图，小于 LB_MIN_BYTES 的当作占位丢掉）
+const LB_MIN_BYTES = 5000;
+async function fetchLogo(url, minBytes = 0) {
+  const res = await fetch(url, { cf: { cacheTtl: 604800, cacheEverything: true } });
+  const type = res.headers.get("content-type") || "";
+  if (!res.ok || !type.startsWith("image/")) return null;
+  const buf = await res.arrayBuffer();
+  return buf.byteLength >= minBytes ? { buf, type } : null;
+}
 app.get("/api/logo", async (c) => {
-  const t = logoTicker((c.req.query("symbol") || "").trim());
-  if (!t) return c.body(null, 404);
+  const sym = (c.req.query("symbol") || "").trim();
+  const t = logoTicker(sym), lb = lbLogoPath(sym);
+  if (!t && !lb) return c.body(null, 404);
   try {
-    const res = await fetch(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(t)}.png`, { cf: { cacheTtl: 604800, cacheEverything: true } });
-    const type = res.headers.get("content-type") || "";
-    if (!res.ok || !type.startsWith("image/")) return c.body(null, 404, { "Cache-Control": "public, max-age=86400" });
-    return new Response(res.body, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=604800" } });
+    const img = (t && await fetchLogo(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(t)}.png`).catch(() => null))
+      || (lb && await fetchLogo(`https://assets.lbkrs.com/ticker/ST/${lb}.png`, LB_MIN_BYTES).catch(() => null));
+    if (!img) return c.body(null, 404, { "Cache-Control": "public, max-age=86400" });
+    return new Response(img.buf, { headers: { "Content-Type": img.type, "Cache-Control": "public, max-age=604800" } });
   } catch {
     return c.body(null, 404);
   }

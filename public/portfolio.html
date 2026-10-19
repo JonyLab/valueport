@@ -415,7 +415,7 @@
 import { applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
 import { mountFeedback } from "/shared/feedback.js";
-import { computeAnchors, priceToPhi, structValid, ZONES } from "/shared/core.js";
+import { computeAnchors, priceToPhi, structValid, ZONES, marketLabel } from "/shared/core.js";
 import { driftText, driftTolerance, driftStatus, driftAction } from "/shared/holding.js";
 import { validatePfQuery, runPfQuery, dropFilter } from "/shared/pf-query.js";
 import { aiErrorText } from "/shared/ai-panel.js";
@@ -957,7 +957,7 @@ function holdingsCard(sAll) {
     const tr = el("tr", p && (p.status === "over" || p.status === "under") ? "off" : "");
     const w = Number.isFinite(r.value) && s.total ? r.value / s.total * 100 : NaN;
     const pl = r.costKnown && r.cost > 0 && Number.isFinite(r.value) ? (r.value / r.cost - 1) * 100 : NaN;
-    tr.append(symTd(r.symbol, r.boardName || r.name || r.symbol, `${r.symbol.slice(2).toUpperCase()} · ${[...r.accounts].filter(Boolean).join(" / ")}`), zoneTd(r.zone, r.onBoard),
+    tr.append(symTd(r.symbol, r.boardName || r.name || r.symbol, [r.symbol.slice(2).toUpperCase(), marketLabel(r.symbol, zh ? "zh" : "en"), [...r.accounts].filter(Boolean).join(" / ")].filter(Boolean).join(" · ")), zoneTd(r.zone, r.onBoard),
       pxQtyTd(r.price > 0 ? `${money(r.price)} ${r.currency}` : "—", r.qty), el("td", "", amt(r.value, 0)), weightTd(w, p));
     if (planOn) tr.append(...tgtCells(p));
     tr.append(el("td", "pf-pnl " + (pl > 0 ? "up" : pl < 0 ? "down" : ""), pct(pl)));
@@ -968,7 +968,7 @@ function holdingsCard(sAll) {
   // 计划建仓：设了目标、还没持有
   for (const p of pv.rows.filter((x) => x.status === "build")) {
     const tr = el("tr", "planned");
-    tr.append(symTd(p.symbol, p.name, `${p.symbol.slice(2).toUpperCase()} · ${T("计划建仓", "Planned")}`), zoneTd(p.zone, true),
+    tr.append(symTd(p.symbol, p.name, [p.symbol.slice(2).toUpperCase(), marketLabel(p.symbol, zh ? "zh" : "en"), T("计划建仓", "Planned")].filter(Boolean).join(" · ")), zoneTd(p.zone, true),
       el("td", "hide-sm", "—"), el("td", "", "—"), weightTd(0, p), ...tgtCells(p), el("td", "", "—"));
     const sr = suggRow(tr, p, false);
     link(tr, p.ticker);
