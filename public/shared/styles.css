@@ -187,20 +187,108 @@
     .gband,.gring,.gdot,.glabel{transition:none !important}
   }
 
-  /* ===== 登录 / 注册 / 站长门禁：居中大圆角卡 ===== */
-  .page:has(.auth),.page.center{display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .auth,.gate{width:min(400px,100%);margin:0 auto;background:var(--card);border:1px solid var(--card-edge);border-radius:var(--r-xl);
+  /* ===== 站长门禁：居中大圆角卡 ===== */
+  .page.center{display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .gate{width:min(400px,100%);margin:0 auto;background:var(--card);border:1px solid var(--card-edge);border-radius:var(--r-xl);
     box-shadow:var(--shadow);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);padding:34px 30px 28px}
   .auth-brand{display:inline-flex;align-items:center;margin-bottom:22px;font-size:24px;letter-spacing:-.02em;color:var(--ink);text-decoration:none}
-  .auth h2,.gate h2{font-weight:400;font-size:34px;letter-spacing:-.025em;line-height:1.1;margin:0 0 20px}
-  .auth p.hint{font-size:13px;color:var(--sun-ink);line-height:1.65;margin:0 0 18px;padding:11px 15px;background:rgba(246,207,74,.28);border-radius:var(--r-md)}
-  .auth input,.gate input{display:block;width:100%;height:48px;font-family:var(--font);font-size:15px;padding:0 18px;border:0;
+  .gate h2{font-weight:400;font-size:34px;letter-spacing:-.025em;line-height:1.1;margin:0 0 20px}
+  .gate input{display:block;width:100%;height:48px;font-family:var(--font);font-size:15px;padding:0 18px;border:0;
     border-radius:var(--r-pill);margin-bottom:10px;background:rgba(255,255,255,.9);box-shadow:inset 0 0 0 1px var(--divider);color:var(--ink)}
-  .auth input:focus,.gate input:focus{outline:none;box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 4px var(--ring)}
-  .auth .btn.primary,.gate .btn.primary{height:48px;margin-top:6px;font-size:15px}
-  .auth .err,.gate .err{color:var(--red);font-size:12.5px;margin-bottom:8px;min-height:16px}
-  .auth .alt{font-size:13px;color:var(--ink-soft);margin-top:18px;text-align:center}
-  .auth .alt a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+  .gate input:focus{outline:none;box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 4px var(--ring)}
+  .gate .btn.primary{height:48px;margin-top:6px;font-size:15px}
+  .gate .err{color:var(--red);font-size:12.5px;margin-bottom:8px;min-height:16px}
+
+  /* ===== 登录 / 注册（产品门面）：宽屏左介绍、右表单；窄屏表单在上、介绍在下（见 DESIGN.md「登录 / 注册」）===== */
+  .ap-page{display:flex;flex-direction:column}
+  .ap-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .ap-shell{flex:1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(360px,440px);gap:clamp(32px,6vw,96px);
+    align-items:center;width:100%;max-width:1180px;margin:0 auto;padding:clamp(16px,4vh,56px) 0}
+  .ap-card{grid-column:2;grid-row:1;background:var(--card);border:1px solid var(--card-edge);border-radius:var(--r-xl);box-shadow:var(--shadow);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);padding:36px 32px 28px}
+  .ap-intro{grid-column:1;grid-row:1;min-width:0}
+  .ap-card h1{font-size:40px;margin:0 0 6px}
+  .ap-sub{font-size:15px;color:var(--ink-soft);margin:0 0 24px}
+  .ap-note{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.6;color:var(--sun-ink);margin:12px 0 22px;padding:11px 14px;
+    background:rgba(246,207,74,.28);border-radius:var(--r-md)}
+  .ap-note i{font-size:16px;margin-top:2px}
+  .ap-field{margin-bottom:16px}
+  .ap-field label{display:block;font-size:13px;font-weight:500;color:var(--ink-soft);margin:0 0 7px 4px}
+  .ap-field input{display:block;width:100%;height:48px;font-family:var(--font);font-size:15px;padding:0 18px;border:0;border-radius:var(--r-pill);
+    background:rgba(255,255,255,.92);box-shadow:inset 0 0 0 1px var(--border);color:var(--ink);transition:box-shadow .15s}
+  .ap-field input::placeholder{color:var(--ink-mute)}
+  .ap-field input:focus{outline:none;box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 4px var(--ring)}
+  .ap-field input[aria-invalid="true"]{box-shadow:inset 0 0 0 1.5px var(--red)}
+  .ap-field input[aria-invalid="true"]:focus{box-shadow:inset 0 0 0 1.5px var(--red),0 0 0 4px rgba(198,65,65,.16)}
+  .ap-field input.ap-mono{font-family:var(--mono);letter-spacing:.06em}
+  .ap-field input.ap-mono::placeholder{letter-spacing:.06em}
+  .ap-help{font-size:12px;color:var(--ink-soft);margin:6px 0 0 4px}
+  .ap-pw{position:relative}
+  .ap-pw input{padding-right:52px}
+  .ap-eye{position:absolute;right:5px;top:5px;width:38px;height:38px;border:0;border-radius:50%;background:none;color:var(--ink-soft);
+    cursor:pointer;display:grid;place-items:center;font-size:18px}
+  .ap-eye:hover{background:var(--track);color:var(--ink)}
+  .ap-eye:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+  .ap-err{display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.5;color:#9e2f2f;background:rgba(198,65,65,.09);
+    border-radius:var(--r-md);padding:10px 14px;margin:0 0 16px}
+  .ap-err[hidden]{display:none}
+  .ap-err i{font-size:16px;margin-top:1px}
+  .ap-submit{width:100%;height:48px;margin-top:8px;font-size:15px;gap:8px}
+  .ap-submit:disabled{cursor:default}
+  .ap-submit.is-busy{background:#3d3d3b;opacity:1;cursor:progress}
+  .ap-spin{display:none;font-size:17px}
+  .ap-submit.is-busy .ap-spin{display:inline-block;animation:ap-spin .8s linear infinite}
+  @keyframes ap-spin{to{transform:rotate(360deg)}}
+  .ap-alt{font-size:13.5px;color:var(--ink-soft);margin:22px 0 0;padding-top:18px;border-top:1px dashed var(--divider);text-align:center}
+  .ap-alt a{color:var(--ink);font-weight:500;text-decoration:underline;text-decoration-color:var(--sun);text-decoration-thickness:2px;text-underline-offset:4px;border-radius:4px}
+  .ap-alt a:hover{text-decoration-color:var(--ink)}
+  .ap-alt a:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+  /* 介绍：直接放在渐变上，不套卡；只有示例钟摆是一张卡 */
+  .ap-eyebrow{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px 0 11px;margin:0 0 16px;border-radius:var(--r-pill);
+    background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 1px var(--card-edge);font-size:13px;color:var(--ink-soft)}
+  .ap-eyebrow i{color:var(--green);font-size:15px}
+  .ap-title{font-weight:400;font-size:clamp(32px,3.6vw,48px);line-height:1.12;letter-spacing:-.03em;margin:0 0 14px}
+  .ap-title span{display:block}
+  .ap-title span + span{color:var(--ink-soft)}
+  .ap-lead{font-size:15.5px;line-height:1.65;color:var(--ink-soft);margin:0 0 24px;max-width:34em}
+  .ap-demo{margin:0 0 24px;max-width:520px;background:var(--card);border:1px solid var(--card-edge);border-radius:var(--r-xl);box-shadow:var(--shadow);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);padding:18px 20px 14px}
+  .ap-demo-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .ap-demo-name{font-size:15px;font-weight:500}
+  .ap-demo-name code{font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.04em;color:var(--ink-mute);margin-left:6px}
+  .ap-demo-badge{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 11px;border-radius:var(--r-pill);background:rgba(46,163,93,.12);
+    color:var(--green);font-size:12.5px;font-weight:500}
+  .ap-demo-badge i{width:7px;height:7px;border-radius:50%;background:#2ea35d}
+  .ap-gauge{max-width:340px;margin:10px auto 8px}
+  .ap-gauge svg{display:block;width:100%;height:auto}
+  .ap-demo-kv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 0;padding-top:12px;border-top:1px dashed var(--divider)}
+  .ap-demo-kv dt{font-size:12px;color:var(--ink-soft);margin-bottom:3px}
+  .ap-demo-kv dd{margin:0;font-size:20px;font-weight:400;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .ap-demo figcaption{font-size:11.5px;color:var(--ink-soft);margin-top:10px}
+  .ap-feats{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 24px;max-width:600px}
+  .ap-feats li{display:flex;gap:12px;align-items:flex-start}
+  .ap-ico{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.75);
+    box-shadow:inset 0 0 0 1px var(--card-edge);font-size:17px;color:var(--ink)}
+  .ap-feats div > b{display:block;font-size:14.5px;font-weight:500;margin:1px 0 3px}
+  .ap-feats div > span{display:block;font-size:13px;line-height:1.55;color:var(--ink-soft)}
+  /* 窄屏：表单在上，介绍收到下方 */
+  @media (max-width:900px){
+    .ap-shell{grid-template-columns:minmax(0,1fr);max-width:480px;gap:44px;align-items:start;padding:20px 0 8px}
+    .ap-card,.ap-intro{grid-column:1;grid-row:auto}
+    .ap-intro{padding:0 4px}
+    .ap-title{font-size:30px}
+    .ap-demo{max-width:none}
+  }
+  @media (max-width:640px){
+    .ap-card{padding:28px 20px 22px}
+    .ap-card h1{font-size:34px}
+    .ap-feats{grid-template-columns:minmax(0,1fr)}
+    .ap-demo-kv dd{font-size:18px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .ap-submit.is-busy .ap-spin{animation:none}
+    .ap-field input{transition:none}
+  }
   /* 大号数字的小数部分缩小（setNum），基线对齐、颜色字重继承 */
   .num-dec{font-size:.6em;letter-spacing:-.01em}
 

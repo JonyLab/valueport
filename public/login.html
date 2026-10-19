@@ -1,21 +1,45 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>登录 · 估值钟摆</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>登录 · ValuePort</title>
 <link rel="stylesheet" href="/shared/styles.css">
-</head><body><div class="page"><div class="page-corner" id="corner"></div><div class="auth">
-<a class="auth-brand" href="/"><b>Value</b>Port</a>
-<h2 data-i18n="a_login_title">登录</h2><div class="err" id="err"></div>
-<input id="u" data-i18n-ph="a_username_ph" placeholder="用户名" autocomplete="username">
-<input id="p" type="password" data-i18n-ph="a_password_ph" placeholder="密码" autocomplete="current-password">
-<button class="btn primary" id="go" style="width:100%" data-i18n="a_login_btn">登录</button>
-<div class="alt"><span data-i18n="a_no_account">没有账号？</span><a href="/register" data-i18n="a_register_link">用激活码注册</a></div>
-</div></div>
+  <link rel="modulepreload" href="/shared/i18n.js">
+  <link rel="modulepreload" href="/shared/langmenu.js">
+  <link rel="modulepreload" href="/shared/auth.js">
+  <link rel="modulepreload" href="/shared/gauge.js">
+  <link rel="modulepreload" href="/shared/core.js">
+</head><body><div class="page ap-page">
+<header class="ap-top"><a class="brand" href="/"><b>Value</b>Port<span class="brand-beta">Beta</span></a><div id="corner"></div></header>
+<main class="ap-shell">
+  <section class="ap-card" aria-labelledby="ap-h">
+    <h1 id="ap-h" data-i18n="a_login_title">登录</h1>
+    <p class="ap-sub" data-i18n="a_login_sub">欢迎回来。</p>
+    <form id="f" novalidate>
+      <div class="ap-err" id="err" role="alert" hidden><i class="ri-error-warning-line" aria-hidden="true"></i><span></span></div>
+      <div class="ap-field">
+        <label for="u" data-i18n="a_username">用户名</label>
+        <input id="u" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required aria-describedby="err">
+      </div>
+      <div class="ap-field">
+        <label for="p" data-i18n="a_password">密码</label>
+        <div class="ap-pw"><input id="p" name="password" type="password" autocomplete="current-password" required aria-describedby="err"><button type="button" class="ap-eye" id="eye"></button></div>
+      </div>
+      <button class="btn primary ap-submit" id="go" type="submit"><i class="ri-loader-4-line ap-spin" aria-hidden="true"></i><span class="ap-btn-label" data-i18n="a_login_btn">登录</span></button>
+    </form>
+    <p class="ap-alt"><span data-i18n="a_no_account">没有账号？</span> <a href="/register" data-i18n="a_register_link">用激活码注册</a></p>
+  </section>
+  <aside class="ap-intro" id="intro"></aside>
+</main>
+</div>
 <script type="module">
 import { t, applyI18n } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
+import { mountIntro, wirePasswordToggle, mapServerError, formState, firstEmpty } from "/shared/auth.js";
 applyI18n();
 mountLangMenu(document.getElementById("corner"));
-const err=document.getElementById("err");
+mountIntro(document.getElementById("intro"));
+const form=document.getElementById("f"), go=document.getElementById("go");
+const st=formState(form, document.getElementById("err"), go);
+wirePasswordToggle(document.getElementById("p"), document.getElementById("eye"));
 async function gotoMyBoard(replace){
   try{
     const r=await fetch("/api/me");
@@ -27,17 +51,19 @@ async function gotoMyBoard(replace){
     return true;
   }catch{ return false; }
 }
-async function login(){ err.textContent="";
-  const go=document.getElementById("go"); go.disabled=true;
+async function login(){ st.clear();
+  const empty=firstEmpty(form,[["u","a_need_username"],["p","a_need_password"]]);
+  if(empty) return st.error(empty.text,[empty.id]);
+  st.busy(true,t("a_login_busy"));
+  let done=false;
   try{
     const r=await fetch("/api/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value,password:document.getElementById("p").value})});
-    if(r.ok){ try{sessionStorage.clear();}catch(e){} /* 换了身份：清掉上个账号的会话缓存 */ if(await gotoMyBoard(false)) return; err.textContent=t("a_board_fail"); }
-    else err.textContent=(await r.json().catch(()=>({}))).error||t("a_login_fail");
-  }catch{ err.textContent=t("a_net_err"); }
-  finally{ go.disabled=false; }
+    if(r.ok){ try{sessionStorage.clear();}catch(e){} /* 换了身份：清掉上个账号的会话缓存 */ if(await gotoMyBoard(false)){ done=true; return; } st.error(t("a_board_fail")); }
+    else { const m=mapServerError((await r.json().catch(()=>({}))).error||t("a_login_fail")); st.error(m.text,m.fields); }
+  }catch{ st.error(t("a_net_err")); }
+  finally{ if(!done) st.busy(false); } // 跳转中保持加载态，不让按钮先弹回来
 }
-document.getElementById("go").addEventListener("click",login);
-document.getElementById("p").addEventListener("keydown",(e)=>{if(e.key==="Enter")login();});
+form.addEventListener("submit",(e)=>{ e.preventDefault(); if(!go.disabled) login(); });
 // 已登录就直接进自己的看板
 gotoMyBoard(true);
 </script></body></html>

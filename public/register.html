@@ -1,31 +1,61 @@
 <!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>注册 · 估值钟摆</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>注册 · ValuePort</title>
 <link rel="stylesheet" href="/shared/styles.css">
-</head><body><div class="page"><div class="page-corner" id="corner"></div><div class="auth">
-<a class="auth-brand" href="/"><b>Value</b>Port</a>
-<h2 data-i18n="a_reg_title">注册</h2><p class="hint" data-i18n="a_reg_hint">需要一枚激活码（向站长索取）。</p><div class="err" id="err"></div>
-<input id="u" data-i18n-ph="a_reg_username_ph" placeholder="用户名（3-20 位字母/数字/_-）" autocomplete="username">
-<input id="p" type="password" data-i18n-ph="a_reg_password_ph" placeholder="密码（至少 6 位）" autocomplete="new-password">
-<input id="c" data-i18n-ph="a_reg_code_ph" placeholder="激活码 XXXX-XXXX-XXXX">
-<button class="btn primary" id="go" style="width:100%" data-i18n="a_reg_btn">注册并进入</button>
-<div class="alt"><span data-i18n="a_has_account">已有账号？</span><a href="/login" data-i18n="a_login_link">去登录</a></div>
-</div></div>
+  <link rel="modulepreload" href="/shared/i18n.js">
+  <link rel="modulepreload" href="/shared/langmenu.js">
+  <link rel="modulepreload" href="/shared/auth.js">
+  <link rel="modulepreload" href="/shared/gauge.js">
+  <link rel="modulepreload" href="/shared/core.js">
+</head><body><div class="page ap-page">
+<header class="ap-top"><a class="brand" href="/"><b>Value</b>Port<span class="brand-beta">Beta</span></a><div id="corner"></div></header>
+<main class="ap-shell">
+  <section class="ap-card" aria-labelledby="ap-h">
+    <h1 id="ap-h" data-i18n="a_reg_title">注册</h1>
+    <p class="ap-note"><i class="ri-key-2-line" aria-hidden="true"></i><span data-i18n="a_reg_sub">ValuePort 目前仅限邀请，注册需要一枚站长发放的激活码。</span></p>
+    <form id="f" novalidate>
+      <div class="ap-err" id="err" role="alert" hidden><i class="ri-error-warning-line" aria-hidden="true"></i><span></span></div>
+      <div class="ap-field">
+        <label for="c" data-i18n="a_code">激活码</label>
+        <input id="c" name="code" class="ap-mono" data-i18n-ph="a_code_ph" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" autofocus required aria-describedby="err">
+      </div>
+      <div class="ap-field">
+        <label for="u" data-i18n="a_username">用户名</label>
+        <input id="u" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required aria-describedby="u-help err">
+        <p class="ap-help" id="u-help" data-i18n="a_reg_username_help">3–20 位字母、数字、_ 或 -</p>
+      </div>
+      <div class="ap-field">
+        <label for="p" data-i18n="a_password">密码</label>
+        <div class="ap-pw"><input id="p" name="password" type="password" autocomplete="new-password" minlength="6" required aria-describedby="p-help err"><button type="button" class="ap-eye" id="eye"></button></div>
+        <p class="ap-help" id="p-help" data-i18n="a_reg_password_help">至少 6 位</p>
+      </div>
+      <button class="btn primary ap-submit" id="go" type="submit"><i class="ri-loader-4-line ap-spin" aria-hidden="true"></i><span class="ap-btn-label" data-i18n="a_reg_btn">注册并进入</span></button>
+    </form>
+    <p class="ap-alt"><span data-i18n="a_has_account">已有账号？</span> <a href="/login" data-i18n="a_login_link">去登录</a></p>
+  </section>
+  <aside class="ap-intro" id="intro"></aside>
+</main>
+</div>
 <script type="module">
 import { t, applyI18n } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
+import { mountIntro, wirePasswordToggle, mapServerError, formState, firstEmpty } from "/shared/auth.js";
 applyI18n();
 mountLangMenu(document.getElementById("corner"));
-const err=document.getElementById("err");
-async function reg(){ err.textContent="";
-  const go=document.getElementById("go"); go.disabled=true;
+mountIntro(document.getElementById("intro"));
+const form=document.getElementById("f"), go=document.getElementById("go");
+const st=formState(form, document.getElementById("err"), go);
+wirePasswordToggle(document.getElementById("p"), document.getElementById("eye"));
+async function reg(){ st.clear();
+  const empty=firstEmpty(form,[["c","a_need_code"],["u","a_need_username"],["p","a_need_password"]]);
+  if(empty) return st.error(empty.text,[empty.id]);
+  st.busy(true,t("a_reg_busy"));
   try{
     const r=await fetch("/api/register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({username:document.getElementById("u").value.trim(),password:document.getElementById("p").value,code:document.getElementById("c").value.trim()})});
-    if(r.ok){ try{sessionStorage.clear();}catch(e){} location.href="/portfolio"; return; } // 换了身份：清掉上个账号的会话缓存 // 注册后先到资产（Portfolio）首页
-    err.textContent=(await r.json().catch(()=>({}))).error||t("a_reg_fail");
-  }catch{ err.textContent=t("a_net_err"); }
-  finally{ go.disabled=false; }
+    if(r.ok){ try{sessionStorage.clear();}catch(e){} location.href="/portfolio"; return; } // 换了身份：清掉上个账号的会话缓存 // 注册后先到资产（Portfolio）首页（跳转中保持加载态）
+    const m=mapServerError((await r.json().catch(()=>({}))).error||t("a_reg_fail")); st.error(m.text,m.fields);
+  }catch{ st.error(t("a_net_err")); }
+  st.busy(false);
 }
-document.getElementById("go").addEventListener("click",reg);
-document.getElementById("c").addEventListener("keydown",(e)=>{if(e.key==="Enter")reg();});
+form.addEventListener("submit",(e)=>{ e.preventDefault(); if(!go.disabled) reg(); });
 </script></body></html>
