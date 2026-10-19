@@ -301,6 +301,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     });
   }
   function selectMethod(idx) {
+    if (activeIdx < 0) baseline = undefined; // 新增时第一次选方法不算改动：等用户真正开始填再记基线
     activeIdx = idx;
     currentMode = null;
     updatePickerLabel();
@@ -1403,4 +1404,19 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   aiBtn.addEventListener("click", () => ai.toggle());
 
   renderForm();
+
+  // ── 未保存改动：用户第一次点击 / 按键时记一份基线（页面自动预填、异步补的数据不算改动），离开时和当前状态比 ──
+  let baseline; // undefined = 还没记
+  function snapshot() {
+    if (activeIdx < 0) return "none";
+    return JSON.stringify({ m: MODELS[activeIdx].key, mode: currentMode || null, f: cleanForm(lastForm), d: currentDerivations(), s: (segments && segments.rows) || [], n: noteInput.value.trim() });
+  }
+  const markBase = (e) => { if (e.isTrusted && baseline === undefined) baseline = snapshot(); };
+  for (const t of ["pointerdown", "keydown"]) document.addEventListener(t, markBase, true); // 抽屉 / 弹窗也算在内
+  return {
+    isDirty: () => baseline !== undefined && snapshot() !== baseline,
+    canSave: () => !submitBtn.disabled,
+    save: () => { if (submitBtn.disabled) return false; submitBtn.click(); return true; },
+    destroy: () => { for (const t of ["pointerdown", "keydown"]) document.removeEventListener(t, markBase, true); },
+  };
 }

@@ -146,6 +146,10 @@
   .modal-head{display:flex;align-items:center;justify-content:space-between;margin:0 -24px 18px;padding:22px 24px 0}
   .modal-title{font-size:22px;font-weight:400;letter-spacing:-.01em;font-family:var(--font)}
   .modal-err{font-size:12.5px;color:var(--red);margin-top:10px;display:none}
+  .ve-confirm{padding:24px}
+  .ve-confirm-msg{margin:10px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink-soft)}
+  .ve-confirm-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
+  .ve-confirm-acts .btn:disabled{opacity:.4;cursor:default}
   .modal-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:22px -24px 0;padding:16px 24px 20px;
     border-top:1px dashed var(--border)}
 
@@ -1221,6 +1225,7 @@ const items = []; // {id, cfg, gauge, chartEl, verdictEl, live, gotQuote}
 let boardSlug = "";
 let owner = false;
 let valEditReturn = null; // 估值编辑器视图打开时存当前 item；否则 null
+let valEditApi = null, valEditLeaving = false; // 工作台接口（isDirty / save）；正在主动离开时不再拦
 let addCardEl = null;
 
 // 默认文案（自定义清空时恢复；随当前语言）
@@ -3101,7 +3106,7 @@ function renderValuationPanel(item, panel, idBlock) {
     viewValEdit.innerHTML = "";
     const head = document.createElement("div"); head.className = "ve-head";
     const back = document.createElement("a"); back.className = "ve-back"; back.href = "#"; back.replaceChildren(ri("arrow-left-line"), document.createTextNode(t("d_back")));
-    back.addEventListener("click", (e) => { e.preventDefault(); finishValEdit(); });
+    back.addEventListener("click", (e) => { e.preventDefault(); leaveValEdit(); });
     // 标题行：返回独占一行；下一行「标题 | 名称 · 代码」基线对齐、竖线分隔
     const titleRow = document.createElement("div"); titleRow.className = "ve-titlerow";
     const title = document.createElement("span"); title.className = "ve-title";
@@ -3113,7 +3118,8 @@ function renderValuationPanel(item, panel, idBlock) {
     head.appendChild(headRight);
     const mountEl = document.createElement("div");
     viewValEdit.append(head, mountEl);
-    mountValuationCalc(mountEl, valuationCtx(item), {
+    if (valEditApi && valEditApi.destroy) valEditApi.destroy();
+    valEditApi = mountValuationCalc(mountEl, valuationCtx(item), {
       lang: LANG,
       initialMethod: card ? card.method : undefined,
       initialInputs: card ? card.inputs : undefined,
@@ -3172,7 +3178,40 @@ function editorStock(item) {
 }
 
 // 退出编辑器：弹掉压入的历史条 → popstate 回到详情
-function finishValEdit() { if (valEditReturn) history.back(); }
+function finishValEdit() { if (!valEditReturn) return; valEditLeaving = true; history.back(); }
+// 用户要离开（返回 / Esc / 浏览器后退）：有未保存改动就先问
+function leaveValEdit() {
+  if (valEditApi && valEditApi.isDirty()) askSaveValEdit(); else finishValEdit();
+}
+function askSaveValEdit() {
+  if (document.getElementById("veConfirm")) return;
+  const zh = LANG === "zh", canSave = valEditApi && valEditApi.canSave();
+  const ov = document.createElement("div"); ov.className = "overlay"; ov.id = "veConfirm";
+  const box = document.createElement("div"); box.className = "modal ve-confirm"; box.setAttribute("role", "alertdialog"); box.setAttribute("aria-modal", "true");
+  const title = document.createElement("div"); title.className = "modal-title"; title.textContent = zh ? "保存这次修改吗？" : "Save your changes?";
+  const msg = document.createElement("p"); msg.className = "ve-confirm-msg";
+  msg.textContent = canSave ? (zh ? "你改过的假设和备注还没保存，离开后会丢失。" : "Your assumptions and note haven't been saved and will be lost if you leave.")
+    : (zh ? "你改过的内容还没保存。现在的假设还算不出合理区间，暂时不能保存；可以继续编辑补全，或者不保存离开。" : "Your changes aren't saved. The inputs can't produce a fair range yet, so they can't be saved — keep editing, or leave without saving.");
+  const acts = document.createElement("div"); acts.className = "ve-confirm-acts";
+  const mk = (cls, text) => { const b = document.createElement("button"); b.type = "button"; b.className = "btn " + cls; b.textContent = text; return b; };
+  const keep = mk("ghost", zh ? "继续编辑" : "Keep editing");
+  const discard = mk("", zh ? "不保存" : "Don't save");
+  const save = mk("primary", zh ? "保存" : "Save"); save.disabled = !canSave;
+  acts.append(keep, discard, save);
+  box.append(title, msg, acts); ov.appendChild(box); document.body.appendChild(ov);
+  const close = () => { ov.remove(); document.removeEventListener("keydown", onKey, true); };
+  const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); close(); } };
+  document.addEventListener("keydown", onKey, true);
+  keep.addEventListener("click", close);
+  ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+  discard.addEventListener("click", () => { close(); finishValEdit(); });
+  save.addEventListener("click", () => { close(); if (!valEditApi.save()) finishValEdit(); }); // 保存成功时 onDone 里会自己退出
+  (canSave ? save : keep).focus();
+}
+// 关标签页 / 刷新：浏览器自带的离开提醒
+window.addEventListener("beforeunload", (e) => {
+  if (valEditReturn && !valEditLeaving && valEditApi && valEditApi.isDirty()) { e.preventDefault(); e.returnValue = ""; }
+});
 
 function currentDetailCode() {
   const m = location.pathname.match(/^\/b\/[^/]+\/([^/]+)/);
@@ -3184,7 +3223,13 @@ function route() {
   if (item && owner) showDetail(item); else showList();
 }
 window.addEventListener("popstate", () => {
-  if (valEditReturn) { const it = valEditReturn; valEditReturn = null; showDetail(it, "val"); return; } // 退出编辑器→回详情（停在估值研究 tab）
+  if (valEditReturn) {
+    // 浏览器后退但有未保存改动：把历史条压回去，先问
+    if (!valEditLeaving && valEditApi && valEditApi.isDirty()) { history.pushState({ valedit: 1 }, "", location.href); askSaveValEdit(); return; }
+    const it = valEditReturn; valEditReturn = null; valEditLeaving = false;
+    if (valEditApi && valEditApi.destroy) valEditApi.destroy(); valEditApi = null;
+    showDetail(it, "val"); return; // 退出编辑器→回详情（停在估值研究 tab）
+  }
   route();
 });
 
@@ -3201,7 +3246,8 @@ document.getElementById("brand").addEventListener("click", (e) => {
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (valEditReturn) { finishValEdit(); }
+    if (document.getElementById("veConfirm")) return; // 确认框自己处理 Esc
+    if (valEditReturn) { leaveValEdit(); }
     else if (!modalOverlay.classList.contains("hidden")) closeItemModal();
     return;
   }
