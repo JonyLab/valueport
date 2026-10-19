@@ -333,7 +333,7 @@ The target repo defaults to `JonyLab/watchlist`; override it with `FEEDBACK_REPO
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/macro` | `{updatedAt, markets: [{key, level, zone, indicators: [{key, value, unit, date, since, pct, expensive, cheapHigh}]} \| {key, pending}], gravity: {us: {ey, y10, real}, cn: {ey, y10}}}`; refreshes in the background when older than 7 days |
+| GET | `/api/macro` | `{updatedAt, markets: [{key, level, zone, indicators: [{key, value, unit, date, since, pct, expensive, cheapHigh}]} \| {key, pending}], gravity: {us: {ey, y10, real}, hk: {ey, y10}, cn: {ey, y10}}}`; refreshes in the background when older than 7 days |
 
 ### Station-master (requires `pendulum_owner` cookie)
 

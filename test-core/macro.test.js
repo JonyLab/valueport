@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFredCsv, parseMultplTable, monthly, percentile, combine, buildMacro } from "../src/macro.js";
+import { parseFredCsv, parseMultplTable, parseLeguleguPe, monthly, percentile, combine, buildMacro } from "../src/macro.js";
 
 describe("macro parsers", () => {
   it("reads FRED CSV and skips missing values", () => {
@@ -37,7 +37,29 @@ describe("buildMacro", () => {
     expect(us.zone).toBe(4);
     expect(cn.indicators.find((i) => i.key === "cn_pe").pct).toBe(33);
     expect(cn.zone).toBeLessThan(3);
-    expect(hk).toEqual({ key: "hk", pending: true });
+    expect(hk).toEqual({ key: "hk", pending: true }); // 没有恒指数据时仍是占位
     expect(m.gravity.us.ey.length).toBe(6);
+  });
+  it("builds Hong Kong from Hang Seng P/E since 2000 against the US 10-year yield", () => {
+    const series = {
+      HK_PE: [{ date: "1973-03", value: 60 }, ...mk([20, 15, 10, 12])], // 1973 的极端值不算进分位
+      US_10Y: mk([5, 4, 3, 4]),
+    };
+    const hk = buildMacro(series, "2026-10-18T00:00:00Z").markets.find((x) => x.key === "hk");
+    const pe = hk.indicators.find((i) => i.key === "hk_pe");
+    expect(pe).toMatchObject({ value: 12, since: "2000-01", pct: 50 });
+    const erp = hk.indicators.find((i) => i.key === "hk_erp"); // 100/12 − 4 ≈ 4.33
+    expect(erp).toMatchObject({ value: 4.33, unit: "pp", cheapHigh: true });
+    expect(hk.level).toBeGreaterThanOrEqual(0);
+    const g = buildMacro(series, "x").gravity.hk;
+    expect(g.ey.length).toBe(4);
+    expect(g.y10[0][0]).toBe("2000-01");
+  });
+});
+
+describe("legulegu Hang Seng P/E", () => {
+  it("parses the monthly table rows", () => {
+    const html = '<tr><th>时间</th></tr><tr><td>2026年9月</td><td>24613.27</td><td>13.79</td></tr><tr><td>1973年5月</td><td>/</td><td>43.56</td></tr><tr><td>2026年8月</td><td>x</td><td>-</td></tr>';
+    expect(parseLeguleguPe(html)).toEqual([{ date: "2026-09", value: 13.79 }, { date: "1973-05", value: 43.56 }]);
   });
 });

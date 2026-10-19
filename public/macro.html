@@ -164,6 +164,8 @@ const IND = {
   buffett: { name: T("总市值 / GDP", "Market cap / GDP"), tip: T("美国非金融企业股权市值 ÷ GDP（季度，FRED）。巴菲特称之为衡量整体估值最好的单一指标。跨国收入让这个比值长期上移，看分位比看绝对值更有意义。", "US non-financial corporate equity ÷ GDP (quarterly, FRED). Buffett's favourite single gauge; global earnings push it up over time, so the percentile matters more than the level.") },
   cape: { name: "Shiller CAPE", tip: T("标普 500 价格 ÷ 过去 10 年经通胀调整的平均盈利（月度，multpl / Shiller 数据）。", "S&P 500 price ÷ 10-year inflation-adjusted average earnings (monthly).") },
   us_erp: { name: T("盈利收益率 − 实际利率", "Earnings yield − real rate"), tip: T("1 / CAPE 减去 10 年期 TIPS 实际利率：股票相对无风险资产多给你多少。越低越贵，所以这里按反向计入水位。", "1/CAPE minus the 10-year TIPS real yield: what stocks pay over a risk-free asset. Lower is pricier, so it counts inversely.") },
+  hk_pe: { name: T("恒生指数市盈率", "Hang Seng Index P/E"), tip: T("恒生指数的市盈率（月度，数据源自恒生指数公司，经乐咕乐股整理），分位按 2000 年以来的历史算。", "Hang Seng Index P/E (monthly, from Hang Seng Indexes via legulegu); percentile measured against history since 2000.") },
+  hk_erp: { name: T("盈利收益率 − 美债利率", "Earnings yield − US 10Y"), tip: T("恒指盈利收益率（1 / PE）减美国 10 年国债收益率。港元与美元挂钩、利率跟着美国走，所以用美债作无风险利率。越低越贵，按反向计入水位。", "Hang Seng earnings yield (1/PE) minus the US 10-year yield — the HKD is pegged to the USD, so US rates are Hong Kong's risk-free rate. Lower is pricier, so it counts inversely.") },
   cn_pe: { name: T("全 A 股市盈率（TTM）", "All A-share P/E (TTM)"), tip: T("沪深两市全部 A 股的市盈率（东方财富，2017 年起）。历史较短，分位仅供参考。", "P/E of all A-shares (eastmoney, since 2017). Short history — treat the percentile with care.") },
   cn_erp: { name: T("股债性价比", "Equity vs bond yield"), tip: T("全 A 股盈利收益率（1 / PE）减 10 年国债收益率。越低越贵，按反向计入水位。", "All A-share earnings yield (1/PE) minus the 10-year CGB yield. Lower is pricier, so it counts inversely.") },
 };
@@ -238,7 +240,7 @@ function renderMarkets(d) {
 function renderGravity(G) {
   const ctl = $("mcGravCtl"); ctl.innerHTML = "";
   const seg = (opts, cur, pick) => { const s = el("div", "mc-seg"); for (const [k, lab] of opts) { const b = el("button", k === cur ? "on" : "", lab); b.type = "button"; b.addEventListener("click", () => { pick(k); renderGravity(G); }); s.appendChild(b); } return s; };
-  ctl.append(seg([["us", MKT.us], ["cn", MKT.cn]], gMkt, (k) => { gMkt = k; }), seg([["10", T("10 年", "10Y")], ["20", T("20 年", "20Y")], ["all", T("全部", "All")]], gRange, (k) => { gRange = k; }));
+  ctl.append(seg([["us", MKT.us], ["hk", MKT.hk], ["cn", MKT.cn]], gMkt, (k) => { gMkt = k; }), seg([["10", T("10 年", "10Y")], ["20", T("20 年", "20Y")], ["all", T("全部", "All")]], gRange, (k) => { gRange = k; }));
   const g = G[gMkt];
   const since = gRange === "all" ? "" : `${new Date().getFullYear() - Number(gRange)}-01`;
   const cut = (s) => (s || []).filter(([d]) => d >= since);
@@ -298,7 +300,7 @@ function renderGravity(G) {
   const lg = $("mcGravLegend"); lg.innerHTML = "";
   const item = (color, text, dashed) => { const s = el("span"); const i = el("i"); i.style.borderColor = color; if (dashed) i.style.borderTopStyle = "dashed"; s.append(i, document.createTextNode(text)); lg.appendChild(s); };
   item("var(--chart-2)", gMkt === "us" ? T("盈利收益率（1 / CAPE）", "Earnings yield (1/CAPE)") : T("盈利收益率（1 / PE）", "Earnings yield (1/PE)"));
-  item("var(--ink)", T("10 年国债收益率", "10-year bond yield"));
+  item("var(--ink)", gMkt === "hk" ? T("美国 10 年国债收益率（港元挂钩美元）", "US 10-year yield (HKD is pegged)") : T("10 年国债收益率", "10-year bond yield"));
   if (real.length) item("var(--ink-mute)", T("10 年实际利率（TIPS）", "10-year real yield (TIPS)"), true);
 }
 

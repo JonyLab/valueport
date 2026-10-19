@@ -169,7 +169,7 @@
 | Shiller CAPE | 美 | shillerdata.com 月度 xls（原 Yale 页面已迁移） | 是 | 中：需解析 xls，月更，存 D1 |
 | 信用利差 | 美 | FRED `BAA10Y`（长历史）；ICE 高收益 OAS 在 FRED 上历史已截短，不适合百分位 | 是 | 低 |
 | CPI | 美 | FRED `CPIAUCSL` | 是 | 低 |
-| 恒指 PE / PB / 股息率 | 港 | 恒生指数公司月度 factsheet（PDF/网页）；或 Longbridge `valuation_history` 对指数（待验证） | 基本免费 | 中高：长历史需一次性回填 |
+| 恒指 PE / PB / 股息率 | 港 | **已接 PE**：乐咕乐股 `legulegu.com/stockdata/market/hsi` 服务端渲染表格（源自恒生指数公司，1973 年起月度）；PB / 股息率在该站要 token 的接口里，暂未接。Longbridge `valuation_history` 对 HSI.HK 返回空、对 2800.HK 是 ETF 的 P/NAV，都不能用 | 免费 | 低：每周抓一次网页 |
 | 香港 CPI | 港 | 政府统计处 | 是 | 中 |
 | 沪深 300 / 中证全指 PE、PB、股息率 | A | 中证指数官网下载；eastmoney 指数估值接口（repo 已接 eastmoney） | 是 | 中：非官方接口可能变动 |
 | 10 年国债 | 中 | eastmoney 中美国债收益率接口 / 中债 | 是 | 低中 |

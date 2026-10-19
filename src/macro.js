@@ -36,6 +36,17 @@ export function parseMultplTable(html) {
   }
   return out;
 }
+// 乐咕乐股恒指市盈率页（数据源自恒生指数公司，1973 年 5 月起月度）：表格行 <td>2026年9月</td><td>24613.27</td><td>13.79</td>
+export function parseLeguleguPe(html) {
+  const out = [];
+  const re = /<td[^>]*>\s*(\d{4})年(\d{1,2})月\s*<\/td>\s*<td[^>]*>[\s\S]*?<\/td>\s*<td[^>]*>\s*([0-9.]+)\s*<\/td>/g;
+  let m;
+  while ((m = re.exec(String(html || "")))) {
+    const v = Number(m[3]);
+    if (Number.isFinite(v) && v > 0) out.push({ date: `${m[1]}-${m[2].padStart(2, "0")}`, value: v });
+  }
+  return out;
+}
 // 按月归并：每月取最后一个观测值 → [{ date: "YYYY-MM", value }]，按时间升序
 export function monthly(points) {
   const map = new Map();
@@ -97,6 +108,7 @@ export async function fetchMacro(fetchImpl = fetch) {
     US_CAPE: async () => monthly(parseMultplTable(await fetchText(fetchImpl, MULTPL("shiller-pe")))),
     CN_10Y: async () => monthly(await eastmoneyAll(fetchImpl, "RPTA_WEB_TREASURYYIELD", "SOLAR_DATE", "EMM00166466", "(SOLAR_DATE>='2002-01-01')")),
     CN_PE: async () => monthly(await eastmoneyAll(fetchImpl, "RPT_VALUEMARKET", "TRADE_DATE", "PE_TTM_AVG", '(TRADE_MARKET_CODE="000300")')),
+    HK_PE: async () => monthly(parseLeguleguPe(await fetchText(fetchImpl, "https://legulegu.com/stockdata/market/hsi"))),
   };
   const out = {}, errors = {};
   const run = async (k) => { try { out[k] = await jobs[k](); } catch (e) { errors[k] = String(e && e.message || e).slice(0, 200); } };
@@ -169,6 +181,7 @@ function market(key, indicators) {
 }
 const pairs = (s, from) => s.filter((p) => !from || p.date >= from).map((p) => [p.date, Math.round(p.value * 100) / 100]);
 
+const HK_FROM = "2000-01";
 export function buildMacro(series, updatedAt) {
   const s = (k) => series[k] || [];
   const usBuffett = quarterlyRatio(s("US_EQUITY"), s("US_GDP"));
@@ -176,6 +189,10 @@ export function buildMacro(series, updatedAt) {
   const usERP = combine(usEY, s("US_REAL10Y"), (ey, r) => ey - r);                          // 盈利收益率 − 实际利率
   const cnEY = s("CN_PE").map((p) => ({ date: p.date, value: 100 / p.value }));
   const cnERP = combine(cnEY, s("CN_10Y"), (ey, y) => ey - y);                               // 股债性价比
+  // 港股：恒指 PE 只取 2000 年起（1970 年代的极端值会把今天衬得过于便宜）；港元联系汇率、利率跟美国走，无风险利率用美国 10 年国债
+  const hkPE = s("HK_PE").filter((p) => p.date >= HK_FROM);
+  const hkEY = hkPE.map((p) => ({ date: p.date, value: 100 / p.value }));
+  const hkERP = combine(hkEY, s("US_10Y"), (ey, y) => ey - y);
   return {
     updatedAt,
     markets: [
@@ -184,7 +201,10 @@ export function buildMacro(series, updatedAt) {
         indicator("cape", s("US_CAPE"), { digits: 1 }),
         indicator("us_erp", usERP, { unit: "pp", cheapHigh: true, digits: 2 }),
       ]),
-      market("hk", []), // 港股：恒指长历史估值尚未接入
+      market("hk", [
+        indicator("hk_pe", hkPE, { digits: 1 }),
+        indicator("hk_erp", hkERP, { unit: "pp", cheapHigh: true, digits: 2 }),
+      ]),
       market("cn", [
         indicator("cn_pe", s("CN_PE"), { digits: 1 }),
         indicator("cn_erp", cnERP, { unit: "pp", cheapHigh: true, digits: 2 }),
@@ -194,6 +214,7 @@ export function buildMacro(series, updatedAt) {
     gravity: {
       us: { ey: pairs(usEY, "1990-01"), y10: pairs(s("US_10Y"), "1990-01"), real: pairs(s("US_REAL10Y"), "1990-01") },
       cn: { ey: pairs(cnEY), y10: pairs(s("CN_10Y"), cnEY.length ? cnEY[0].date : "") },
+      hk: { ey: pairs(hkEY), y10: pairs(s("US_10Y"), hkEY.length ? hkEY[0].date : "") },
     },
   };
 }
