@@ -27,6 +27,11 @@
   .sb-say{font-size:12px;color:var(--ink-mute)}
   .sb-close{flex:none;width:26px;height:26px;border:0;border-radius:50%;background:none;color:var(--ink-mute);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
   .sb-close:hover{background:rgba(29,29,27,.06);color:var(--ink)}
+  .strike-banner.review{background:rgba(240,140,46,.09);box-shadow:inset 0 0 0 1px rgba(240,140,46,.22)}
+  .strike-banner + .strike-banner.review{margin-top:-14px} /* 两条都在时挨着 */
+  .strike-banner.review .sb-ico{background:#e08a35}
+  .strike-banner.review .sb-name{color:#8a4a17;box-shadow:inset 0 0 0 1px rgba(240,140,46,.3)}
+  .strike-banner.review .sb-name:hover{background:rgba(240,140,46,.12)}
   .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;flex-wrap:wrap}
   .hero-main{min-width:0;flex:1 1 360px}
   .hero-main h1{font-size:clamp(36px,5vw,56px);margin:0}
@@ -1079,6 +1084,8 @@
 
   <!-- 有标的落进击球区时的一行提示（名称可点进详情；可关掉，进击球区的标的变了会再出现） -->
   <div class="strike-banner hidden" id="strikeBanner" role="status"></div>
+  <!-- 该复核的估值：选中的估值卡超过半年没动，或之后出了新年报 -->
+  <div class="strike-banner review hidden" id="reviewBanner" role="status"></div>
 
   <div class="layout">
     <div class="charts" id="charts"><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div><div class="chart-item sk-tile" aria-hidden="true"><div class="sk-row"><span class="sk sk-round" style="width:34px;height:34px"></span><div class="sk-grow"><span class="sk sk-line" style="width:46%"></span><span class="sk sk-line" style="width:28%;height:9px;margin-top:8px"></span></div><span class="sk sk-line" style="width:64px;height:22px"></span></div><span class="sk sk-pill" style="height:14px"></span><div class="sk-row"><span class="sk sk-line" style="width:22%"></span><span class="sk-grow"></span><span class="sk sk-line" style="width:18%"></span></div></div></div>
@@ -1402,6 +1409,84 @@ function renderOverview() {
   document.getElementById("icoStrike").style.background = ZONES[0].hex;
   document.getElementById("icoBubble").style.background = ZONES[ZONES.length - 1].hex;
   renderStrikeBanner(real.filter((i) => extremeOf(i.cfg) === "strike"));
+  renderReviewBanner();
+}
+
+// ── 该复核的估值 ──
+// 只看选中的那张估值卡（它决定了合理区间）：updatedAt 超过 REVIEW_DAYS 天，或最新年报的期末在估值之后（年报一定是期末之后才发布）
+const REVIEW_DAYS = 180;
+const selectedCard = (c) => (Array.isArray(c.valuations) ? c.valuations.find((v) => v.id === c.selectedValuationId) : null) || null;
+// 最新年报期末（ISO 日期）按标的缓存一天，避免每次打开都拉财报
+const FP_KEY = (sym) => "rv_fp_" + sym;
+function cachedFp(sym) {
+  try { const j = JSON.parse(localStorage.getItem(FP_KEY(sym)) || "null"); return j && Date.now() - j.at < 86400000 ? j : null; } catch { return null; }
+}
+function latestAnnualEnd(financials) {
+  const acct = financials && financials.IS && financials.IS[0];
+  const v = acct && acct.values && acct.values[0]; // 最新期在前
+  if (!v) return null;
+  const t = Number(v.fpEnd);
+  const iso = Number.isFinite(t) && t > 0 ? new Date(t * 1000).toISOString().slice(0, 10) : null;
+  return iso ? { end: iso, label: v.period || (v.year ? "FY" + v.year : "") } : null;
+}
+function reviewReasons(item) {
+  const card = selectedCard(item.cfg);
+  if (!card || !card.updatedAt) return null;
+  const at = Date.parse(card.updatedAt); if (!Number.isFinite(at)) return null;
+  const zh = LANG === "zh", out = [];
+  const months = Math.floor((Date.now() - at) / (30.44 * 86400000));
+  if (Date.now() - at > REVIEW_DAYS * 86400000) out.push(zh ? `估值已 ${months} 个月` : `${months} months old`);
+  const fp = cachedFp(item.cfg.symbol);
+  if (fp && fp.end && fp.end > card.updatedAt.slice(0, 10)) out.push(zh ? `有新年报 ${fp.label}` : `new report ${fp.label}`);
+  return out.length ? out : null;
+}
+let reviewFetching = false;
+// 后台逐个补齐「最新年报期末」（只给主人、只看已估值的；长桥财报接口限频，一个一个来）
+async function fillReportDates() {
+  if (!owner || reviewFetching) return;
+  const todo = items.filter((i) => i.cfg.symbol && selectedCard(i.cfg) && !cachedFp(i.cfg.symbol));
+  if (!todo.length) return;
+  reviewFetching = true;
+  try {
+    for (const it of todo) {
+      const r = await loadFinancials(it, "annual").catch(() => null);
+      const fp = latestAnnualEnd(r && r.financials);
+      try { localStorage.setItem(FP_KEY(it.cfg.symbol), JSON.stringify({ at: Date.now(), ...(fp || {}) })); } catch { /* 存不了就下次再拉 */ }
+      renderReviewBanner();
+    }
+  } finally { reviewFetching = false; }
+}
+function renderReviewBanner() {
+  const el = document.getElementById("reviewBanner"); if (!el) return;
+  if (!owner) { el.classList.add("hidden"); return; }
+  const zh = LANG === "zh";
+  const list = items.filter((i) => i.cfg.symbol).map((i) => [i, reviewReasons(i)]).filter(([, r]) => r);
+  const key = "review_banner_off_" + boardSlug, sig = list.map(([i, r]) => i.cfg.symbol + ":" + r.join("|")).sort().join(",");
+  let off = ""; try { off = sessionStorage.getItem(key) || ""; } catch { off = ""; }
+  if (!list.length || off === sig) { el.classList.add("hidden"); el.replaceChildren(); return; }
+  const ico = document.createElement("span"); ico.className = "sb-ico"; ico.appendChild(ri("refresh-line"));
+  const body = document.createElement("div"); body.className = "sb-body";
+  const head = document.createElement("div"); head.className = "sb-head";
+  head.textContent = zh ? `${list.length} 个估值该复核了` : `${list.length} valuation${list.length > 1 ? "s" : ""} to review`;
+  const names = document.createElement("div"); names.className = "sb-names";
+  for (const [it, reasons] of list) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "sb-name";
+    b.textContent = displayName(it) + " · " + reasons.join(zh ? "，" : ", ");
+    b.addEventListener("click", () => {
+      const code = (it.cfg.ticker || "").toUpperCase(); if (!code) return;
+      history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug) + "/" + encodeURIComponent(code));
+      showDetail(it, "val");
+    });
+    names.appendChild(b);
+  }
+  const say = document.createElement("div"); say.className = "sb-say";
+  say.textContent = zh ? "看看假设还成不成立，可以用 AI 复核" : "Check the assumptions still hold — try the AI review";
+  body.append(head, names, say);
+  const x = document.createElement("button"); x.type = "button"; x.className = "sb-close"; x.setAttribute("aria-label", zh ? "关闭提示" : "Dismiss");
+  x.appendChild(ri("close-line"));
+  x.addEventListener("click", () => { try { sessionStorage.setItem(key, sig); } catch { /* 只关这一次 */ } el.classList.add("hidden"); });
+  el.replaceChildren(ico, body, x);
+  el.classList.remove("hidden");
 }
 // 击球区提示：列出现价低于「低点 ×(1 − 安全边际)」的标的；关掉后按这组标的记在本次会话，组合变了再出现
 function renderStrikeBanner(list) {
@@ -1523,6 +1608,7 @@ function applyBoard(me, data, prices) {
   }
   rows.forEach((r) => addChart({ ...r, price: (prices && prices[r.symbol]) || 0 }));
   if (owner && !ownerInited) { ownerInited = true; initOwner(data.settings || {}); }
+  if (owner) setTimeout(fillReportDates, 1500); // 页面先画好，再在后台补「最新年报」做复核提醒
   return true;
 }
 
@@ -2084,6 +2170,7 @@ function showView(v) { // "list" | "settings" | "detail" | "valedit"
   if (!isValEdit) valEditReturn = null; // 离开编辑器视图即清状态
   pageHeadEl.classList.toggle("hidden", !isList);
   document.getElementById("strikeBanner").classList.toggle("offview", !isList); // 只在列表视图显示
+  document.getElementById("reviewBanner").classList.toggle("offview", !isList);
   layoutEl.classList.toggle("hidden", !isList);
   viewSettings.classList.toggle("hidden", !isSettings);
   viewDetail.classList.toggle("hidden", !isDetail);
