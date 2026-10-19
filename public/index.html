@@ -1413,15 +1413,15 @@ function renderOverview() {
 }
 
 // ── 该复核的估值 ──
-// 只看选中的那张估值卡（它决定了合理区间）：updatedAt 超过 REVIEW_DAYS 天，或最新年报的期末在估值之后（年报一定是期末之后才发布）
+// 只看选中的那张估值卡（它决定了合理区间）：updatedAt 超过 REVIEW_DAYS 天，或估值之后又出了财报（季报 / 半年报 / 年报：最新一期的期末晚于估值日期，财报一定是期末之后才发布）
 const REVIEW_DAYS = 180;
 const selectedCard = (c) => (Array.isArray(c.valuations) ? c.valuations.find((v) => v.id === c.selectedValuationId) : null) || null;
-// 最新年报期末（ISO 日期）按标的缓存一天，避免每次打开都拉财报
-const FP_KEY = (sym) => "rv_fp_" + sym;
+// 最新一期财报的期末（ISO 日期）按标的缓存一天，避免每次打开都拉财报
+const FP_KEY = (sym) => "rv_fp2_" + sym; // v2：季报起算（v1 只看年报）
 function cachedFp(sym) {
   try { const j = JSON.parse(localStorage.getItem(FP_KEY(sym)) || "null"); return j && Date.now() - j.at < 86400000 ? j : null; } catch { return null; }
 }
-function latestAnnualEnd(financials) {
+function latestAnnualEnd(financials) { // 年报 / 季报都适用：取最新一期的期末与期名
   const acct = financials && financials.IS && financials.IS[0];
   const v = acct && acct.values && acct.values[0]; // 最新期在前
   if (!v) return null;
@@ -1437,11 +1437,11 @@ function reviewReasons(item) {
   const months = Math.floor((Date.now() - at) / (30.44 * 86400000));
   if (Date.now() - at > REVIEW_DAYS * 86400000) out.push(zh ? `估值已 ${months} 个月` : `${months} months old`);
   const fp = cachedFp(item.cfg.symbol);
-  if (fp && fp.end && fp.end > card.updatedAt.slice(0, 10)) out.push(zh ? `有新年报 ${fp.label}` : `new report ${fp.label}`);
+  if (fp && fp.end && fp.end > card.updatedAt.slice(0, 10)) out.push(zh ? `有新财报 ${fp.label}` : `new report ${fp.label}`);
   return out.length ? out : null;
 }
 let reviewFetching = false;
-// 后台逐个补齐「最新年报期末」（只给主人、只看已估值的；长桥财报接口限频，一个一个来）
+// 后台逐个补齐「最新一期财报期末」：先看季报，没有季报（只出半年报 / 没数据）再看年报；只给主人、只看已估值的；长桥财报接口限频，一个一个来
 async function fillReportDates() {
   if (!owner || reviewFetching) return;
   const todo = items.filter((i) => i.cfg.symbol && selectedCard(i.cfg) && !cachedFp(i.cfg.symbol));
@@ -1449,8 +1449,9 @@ async function fillReportDates() {
   reviewFetching = true;
   try {
     for (const it of todo) {
-      const r = await loadFinancials(it, "annual").catch(() => null);
-      const fp = latestAnnualEnd(r && r.financials);
+      const q = await loadFinancials(it, "quarter").catch(() => null);
+      let fp = latestAnnualEnd(q && q.financials);
+      if (!fp) { const a = await loadFinancials(it, "annual").catch(() => null); fp = latestAnnualEnd(a && a.financials); }
       try { localStorage.setItem(FP_KEY(it.cfg.symbol), JSON.stringify({ at: Date.now(), ...(fp || {}) })); } catch { /* 存不了就下次再拉 */ }
       renderReviewBanner();
     }
