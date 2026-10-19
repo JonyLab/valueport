@@ -38,7 +38,7 @@ const maxStr = (...xs) => xs.filter((x) => typeof x === "string" && /^\d{4}-\d{2
 export async function ownerStats(env) {
   const db = env.DB, day = today(), since = daysAgo(STATS_DAYS - 1), week = daysAgo(6);
   const [users, items, brokers, models, chats, flags, codes, top, daily, perUser7, perUserToday] = await Promise.all([
-    rows(db, "SELECT id, username, created_at FROM users"),
+    rows(db, "SELECT id, username, board_slug, created_at FROM users"),
     rows(db, `SELECT user_id, COUNT(*) AS n, SUM(CASE WHEN json_valid(valuations) THEN json_array_length(valuations) ELSE 0 END) AS v, MAX(updated_at) AS last
               FROM items GROUP BY user_id`),
     rows(db, `SELECT a.user_id, COUNT(DISTINCT a.id) AS accounts, COUNT(h.id) AS holdings
@@ -64,7 +64,7 @@ export async function ownerStats(env) {
     const it = I.get(u.id) || {}, br = B.get(u.id) || {}, ch = C.get(u.id) || {};
     const aiToday = Math.max(T.get(u.id)?.ai || 0, legacyAi.get(u.id) || 0);
     return {
-      id: u.id, username: u.username, joined: u.created_at,
+      id: u.id, username: u.username, slug: u.board_slug, joined: u.created_at,
       items: it.n || 0, valuations: it.v || 0,
       accounts: br.accounts || 0, holdings: br.holdings || 0,
       models: M.get(u.id)?.n || 0, chats: ch.n || 0,

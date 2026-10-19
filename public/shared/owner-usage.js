@@ -55,8 +55,8 @@ const CSS = `
 .us-top .bar i{display:block;height:100%;background:var(--sun)}
 .us-top .n{font-family:var(--mono);font-size:12px;width:20px;text-align:right}
 .us-empty{font-size:12.5px;color:var(--ink-mute);padding:8px 0}
-.us-table{overflow-x:auto;margin-top:6px}
-.us-table table{min-width:640px}
+.us-table{overflow-x:auto}
+.us-table table{min-width:720px;margin-top:0}
 .us-table th{cursor:pointer;user-select:none;white-space:nowrap}
 .us-table th.on{color:var(--ink)}
 .us-table th.on::after{content:" ↓";font-size:11px}
@@ -66,6 +66,9 @@ const CSS = `
 .us-table td.z{color:var(--ink-mute)}
 .us-table td.ago{white-space:nowrap;color:var(--ink-soft)}
 .us-table td.ago.fresh{color:var(--green)}
+.us-table td .us-slug{display:block;font-family:var(--mono);font-size:11.5px;color:var(--ink-mute);text-decoration:none}
+.us-table td .us-slug:hover{color:var(--ink)}
+.us-table td.act{text-align:right;white-space:nowrap}
 .us-note{font-size:11.5px;color:var(--ink-mute);margin-top:10px}
 @media (max-width:760px){.us-tiles{grid-template-columns:repeat(2,1fr)}.us-charts{grid-template-columns:1fr}.us-num{font-size:32px}}
 `;
@@ -102,7 +105,8 @@ const COLS = [
   { k: "accounts", l: "pf", n: 1 }, { k: "aiToday", l: "ai", n: 1 }, { k: "ai7d", l: "ai7", n: 1 }, { k: "chats", l: "chat", n: 1 }, { k: "lastActive", l: "last" },
 ];
 
-export function mountUsage(root) {
+// overview：统计格 + 曲线 + 热门标的；users：可排序的用户表，rowEnd(u) 给每行末尾追加一格（站长页放「重置密码」）
+export function mountUsage({ overview, users, rowEnd = () => "" }) {
   if (!document.getElementById("us-css")) { const st = document.createElement("style"); st.id = "us-css"; st.textContent = CSS; document.head.appendChild(st); }
   let data = null, sortKey = "lastActive", asc = false;
 
@@ -114,17 +118,17 @@ export function mountUsage(root) {
     });
     if (!list.length) return `<div class="us-empty">${esc(T.empty)}</div>`;
     const fresh = Date.now() - 86400000;
-    return `<div class="us-table"><table><tr>${COLS.map((c) => `<th data-k="${c.k}" class="${c.n ? "n " : ""}${c.k === sortKey ? "on" + (asc ? " asc" : "") : ""}">${esc(T[c.l])}</th>`).join("")}</tr>` +
-      list.map((u) => `<tr><td>${esc(u.username)}</td><td class="mono">${esc((u.joined || "").slice(0, 10))}</td>` +
+    return `<div class="us-table"><table><tr>${COLS.map((c) => `<th data-k="${c.k}" class="${c.n ? "n " : ""}${c.k === sortKey ? "on" + (asc ? " asc" : "") : ""}">${esc(T[c.l])}</th>`).join("")}<th></th></tr>` +
+      list.map((u) => `<tr><td>${esc(u.username)}${u.slug ? `<a class="us-slug" href="/b/${encodeURIComponent(u.slug)}" target="_blank" rel="noopener">/b/${esc(u.slug)}</a>` : ""}</td><td class="mono">${esc((u.joined || "").slice(0, 10))}</td>` +
         ["items", "valuations", "accounts", "aiToday", "ai7d", "chats"].map((k) => `<td class="n${u[k] ? "" : " z"}">${fmt(u[k])}</td>`).join("") +
-        `<td class="ago${u.lastActive && new Date(u.lastActive) > fresh && u.lastActive.length > 10 ? " fresh" : ""}" title="${esc(u.lastActive || "")}">${esc(ago(u.lastActive))}</td></tr>`).join("") +
+        `<td class="ago${u.lastActive && new Date(u.lastActive) > fresh && u.lastActive.length > 10 ? " fresh" : ""}" title="${esc(u.lastActive || "")}">${esc(ago(u.lastActive))}</td><td class="act">${rowEnd(u)}</td></tr>`).join("") +
       `</table></div>`;
   }
 
   function render() {
     const s = data, top = s.topSymbols, topMax = Math.max(1, ...top.map((x) => x.users));
     const tile = (lab, num, foot, hi) => `<div class="us-tile${hi ? " hi" : ""}"><div class="us-lab">${esc(lab)}</div><div class="us-num">${num}</div><div class="us-foot">${foot}</div></div>`;
-    root.innerHTML = `
+    if (overview) overview.innerHTML = `
       <div class="us-head"><span class="card-title">${esc(T.title)}</span><span class="us-sub">${esc(T.d30)}</span><button class="btn sm" data-act="refresh">${esc(T.refresh)}</button></div>
       <div class="us-tiles">
         ${tile(T.users, fmt(s.users.total), `<b>+${fmt(s.users.today)}</b> ${esc(T.today)} · <b>+${fmt(s.users.week)}</b> ${esc(T.week)}`, true)}
@@ -143,24 +147,27 @@ export function mountUsage(root) {
           `<li title="${esc(x.symbol)} · ${x.users} ${esc(T.watchers)}"><span class="tk">${esc(x.ticker || x.symbol)}</span><span class="nm">${esc(x.name)}</span><span class="bar"><i style="width:${(x.users / topMax) * 100}%"></i></span><span class="n">${x.users}</span></li>`).join("")}</ul>`
           : `<div class="us-empty">${esc(T.topNone)}</div>`}</div>
       </div>
-      <div data-slot="table">${table()}</div>
       <div class="us-note">${esc(T.note)}</div>`;
+    if (users) users.innerHTML = table();
   }
 
-  root.addEventListener("click", (e) => {
+  const onClick = (e) => {
     if (e.target.closest("[data-act=refresh]")) return load();
     const th = e.target.closest("th[data-k]");
     if (!th || !data) return;
     if (sortKey === th.dataset.k) asc = !asc; else { sortKey = th.dataset.k; asc = sortKey === "username"; }
-    root.querySelector("[data-slot=table]").innerHTML = table();
-  });
+    users.innerHTML = table();
+  };
+  overview?.addEventListener("click", onClick);
+  users?.addEventListener("click", onClick);
 
   async function load() {
     try {
       const r = await fetch("/api/owner/stats");
       if (!r.ok) throw new Error(r.status);
       data = await r.json(); render();
-    } catch { root.innerHTML = `<div class="us-empty">${esc(T.err)}</div>`; }
+      return data;
+    } catch { for (const el of [overview, users]) if (el) el.innerHTML = `<div class="us-empty">${esc(T.err)}</div>`; }
   }
-  return load();
+  return { load };
 }

@@ -22,7 +22,7 @@ Sessions are stateless HMAC-signed cookies (`SESSION_SECRET`). The owner backend
 | `/register` | New-user registration (requires an activation code) |
 | `/b/<slug>` | The board page — read-only for visitors; the signed-in owner edits items via dialogs and opens Settings (top-right) for text/colors/board config |
 | `/app` | Legacy entry — 302 redirect to your `/b/<slug>` (or `/login`) |
-| `/owner` | Station-master backend — usage dashboard (users, activity, AI usage, most-watched symbols), issue activation codes, manage users, reset passwords |
+| `/owner` | Station-master backend with a side menu — Overview (usage dashboard), Users (activity table + password reset), Activation codes (issue, filter by used / unused, see who redeemed) |
 | `/portfolio` | Signed-in user's Portfolio — linked broker accounts (Longbridge / IBKR Flex / Tiger / Schwab / E*TRADE / Webull / manual + CSV), total assets and holdings mapped onto the board's valuation zones |
 
 ## Architecture

@@ -353,8 +353,8 @@ app.use("/api/owner/*", async (c, next) => {
   await next();
 });
 app.get("/api/owner/codes", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT code, used_by, used_at, created_at FROM activation_codes ORDER BY created_at DESC").all();
-  return c.json({ codes: (results || []).map((r) => ({ code: r.code, used: r.used_by != null, usedBy: r.used_by, usedAt: r.used_at })) });
+  const { results } = await c.env.DB.prepare("SELECT a.code, a.used_by, a.used_at, a.created_at, u.username FROM activation_codes a LEFT JOIN users u ON u.id=a.used_by ORDER BY a.created_at DESC").all();
+  return c.json({ codes: (results || []).map((r) => ({ code: r.code, used: r.used_by != null, usedBy: r.used_by, usedByName: r.username || null, usedAt: r.used_at, createdAt: r.created_at })) });
 });
 app.post("/api/owner/codes", async (c) => {
   const { count } = await c.req.json().catch(() => ({}));

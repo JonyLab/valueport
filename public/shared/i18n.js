@@ -139,6 +139,7 @@ const DICT = {
     o_codes: "激活码", o_gen: "生成", o_users: "用户", o_status: "状态", o_used: "已用", o_free: "未用",
     o_copy: "复制", o_copied: "已复制", o_username: "用户名", o_url: "网址", o_created: "注册时间",
     o_reset: "重置密码", o_reset_ok: "临时密码（转告该用户，登录后请改）：", o_pw_bad: "密码错误",
+    o_overview: "概览", o_all: "全部", o_used_by: "使用者", o_used_at: "使用时间", o_issued_at: "生成时间",
 
     a_login_btn: "登录",
     a_no_account: "没有账号？",
@@ -290,6 +291,7 @@ const DICT = {
     o_codes: "Activation codes", o_gen: "Generate", o_users: "Users", o_status: "Status", o_used: "Used", o_free: "Unused",
     o_copy: "Copy", o_copied: "Copied", o_username: "Username", o_url: "Board URL", o_created: "Registered",
     o_reset: "Reset password", o_reset_ok: "Temporary password (pass it to the user; they should change it after signing in):", o_pw_bad: "Wrong password",
+    o_overview: "Overview", o_all: "All", o_used_by: "Used by", o_used_at: "Used on", o_issued_at: "Created",
 
     a_login_btn: "Sign in",
     a_no_account: "No account?",

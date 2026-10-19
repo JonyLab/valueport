@@ -2,8 +2,8 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>站长后台 · 估值钟摆</title>
 <link rel="stylesheet" href="/shared/styles.css">
-<style>.wrap{max-width:860px;width:100%;margin:0 auto;padding-top:8px}.hidden{display:none}
-.owner-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
+<style>.wrap{max-width:1140px;width:100%;margin:0 auto;padding-top:8px}.hidden{display:none}
+.owner-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;padding-right:52px} /* 右上角留给语言按钮 */
 .owner-head h1{font-size:44px;margin:0}
 .card{padding:22px 24px;margin-bottom:14px}
 .card-title{font-size:20px;font-weight:400;margin-right:auto}
@@ -15,17 +15,43 @@ td{text-align:left;padding:9px 10px;border-top:1px dashed var(--border)}
 td .btn{height:32px;padding:0 13px;font-size:13px}
 .tag{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:var(--r-pill);font-size:12px;background:var(--track);color:var(--ink-soft)}
 .tag.free{background:var(--sun);color:var(--sun-ink)}
-.mono{font-family:var(--mono)}</style>
+.mono{font-family:var(--mono)}
+/* 左侧菜单 + 右侧内容；窄屏菜单变成顶部一排胶囊 */
+.ow-shell{display:grid;grid-template-columns:196px minmax(0,1fr);gap:18px;align-items:start}
+.ow-nav{position:sticky;top:16px;display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:var(--r-xl);background:var(--card);border:1px solid var(--card-edge);box-shadow:var(--shadow)}
+.ow-nav a{display:flex;align-items:center;gap:10px;height:42px;padding:0 14px;border-radius:var(--r-pill);color:var(--ink-soft);text-decoration:none;font-size:14.5px;white-space:nowrap}
+.ow-nav a:hover{background:var(--track);color:var(--ink)}
+.ow-nav a.on{background:var(--dark);color:#fff}
+.ow-nav a svg{width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ow-nav a .cnt{margin-left:auto;font-family:var(--mono);font-size:11.5px;min-width:22px;height:20px;padding:0 6px;border-radius:var(--r-pill);display:inline-flex;align-items:center;justify-content:center;background:var(--track);color:var(--ink-soft)}
+.ow-nav a.on .cnt{background:var(--sun);color:var(--sun-ink)}
+.pane{display:none}.pane.on{display:block}
+.seg{display:inline-flex;gap:2px;padding:3px;border-radius:var(--r-pill);background:var(--track)}
+.seg button{height:30px;padding:0 13px;border:0;border-radius:var(--r-pill);background:transparent;font-family:var(--font);font-size:13px;color:var(--ink-soft);cursor:pointer}
+.seg button.on{background:#fff;color:var(--ink)}
+.seg button small{font-family:var(--mono);font-size:11px;margin-left:4px;color:var(--ink-mute)}
+td.dim{color:var(--ink-mute)}
+@media (max-width:860px){.ow-shell{grid-template-columns:1fr}.ow-nav{position:static;flex-direction:row;overflow-x:auto;scrollbar-width:none;padding:6px}.ow-nav::-webkit-scrollbar{display:none}.ow-nav a{height:38px;padding:0 12px}.owner-head h1{font-size:34px}}</style>
 </head><body><div class="page center" id="page"><div class="page-corner" id="corner"></div>
 <div class="gate" id="gate"><a class="auth-brand" href="/"><b>Value</b>Port</a><h2 data-i18n="o_login">站长登录</h2><div class="err" id="gerr"></div>
 <input id="pw" type="password" placeholder="站长密码" data-i18n-ph="o_pw_ph"><button class="btn primary" id="gin" style="width:100%" data-i18n="o_enter">进入</button></div>
 <div class="wrap hidden" id="app">
   <div class="owner-head"><h1 data-i18n="o_title">站长后台</h1><button class="btn" id="out" data-i18n="o_out">退出</button></div>
-  <!-- 使用统计（public/shared/owner-usage.js 自带样式与逻辑） -->
-  <div class="card" id="usage"></div>
-  <div class="card"><div class="row"><span class="card-title" data-i18n="o_codes">激活码</span><input id="cnt" type="number" min="1" max="50" value="5">
-    <button class="btn primary" id="gen" data-i18n="o_gen">生成</button></div><div id="codes"></div></div>
-  <div class="card"><div class="row"><span class="card-title" data-i18n="o_users">用户</span></div><div id="users"></div></div>
+  <div class="ow-shell">
+    <nav class="ow-nav" id="nav">
+      <a href="#overview" data-pane="overview"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span data-i18n="o_overview">概览</span></a>
+      <a href="#users" data-pane="users"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.3-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.8c1.7.8 2.7 2.5 3 5.2"/></svg><span data-i18n="o_users">用户</span><span class="cnt" id="n-users"></span></a>
+      <a href="#codes" data-pane="codes"><svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v8a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2z"/><path d="M9 6v12" stroke-dasharray="2 2"/></svg><span data-i18n="o_codes">激活码</span><span class="cnt" id="n-codes"></span></a>
+    </nav>
+    <main>
+      <!-- 概览 / 用户两块的内容由 public/shared/owner-usage.js 渲染（自带样式） -->
+      <section class="pane" data-pane="overview"><div class="card" id="usage"></div></section>
+      <section class="pane" data-pane="users"><div class="card"><div class="row"><span class="card-title" data-i18n="o_users">用户</span></div><div id="users"></div></div></section>
+      <section class="pane" data-pane="codes"><div class="card"><div class="row"><span class="card-title" data-i18n="o_codes">激活码</span>
+        <div class="seg" id="cfilter"><button data-f="free"></button><button data-f="used"></button><button data-f="all"></button></div>
+        <input id="cnt" type="number" min="1" max="50" value="5"><button class="btn primary" id="gen" data-i18n="o_gen">生成</button></div><div id="codes"></div></div></section>
+    </main>
+  </div>
 </div>
 </div>
 <script type="module">
@@ -37,23 +63,39 @@ document.title = t("o_title") + " · ValuePort";
 mountLangMenu(document.getElementById("corner"));
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// 菜单：按 location.hash 切换右侧内容，刷新后停在原处
+const PANES=[...document.querySelectorAll("#nav a")].map(a=>a.dataset.pane);
+function show(){ const p=PANES.includes(location.hash.slice(1))?location.hash.slice(1):PANES[0];
+  document.querySelectorAll("[data-pane]").forEach(el=>el.classList.toggle("on",el.dataset.pane===p)); }
+addEventListener("hashchange",()=>{ show(); scrollTo(0,0); }); show();
+let usage=null;
 async function tryLoad(){ let r; try{ r=await fetch("/api/owner/codes"); }catch{ return false; } if(r.status===401) return false;
-  $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); $("page").classList.remove("center"); mountUsage($("usage")); await refreshCodes(); await refreshUsers(); return true; }
+  $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); $("page").classList.remove("center");
+  usage=mountUsage({ overview:$("usage"), users:$("users"), rowEnd:(u)=>`<button class="btn" data-id="${esc(u.id)}">${esc(t("o_reset"))}</button>` });
+  usage.load().then((d)=>{ if(d) $("n-users").textContent=d.users.total||""; });
+  await refreshCodes(); return true; }
 async function login(){ $("gerr").textContent="";
   let r; try{ r=await fetch("/api/owner/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:$("pw").value})}); }catch{ $("gerr").textContent=t("a_net_err"); return; }
   if(r.ok) tryLoad(); else $("gerr").textContent=t("o_pw_bad"); }
 $("gin").addEventListener("click",login); $("pw").addEventListener("keydown",(e)=>{if(e.key==="Enter")login();});
 $("out").addEventListener("click",async()=>{await fetch("/api/owner/logout",{method:"POST"});location.reload();});
-$("gen").addEventListener("click",async()=>{ await fetch("/api/owner/codes",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({count:Number($("cnt").value)||1})}); refreshCodes(); });
-async function refreshCodes(){ const {codes}=await (await fetch("/api/owner/codes")).json();
+$("gen").addEventListener("click",async()=>{ await fetch("/api/owner/codes",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({count:Number($("cnt").value)||1})}); filter="free"; refreshCodes(); usage?.load(); });
+$("users").addEventListener("click",async(e)=>{ const b=e.target.closest("button[data-id]"); if(!b) return;
+  const r=await fetch(`/api/owner/users/${b.dataset.id}/reset`,{method:"POST"}); const j=await r.json(); if(j.ok) alert(t("o_reset_ok")+"\n"+j.password); });
+// 激活码：默认只看未用的，已用的切过去看谁用了、何时用的
+let codes=[], filter="free";
+$("cfilter").addEventListener("click",(e)=>{ const b=e.target.closest("button[data-f]"); if(b){ filter=b.dataset.f; renderCodes(); } });
+async function refreshCodes(){ codes=(await (await fetch("/api/owner/codes")).json()).codes; renderCodes(); }
+function renderCodes(){
+  const free=codes.filter(c=>!c.used), used=codes.filter(c=>c.used);
+  $("n-codes").textContent=free.length||"";
+  $("cfilter").innerHTML=[["free",t("o_free"),free.length],["used",t("o_used"),used.length],["all",t("o_all"),codes.length]]
+    .map(([f,l,n])=>`<button data-f="${f}" class="${f===filter?"on":""}">${esc(l)}<small>${n}</small></button>`).join("");
+  const list=filter==="free"?free:filter==="used"?used:codes;
+  const d=(s)=>esc((s||"").slice(0,10));
   const tb=document.createElement("div");
-  tb.innerHTML=`<table><tr><th>${esc(t("o_codes"))}</th><th>${esc(t("o_status"))}</th><th></th></tr>`+codes.map(c=>`<tr><td class="mono">${esc(c.code)}</td><td><span class="tag${c.used?"":" free"}">${esc(c.used?t("o_used"):t("o_free"))}</span></td><td>${c.used?"":`<button class="btn" data-code="${esc(c.code)}">${esc(t("o_copy"))}</button>`}</td></tr>`).join("")+"</table>";
+  tb.innerHTML=`<table><tr><th>${esc(t("o_codes"))}</th><th>${esc(t("o_status"))}</th><th>${esc(t("o_issued_at"))}</th><th>${esc(t("o_used_by"))}</th><th>${esc(t("o_used_at"))}</th><th></th></tr>`+list.map(c=>`<tr><td class="mono">${esc(c.code)}</td><td><span class="tag${c.used?"":" free"}">${esc(c.used?t("o_used"):t("o_free"))}</span></td><td class="mono dim">${d(c.createdAt)}</td><td>${c.used?esc(c.usedByName||"#"+c.usedBy):""}</td><td class="mono dim">${d(c.usedAt)}</td><td>${c.used?"":`<button class="btn" data-code="${esc(c.code)}">${esc(t("o_copy"))}</button>`}</td></tr>`).join("")+"</table>";
   tb.querySelectorAll("button[data-code]").forEach(b=>b.addEventListener("click",()=>{ navigator.clipboard.writeText(b.dataset.code); const orig=b.textContent; b.textContent=t("o_copied"); setTimeout(()=>{ b.textContent=orig; },1500); }));
   $("codes").innerHTML=""; $("codes").appendChild(tb); }
-async function refreshUsers(){ const {users}=await (await fetch("/api/owner/users")).json();
-  const tb=document.createElement("div");
-  tb.innerHTML=`<table><tr><th>${esc(t("o_username"))}</th><th>${esc(t("o_url"))}</th><th>${esc(t("o_created"))}</th><th></th></tr>`+users.map(u=>`<tr><td>${esc(u.username)}</td><td class="mono">/b/${esc(u.boardSlug)}</td><td>${esc((u.createdAt||"").slice(0,10))}</td><td><button class="btn" data-id="${esc(u.id)}">${esc(t("o_reset"))}</button></td></tr>`).join("")+"</table>";
-  tb.querySelectorAll("button[data-id]").forEach(b=>b.addEventListener("click",async()=>{ const r=await fetch(`/api/owner/users/${b.dataset.id}/reset`,{method:"POST"}); const j=await r.json(); if(j.ok) alert(t("o_reset_ok")+"\n"+j.password); }));
-  $("users").innerHTML=""; $("users").appendChild(tb); }
 tryLoad();
 </script></body></html>

@@ -71,6 +71,13 @@ describe("GET /api/owner/stats", () => {
     expect(ben).toMatchObject({ items: 1, valuations: 1, accounts: 0, models: 1, aiToday: 0, ai7d: 5 });
     expect(ben.lastActive).toBe(day(2));
     expect(Object.keys(ann)).not.toContain("pass_hash");
+    expect(ann.slug).toBe("ann");
+  });
+
+  it("activation codes report who used them", async () => {
+    const { codes } = await (await SELF.fetch("https://x/api/owner/codes", { headers: { cookie: await ownerCookie() } })).json();
+    expect(codes.find((c) => c.code === "A")).toMatchObject({ used: true, usedBy: 1, usedByName: "ann" });
+    expect(codes.find((c) => c.code === "D")).toMatchObject({ used: false, usedByName: null });
   });
 
   it("/api/me records last-seen and a daily-active row", async () => {
