@@ -138,3 +138,15 @@ describe("rowToItem with valuations", () => {
     expect(rowToItem(row).selectedValuationId).toBe(null);
   });
 });
+
+describe("valuation review marks", () => {
+  it("keeps a manual reviewedAt on valuation cards and drops junk", () => {
+    const base = { ticker: "AAPL", name: "Apple", symbol: "usAAPL", fairLow: 100, fairHigh: 150, mos: 30, ext: 40 };
+    const card = { id: "v1", method: "pe", inputs: {}, low: 100, high: 150, updatedAt: "2026-06-01T00:00:00Z" };
+    const ok = validateItem({ ...base, valuations: [{ ...card, reviewedAt: "2026-10-19T14:39:17.746Z" }], selectedValuationId: "v1" });
+    expect(ok.ok).toBe(true);
+    expect(ok.value.valuations[0].reviewedAt).toBe("2026-10-19T14:39:17.746Z");
+    const none = validateItem({ ...base, valuations: [{ ...card, reviewedAt: 123 }], selectedValuationId: "v1" });
+    expect("reviewedAt" in none.value.valuations[0]).toBe(false);
+  });
+});

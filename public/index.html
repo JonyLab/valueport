@@ -817,6 +817,11 @@
   .vcard-verdict{margin-top:10px;width:fit-content;font-size:12.5px;font-weight:500;padding:4px 10px;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft)}
   .vcard-verdict.v-under{color:var(--green);background:rgba(31,143,84,.12)} .vcard-verdict.v-over{color:var(--red);background:rgba(198,65,65,.10)}
   .vcard-assume{margin-top:14px;font-size:12.5px;line-height:1.6;color:var(--ink-soft)}
+  .vcard-checked{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--ink-mute)}
+  .vcard-checked i{font-size:13px;color:var(--green)}
+  .vcard-checked.due{color:#8a4a17} .vcard-checked.due i{color:#d0782a}
+  .vcard-mark{margin-left:auto;border:0;cursor:pointer;font-family:var(--font);font-size:12px;color:#8a4a17;background:rgba(240,140,46,.12);border-radius:var(--r-pill);padding:4px 11px}
+  .vcard-mark:hover{background:rgba(240,140,46,.22)}
   .vcard-note{margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);font-size:12.5px;line-height:1.6;color:var(--ink-soft);white-space:pre-wrap;word-break:break-word}
   .vcard-actions{margin-top:auto;padding-top:16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
   /* AI 复核：按钮 + 卡内结果块 */
@@ -1429,17 +1434,22 @@ function latestAnnualEnd(financials) { // 年报 / 季报都适用：取最新�
   const iso = Number.isFinite(t) && t > 0 ? new Date(t * 1000).toISOString().slice(0, 10) : null;
   return iso ? { end: iso, label: v.period || (v.year ? "FY" + v.year : "") } : null;
 }
-function reviewReasons(item) {
-  const card = selectedCard(item.cfg);
-  if (!card || !card.updatedAt) return null;
-  const at = Date.parse(card.updatedAt); if (!Number.isFinite(at)) return null;
-  const zh = LANG === "zh", out = [];
+// 最近一次「看过」这张卡的时间：编辑保存、AI 复核、手动「标记已复核」三者取最新 → { at: ISO, how: "edit"|"ai"|"mark" }
+function lastChecked(card) {
+  const c = [[card.updatedAt, "edit"], [card.review && card.review.at, "ai"], [card.reviewedAt, "mark"]]
+    .filter(([t]) => typeof t === "string" && Number.isFinite(Date.parse(t))).sort((a, b) => Date.parse(b[0]) - Date.parse(a[0]));
+  return c.length ? { at: c[0][0], how: c[0][1] } : null;
+}
+function reviewReasonsFor(card, symbol) {
+  const lc = card && lastChecked(card); if (!lc) return null;
+  const at = Date.parse(lc.at), zh = LANG === "zh", out = [];
   const months = Math.floor((Date.now() - at) / (30.44 * 86400000));
-  if (Date.now() - at > REVIEW_DAYS * 86400000) out.push(zh ? `估值已 ${months} 个月` : `${months} months old`);
-  const fp = cachedFp(item.cfg.symbol);
-  if (fp && fp.end && fp.end > card.updatedAt.slice(0, 10)) out.push(zh ? `有新财报 ${fp.label}` : `new report ${fp.label}`);
+  if (Date.now() - at > REVIEW_DAYS * 86400000) out.push(zh ? `${months} 个月未复核` : `not reviewed for ${months} months`);
+  const fp = cachedFp(symbol);
+  if (fp && fp.end && fp.end > lc.at.slice(0, 10)) out.push(zh ? `有新财报 ${fp.label}` : `new report ${fp.label}`);
   return out.length ? out : null;
 }
+function reviewReasons(item) { return reviewReasonsFor(selectedCard(item.cfg), item.cfg.symbol); }
 let reviewFetching = false;
 // 后台逐个补齐「最新一期财报期末」：先看季报，没有季报（只出半年报 / 没数据）再看年报；只给主人、只看已估值的；长桥财报接口限频，一个一个来
 async function fillReportDates() {
@@ -3087,7 +3097,24 @@ function renderValuationPanel(item, panel, idBlock) {
     const revErr = document.createElement("div"); revErr.className = "vrev-err"; revErr.hidden = true;
     rev.addEventListener("click", () => runReview(card, rev, revErr));
     actions.append(sel, rev, edit, del);
+    // 复核状态：上次什么时候、怎么看过；选中的卡到了该复核的时候，多一个「标记已复核」（看过、假设仍成立，不用改卡）
+    const zh = LANG === "zh", lc = lastChecked(card), due = picked ? reviewReasonsFor(card, c.symbol) : null;
+    const chk = document.createElement("div"); chk.className = "vcard-checked" + (due ? " due" : "");
+    if (lc) {
+      const days = Math.floor((Date.now() - Date.parse(lc.at)) / 86400000);
+      const when = days < 1 ? (zh ? "今天" : "today") : zh ? `${days} 天前` : `${days} day${days > 1 ? "s" : ""} ago`;
+      const how = { edit: zh ? "编辑" : "edited", ai: zh ? "AI 复核" : "AI review", mark: zh ? "手动标记" : "marked" }[lc.how];
+      chk.append(ri(due ? "error-warning-line" : "checkbox-circle-line"), document.createTextNode((zh ? `上次复核 ${when} · ${how}` : `Last reviewed ${when} · ${how}`) + (due ? (zh ? " · " : " · ") + due.join(zh ? "，" : ", ") : "")));
+    }
+    if (due) {
+      const mark = document.createElement("button"); mark.type = "button"; mark.className = "vcard-mark";
+      mark.textContent = zh ? "标记已复核" : "Mark reviewed";
+      mark.title = zh ? "看过了，假设仍成立，不需要改这张卡" : "Checked — the assumptions still hold, no edit needed";
+      mark.addEventListener("click", () => { card.reviewedAt = new Date().toISOString(); saveItem(item); renderOverview(); showList(); });
+      chk.appendChild(mark);
+    }
     wrap.append(head, range, verd, sum, note);
+    if (lc) wrap.appendChild(chk);
     if (card.review) wrap.appendChild(reviewEl(card, model));
     wrap.append(revErr, actions);
     return wrap;
@@ -3134,6 +3161,7 @@ function renderValuationPanel(item, panel, idBlock) {
       if (!r.ok || !j.review) throw new Error(aiErrorText(r.status, j, LANG));
       card.review = j.review;
       saveItem(item);
+      renderOverview(); // AI 复核也算复核过：刷新顶部提示
       showList();
     } catch (e) {
       errEl.textContent = (LANG === "zh" ? "复核失败：" : "Review failed: ") + (e && e.message || e);

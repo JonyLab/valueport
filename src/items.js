@@ -29,6 +29,7 @@ function validateValuations(raw) {
       derivations: (card.derivations && typeof card.derivations === "object" && !Array.isArray(card.derivations)) ? card.derivations : {},
       segments: (card.segments && typeof card.segments === "object" && !Array.isArray(card.segments)) ? card.segments : {},
       updatedAt: typeof card.updatedAt === "string" ? card.updatedAt : "",
+      ...(typeof card.reviewedAt === "string" && card.reviewedAt ? { reviewedAt: card.reviewedAt.slice(0, 40) } : {}), // 手动「标记已复核」的时间
       ...(cleanReview(card.review) ? { review: cleanReview(card.review) } : {}) });
   }
   return { ok: true, value: out };
