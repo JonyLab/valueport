@@ -1373,6 +1373,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const ai = mountAiPanel(mount, {
     lang,
     getContext: aiContext,
+    // 对话按标的保存；记下当时用的估值方法
+    chatKey: () => ({ symbol: (stock && stock.symbol) || "", method: (MODELS[activeIdx] && MODELS[activeIdx].key) || "" }),
     checkParams,
     fmtField: (f, v) => !Number.isFinite(v) ? "—" : f.money ? fmtMoney(v) : String(Math.round(v * 1000) / 1000),
     onApply: (params) => {

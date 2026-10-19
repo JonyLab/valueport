@@ -26,7 +26,7 @@ const TX = {
     more: ["保守和乐观之间差多大比较合适？", "这家公司最大的风险是什么？", "和同行比，现在的估值贵不贵？", "哪个假设对结论影响最大？", "这个估值方法适合这家公司吗？", "当前价格隐含了多少增长？"],
     fieldQ: (f) => `「${f}」该取多少？`, sugHint: "↑↓ 选择 · Enter 发送 · Tab 填入",
     thinking: "思考中…", copy: "复制", copied: "已复制", copyFail: "复制失败，可以手动选中文字复制", retry: "重试", suggest: "建议参数", field: "字段", now: "当前", next: "建议", apply: "应用到表单", applied: "已应用", undo: "撤销",
-    cons: "保守", opt: "乐观", scenC: "保守情景", scenO: "乐观情景", scenDrivers: "关键假设", scenBreaks: "可能错在哪", scenSignals: "跟踪信号", err: "AI 暂时不可用", limit: "今天的 AI 对话次数已用完，明天再来", clear: "清空对话",
+    cons: "保守", opt: "乐观", scenC: "保守情景", scenO: "乐观情景", scenDrivers: "关键假设", scenBreaks: "可能错在哪", scenSignals: "跟踪信号", err: "AI 暂时不可用", limit: "今天的 AI 对话次数已用完，明天再来", clear: "新对话", hist: "历史对话", histEmpty: "这只股票还没有保存的对话", histDel: "删除这条对话", histDelQ: "删除这条对话？", untitled: "（无标题）", cur: "当前",
     disclaimer: "AI 建议仅供参考，不构成投资建议",
     sens: "敏感性", sensLow: "合理价 低", sensHigh: "高", peers: "倍数对比", setTo: (x, y) => `把 ${x} 改成 ${y}`, setDone: "已改",
   },
@@ -37,7 +37,7 @@ const TX = {
     more: ["How far apart should the conservative and optimistic cases be?", "What's the biggest risk for this company?", "Is it expensive compared with peers?", "Which assumption moves the result most?", "Does this method suit this company?", "How much growth does today's price imply?"],
     fieldQ: (f) => `What should "${f}" be?`, sugHint: "↑↓ choose · Enter send · Tab fill in",
     thinking: "Thinking…", copy: "Copy", copied: "Copied", copyFail: "Couldn't copy — select the text to copy it", retry: "Retry", suggest: "Suggested inputs", field: "Field", now: "Now", next: "Suggested", apply: "Apply to form", applied: "Applied", undo: "Undo",
-    cons: "Cons.", opt: "Opt.", scenC: "Conservative case", scenO: "Optimistic case", scenDrivers: "Key assumptions", scenBreaks: "Where it could be wrong", scenSignals: "Signals to watch", err: "AI is unavailable right now", limit: "Daily AI limit reached — try again tomorrow", clear: "Clear chat",
+    cons: "Cons.", opt: "Opt.", scenC: "Conservative case", scenO: "Optimistic case", scenDrivers: "Key assumptions", scenBreaks: "Where it could be wrong", scenSignals: "Signals to watch", err: "AI is unavailable right now", limit: "Daily AI limit reached — try again tomorrow", clear: "New chat", hist: "Chat history", histEmpty: "No saved chats for this stock yet", histDel: "Delete this chat", histDelQ: "Delete this chat?", untitled: "(untitled)", cur: "Current",
     disclaimer: "AI suggestions are for reference only, not investment advice",
     sens: "Sensitivity", sensLow: "Fair value low", sensHigh: "High", peers: "Multiple check", setTo: (x, y) => `Set ${x} to ${y}`, setDone: "Changed",
   },
@@ -56,7 +56,7 @@ export function aiErrorText(status, j, lang) {
   return String((j && j.detail) || e || status);
 }
 
-export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField, widgets: wx, checkParams }) {
+export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField, widgets: wx, checkParams, chatKey }) {
   const T = TX[lang] || TX.zh;
   const history = []; // { role, content } —— 发给后端的对话（不含建议卡）
   let busy = false;
@@ -111,9 +111,14 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   loadModels();
   modelBtn.addEventListener("click", (e) => { e.stopPropagation(); if (!models) return; if (modelMenu.hidden) loadModels(); modelMenu.hidden = !modelMenu.hidden; });
   document.addEventListener("click", (e) => { if (!modelWrap.contains(e.target)) modelMenu.hidden = true; });
-  const clearBtn = el("button", "btn icon sm vc-ai-iconbtn"); clearBtn.type = "button"; clearBtn.title = T.clear; clearBtn.setAttribute("aria-label", T.clear); clearBtn.appendChild(ri("delete-bin-6-line"));
+  // 「历史」：这只股票保存过的对话；「新对话」：开一段新的（旧的仍在历史里）
+  const histWrap = el("div", "vc-ai-histwrap");
+  const histBtn = el("button", "btn icon sm vc-ai-iconbtn"); histBtn.type = "button"; histBtn.title = T.hist; histBtn.setAttribute("aria-label", T.hist); histBtn.setAttribute("aria-haspopup", "menu"); histBtn.appendChild(ri("history-line"));
+  const histMenu = el("div", "vc-ai-mmenu vc-ai-hmenu"); histMenu.setAttribute("role", "menu"); histMenu.hidden = true;
+  histWrap.append(histBtn, histMenu);
+  const clearBtn = el("button", "btn icon sm vc-ai-iconbtn"); clearBtn.type = "button"; clearBtn.title = T.clear; clearBtn.setAttribute("aria-label", T.clear); clearBtn.appendChild(ri("chat-new-line"));
   const closeBtn = el("button", "btn icon sm vc-ai-iconbtn"); closeBtn.type = "button"; closeBtn.setAttribute("aria-label", T.close); closeBtn.appendChild(ri("close-line"));
-  head.append(badge, titles, clearBtn, closeBtn);
+  head.append(badge, titles, histWrap, clearBtn, closeBtn);
 
   const log = el("div", "vc-ai-log");
   log.setAttribute("aria-live", "polite");
@@ -347,6 +352,94 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     return out;
   }
 
+  function userMsg(text) { const um = bubble("user", text); msgActions(um, { copy: text }); return um; }
+  // 一条 AI 回复：正文 + 建议参数卡（含情景）+ 交互组件 + 复制；发送和恢复历史共用。返回正文
+  function renderAssistant(view, fields) {
+    const extra = renderWidgets(view.widgets, fields);
+    const reply = view.reply || (view.params || extra.length ? "" : "…");
+    const m = bubble("ai", reply);
+    if (!reply) m.querySelector(".vc-ai-bubble").remove();
+    if (view.params) m.appendChild(suggestionCard(view.params, view.reasons, fields, view.scenarios));
+    for (const node of extra) m.appendChild(node);
+    msgActions(m, { copy: () => replyAsText(reply === "…" ? "" : reply, view, fields) });
+    log.scrollTop = log.scrollHeight;
+    return reply;
+  }
+  // 发给后端的历史里，AI 回复带上它给过的参数 / 组件（JSON 一行），让后续追问有上下文
+  function historyContent(reply, view) {
+    const tail = {};
+    if (view.params) tail.params = view.params;
+    if (view.widgets && view.widgets.length) tail.widgets = view.widgets;
+    return reply + (Object.keys(tail).length ? "\n" + JSON.stringify(tail) : "");
+  }
+
+  // ── 对话记录：每次问答成功后存到服务端（按标的），面板第一次打开时恢复最近一次 ──
+  const saved = []; // [{ role, content, view? }]
+  let chatId = null, restoredOnce = false;
+  const keyNow = () => { try { return chatKey ? chatKey() : null; } catch { return null; } };
+  let saving = Promise.resolve();
+  function saveChat() {
+    const k = keyNow(); if (!k || !k.symbol || !saved.length) return;
+    const body = { id: chatId || undefined, symbol: k.symbol, method: k.method || "", messages: saved.slice(-80) };
+    saving = saving.then(() => fetch("/api/my/ai/chats", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+      .then((r) => (r.ok ? r.json() : null)).then((j) => { if (j && j.id) chatId = j.id; }).catch(() => {}));
+  }
+  function resetChat() { history.length = 0; saved.length = 0; chatId = null; renderIntro(); }
+  function restoreChat(chat) {
+    let fields = [];
+    try { const c = getContext(); fields = (c && c.fields) || []; } catch { fields = []; }
+    history.length = 0; saved.length = 0; chatId = chat.id;
+    log.innerHTML = "";
+    for (const msg of chat.messages || []) {
+      if (msg.role === "user") { userMsg(msg.content); history.push({ role: "user", content: msg.content }); }
+      else { const view = msg.view || { reply: msg.content }; renderAssistant(view, fields); history.push({ role: "assistant", content: historyContent(msg.content, view) }); }
+      saved.push(msg);
+    }
+    if (!saved.length) renderIntro();
+  }
+  async function listChats() {
+    const k = keyNow(); if (!k || !k.symbol) return [];
+    try { const r = await fetch("/api/my/ai/chats?symbol=" + encodeURIComponent(k.symbol)); return r.ok ? (await r.json()).chats || [] : []; } catch { return []; }
+  }
+  async function openChat(id) {
+    try { const r = await fetch("/api/my/ai/chats/" + id); if (r.ok) restoreChat((await r.json()).chat); } catch { /* 拿不到就保持现状 */ }
+  }
+  async function restoreLatest() {
+    if (restoredOnce || saved.length || busy) return;
+    restoredOnce = true;
+    const list = await listChats();
+    if (list.length && !saved.length && !busy) await openChat(list[0].id);
+  }
+  const whenText = (iso) => {
+    const d = new Date(iso); if (isNaN(d)) return "";
+    const days = Math.floor((Date.now() - d) / 86400000);
+    if (days < 1) return d.toLocaleTimeString(lang === "zh" ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" });
+  };
+  async function drawHistory() {
+    histMenu.innerHTML = "";
+    histMenu.appendChild(el("div", "vc-ai-mgroup", T.hist));
+    const list = await listChats();
+    if (!list.length) { histMenu.appendChild(el("div", "vc-ai-hempty", T.histEmpty)); return; }
+    for (const c of list) {
+      const row = el("div", "vc-ai-hrow" + (c.id === chatId ? " on" : ""));
+      const b = el("button", ""); b.type = "button"; b.setAttribute("role", "menuitem");
+      b.append(el("span", "vc-ai-mname", c.title || T.untitled), el("span", "vc-ai-mmodel", `${whenText(c.updatedAt)} · ${Math.ceil(c.count / 2)} ${lang === "zh" ? "轮" : c.count > 2 ? "turns" : "turn"}${c.id === chatId ? " · " + T.cur : ""}`));
+      b.addEventListener("click", () => { histMenu.hidden = true; if (busy || c.id === chatId) return; openChat(c.id); });
+      const del = el("button", "vc-ai-hdel"); del.type = "button"; del.title = T.histDel; del.setAttribute("aria-label", T.histDel); del.appendChild(ri("delete-bin-6-line"));
+      del.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm(T.histDelQ)) return;
+        await fetch("/api/my/ai/chats/" + c.id, { method: "DELETE" }).catch(() => null);
+        if (c.id === chatId && !busy) resetChat();
+        drawHistory();
+      });
+      row.append(b, del); histMenu.appendChild(row);
+    }
+  }
+  histBtn.addEventListener("click", (e) => { e.stopPropagation(); const show = histMenu.hidden; histMenu.hidden = !show; if (show) drawHistory(); });
+  document.addEventListener("click", (e) => { if (!histWrap.contains(e.target)) histMenu.hidden = true; });
+
   async function send(text) {
     text = (text || "").trim();
     if (!text || busy) return;
@@ -355,8 +448,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     if (!context || !context.fields || !context.fields.length) return;
     busy = true; sendBtn.disabled = true;
     input.value = ""; autosize();
-    const um = bubble("user", text);
-    msgActions(um, { copy: text });
+    const um = userMsg(text);
     history.push({ role: "user", content: text });
     const pending = bubble("ai", T.thinking); pending.classList.add("pending");
     // 失败时：错误消息带「重试」——去掉这一问一答，用同样的问题重新发
@@ -376,18 +468,11 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
         failed(r.status === 429 ? aiErrorText(r.status, j, lang) : `${T.err}${j && j.detail ? "：" + j.detail : ""}`);
         return;
       }
-      const extra = renderWidgets(j.widgets, context.fields);
-      const reply = j.reply || (j.params || extra.length ? "" : "…");
-      const tail = {};
-      if (j.params) tail.params = j.params;
-      if (Array.isArray(j.widgets) && j.widgets.length) tail.widgets = j.widgets;
-      history.push({ role: "assistant", content: reply + (Object.keys(tail).length ? "\n" + JSON.stringify(tail) : "") });
-      const m = reply ? bubble("ai", reply) : bubble("ai", "");
-      if (!reply) m.querySelector(".vc-ai-bubble").remove();
-      if (j.params) m.appendChild(suggestionCard(j.params, j.reasons, context.fields, j.scenarios));
-      for (const node of extra) m.appendChild(node);
-      msgActions(m, { copy: () => replyAsText(reply === "…" ? "" : reply, j, context.fields) });
-      log.scrollTop = log.scrollHeight;
+      const view = { reply: j.reply || "", params: j.params || null, reasons: j.reasons || null, scenarios: j.scenarios || null, widgets: Array.isArray(j.widgets) ? j.widgets : [] };
+      const reply = renderAssistant(view, context.fields);
+      history.push({ role: "assistant", content: historyContent(reply, view) });
+      saved.push({ role: "user", content: text }, { role: "assistant", content: reply, view });
+      saveChat();
     } catch {
       pending.remove(); history.pop();
       failed(T.err);
@@ -450,7 +535,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     }
   });
   foot.addEventListener("submit", (e) => { e.preventDefault(); send(input.value); });
-  clearBtn.addEventListener("click", () => { if (busy) return; history.length = 0; renderIntro(); });
+  clearBtn.addEventListener("click", () => { if (busy) return; resetChat(); input.focus(); });
   closeBtn.addEventListener("click", () => close());
   // Esc 只关面板：捕获阶段接住，避免宿主页的全局 Esc 顺带退出整个编辑器
   window.addEventListener("keydown", (e) => {
@@ -460,7 +545,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     close();
   }, true);
 
-  function open() { panel.hidden = false; document.body.classList.add("vc-ai-open"); requestAnimationFrame(() => panel.classList.add("on")); setTimeout(() => input.focus(), 50); }
+  function open() { restoreLatest(); panel.hidden = false; document.body.classList.add("vc-ai-open"); requestAnimationFrame(() => panel.classList.add("on")); setTimeout(() => input.focus(), 50); }
   function close() { panel.classList.remove("on"); document.body.classList.remove("vc-ai-open"); setTimeout(() => { if (!panel.classList.contains("on")) panel.hidden = true; }, 220); }
   // history()：给备注草稿用的对话摘录（只读副本）
   return { open, close, toggle: () => (panel.hidden ? open() : close()), history: () => history.slice(-20) };
