@@ -150,6 +150,39 @@ After deploying:
 > **Note:** `wrangler.toml` ships with `database_id = "PLACEHOLDER_RUN_d1_create_TO_FILL"`.
 > Replace this with the real ID returned by `d1 create` before deploying.
 
+## Continuous deployment (GitHub Actions)
+
+`.github/workflows/ci.yml` runs on every push and pull request to `main`:
+
+1. **test** — `npm ci`, then `vitest run` (core + worker projects; the worker project uses wrangler's `[env.test]`, which has no AI binding).
+2. **deploy** — only on push to `main`, and only after `test` passes: `wrangler deploy --env=""` (the top-level production config). Deploys run one at a time in push order.
+
+So production is always the tested tip of `main`. Don't `npm run deploy` by hand from a local checkout any more — a manual deploy from a stale or uncommitted copy puts code that is not on `main` into production until the next CI deploy replaces it.
+
+### Repository secrets (Settings → Secrets and variables → Actions → New repository secret)
+
+| Secret | Value |
+|---|---|
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID (right sidebar) |
+| `CLOUDFLARE_API_TOKEN` | API token created at My Profile → API Tokens → Create Token |
+
+Token permissions (start from the **Edit Cloudflare Workers** template, then check the list), scoped to this account only:
+
+- Account · **Workers Scripts · Edit** — upload the worker, its static assets and cron trigger
+- Account · **D1 · Edit** — bind `pendulum-db` (also lets you run migrations with the same token if you ever want to)
+- Account · **Workers AI · Read** — only if the deploy complains about the `[ai]` binding; not needed otherwise
+- Account · **Account Settings · Read** — harmless, lets wrangler resolve the account
+
+The workflow passes the token only as an environment variable to the `wrangler deploy` step; it is never echoed. Worker runtime secrets (`ADMIN_PASSWORD`, `SESSION_SECRET`, …) stay in Cloudflare (`wrangler secret put`) and are not needed in GitHub — `wrangler deploy` keeps existing secrets.
+
+### D1 migrations stay manual
+
+CI never touches the database schema. When a commit adds a file under `migrations/`, apply it yourself **before** merging to `main` (new code may depend on the new columns/tables):
+
+```bash
+npx wrangler d1 execute pendulum-db --remote --file=./migrations/<file>.sql
+```
+
 ## Migration (existing single-board DB to multi-user)
 
 If you have an existing single-board deployment (pre-multi-user schema), run the migration
