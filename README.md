@@ -22,7 +22,7 @@ Sessions are stateless HMAC-signed cookies (`SESSION_SECRET`). The owner backend
 | `/register` | New-user registration (requires an activation code) |
 | `/b/<slug>` | The board page — read-only for visitors; the signed-in owner edits items via dialogs and opens Settings (top-right) for text/colors/board config |
 | `/app` | Legacy entry — 302 redirect to your `/b/<slug>` (or `/login`) |
-| `/owner` | Station-master backend — issue activation codes, manage users, reset passwords |
+| `/owner` | Station-master backend — usage dashboard (users, activity, AI usage, most-watched symbols), issue activation codes, manage users, reset passwords |
 | `/portfolio` | Signed-in user's Portfolio — linked broker accounts (Longbridge / IBKR Flex / Tiger / Schwab / E*TRADE / Webull / manual + CSV), total assets and holdings mapped onto the board's valuation zones |
 
 ## Architecture
@@ -182,6 +182,8 @@ CI never touches the database schema. When a commit adds a file under `migration
 ```bash
 npx wrangler d1 execute pendulum-db --remote --file=./migrations/<file>.sql
 ```
+
+**Usage dashboard** (`/owner`, `GET /api/owner/stats`, `src/usage.js`): read-only aggregates — users and invite codes, per-user watchlist / valuation cards / broker accounts / AI usage / last active, and the top-10 watched symbols. Daily AI requests and daily-active users come from the small `usage_daily` table (one row per user per day); "last active" is the settings key `_last_seen`, refreshed by `/api/me` at most every 10 minutes. Apply `migrations/2026-10-19-usage-daily.sql` once; until then the dashboard still loads and falls back to `_ai_usage` for today's AI count.
 
 ## Migration (existing single-board DB to multi-user)
 

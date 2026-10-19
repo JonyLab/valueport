@@ -21,6 +21,8 @@ td .btn{height:32px;padding:0 13px;font-size:13px}
 <input id="pw" type="password" placeholder="站长密码" data-i18n-ph="o_pw_ph"><button class="btn primary" id="gin" style="width:100%" data-i18n="o_enter">进入</button></div>
 <div class="wrap hidden" id="app">
   <div class="owner-head"><h1 data-i18n="o_title">站长后台</h1><button class="btn" id="out" data-i18n="o_out">退出</button></div>
+  <!-- 使用统计（public/shared/owner-usage.js 自带样式与逻辑） -->
+  <div class="card" id="usage"></div>
   <div class="card"><div class="row"><span class="card-title" data-i18n="o_codes">激活码</span><input id="cnt" type="number" min="1" max="50" value="5">
     <button class="btn primary" id="gen" data-i18n="o_gen">生成</button></div><div id="codes"></div></div>
   <div class="card"><div class="row"><span class="card-title" data-i18n="o_users">用户</span></div><div id="users"></div></div>
@@ -29,13 +31,14 @@ td .btn{height:32px;padding:0 13px;font-size:13px}
 <script type="module">
 import { t, applyI18n } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
+import { mountUsage } from "/shared/owner-usage.js";
 applyI18n();
 document.title = t("o_title") + " · ValuePort";
 mountLangMenu(document.getElementById("corner"));
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 async function tryLoad(){ let r; try{ r=await fetch("/api/owner/codes"); }catch{ return false; } if(r.status===401) return false;
-  $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); $("page").classList.remove("center"); await refreshCodes(); await refreshUsers(); return true; }
+  $("gate").classList.add("hidden"); $("app").classList.remove("hidden"); $("page").classList.remove("center"); mountUsage($("usage")); await refreshCodes(); await refreshUsers(); return true; }
 async function login(){ $("gerr").textContent="";
   let r; try{ r=await fetch("/api/owner/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:$("pw").value})}); }catch{ $("gerr").textContent=t("a_net_err"); return; }
   if(r.ok) tryLoad(); else $("gerr").textContent=t("o_pw_bad"); }

@@ -24,6 +24,7 @@ import { fetchSchwabAssets, schwabAuthorizeUrl, schwabExchangeCode } from "./bro
 import { fetchEtradeAssets, etradeStart, etradeFinish } from "./brokers/etrade.js";
 import { fetchWebullAssets } from "./brokers/webull.js";
 import { parseHoldingsCsv } from "./brokers/csv.js";
+import { touchSeen, ownerStats } from "./usage.js";
 
 const app = new Hono();
 const USER_COOKIE = "pendulum_user", OWNER_COOKIE = "pendulum_owner";
@@ -240,6 +241,7 @@ app.get("/api/me", async (c) => {
   if (!uid) return c.json({ ok: false, error: "unauthorized" }, 401);
   const user = await c.env.DB.prepare("SELECT * FROM users WHERE id=?").bind(uid).first();
   if (!user) return c.json({ ok: false }, 401);
+  await touchSeen(c.env, uid); // 站长统计里的「最近活跃」
   return c.json({ username: user.username, board: { slug: user.board_slug, name: user.board_name } });
 });
 app.use("/api/my/*", async (c, next) => {
@@ -366,6 +368,8 @@ app.get("/api/owner/users", async (c) => {
   const { results } = await c.env.DB.prepare("SELECT * FROM users ORDER BY created_at DESC").all();
   return c.json({ users: (results || []).map(rowToUser) });
 });
+// 使用统计（站长后台顶部的仪表盘）：只读聚合，见 src/usage.js
+app.get("/api/owner/stats", async (c) => { c.header("Cache-Control", "no-store"); return c.json(await ownerStats(c.env)); });
 app.post("/api/owner/users/:id/reset", async (c) => {
   const tmp = generateCode();
   const { hash, salt } = await hashPassword(tmp);

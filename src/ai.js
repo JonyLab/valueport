@@ -3,6 +3,7 @@
 //
 import { encryptJson, decryptJson } from "./crypto.js";
 import { METRICS, METRIC_KEYS, metricKey } from "../public/shared/metric-spark.js";
+import { countAi } from "./usage.js";
 
 // 模型服务：用户在设置页配置自己的模型（ai_models 表）、在 AI 面板里切换（见 userAi()）；没选就用站点默认（wrangler.toml [vars] / secret）：
 //   AI_PROVIDER  workers-ai（默认，用 [ai] 绑定，无需 Key）| openai（OpenAI 兼容协议）| anthropic
@@ -689,6 +690,7 @@ export function registerAi(app, { chat = chatComplete } = {}) {
     let u;
     try { u = await userAi(c.env, c.get("uid")); } catch { return { res: c.json({ error: "ai_settings_unreadable", detail: "saved API key can't be decrypted — re-enter it in settings" }, 500) }; }
     if (!u.own && !(await takeQuota(c.env, c.get("uid")))) return { res: c.json({ error: "daily_limit" }, 429) };
+    await countAi(c.env, c.get("uid"), u.own); // 站长统计的每日 AI 请求数
     try { return { text: await chat(c.env, system, messages, undefined, u.cfg) }; }
     catch (e) {
       // Workers AI 账号每天的免费额度（10,000 Neurons，全站共用）用完：单独报 site_quota，前端提示「早上 8 点恢复 / 配自己的模型」
