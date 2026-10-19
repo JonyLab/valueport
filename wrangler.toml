@@ -5,6 +5,12 @@ compatibility_flags = ["nodejs_compat"]
 
 assets = { directory = "./public", binding = "ASSETS" }
 
+# 线上日志（Workers Logs）：console.log / console.error 与每次请求都留存，可在 Cloudflare 后台 Observability 里查历史。
+# 写在这里而不是只在后台开：每次 wrangler deploy 都按本文件设置，避免部署把后台的开关改回去。
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [[d1_databases]]
 binding = "DB"
 database_name = "pendulum-db"
