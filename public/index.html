@@ -15,16 +15,17 @@
 
   /* ===== 概览区：问候 + 大标题 / 大号统计 / 估值分布胶囊条 ===== */
   .page-head{margin:0 4px 30px}
-  .strike-banner{display:flex;align-items:flex-start;gap:12px;margin:-14px 4px 22px;padding:14px 14px 14px 16px;border-radius:var(--r-lg);background:rgba(46,163,93,.09);box-shadow:inset 0 0 0 1px rgba(46,163,93,.18)}
+  .strike-banner{display:flex;align-items:center;gap:10px;margin:-14px 4px 22px;padding:8px 8px 8px 10px;border-radius:var(--r-pill);background:rgba(46,163,93,.09);box-shadow:inset 0 0 0 1px rgba(46,163,93,.18)}
   .strike-banner.hidden,.strike-banner.offview{display:none}
-  .sb-ico{flex:none;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px}
-  .sb-body{flex:1;min-width:0}
-  .sb-head{font-size:14.5px;font-weight:500;color:var(--ink);line-height:30px}
-  .sb-names{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-  .sb-name{border:0;cursor:pointer;font-family:var(--font);font-size:12.5px;color:#1f7a45;background:#fff;border-radius:var(--r-pill);padding:4px 11px;box-shadow:inset 0 0 0 1px rgba(46,163,93,.25)}
+  .sb-ico{flex:none;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px}
+  /* 一行排下：标题 · 标的胶囊 · 一句提醒（窄屏自动换行） */
+  .sb-body{flex:1;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px}
+  .sb-head{font-size:13.5px;font-weight:500;color:var(--ink);white-space:nowrap}
+  .sb-names{display:flex;flex-wrap:wrap;gap:6px}
+  .sb-name{border:0;cursor:pointer;font-family:var(--font);font-size:12px;color:#1f7a45;background:#fff;border-radius:var(--r-pill);padding:3px 10px;box-shadow:inset 0 0 0 1px rgba(46,163,93,.25)}
   .sb-name:hover{background:rgba(46,163,93,.12)}
-  .sb-say{margin-top:8px;font-size:12.5px;line-height:1.55;color:var(--ink-soft)}
-  .sb-close{flex:none;width:28px;height:28px;border:0;border-radius:50%;background:none;color:var(--ink-mute);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .sb-say{font-size:12px;color:var(--ink-mute)}
+  .sb-close{flex:none;width:26px;height:26px;border:0;border-radius:50%;background:none;color:var(--ink-mute);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center}
   .sb-close:hover{background:rgba(29,29,27,.06);color:var(--ink)}
   .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:28px;flex-wrap:wrap}
   .hero-main{min-width:0;flex:1 1 360px}
@@ -645,6 +646,8 @@
   .vc-ai-msg.pending .vc-ai-bubble{color:var(--ink-mute);animation:vcAiPulse 1.2s ease-in-out infinite}
   .vc-ai-msg.error .vc-ai-bubble{color:var(--red);background:rgba(198,65,65,.07);box-shadow:none}
   /* 消息操作行：复制 / 重试，平时淡，悬停这条消息时变清楚；失败消息的操作一直清楚 */
+  .vc-ai-risk{display:flex;align-items:flex-start;gap:7px;margin:8px 0 6px;padding:8px 10px;border-radius:var(--r-sm);background:rgba(240,140,46,.10);color:#8a4a17;font-size:11.5px;line-height:1.55}
+  .vc-ai-risk i{flex:none;font-size:13px;margin-top:1px;color:#d0782a}
   .vc-ai-macts{display:flex;gap:2px;margin-top:-4px;opacity:.45;transition:opacity .15s}
   .vc-ai-msg:hover .vc-ai-macts,.vc-ai-msg.error .vc-ai-macts,.vc-ai-macts:focus-within{opacity:1}
   .vc-ai-mact{width:26px;height:26px;border:0;border-radius:50%;background:none;color:var(--ink-mute);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:14px}
@@ -1415,7 +1418,7 @@ function renderStrikeBanner(list) {
     names.appendChild(b);
   }
   const say = document.createElement("div"); say.className = "sb-say";
-  say.textContent = zh ? "现价已低于你按安全边际设的买点。这不是买入信号：先复核估值假设还成不成立，再决定。" : "Prices are below the buy line set by your margin of safety. Not a buy signal — re-check that your assumptions still hold first.";
+  say.textContent = zh ? "不是买入信号，先复核估值假设" : "Not a buy signal — re-check your assumptions first";
   body.append(head, names, say);
   const x = document.createElement("button"); x.type = "button"; x.className = "sb-close"; x.setAttribute("aria-label", zh ? "关闭提示" : "Dismiss");
   x.appendChild(ri("close-line"));

@@ -28,6 +28,7 @@ const TX = {
     thinking: "思考中…", copy: "复制", copied: "已复制", copyFail: "复制失败，可以手动选中文字复制", retry: "重试", suggest: "建议参数", field: "字段", now: "当前", next: "建议", apply: "应用到表单", applied: "已应用", undo: "撤销",
     cons: "保守", opt: "乐观", scenC: "保守情景", scenO: "乐观情景", scenDrivers: "关键假设", scenBreaks: "可能错在哪", scenSignals: "跟踪信号", err: "AI 暂时不可用", limit: "今天的 AI 对话次数已用完，明天再来", clear: "新对话", hist: "历史对话", histEmpty: "这只股票还没有保存的对话", histDel: "删除这条对话", histDelQ: "删除这条对话？", untitled: "（无标题）", cur: "当前",
     disclaimer: "AI 建议仅供参考，不构成投资建议",
+    risk: "AI 的回答可能出错。它不是持牌投资顾问，以上内容仅供参考，不构成投资建议；数字和结论请自己核实，不要盲目照做。",
     sens: "敏感性", sensLow: "合理价 低", sensHigh: "高", peers: "倍数对比", setTo: (x, y) => `把 ${x} 改成 ${y}`, setDone: "已改",
   },
   en: {
@@ -39,6 +40,7 @@ const TX = {
     thinking: "Thinking…", copy: "Copy", copied: "Copied", copyFail: "Couldn't copy — select the text to copy it", retry: "Retry", suggest: "Suggested inputs", field: "Field", now: "Now", next: "Suggested", apply: "Apply to form", applied: "Applied", undo: "Undo",
     cons: "Cons.", opt: "Opt.", scenC: "Conservative case", scenO: "Optimistic case", scenDrivers: "Key assumptions", scenBreaks: "Where it could be wrong", scenSignals: "Signals to watch", err: "AI is unavailable right now", limit: "Daily AI limit reached — try again tomorrow", clear: "New chat", hist: "Chat history", histEmpty: "No saved chats for this stock yet", histDel: "Delete this chat", histDelQ: "Delete this chat?", untitled: "(untitled)", cur: "Current",
     disclaimer: "AI suggestions are for reference only, not investment advice",
+    risk: "AI can be wrong. It is not a licensed financial adviser — treat this as reference only, not investment advice. Check the numbers and conclusions yourself; don't follow it blindly.",
     sens: "Sensitivity", sensLow: "Fair value low", sensHigh: "High", peers: "Multiple check", setTo: (x, y) => `Set ${x} to ${y}`, setDone: "Changed",
   },
 };
@@ -205,6 +207,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       }
       parts.push(lines.join("\n"));
     }
+    parts.push("—— " + T.risk); // 复制出去也带上风险提示
     return parts.join("\n\n");
   }
 
@@ -361,6 +364,9 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     if (!reply) m.querySelector(".vc-ai-bubble").remove();
     if (view.params) m.appendChild(suggestionCard(view.params, view.reasons, fields, view.scenarios));
     for (const node of extra) m.appendChild(node);
+    // 每条 AI 回复底部一条醒目的风险提示：可能出错、不是持牌顾问、只能参考
+    const risk = el("div", "vc-ai-risk"); risk.append(ri("error-warning-line"), el("span", "", T.risk));
+    m.appendChild(risk);
     msgActions(m, { copy: () => replyAsText(reply === "…" ? "" : reply, view, fields) });
     log.scrollTop = log.scrollHeight;
     return reply;
