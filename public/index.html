@@ -2634,7 +2634,9 @@ function valuationCtx(item) {
     adjustedEps: Number.isFinite(latest.adjustedEps) ? latest.adjustedEps : undefined,
     netDebt: Number.isFinite(latest.netDebt) ? latest.netDebt : undefined,
     fcf: Number.isFinite(latest.fcf) ? latest.fcf : undefined,
-    annualYear: Number.isFinite(latest.year) ? latest.year : undefined };
+    annualYear: Number.isFinite(latest.year) ? latest.year : undefined,
+    // 近一年（过去 12 个月除息）每股股息，DDM 优先用它预填
+    dpsTtm: (() => { const d = item._financials && item._financials.annual && item._financials.annual.dividends; const t = d && d.ttm; return t && Number.isFinite(t.perShare) && t.perShare > 0 ? t.perShare : undefined; })() };
 }
 
 // 把某卡设为合理区间：写 fair 区间 + 选中 id，刷新钟摆/顶部判定/列表行，并保存。
@@ -2691,7 +2693,7 @@ function assumeSummary(model, inputs) {
 function loadFinancials(item, period) {
   item._financials = item._financials || {};
   if (item._financials[period]) return Promise.resolve(item._financials[period]);
-  const url = `/api/financials?symbol=${encodeURIComponent(item.cfg.symbol)}&period=${period}&v=4`;
+  const url = `/api/financials?symbol=${encodeURIComponent(item.cfg.symbol)}&period=${period}&v=5`;
   return fetch(url).then((r) => r.json()).then((j) => (item._financials[period] = j))
     .catch(() => (item._financials[period] = { financials: null, latest: null }));
 }

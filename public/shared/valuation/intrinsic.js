@@ -229,10 +229,10 @@ const DDM = {
       label: { zh: "每股股利", en: "Dividend per share" },
       col: "single",
       unit: "",
-      // 预填 = 每股股利金额。注:ctx.dividendYield 实为长桥静态字段「每股股利」(金额,非收益率%),直接用作 dps
+      // 预填 = 近一年(过去 12 个月除息)每股股息之和 ctx.dpsTtm;没有就退回长桥静态字段「每股股利」ctx.dividendYield(金额,非收益率%)。保留 4 位小数
       prefill: (ctx) => {
-        const v = ctx && ctx.dividendYield;
-        return Number.isFinite(v) ? v : "";
+        const v = ctx && Number.isFinite(ctx.dpsTtm) ? ctx.dpsTtm : ctx && ctx.dividendYield;
+        return Number.isFinite(v) ? Math.round(v * 1e4) / 1e4 : "";
       },
       meta: "dps",
     },

@@ -91,5 +91,8 @@ describe("DDM (2-stage)", () => {
     expect(f.prefill({ price: 100, dividendYield: 1.28 })).toBeCloseTo(1.28, 6);
     expect(f.prefill({ price: NaN, dividendYield: 1.28 })).toBeCloseTo(1.28, 6); // 不再依赖 price
     expect(f.prefill({ dividendYield: NaN })).toBe("");
+    // 有近一年每股股息就优先用它；保留 4 位小数
+    expect(f.prefill({ dividendYield: 4.708955445651571, dpsTtm: 51.9812 })).toBe(51.9812);
+    expect(f.prefill({ dividendYield: 4.708955445651571 })).toBe(4.709);
   });
 });

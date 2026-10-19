@@ -8,7 +8,7 @@ export const FIELD_META = {
   revenue: { guide: { zh: "公司总营收（非每股）。已用最近年报预填，可改成你的预期口径。", en: "Total company revenue (not per share). Prefilled from the latest annual report; adjust to your estimate." } },
   netIncome: { guide: { zh: "公司净利润总额（非每股）。已用最近年报预填。", en: "Total net income (not per share). Prefilled from the latest annual report." } },
   netDebt: { guide: { zh: "有息负债−现金。已用最近年报预填；负值=净现金。", en: "Interest-bearing debt minus cash. Prefilled; negative means net cash." } },
-  dps: { guide: { zh: "每股股利。已按现价×股息率预填，可改成你预期的每股分红。", en: "Dividend per share. Prefilled from price×yield; adjust to your expected payout." } },
+  dps: { guide: { zh: "每股股利。已按近一年（过去 12 个月除息）的每股股息合计预填，可改成你预期的每股分红。", en: "Dividend per share. Prefilled with dividends per share paid over the last 12 months (by ex-date); adjust to your expected payout." } },
   eps: { guide: { zh: "每股收益，已用 TTM 预填。", en: "Earnings per share, prefilled with TTM." } },
   bps: { guide: { zh: "每股净资产，已用最近年报预填。", en: "Book value per share, prefilled from the latest annual report." } },
   ebitda: { guide: { zh: "息税折旧摊销前利润。接口无此项，请手填（≈营业利润+折旧摊销）。", en: "EBITDA. Not provided by the API — enter manually (≈ operating income + D&A)." } },

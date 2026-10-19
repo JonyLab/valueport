@@ -36,50 +36,68 @@ export function parsePlanExplain(text) {
 
 // A股 RPT_SHAREBONUS_DET → { currency, byYear }；按 REPORT_DATE 年份累加现金派息（每10股→每股）
 export function aggregateAShare(rows) {
-  const byYear = {};
+  const byYear = {}, pays = [];
   for (const r of rows || []) {
     const cash = Number(r && r.PRETAX_BONUS_RMB);
     const y = typeof (r && r.REPORT_DATE) === "string" ? Number(r.REPORT_DATE.slice(0, 4)) : NaN;
     if (!Number.isFinite(cash) || cash <= 0 || !Number.isFinite(y)) continue;
     byYear[y] = (byYear[y] || 0) + cash / 10;
+    addPay(pays, r, cash / 10);
   }
-  return { currency: "CNY", byYear };
+  return { currency: "CNY", byYear, pays };
 }
 
 // 港股 RPT_HKF10_MAIN_DIVBASIC → 按 YEAR（财年）累加 PLAN_EXPLAIN 金额
 export function aggregateHK(rows) {
-  const byYear = {}; let currency = "";
+  const byYear = {}, pays = []; let currency = "";
   for (const r of rows || []) {
     const p = parsePlanExplain(r && r.PLAN_EXPLAIN);
     const y = Number(r && r.YEAR);
     if (!p || !Number.isFinite(y)) continue;
     byYear[y] = (byYear[y] || 0) + p.amount;
+    addPay(pays, r, p.amount);
     if (p.currency) currency = p.currency;
   }
-  return { currency: currency || "HKD", byYear };
+  return { currency: currency || "HKD", byYear, pays };
 }
 
 // 美股 RPT_USF10_INFO_DIVIDEND → 按 ASSIGN_PERIOD 年份累加 PLAN_EXPLAIN 金额
 export function aggregateUS(rows) {
-  const byYear = {}; let currency = "";
+  const byYear = {}, pays = []; let currency = "";
   for (const r of rows || []) {
     const p = parsePlanExplain(r && r.PLAN_EXPLAIN);
     const mm = typeof (r && r.ASSIGN_PERIOD) === "string" ? r.ASSIGN_PERIOD.match(/(\d{4})/) : null;
     const y = mm ? Number(mm[1]) : NaN;
     if (!p || !Number.isFinite(y)) continue;
     byYear[y] = (byYear[y] || 0) + p.amount;
+    addPay(pays, r, p.amount);
     if (p.currency) currency = p.currency;
   }
-  return { currency: currency || "USD", byYear };
+  return { currency: currency || "USD", byYear, pays };
 }
 
 // { currency, byYear } → { currency, years:[{year, perShare}] 升序 } | null
-export function normalizeDividends(agg) {
+export function normalizeDividends(agg, now = Date.now()) {
   if (!agg || !agg.byYear) return null;
   const years = Object.keys(agg.byYear).map(Number).filter(Number.isFinite).sort((a, b) => a - b)
     .map((y) => ({ year: y, perShare: Math.round(agg.byYear[y] * 1e4) / 1e4 }))
     .filter((x) => x.perShare > 0);
-  return years.length ? { currency: agg.currency, years } : null;
+  return years.length ? { currency: agg.currency, years, ttm: trailingDividends(agg.pays, now) } : null;
+}
+
+// 近一年每股股息：除息日落在过去 365 天内的各次现金派息之和（还没到除息日的不算）→ { perShare, count, from, to } | null
+export function trailingDividends(pays, now = Date.now()) {
+  const end = new Date(now).toISOString().slice(0, 10), start = new Date(now - 365 * 86400000).toISOString().slice(0, 10);
+  const hit = (pays || []).filter((p) => p.date > start && p.date <= end);
+  if (!hit.length) return null;
+  const sum = hit.reduce((a, p) => a + p.amount, 0);
+  const dates = hit.map((p) => p.date).sort();
+  return { perShare: Math.round(sum * 1e4) / 1e4, count: hit.length, from: dates[0], to: dates[dates.length - 1] };
+}
+// 每次派息的日期：优先除息日，没有就用派息日 / 公告日（港股未宣派的行常没有除息日）
+function addPay(pays, r, amount) {
+  const d = [r && r.EX_DIVIDEND_DATE, r && r.DIVIDEND_DATE, r && r.BONUS_PAY_DATE, r && r.NOTICE_DATE].find((x) => typeof x === "string" && /^\d{4}-\d{2}-\d{2}/.test(x));
+  if (d && Number.isFinite(amount) && amount > 0) pays.push({ date: d.slice(0, 10), amount });
 }
 
 async function emGet(reportName, secucode, source) {
