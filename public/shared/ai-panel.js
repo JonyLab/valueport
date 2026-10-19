@@ -23,6 +23,8 @@ const TX = {
     title: "AI 估值助手", sub: "聊聊这家公司，让 AI 帮你填假设", close: "关闭", ph: "问点什么，如「增速给多少合适？」", send: "发送",
     intro: "我会结合这只股票的数据和当前估值方法，给出保守 / 乐观两档假设和理由。建议的参数需要你确认后才会写入表单。",
     quick: ["帮我给出一套完整的保守 / 乐观假设", "看看我现在的假设是否合理", "折现率 / WACC 该取多少？"],
+    more: ["保守和乐观之间差多大比较合适？", "这家公司最大的风险是什么？", "和同行比，现在的估值贵不贵？", "哪个假设对结论影响最大？", "这个估值方法适合这家公司吗？", "当前价格隐含了多少增长？"],
+    fieldQ: (f) => `「${f}」该取多少？`, sugHint: "↑↓ 选择 · Enter 发送 · Tab 填入",
     thinking: "思考中…", copy: "复制", copied: "已复制", copyFail: "复制失败，可以手动选中文字复制", retry: "重试", suggest: "建议参数", field: "字段", now: "当前", next: "建议", apply: "应用到表单", applied: "已应用", undo: "撤销",
     cons: "保守", opt: "乐观", scenC: "保守情景", scenO: "乐观情景", scenDrivers: "关键假设", scenBreaks: "可能错在哪", scenSignals: "跟踪信号", err: "AI 暂时不可用", limit: "今天的 AI 对话次数已用完，明天再来", clear: "清空对话",
     disclaimer: "AI 建议仅供参考，不构成投资建议",
@@ -32,6 +34,8 @@ const TX = {
     title: "AI valuation assistant", sub: "Talk it through and let AI fill in assumptions", close: "Close", ph: "Ask about growth, margins, WACC…", send: "Send",
     intro: "I'll use this stock's data and the current method to suggest conservative / optimistic assumptions with reasons. Nothing is written to the form until you apply it.",
     quick: ["Suggest a full set of conservative / optimistic assumptions", "Are my current assumptions reasonable?", "What discount rate / WACC should I use?"],
+    more: ["How far apart should the conservative and optimistic cases be?", "What's the biggest risk for this company?", "Is it expensive compared with peers?", "Which assumption moves the result most?", "Does this method suit this company?", "How much growth does today's price imply?"],
+    fieldQ: (f) => `What should "${f}" be?`, sugHint: "↑↓ choose · Enter send · Tab fill in",
     thinking: "Thinking…", copy: "Copy", copied: "Copied", copyFail: "Couldn't copy — select the text to copy it", retry: "Retry", suggest: "Suggested inputs", field: "Field", now: "Now", next: "Suggested", apply: "Apply to form", applied: "Applied", undo: "Undo",
     cons: "Cons.", opt: "Opt.", scenC: "Conservative case", scenO: "Optimistic case", scenDrivers: "Key assumptions", scenBreaks: "Where it could be wrong", scenSignals: "Signals to watch", err: "AI is unavailable right now", limit: "Daily AI limit reached — try again tomorrow", clear: "Clear chat",
     disclaimer: "AI suggestions are for reference only, not investment advice",
@@ -118,7 +122,9 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   const input = el("textarea", "vc-ai-input"); input.rows = 1; input.placeholder = T.ph; input.maxLength = 2000;
   const sendBtn = el("button", "vc-ai-send"); sendBtn.type = "submit"; sendBtn.setAttribute("aria-label", T.send); sendBtn.appendChild(ri("arrow-up-line"));
   const box = el("div", "vc-ai-box"); box.append(input, sendBtn);
-  foot.append(box, el("div", "vc-ai-disclaimer", T.disclaimer));
+  // 预设问题建议：输入框聚焦时在上方弹出；空着时列常用问题，输入后按关键字过滤；问题里也带上当前方法的字段
+  const sug = el("div", "vc-ai-sug"); sug.hidden = true; sug.setAttribute("role", "listbox");
+  foot.append(sug, box, el("div", "vc-ai-disclaimer", T.disclaimer));
 
   panel.append(head, log, foot);
   host.appendChild(panel);
@@ -391,9 +397,57 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   }
 
   function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 140) + "px"; }
-  input.addEventListener("input", autosize);
+  // ── 预设问题建议 ──
+  let sugItems = [], sugIdx = -1;
+  function presets() {
+    let fields = [];
+    try { const c = getContext(); fields = (c && c.fields || []).map((f) => f.label || f.k).filter(Boolean); } catch { fields = []; }
+    const all = [...T.quick, ...T.more, ...fields.map((f) => T.fieldQ(f))];
+    return [...new Set(all)];
+  }
+  // 打分：整串包含 > 按空格 / 标点切出的词都命中 > 命中的字数；没输入时按预设顺序
+  function rank(q, list) {
+    const t = q.trim().toLowerCase();
+    if (!t) return list.slice(0, 5);
+    const words = t.split(/[\s,，。？?！!、/]+/).filter(Boolean);
+    return list.map((x) => {
+      const lx = x.toLowerCase();
+      let score = 0;
+      if (lx.includes(t)) score = 1000 - lx.indexOf(t);
+      else if (words.length && words.every((w) => lx.includes(w))) score = 500;
+      else if (/[\u4e00-\u9fff]/.test(t)) { const chars = [...new Set(t.replace(/[^\u4e00-\u9fff]/g, ""))]; score = chars.length && chars.filter((ch) => lx.includes(ch)).length / chars.length >= 0.6 ? 100 + chars.length : 0; } // 中文按字模糊匹配；英文字母重合没意义
+      return [score, x];
+    }).filter(([sc, x]) => sc > 0 && x.toLowerCase() !== t).sort((a, b) => b[0] - a[0]).slice(0, 5).map(([, x]) => x);
+  }
+  function hideSug() { sug.hidden = true; sugIdx = -1; }
+  function showSug() {
+    if (busy) return hideSug();
+    sugItems = rank(input.value, presets());
+    if (!sugItems.length) return hideSug();
+    sug.innerHTML = "";
+    sugItems.forEach((q, i) => {
+      const b = el("button", "vc-ai-sugitem" + (i === sugIdx ? " on" : ""), q); b.type = "button"; b.setAttribute("role", "option");
+      b.addEventListener("mousedown", (e) => e.preventDefault()); // 不让输入框先失焦
+      b.addEventListener("click", () => { hideSug(); send(q); });
+      sug.appendChild(b);
+    });
+    sug.appendChild(el("div", "vc-ai-sughint", T.sugHint));
+    sug.hidden = false;
+  }
+  const moveSug = (d) => { if (sug.hidden || !sugItems.length) return false; sugIdx = (sugIdx + d + sugItems.length) % sugItems.length; showSug(); return true; };
+  input.addEventListener("input", () => { autosize(); sugIdx = -1; showSug(); });
+  input.addEventListener("focus", showSug);
+  input.addEventListener("blur", () => setTimeout(hideSug, 120));
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(input.value); }
+    if (e.isComposing) return;
+    if (e.key === "ArrowDown" && moveSug(1)) { e.preventDefault(); return; }
+    if (e.key === "ArrowUp" && moveSug(-1)) { e.preventDefault(); return; }
+    if (e.key === "Tab" && !sug.hidden && sugItems.length) { e.preventDefault(); input.value = sugItems[Math.max(0, sugIdx)]; autosize(); hideSug(); return; }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const pick = !sug.hidden && sugIdx >= 0 ? sugItems[sugIdx] : null;
+      hideSug(); send(pick || input.value);
+    }
   });
   foot.addEventListener("submit", (e) => { e.preventDefault(); send(input.value); });
   clearBtn.addEventListener("click", () => { if (busy) return; history.length = 0; renderIntro(); });
@@ -401,7 +455,9 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   // Esc 只关面板：捕获阶段接住，避免宿主页的全局 Esc 顺带退出整个编辑器
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || panel.hidden || !panel.isConnected) return;
-    e.stopPropagation(); e.preventDefault(); close();
+    e.stopPropagation(); e.preventDefault();
+    if (!sug.hidden) { hideSug(); return; } // 先收起建议，再按一次才关面板
+    close();
   }, true);
 
   function open() { panel.hidden = false; document.body.classList.add("vc-ai-open"); requestAnimationFrame(() => panel.classList.add("on")); setTimeout(() => input.focus(), 50); }
