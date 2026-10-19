@@ -24,7 +24,7 @@ const TX = {
     intro: "我会结合这只股票的数据和当前估值方法，给出保守 / 乐观两档假设和理由。建议的参数需要你确认后才会写入表单。",
     quick: ["帮我给出一套完整的保守 / 乐观假设", "看看我现在的假设是否合理", "折现率 / WACC 该取多少？"],
     more: ["保守和乐观之间差多大比较合适？", "这家公司最大的风险是什么？", "和同行比，现在的估值贵不贵？", "哪个假设对结论影响最大？", "这个估值方法适合这家公司吗？", "当前价格隐含了多少增长？"],
-    fieldQ: (f) => `「${f}」该取多少？`, sugHint: "↑↓ 选择 · Enter 发送 · Tab 填入",
+    fieldQ: (f) => `「${f}」该取多少？`, sugHint: "↑↓ 选择 · Enter 发送 · Tab 填入", sugBtn: "常用问题",
     thinking: "思考中…", copy: "复制", copied: "已复制", copyFail: "复制失败，可以手动选中文字复制", retry: "重试", suggest: "建议参数", field: "字段", now: "当前", next: "建议", apply: "应用到表单", applied: "已应用", undo: "撤销",
     cons: "保守", opt: "乐观", scenC: "保守情景", scenO: "乐观情景", scenDrivers: "关键假设", scenBreaks: "可能错在哪", scenSignals: "跟踪信号", err: "AI 暂时不可用", limit: "今天的 AI 对话次数已用完，明天再来", clear: "新对话", hist: "历史对话", histEmpty: "这只股票还没有保存的对话", histDel: "删除这条对话", histDelQ: "删除这条对话？", untitled: "（无标题）", cur: "当前",
     disclaimer: "AI 建议仅供参考，不构成投资建议",
@@ -36,7 +36,7 @@ const TX = {
     intro: "I'll use this stock's data and the current method to suggest conservative / optimistic assumptions with reasons. Nothing is written to the form until you apply it.",
     quick: ["Suggest a full set of conservative / optimistic assumptions", "Are my current assumptions reasonable?", "What discount rate / WACC should I use?"],
     more: ["How far apart should the conservative and optimistic cases be?", "What's the biggest risk for this company?", "Is it expensive compared with peers?", "Which assumption moves the result most?", "Does this method suit this company?", "How much growth does today's price imply?"],
-    fieldQ: (f) => `What should "${f}" be?`, sugHint: "↑↓ choose · Enter send · Tab fill in",
+    fieldQ: (f) => `What should "${f}" be?`, sugHint: "↑↓ choose · Enter send · Tab fill in", sugBtn: "Suggested questions",
     thinking: "Thinking…", copy: "Copy", copied: "Copied", copyFail: "Couldn't copy — select the text to copy it", retry: "Retry", suggest: "Suggested inputs", field: "Field", now: "Now", next: "Suggested", apply: "Apply to form", applied: "Applied", undo: "Undo",
     cons: "Cons.", opt: "Opt.", scenC: "Conservative case", scenO: "Optimistic case", scenDrivers: "Key assumptions", scenBreaks: "Where it could be wrong", scenSignals: "Signals to watch", err: "AI is unavailable right now", limit: "Daily AI limit reached — try again tomorrow", clear: "New chat", hist: "Chat history", histEmpty: "No saved chats for this stock yet", histDel: "Delete this chat", histDelQ: "Delete this chat?", untitled: "(untitled)", cur: "Current",
     disclaimer: "AI suggestions are for reference only, not investment advice",
@@ -128,7 +128,10 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   const foot = el("form", "vc-ai-foot");
   const input = el("textarea", "vc-ai-input"); input.rows = 1; input.placeholder = T.ph; input.maxLength = 2000;
   const sendBtn = el("button", "vc-ai-send"); sendBtn.type = "submit"; sendBtn.setAttribute("aria-label", T.send); sendBtn.appendChild(ri("arrow-up-line"));
-  const box = el("div", "vc-ai-box"); box.append(input, sendBtn);
+  // 常用问题：默认收起，点输入框左边的灯泡才展开；展开时输入会按关键字过滤
+  const sugToggle = el("button", "vc-ai-sugbtn"); sugToggle.type = "button"; sugToggle.title = T.sugBtn; sugToggle.setAttribute("aria-label", T.sugBtn); sugToggle.setAttribute("aria-expanded", "false");
+  sugToggle.appendChild(ri("lightbulb-line"));
+  const box = el("div", "vc-ai-box"); box.append(sugToggle, input, sendBtn);
   // 预设问题建议：输入框聚焦时在上方弹出；空着时列常用问题，输入后按关键字过滤；问题里也带上当前方法的字段
   const sug = el("div", "vc-ai-sug"); sug.hidden = true; sug.setAttribute("role", "listbox");
   foot.append(sug, box, el("div", "vc-ai-disclaimer", T.disclaimer));
@@ -510,9 +513,10 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       return [score, x];
     }).filter(([sc, x]) => sc > 0 && x.toLowerCase() !== t).sort((a, b) => b[0] - a[0]).slice(0, 5).map(([, x]) => x);
   }
-  function hideSug() { sug.hidden = true; sugIdx = -1; }
+  let sugOpen = false; // 只有点了灯泡才展开
+  function hideSug() { sug.hidden = true; sugIdx = -1; sugOpen = false; sugToggle.classList.remove("on"); sugToggle.setAttribute("aria-expanded", "false"); }
   function showSug() {
-    if (busy) return hideSug();
+    if (busy || !sugOpen) return hideSug();
     sugItems = rank(input.value, presets());
     if (!sugItems.length) return hideSug();
     sug.innerHTML = "";
@@ -526,9 +530,13 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     sug.hidden = false;
   }
   const moveSug = (d) => { if (sug.hidden || !sugItems.length) return false; sugIdx = (sugIdx + d + sugItems.length) % sugItems.length; showSug(); return true; };
-  input.addEventListener("input", () => { autosize(); sugIdx = -1; showSug(); });
-  input.addEventListener("focus", showSug);
-  input.addEventListener("blur", () => setTimeout(hideSug, 120));
+  input.addEventListener("input", () => { autosize(); sugIdx = -1; if (sugOpen) showSug(); });
+  input.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== sugToggle) hideSug(); }, 120));
+  sugToggle.addEventListener("mousedown", (e) => e.preventDefault()); // 保持输入框焦点
+  sugToggle.addEventListener("click", () => {
+    if (sugOpen) { hideSug(); input.focus(); return; }
+    sugOpen = true; sugToggle.classList.add("on"); sugToggle.setAttribute("aria-expanded", "true"); sugIdx = -1; showSug(); input.focus();
+  });
   input.addEventListener("keydown", (e) => {
     if (e.isComposing) return;
     if (e.key === "ArrowDown" && moveSug(1)) { e.preventDefault(); return; }
