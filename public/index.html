@@ -634,6 +634,47 @@
   .vc-thesis-notes{margin-top:12px;font-size:12px;color:var(--ink-soft)}
   .vc-thesis-notes summary{cursor:pointer;margin-bottom:8px}
   .vc-question{display:grid;gap:12px;padding:0 0 20px;border-bottom:1px solid var(--border)}
+  .vc-draft-status{margin:0 0 14px;font-size:12px;line-height:1.6;color:var(--ink-mute)}
+  .vc-thesis-modes{display:flex;gap:8px;margin-bottom:8px}
+  .vc-thesis-modes button{padding:8px 14px;border:1px solid var(--border);border-radius:var(--r-pill);font:inherit;font-size:12px;color:var(--ink-soft);background:transparent;cursor:pointer}
+  .vc-thesis-modes button[aria-pressed="true"]{background:var(--dark);border-color:var(--dark);color:#fff}
+  .vc-thesis-manual{display:grid;gap:20px}
+  .vc-thesis-manual[hidden],.vc-guide[hidden],.vc-note-ai[hidden],.vc-guide-error[hidden]{display:none}
+  .vc-guide{display:grid;gap:16px;min-width:0}
+  .vc-guide-title{margin:0;font-size:17px;font-weight:500;line-height:1.5;overflow-wrap:anywhere;outline-offset:4px}
+  .vc-guide-progress{display:flex;gap:6px;list-style:none;margin:0;padding:0;font-size:11px;color:var(--ink-mute)}
+  .vc-guide-progress li{flex:1;padding:8px 4px;border-bottom:2px solid var(--border);text-align:center}
+  .vc-guide-progress li[aria-current="step"]{border-color:var(--sun);color:var(--ink)}
+  .vc-guide-progress li.done{border-color:var(--ink-soft);color:var(--ink-soft)}
+  .vc-guide-content{display:grid;gap:14px}
+  .vc-guide-lead,.vc-guide-context{margin:0;font-size:13px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink-soft)}
+  .vc-guide-context{padding:12px 14px;background:var(--track);border-radius:var(--r-md)}
+  .vc-guide-options{display:grid;gap:9px;margin:0;padding:0;border:0;min-width:0}
+  .vc-guide-options legend{float:left;width:100%;margin:0 0 12px;font-size:15px;line-height:1.6;font-weight:500;color:var(--ink)}
+  .vc-guide-option{display:flex;align-items:flex-start;gap:10px;padding:13px;border:1px solid var(--border);border-radius:var(--r-md);background:#fff;cursor:pointer;min-width:0}
+  .vc-guide-option:has(input:checked){border-color:var(--sun-ink);background:var(--sun-soft,#fff5ce)}
+  .vc-guide-option:focus-within{outline:2px solid var(--ring-border);outline-offset:2px}
+  .vc-guide-option input{flex:none;margin-top:4px;accent-color:var(--dark)}
+  .vc-guide-option span{display:grid;gap:4px;min-width:0;overflow-wrap:anywhere}
+  .vc-guide-option strong{font-size:13px;font-weight:500;line-height:1.6}
+  .vc-guide-option small{font-size:12px;line-height:1.6;color:var(--ink-mute)}
+  .vc-guide-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .vc-guide-primary,.vc-guide-secondary{justify-self:start;padding:11px 18px;border:1px solid var(--border);border-radius:var(--r-pill);font:inherit;font-size:13px;line-height:1.5;cursor:pointer;max-width:100%;white-space:normal}
+  .vc-guide-primary{background:var(--dark);border-color:var(--dark);color:#fff}
+  .vc-guide-secondary{background:transparent;color:var(--ink-soft)}
+  .vc-guide-primary:disabled{opacity:.4;cursor:default}
+  .vc-guide-status{font-size:13px;line-height:1.7;color:var(--ink-soft)}
+  .vc-guide-error{margin:0;font-size:12px;line-height:1.7;color:var(--red);overflow-wrap:anywhere}
+  .vc-guide-history{font-size:12px;line-height:1.7;color:var(--ink-soft);overflow-wrap:anywhere}
+  .vc-guide-history summary{cursor:pointer}
+  .vc-guide-history p{white-space:pre-wrap}
+  .vc-guide-history-q{font-weight:500;margin-bottom:4px}
+  .vc-guide-review{padding:14px;background:var(--track);border-radius:var(--r-md);overflow-wrap:anywhere}
+  .vc-guide-review h4{margin:0 0 8px;font-size:13px;font-weight:500}
+  .vc-guide-review p{margin:6px 0 0;font-size:13px;line-height:1.8;white-space:pre-wrap}
+  .vc-savebar{gap:12px;flex-wrap:wrap}
+  .vc-savebar>.vc-guide-error{flex:1 1 200px}
+  @media(max-width:600px){.vc-guide-progress{font-size:10px}.vc-guide-primary{width:100%}.vc-guide .vc-note-input{font-size:16px}}
   .vc-question:last-of-type{border-bottom:0;padding-bottom:0}
   .vc-question-label{margin:0;font-size:14px;font-weight:500;line-height:1.6;color:var(--ink)}
   .vc-question-help{margin:0;font-size:12px;font-weight:400;line-height:1.7;color:var(--ink-mute)}
@@ -1090,13 +1131,17 @@
   <link rel="modulepreload" href="/shared/valuation-ui.js">
 <link rel="modulepreload" href="/shared/valuation/thesis.js">
 <link rel="modulepreload" href="/shared/valuation/thesis-questions.js">
-<link rel="modulepreload" href="/shared/valuation/resource-ai.js">
+<link rel="modulepreload" href="/shared/valuation/save.js">
+<link rel="modulepreload" href="/shared/valuation/editor-draft.js">
+<link rel="modulepreload" href="/shared/valuation/thesis-guide-ui.js">
+<link rel="modulepreload" href="/shared/valuation/thesis-guide.js">
   <link rel="modulepreload" href="/shared/valuation/derivations.js">
   <link rel="modulepreload" href="/shared/valuation/facts.js">
   <link rel="modulepreload" href="/shared/valuation/index.js">
   <link rel="modulepreload" href="/shared/valuation/intrinsic.js">
   <link rel="modulepreload" href="/shared/valuation/relative.js">
   <link rel="modulepreload" href="/shared/valuation/resource.js">
+  <link rel="modulepreload" href="/shared/valuation/resource-ai.js">
   <link rel="modulepreload" href="/shared/valuation/segments.js">
   <link rel="modulepreload" href="/shared/valuation/workbench.js">
   <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页，点击后几乎立即切换（Chrome 系浏览器支持，其他浏览器忽略） -->
@@ -1266,6 +1311,7 @@ import { mountLangMenu } from "/shared/langmenu.js";
 import { mountFeedback } from "/shared/feedback.js";
 import { mountValuationCalc } from "/shared/valuation-ui.js";
 import { cleanThesis, thesisEntries, THESIS_SCENARIOS } from "/shared/valuation/thesis.js";
+import { persistValuation } from "/shared/valuation/save.js";
 import { MODELS, modeFields } from "/shared/valuation/index.js";
 import { verifiedFacts, latestMetrics, assumptionChecks, marketViews, masterLenses, businessFacts } from "/shared/valuation/facts.js";
 import { aiErrorText } from "/shared/ai-panel.js";
@@ -2937,14 +2983,14 @@ function clearValuation(item, idBlock) {
 }
 
 // 区间变更后统一刷新：详情钟摆/占位、顶部判定、列表行、保存。
-function syncFairUI(item, idBlock) {
+function syncFairUI(item, idBlock, persist = true) {
   const c = item.cfg;
   mountDetailPendulum(item);
   if (detailDistEl && detailItem === item) renderDistance(item, detailDistEl);
   if (idBlock) { const vv = verdictOf(c, VMSGS); const vEl = idBlock.querySelector(".vd-verdict"); vEl.textContent = vv.text; vEl.className = "vd-verdict " + vv.cls; }
   if (item.gauge) item.gauge.set(c, true);
   renderVerdict(item); renderItemHead(item);
-  saveItem(item);
+  if (persist) saveItem(item);
 }
 
 // 关键假设摘要：先列单值「(高)增长年数」(它框定后面增速的适用区间)，再列 dual 字段（保守–乐观）
@@ -3368,6 +3414,9 @@ function renderValuationPanel(item, panel, idBlock) {
       initialSegments: card ? card.segments : undefined,
       initialNote: card ? card.note : undefined,
       initialThesis: card ? card.thesis : undefined,
+      draftKey: `${greetName}:${boardSlug}:${item.cfg.symbol}:${card?.id || "new"}`,
+      initialUpdatedAt: card?.updatedAt || "",
+      loadGuideData: async () => { const annual = await loadFinancials(item, "annual"); return { financials: annual?.financials || null, dividends: annual?.dividends || null }; },
       refData: {
         financials: (item._financials && item._financials.annual && item._financials.annual.financials) || null,
         financialsQ: (item._financials && item._financials.quarter && item._financials.quarter.financials) || null,
@@ -3378,19 +3427,11 @@ function renderValuationPanel(item, panel, idBlock) {
       verdict: (low, high) => { const vv = verdictOf({ ...item.cfg, fairLow: low, fairHigh: high }, VMSGS); return { text: vv.text, cls: vv.cls }; },
       stock: editorStock(item),
       onCancel: () => finishValEdit(),
-      onDone: ({ method, inputs, low, high, note, thesis, derivations, segments }) => {
-        const c = item.cfg; // 实时读取
-        if (!Array.isArray(c.valuations)) c.valuations = [];
-        if (card) {
-          Object.assign(card, { method, inputs, low, high, note, thesis, derivations, segments, updatedAt: new Date().toISOString() });
-          delete card.review; delete card.reviewedAt;
-          if (c.selectedValuationId === card.id) selectValuation(item, card, idBlock);
-        } else {
-          const fresh = { id: newValuationId(), method, inputs, low, high, note, thesis, derivations, segments, updatedAt: new Date().toISOString() };
-          c.valuations.push(fresh);
-          if (!c.selectedValuationId) selectValuation(item, fresh, idBlock); // 首张/无选中时自动设为合理区间
-        }
-        saveItem(item); finishValEdit();
+      onDone: async (value) => {
+        const result = await persistValuation(item, card?.id, value);
+        Object.assign(item.cfg, result.change); item.id = result.id;
+        syncFairUI(item, idBlock, false); finishValEdit();
+        return true;
       },
     });
     showView("valedit");
@@ -3424,22 +3465,23 @@ function editorStock(item) {
 function finishValEdit() { if (!valEditReturn) return; valEditLeaving = true; history.back(); }
 // 用户要离开（返回 / Esc / 浏览器后退）：有未保存改动就先问
 function leaveValEdit() {
+  if (valEditApi?.isSaving()) return;
   if (valEditApi && valEditApi.isDirty()) askSaveValEdit(); else finishValEdit();
 }
 function askSaveValEdit() {
   if (document.getElementById("veConfirm")) return;
-  const zh = LANG === "zh", canSave = valEditApi && valEditApi.canSave();
+  const zh = LANG === "zh", canSave = valEditApi && valEditApi.canSave(), canDraft = valEditApi?.hasLocalDraft();
   const ov = document.createElement("div"); ov.className = "overlay"; ov.id = "veConfirm";
   const box = document.createElement("div"); box.className = "modal ve-confirm"; box.setAttribute("role", "alertdialog"); box.setAttribute("aria-modal", "true");
   const title = document.createElement("div"); title.className = "modal-title"; title.textContent = zh ? "保存这次修改吗？" : "Save your changes?";
   const msg = document.createElement("p"); msg.className = "ve-confirm-msg";
   msg.textContent = canSave ? (zh ? "你改过的假设和备注还没保存，离开后会丢失。" : "Your assumptions and note haven't been saved and will be lost if you leave.")
-    : (zh ? "你改过的内容还没保存。现在的假设还算不出合理区间，暂时不能保存；可以继续编辑补全，或者不保存离开。" : "Your changes aren't saved. The inputs can't produce a fair range yet, so they can't be saved — keep editing, or leave without saving.");
+    : (zh ? "研究还没完成，可以先保留在此浏览器，下次回来继续；草稿不会参与估值钟摆。" : "Keep the unfinished research in this browser and resume later. Drafts do not affect the valuation gauge.");
   const acts = document.createElement("div"); acts.className = "ve-confirm-acts";
   const mk = (cls, text) => { const b = document.createElement("button"); b.type = "button"; b.className = "btn " + cls; b.textContent = text; return b; };
   const keep = mk("ghost", zh ? "继续编辑" : "Keep editing");
   const discard = mk("", zh ? "不保存" : "Don't save");
-  const save = mk("primary", zh ? "保存" : "Save"); save.disabled = !canSave;
+  const save = mk("primary", canSave ? (zh ? "保存" : "Save") : (zh ? "保留草稿并离开" : "Keep draft and leave")); save.disabled = !canSave && !canDraft;
   acts.append(keep, discard, save);
   box.append(title, msg, acts); ov.appendChild(box); document.body.appendChild(ov);
   const close = () => { ov.remove(); document.removeEventListener("keydown", onKey, true); };
@@ -3447,8 +3489,12 @@ function askSaveValEdit() {
   document.addEventListener("keydown", onKey, true);
   keep.addEventListener("click", close);
   ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
-  discard.addEventListener("click", () => { close(); finishValEdit(); });
-  save.addEventListener("click", () => { close(); if (!valEditApi.save()) finishValEdit(); }); // 保存成功时 onDone 里会自己退出
+  discard.addEventListener("click", () => { valEditApi?.discardDraft(); close(); finishValEdit(); });
+  save.addEventListener("click", () => {
+    if (canSave) { close(); valEditApi.save(); }
+    else if (valEditApi.keepDraft()) { close(); finishValEdit(); }
+    else msg.textContent = zh ? "此浏览器未能保留草稿，请继续编辑或复制研究内容。" : "The draft could not be stored. Keep editing or copy your research.";
+  });
   (canSave ? save : keep).focus();
 }
 // 关标签页 / 刷新：浏览器自带的离开提醒

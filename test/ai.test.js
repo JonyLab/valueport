@@ -401,6 +401,56 @@ describe("AI note draft", () => {
   });
 });
 
+describe("optional company-specific thesis guide", () => {
+  const context = { stock: { name: "示例芯片公司", code: "DEMO" }, fields: [], business: ["业务描述：设计工业芯片，海外渠道仍在建设中。"], verified: ["2025 年海外收入占比 20%，来自测试财报。"] };
+  const question = { type: "question", context: "公司正在建设海外芯片渠道，收入持续性仍需验证。", question: "你怎么看工业芯片海外渠道的发展？", selection: "single", options: [{ id: "a", label: "如果客户认可产品，海外收入会增长", detail: "场景假设，待验证" }, { id: "b", label: "渠道建设慢，增长有限" }] };
+  const draft = { story: "海外工业芯片收入增长", evidence: "测试财报显示 2025 年海外收入占比 20%", uncertainties: "客户复购与投入效率待验证", impacts: [{ key: "growth", direction: "up", reason: "海外渠道可能增加销售" }, { key: "reinvestment", direction: "unknown", reason: "渠道投入效率未确定" }], signals: "建议跟踪复购和渠道费用，不设未确认的阈值" };
+  const request = (cookie, body) => SELF.fetch("https://x/api/my/ai/thesis-guide", { method: "POST", headers: { ...J, ...(cookie ? { cookie } : {}) }, body: JSON.stringify(body) });
+  const body = { lang: "zh", scenario: "o", context, turns: [], thesis: { c: { story: "另一个场景的私有判断" } } };
+  it("validates bounded turns, isolates the case and includes available company evidence", async () => {
+    const { validateThesisGuide, buildThesisGuidePrompt } = await import("../src/ai.js");
+    expect(validateThesisGuide(body)).toBeNull();
+    expect(validateThesisGuide({ ...body, scenario: "both" })).toBe("scenario required");
+    expect(validateThesisGuide({ ...body, turns: Array(4).fill({ question: "q", answer: "a" }) })).toBe("bad turns");
+    expect(validateThesisGuide({ ...body, turns: [{ question: "q", answer: "" }] })).toBe("bad turns");
+    expect(validateThesisGuide({ ...body, context: { fields: [] } })).toBe("stock required");
+    const prompt = buildThesisGuidePrompt(body, "zh");
+    expect(prompt).toContain("工业芯片"); expect(prompt).toContain("2025 年海外收入占比"); expect(prompt).toContain("乐观场景");
+    expect(prompt).not.toContain("另一个场景的私有判断"); expect(prompt).toContain("不是你声称已经发生的事实");
+    expect(buildThesisGuidePrompt({ ...body, context: { stock: context.stock } }, "en")).toContain("资料不足");
+    expect(buildThesisGuidePrompt(body, "en")).toContain("in English");
+  });
+  it("completes three contextual question rounds, accepts typed uncertainty and previews a bounded summary", async () => {
+    const cookie = await userCookie("guided_three_rounds"); const turns = [];
+    const answers = ["我更看好海外芯片渠道", "目前只有测试财报，还不清楚复购", "可能影响收入增长和渠道投入，方向还不确定"];
+    for (let i = 0; i < 4; i++) {
+      fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, (options) => {
+        const prompt = JSON.parse(options.body).messages[0].content;
+        expect(prompt).toContain("示例芯片公司"); if (i) expect(prompt).toContain(answers[i - 1]);
+        return { choices: [{ message: { content: JSON.stringify(i === 3 ? { type: "summary", draft: { ...draft, params: { growth: 100 } } } : { ...question, selection: i === 2 ? "multiple" : "single" }) } }] };
+      });
+      const response = await request(cookie, { ...body, turns }); const result = await response.json();
+      expect(response.status).toBe(200); expect(response.headers.get("cache-control")).toBe("no-store"); expect(result.step).toBe(i); expect(result.references).toEqual([...context.business, ...context.verified]);
+      if (i < 3) { expect(result.type).toBe("question"); turns.push({ question: result.question, answer: answers[i] }); }
+      else { expect(result.type).toBe("summary"); expect(result.draft).toEqual(draft); expect(result.draft.params).toBeUndefined(); }
+    }
+  });
+  it("rejects early summaries, incomplete UI and auth/quota failures without a pretend fallback", async () => {
+    expect((await request(null, body)).status).toBe(401);
+    const cookie = await userCookie("guided_recovery");
+    expect((await request(cookie, { ...body, turns: "bad" })).status).toBe(400);
+    for (const content of [{ type: "summary", draft }, { type: "html", html: "<script>bad</script>" }, { ...question, options: [] }]) {
+      fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, { choices: [{ message: { content: JSON.stringify(content) } }] });
+      const response = await request(cookie, body); expect(response.status).toBe(502); expect(await response.json()).toEqual({ error: "bad_ai_output" });
+    }
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(503, { error: { message: "temporary failure" } });
+    expect((await request(cookie, body)).status).toBe(502);
+    const { id } = await env.DB.prepare("SELECT id FROM users WHERE username='guided_recovery'").first();
+    await env.DB.prepare("INSERT OR REPLACE INTO settings(user_id,key,value) VALUES(?,?,?)").bind(id, "_ai_usage", new Date().toISOString().slice(0, 10) + ":100").run();
+    expect((await request(cookie, body)).status).toBe(429);
+  });
+});
+
 describe("AI fundamentals brief", () => {
   const BODY = { lang: "zh", stock: { name: "腾讯控股", code: "00700", currency: "HKD" }, verified: ["自由现金流 2016–2025：各年均为正"], metrics: ["营收增速：最新年同比 +7.0%"] };
   it("builds a grounded prompt and parses points and risks", async () => {
