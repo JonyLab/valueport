@@ -14,6 +14,7 @@ import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef, multipleCo
 import { derivationForMeta } from "/shared/valuation/derivations.js";
 import { aggregateSegments } from "/shared/valuation/segments.js";
 import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
+import { resourceAiFields, resourceAiFacts, applyResourceAiParams } from "/shared/valuation/resource-ai.js";
 import { mountAiPanel, aiErrorText } from "/shared/ai-panel.js";
 import { verifiedFacts, marketViews, masterLenses, businessFacts, latestMetrics, assumptionChecks } from "/shared/valuation/facts.js";
 
@@ -1343,6 +1344,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     });
     const facts = {
       ...stockFacts(),
+      ...(model.assetModel ? { resourceValuation: resourceAiFacts(lastForm) } : {}),
       currentConclusion: Number.isFinite(lastLow) && Number.isFinite(lastHigh) ? `${fmt(Math.min(lastLow, lastHigh), "—")} ~ ${fmt(Math.max(lastLow, lastHigh), "—")}` : null,
     };
     // 生意、历史区间、市场投研与大师视角一起给，AI 才能分别把保守 / 乐观情景讲透
@@ -1354,6 +1356,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       extra.market = marketViews({ research: researchData, financials: fin, price: ctx.price, market: sym.slice(0, 2), lang });
       extra.lenses = masterLenses({ financials: fin, research: researchData, price: ctx.price, eps: ctx.epsTtm, bps: ctx.bps, lang });
     } catch { /* 缺数据时只用基本面 */ }
+    if (model.assetModel) fields.push(...resourceAiFields(lastForm, lang));
     return { stock: aiStock(), verified: aiVerified(), ...extra,
       method: { key: model.key, label: textFor(meta && meta.title, lang, modelTitle(model, lang)) }, mode: currentMode || null, fields, facts };
   }
@@ -1378,22 +1381,45 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     chatKey: () => ({ symbol: (stock && stock.symbol) || "", method: (MODELS[activeIdx] && MODELS[activeIdx].key) || "" }),
     checkParams,
     fmtField: (f, v) => !Number.isFinite(v) ? "—" : f.money ? fmtMoney(v) : String(Math.round(v * 1000) / 1000),
-    onApply: (params) => {
-      const snap = { inputs: cleanForm(lastForm), derivations: JSON.parse(JSON.stringify(derivations)) };
-      const merged = cleanForm(lastForm);
-      for (const [k, v] of Object.entries(params)) { merged[k] = v; delete derivations[k]; } // 改了的字段解除推导
+    onApply: (params, fields = []) => {
+      const snap = { inputs: structuredClone(cleanForm(lastForm)), derivations: JSON.parse(JSON.stringify(derivations)) };
+      let merged;
+      try {
+        if (Object.keys(params).some((k) => k.startsWith("resource."))) {
+          if (!MODELS[activeIdx]?.assetModel) throw new Error("resource_inputs_changed");
+          merged = applyResourceAiParams(cleanForm(lastForm), params, fields);
+        } else merged = { ...cleanForm(lastForm), ...params };
+      } catch {
+        alert(lang === "zh" ? "资产明细或估值方法已变化，请重新获取 AI 建议。" : "Assets or method changed. Please request fresh AI suggestions.");
+        return null;
+      }
+      for (const k of Object.keys(params)) delete derivations[k]; // 改了的字段解除推导
+      if (MODELS[activeIdx]?.assetModel) {
+        assetState.rows = structuredClone(merged.assets || []);
+        priceState = structuredClone(merged.prices || {});
+      }
       seedInputs = merged; renderForm();
       return snap;
     },
     onUndo: (snap) => {
       for (const k of Object.keys(derivations)) delete derivations[k];
       Object.assign(derivations, snap.derivations);
+      if (MODELS[activeIdx]?.assetModel) {
+        assetState.rows = structuredClone(snap.inputs.assets || []);
+        priceState = structuredClone(snap.inputs.prices || {});
+      }
       seedInputs = snap.inputs; renderForm();
     },
     // 交互组件的数值都在这里现算：模型只给字段和步长
     widgets: {
       sweep: (k, steps) => {
         const model = MODELS[activeIdx]; if (!model) return null;
+        if (model.assetModel && k.startsWith("resource.")) {
+          const fields = resourceAiFields(lastForm, lang), field = fields.find((f) => f.k === k);
+          if (!field) return null;
+          return fieldSweep({ model, form: { ...lastForm, [k]: field.value }, ctx, field, steps, money: field.money,
+            run: (m, varied, context) => runModel(m, applyResourceAiParams(lastForm, { [k]: varied[k] }, fields), context) });
+        }
         const field = modeFields(model, currentMode).find((f) => f.k === k); if (!field) return null;
         return fieldSweep({ model, form: lastForm, ctx, run: runModel, field, steps, money: MONEY_METAS.has(field.meta) });
       },

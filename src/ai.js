@@ -103,7 +103,7 @@ export function validateChat(body) {
     if (!m || (m.role !== "user" && m.role !== "assistant") || typeof m.content !== "string" || !m.content.trim() || m.content.length > MAX_CHARS) return "bad message";
   }
   if (messages[messages.length - 1].role !== "user") return "last message must be from user";
-  if (!context || typeof context !== "object" || !Array.isArray(context.fields) || !context.fields.length || context.fields.length > 40) return "context.fields required";
+  if (!context || typeof context !== "object" || !Array.isArray(context.fields) || !context.fields.length || context.fields.length > (context.method?.key === "navsotp" ? 160 : 40)) return "context.fields required";
   if (badVerified(context.verified) || badVerified(context.market) || badVerified(context.lenses) || badVerified(context.business) || badVerified(context.metrics)) return "bad verified facts";
   for (const f of context.fields) if (!f || typeof f.k !== "string" || (f.col !== "single" && f.col !== "dual")) return "bad field";
   if (JSON.stringify(context).length > 28000) return "context too large";
@@ -137,6 +137,18 @@ export function buildSystemPrompt(context, lang) {
     "",
     "当前方法的输入字段（k｜名称｜类型｜单位｜当前值）：",
     fieldLines,
+    ...(c.method?.key === "navsotp" ? [
+      "",
+      "资源股 NAV / SOTP 专用口径（优先于通用增速/利润率模板）：",
+      "在产矿现值 = 权益年产量 × 商品单位换算 ×（长期商品价 − 完全成本）×（1 − 税率）× 年金系数(剩余寿命,WACC)。有限寿命、产量恒定、无永续价值，不额外加入增长率或终值。",
+      "保守情景 = 较低长期商品价 + 较高 WACC；乐观情景 = 较高长期商品价 + 较低 WACC。WACC 保守值通常高于乐观值，不要套用通用的保守值更低规则。长期价格不是现货报价，默认价格不是已核实的当前行情。",
+      "资产包、商品价格、完全成本与净负债都以人民币计价；黄金/白银产量为吨、价格为元/克，铜/锌产量为万吨、价格为元/吨；总股本为股。不得将美元/盎司、千吨、亿元直接当作表单原始单位。报价币种不等于资产模型币种，未提供汇率时不要虚构换算。",
+      "固定值包是直接计入的现值，不再折现或重复加同一矿山；未开发储量期权由 Black–Scholes 计算，使用储量、边际成本、开发成本现值、波动率、期限、无风险利率，不用矿山 WACC 再折现；不能同时算进在产矿与期权。当前 UI 的资产产量/成本/寿命、固定现值、税率与净负债是两情景共用单值，只能给单值建议，不要伪造两档结构。",
+      "用户要完整假设时，逐一覆盖：资产清单与权益口径、每种商品长期价格两档、每个在产矿的权益产量/完全成本/剩余寿命、固定值包依据、期权输入、WACC 两档、有效税率与净负债；说明哪些是用户输入、哪些是待核实假设、哪些来自给定公司资料。",
+      "没有披露依据的矿名、权益产量、成本、储量、寿命、开发成本、负债不得凭公司名称补造，空值不可当零；列出具体待补数据及建议查阅的年报/储量报告/成本披露。可以给明确标注为情景假设的长期价格和折现率，并说明依据和局限，不能冒充实时事实。",
+      "如果资产行仍是空的「主力矿」占位，不能据此认定这家公司只有铜矿，也不能宣称已给出公司完整 NAV。正文先指出缺失资产和数据；待补项写入对应 scenarios 的 drivers/signals。当前接口只能修改已列出的字段，不能自动新增/删除/更改商品种类；需要新资产时在文字里说明如何添加。",
+      "理由与两档情景应解释商品周期、成本压力、储量消耗、矿权/国家风险及折现率选择；先检查是否有资产重复计价、权益产量混用、维持资本开支遗漏。资料不足时明确尚不能得出完整 NAV，不要编造计算结果。",
+    ] : []),
     "",
     "规则：",
     "1. 只能建议上面列出的字段，不要发明字段；保守值应比乐观值更谨慎（增速、利润率、倍数更低；折现率更高）。",

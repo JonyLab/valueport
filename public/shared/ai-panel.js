@@ -249,9 +249,9 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     const same = (f, v) => f.col === "dual" ? (v && f.value && v.c === f.value.c && v.o === f.value.o) : v === f.value;
     let checks = {}; try { checks = (checkParams && checkParams(params)) || {}; } catch { checks = {}; }
     Object.entries(params).forEach(([k, v]) => {
-      const f = byKey.get(k); if (!f || same(f, v)) return; // 和当前值一样的不列
+      const f = byKey.get(k); if (!f || (same(f, v) && !reasons?.[k])) return;
       const row = el("div", "vc-ai-srow");
-      const lab = el("div", "vc-ai-slab", f.label + (f.unit === "%" ? " %" : ""));
+      const lab = el("div", "vc-ai-slab", f.label + (f.unit ? ` (${f.unit})` : ""));
       const vals = el("div", "vc-ai-svals");
       const now = el("span", "vc-ai-snow", showVal(f, f.value));
       const arrow = ri("arrow-right-line");
@@ -271,7 +271,8 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     const undo = el("button", "vc-ai-undo", T.undo); undo.type = "button"; undo.hidden = true;
     let snap = null;
     apply.addEventListener("click", () => {
-      snap = onApply(params);
+      snap = onApply(params, fields);
+      if (snap === null) return;
       apply.disabled = true; apply.replaceChildren(ri("check-double-line"), document.createTextNode(T.applied));
       undo.hidden = false;
     });
@@ -330,7 +331,8 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     const undo = el("button", "vc-ai-undo", T.undo); undo.type = "button"; undo.hidden = true;
     let snap = null;
     btn.addEventListener("click", () => {
-      snap = onApply({ [w.field]: w.value });
+      snap = onApply({ [w.field]: w.value }, [f]);
+      if (snap === null) return;
       btn.disabled = true; btn.replaceChildren(ri("check-line"), document.createTextNode(`${T.setDone} · ${label}`));
       undo.hidden = false;
     });
@@ -361,6 +363,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   function userMsg(text) { const um = bubble("user", text); msgActions(um, { copy: text }); return um; }
   // 一条 AI 回复：正文 + 建议参数卡（含情景）+ 交互组件 + 复制；发送和恢复历史共用。返回正文
   function renderAssistant(view, fields) {
+    if (Array.isArray(view.resourceFields)) fields = fields.filter((f) => !f.k.startsWith("resource.")).concat(view.resourceFields);
     const extra = renderWidgets(view.widgets, fields);
     const reply = view.reply || (view.params || extra.length ? "" : "…");
     const m = bubble("ai", reply);
@@ -478,6 +481,9 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
         return;
       }
       const view = { reply: j.reply || "", params: j.params || null, reasons: j.reasons || null, scenarios: j.scenarios || null, widgets: Array.isArray(j.widgets) ? j.widgets : [] };
+      const usedFields = new Set([...Object.keys(view.params || {}), ...view.widgets.map((w) => w.field)]);
+      const resourceFields = context.fields.filter((f) => f.k.startsWith("resource.") && usedFields.has(f.k));
+      if (resourceFields.length) view.resourceFields = resourceFields;
       const reply = renderAssistant(view, context.fields);
       history.push({ role: "assistant", content: historyContent(reply, view) });
       saved.push({ role: "user", content: text }, { role: "assistant", content: reply, view });

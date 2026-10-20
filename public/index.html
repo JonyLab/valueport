@@ -61,34 +61,47 @@
   html:not(.has-cache) body.booting :is(#eyebrow,#title,#sub,.stat-num){color:transparent !important;width:fit-content;max-width:100%;border-radius:10px;
     background:linear-gradient(90deg,rgba(29,29,27,.055) 25%,rgba(29,29,27,.1) 37%,rgba(29,29,27,.055) 63%);background-size:400% 100%;animation:skShimmer 1.4s ease infinite}
   body.booting #updated{visibility:hidden}
-  .sk-tile{min-height:196px;justify-content:space-between}
+  .sk-tile{min-height:180px;justify-content:space-between}
   /* 真实内容替换骨架时淡入（只用于只渲染一次的块；会反复重绘的估值研究面板不加，避免每次操作都闪） */
   .chart-item:not(.sk-tile),.vd-cols,.p-fund > .fd-sec{animation:skIn .28s ease both}
   @media (prefers-reduced-motion:reduce){ .chart-item:not(.sk-tile),.vd-cols,.p-fund > .fd-sec{animation:none} }
-  .charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(420px,100%),1fr));gap:16px;
+  .charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:14px;
     background:none;border:0;border-radius:0;margin:0;padding:0;box-shadow:none;max-width:none}
-  .chart-item{position:relative;display:flex;flex-direction:column;gap:18px;padding:22px 22px 18px;
+  .chart-item{position:relative;display:flex;flex-direction:column;gap:12px;padding:18px 18px 14px;
     background:var(--card);border:1px solid var(--card-edge);border-radius:var(--r-xl);box-shadow:var(--shadow);
     -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
     transition:transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s,background .2s}
   .chart-item[style*="cursor"]:hover{transform:translateY(-2px);background:rgba(255,255,255,.78);
     box-shadow:0 1px 2px rgba(60,50,20,.05),0 18px 40px -18px rgba(60,50,20,.28)}
+  .chart-item.is-strike{--strike-color:#2ea35d;--strike-ink:color-mix(in srgb,var(--strike-color) 65%,#14251b);
+    background:linear-gradient(120deg,color-mix(in srgb,var(--strike-color) 13%,#fff),rgba(255,255,255,.86));
+    border-color:color-mix(in srgb,var(--strike-color) 50%,#fff);
+    box-shadow:0 6px 24px -16px color-mix(in srgb,var(--strike-color) 45%,transparent)}
+  .chart-item.is-strike::after{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;
+    box-shadow:0 0 0 2px color-mix(in srgb,var(--strike-color) 35%,transparent),0 0 22px 2px color-mix(in srgb,var(--strike-color) 20%,transparent);
+    animation:strikeGlow 3.2s ease-in-out infinite}
+  @keyframes strikeGlow{0%,100%{opacity:.12}50%{opacity:.85}}
+  @media (prefers-reduced-motion:reduce){.chart-item.is-strike::after{animation:none;opacity:.25}}
+  .chart-item.is-strike[style*="cursor"]:hover{background:linear-gradient(120deg,color-mix(in srgb,var(--strike-color) 18%,#fff),#fff);
+    box-shadow:0 12px 32px -18px color-mix(in srgb,var(--strike-color) 65%,transparent)}
+  .chart-item.is-strike .verdict.v-under .lbl{gap:5px;background:color-mix(in srgb,var(--strike-color) 14%,#fff);color:var(--strike-ink)}
+  .chart-item.is-strike .verdict .lbl i{font-size:14px}
   .chart-info{min-width:0}
-  .ci-id{display:flex;align-items:center;gap:10px;margin-bottom:14px;min-width:0;padding-right:84px}
+  .ci-id{display:flex;align-items:center;gap:8px;margin-bottom:10px;min-width:0;padding-right:76px}
   /* 标的 logo：圆形，首字母占位；图片加载后填满（白底，透明 logo 也清楚） */
   .ci-logo,.vd-avatar,.peer-av,.vc-prof-av{overflow:hidden;flex:none}
   .ci-logo img,.vd-avatar img,.peer-av img,.vc-prof-av img{width:100%;height:100%;object-fit:contain;display:block}
   .has-img{background:#fff !important;box-shadow:inset 0 0 0 1px var(--divider)}
-  .ci-logo{width:36px;height:36px;border-radius:50%;background:var(--track-edge);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500}
-  .ci-name{font-size:20px;font-weight:400;letter-spacing:-.01em;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ci-logo{width:32px;height:32px;border-radius:50%;background:var(--track-edge);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500}
+  .ci-name{font-size:18px;font-weight:400;letter-spacing:-.01em;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ci-idtext{display:flex;flex-direction:column;gap:3px;min-width:0} /* 名称一行、代码一行 */
   .ci-name{line-height:1.15}
   .ci-code{font-size:12px;line-height:1.2;color:var(--ink-mute)}
-  .chart-info .verdict{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;text-align:left;margin:0;line-height:1}
-  .chart-info .verdict .px{font-size:44px;font-weight:400;letter-spacing:-.035em}
-  .chart-info .verdict .lbl{position:relative;top:-8.25px; /* 标签底边落在价格基线上 */
-    display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:var(--r-pill);
-    background:var(--track);font-size:12.5px;font-weight:500;color:var(--ink-soft)}
+  .chart-info .verdict{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;text-align:left;margin:0;line-height:1}
+  .chart-info .verdict .px{font-size:36px;font-weight:400;letter-spacing:-.035em}
+  .chart-info .verdict .lbl{position:relative;top:-6.75px; /* 标签底边落在价格基线上 */
+    display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:var(--r-pill);
+    background:var(--track);font-size:11.5px;font-weight:500;color:var(--ink-soft)}
   .chart-info .verdict.v-under .lbl{background:rgba(31,143,84,.12);color:var(--green)}
   .chart-info .verdict.v-over .lbl{background:rgba(198,65,65,.10);color:var(--red)}
   .chart-bar{width:100%}
@@ -108,18 +121,28 @@
   .vbar-empty::before{content:attr(data-t);padding:2px 10px;border-radius:var(--r-pill);background:rgba(255,255,255,.92);font-size:11px;color:var(--ink-soft)}
   .vbar.is-empty .vbar-empty{font-size:0}
   @media (max-width:560px){
-    .chart-info .verdict .px{font-size:38px}
+    .chart-info .verdict .px{font-size:34px}
   }
 
-  /* 卡片右上角：圆形 ↗ 详情 + 编辑 */
-  .card-actions{position:absolute;top:16px;right:16px;z-index:5;display:flex;gap:6px}
+  /* 卡片右上角：悬停显示更多菜单，圆形 ↗ 详情常驻 */
+  .card-actions{position:absolute;top:14px;right:14px;z-index:5;display:flex;gap:6px}
   .card-actions .btn{background:rgba(255,255,255,.85)}
   .card-actions .btn:hover{background:#fff}
-  .card-actions .btn.edit{opacity:0;transition:opacity .15s}
-  .chart-item:hover .card-actions .btn.edit,.card-actions:focus-within .btn.edit{opacity:1}
-  @media (hover:none){ .card-actions .btn.edit{opacity:1} }
+  .card-more>summary{list-style:none;opacity:0;transition:opacity .15s;cursor:pointer}
+  .card-more>summary::-webkit-details-marker{display:none}
+  .chart-item:hover .card-more>summary,.card-actions:focus-within .card-more>summary,.card-more[open]>summary{opacity:1}
+  @media (hover:none){.card-more>summary{opacity:1}}
+  .chart-item:has(.card-more[open]){z-index:6}
+  .card-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:154px;padding:6px;background:#fffdf8;
+    border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px rgba(60,50,20,.15)}
+  .card-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:0;border-radius:9px;
+    background:transparent;color:var(--ink);font:inherit;font-size:13px;text-align:left;cursor:pointer;white-space:nowrap}
+  .card-menu button:hover,.card-menu button:focus-visible{background:var(--track)}
+  .card-menu button.danger{color:var(--red)}
+  .card-menu button.danger:hover,.card-menu button.danger:focus-visible{background:rgba(198,65,65,.08)}
+  .card-menu button:disabled{opacity:.5;cursor:wait}
   /* 「添加」瓷砖：虚线胶囊框 */
-  .add-card{min-height:200px;border:1.5px dashed rgba(29,29,27,.12);border-radius:var(--r-xl);background:rgba(255,255,255,.22);
+  .add-card{min-height:180px;border:1.5px dashed rgba(29,29,27,.12);border-radius:var(--r-xl);background:rgba(255,255,255,.22);
     color:var(--ink-soft);font-size:15px;font-weight:400;cursor:pointer;font-family:var(--font);
     transition:background .15s,color .15s,border-color .15s}
   .add-card{display:flex;align-items:center;justify-content:center;gap:8px}
@@ -1274,7 +1297,11 @@ function renderVerdict(item) {
   setNum(px, v.px);
   const lbl = document.createElement("span");
   lbl.className = "lbl";
-  lbl.textContent = v.text === "—" ? t("ov_none") : v.text;
+  const isStrike = extremeOf(item.cfg) === "strike";
+  item.chartEl.classList.toggle("is-strike", isStrike);
+  item.chartEl.style.setProperty("--strike-color", ZONES[0].hex);
+  lbl.textContent = isStrike ? `${t("zone_deep")} · ${v.text}` : v.text === "—" ? t("ov_none") : v.text;
+  if (isStrike) lbl.prepend(ri("focus-3-line"));
   el.appendChild(px);
   el.appendChild(lbl);
   renderOverview(); // 任一卡片判定变化（报价/区间/编辑）都同步概览
@@ -1370,16 +1397,39 @@ function addChart(cfg) {
     wrap.addEventListener("click", (e) => { if (e.target.closest(".card-actions")) return; openDetail(); });
     const actions = document.createElement("div");
     actions.className = "card-actions";
-    const edit = document.createElement("button");
-    edit.className = "btn sm edit";
-    edit.textContent = t("b_edit");
-    edit.addEventListener("click", () => openItemModal(item, false));
+    const more = document.createElement("details"); more.className = "card-more";
+    const moreButton = document.createElement("summary"); moreButton.className = "btn icon sm";
+    moreButton.setAttribute("aria-label", LANG === "zh" ? "更多操作" : "More actions");
+    moreButton.title = LANG === "zh" ? "更多操作" : "More actions";
+    moreButton.appendChild(ri("more-line"));
+    const menu = document.createElement("div"); menu.className = "card-menu";
+    const edit = document.createElement("button"); edit.type = "button";
+    edit.append(ri("edit-line"), document.createTextNode(t("b_edit")));
+    edit.addEventListener("click", () => {
+      more.open = false;
+      openItemModal(item, false);
+      const first = modalForm.querySelector("input"); if (first) first.focus();
+    });
+    const remove = document.createElement("button"); remove.type = "button"; remove.className = "danger";
+    remove.append(ri("delete-bin-line"), document.createTextNode(LANG === "zh" ? "移除自选" : "Remove from watchlist"));
+    remove.addEventListener("click", async () => {
+      remove.disabled = true;
+      try { await requestRemoveItem(item); }
+      finally { remove.disabled = false; more.open = false; if (moreButton.isConnected) moreButton.focus(); }
+    });
+    menu.append(edit, remove); more.append(moreButton, menu);
+    more.addEventListener("toggle", () => {
+      if (more.open) document.querySelectorAll(".card-more[open]").forEach((el) => { if (el !== more) el.open = false; });
+    });
+    more.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && more.open) { e.stopPropagation(); more.open = false; moreButton.focus(); }
+    });
     const detail = document.createElement("button");
     detail.className = "btn icon sm";
     detail.title = t("b_detail"); detail.setAttribute("aria-label", t("b_detail"));
     detail.innerHTML = '<i class="ri-arrow-right-up-line" aria-hidden="true"></i>';
     detail.addEventListener("click", openDetail);
-    actions.append(edit, detail);
+    actions.append(more, detail);
     wrap.appendChild(actions);
   }
   if (addCardEl) chartsEl.insertBefore(wrap, addCardEl); else chartsEl.appendChild(wrap);
@@ -1394,6 +1444,9 @@ function removeChart(item) {
   if (idx >= 0) { item.gauge.destroy(); item.chartEl.remove(); items.splice(idx, 1); }
   renderOverview();
 }
+document.addEventListener("click", (e) => {
+  document.querySelectorAll(".card-more[open]").forEach((el) => { if (!el.contains(e.target)) el.open = false; });
+});
 // 概览区：统计数字（标的 / 击球区 / 泡沫区）
 // 两端区间：击球区 = 现价 < 低点×(1−安全边际)；泡沫区 = 现价 ≥ 高点×(1+泡沫阈值)（边界与卡片五段条的落段一致）
 function extremeOf(c) {
@@ -2018,18 +2071,25 @@ document.getElementById("btnModalCancel").addEventListener("click", async () => 
   modalItem = null;
   modalOverlay.classList.add("hidden");
 });
-btnModalRemove.addEventListener("click", async () => {
-  if (!modalItem) return;
+async function requestRemoveItem(removed) {
   if (!confirm(t("m_confirm_remove"))) return;
-  const removed = modalItem;
-  if (removed.id) await fetch(`/api/my/items/${removed.id}`, { method: "DELETE" });
+  try {
+    if (removed.id) {
+      const res = await fetch(`/api/my/items/${removed.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Remove failed");
+    }
+  } catch {
+    alert(LANG === "zh" ? "移除失败，请稍后重试" : "Could not remove this symbol. Please try again.");
+    return;
+  }
+  clearTimeout(removed._saveT);
   const wasOnDetail = detailItem === removed && !viewDetail.classList.contains("hidden");
   removeChart(removed);
-  modalItem = null;
-  modalOverlay.classList.add("hidden");
+  if (modalItem === removed) { modalItem = null; modalOverlay.classList.add("hidden"); }
   // 在该标的详情页删除 → 回到列表（否则详情页悬空）
   if (wasOnDetail) { detailItem = null; history.pushState({}, "", "/b/" + encodeURIComponent(boardSlug)); showList(); }
-});
+}
+btnModalRemove.addEventListener("click", () => { if (modalItem) requestRemoveItem(modalItem); });
 
 /* ---------- 视图与路由：列表 / 设置 / 详情 ---------- */
 const layoutEl = document.querySelector(".layout");
