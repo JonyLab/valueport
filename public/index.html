@@ -337,6 +337,9 @@
   .view-valedit .ve-titlerow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
   .view-valedit .ve-title{font-size:24px;line-height:1.2;letter-spacing:-.015em} /* 工作页标题：和返回按钮同一行、不抢内容 */
   .vc-mount{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  .vc-workflow{display:flex;flex-wrap:wrap;gap:8px 20px;list-style:none;padding:0;margin:0 0 18px;flex:none;font-size:12px;color:var(--ink-soft)}
+  .vc-workflow li{display:flex;align-items:center;gap:6px}
+  .vc-workflow li span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--sun-soft,#fbefbb);font-size:11px;color:var(--ink)}
   .vc-workbench{display:grid;grid-template-columns:minmax(420px,5fr) minmax(0,7fr);gap:22px;padding-bottom:40px;color:var(--ink);flex:1 1 auto;min-height:0}
   /* 栏头：左「关键假设」= 输入，右「估值结论」= 输出 */
   .vc-colhead{display:flex;flex-direction:column;gap:3px}
@@ -603,7 +606,7 @@
   .vc-rrow::after{content:"";order:1;flex:1;border-bottom:1.5px dotted var(--node);transform:translateY(-3px);min-width:16px}
   .vc-rv{order:2;color:var(--ink);font-weight:400;font-size:13.5px;font-variant-numeric:tabular-nums;text-align:right}
   /* 备注 + 保存 */
-  .vc-savebar{position:sticky;bottom:-26px;z-index:2;margin:auto -26px -26px;padding:18px 26px 22px;border-top:1px dashed var(--border);background:#fdfcf9;border-radius:0 0 var(--r-xl) var(--r-xl);display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:14px}
+  .vc-savebar{position:sticky;bottom:-26px;z-index:2;margin:auto -26px -26px;padding:18px 26px 22px;border-top:1px dashed var(--border);background:#fdfcf9;border-radius:0 0 var(--r-xl) var(--r-xl);display:flex;justify-content:flex-end}
   .vc-note{margin:0}
   .vc-note-label{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-soft);margin-bottom:8px}
   .vc-note-label > span{flex:1}
@@ -615,6 +618,40 @@
   .vc-note-input{width:100%;min-height:84px;padding:11px 14px;border:0;border-radius:var(--r-md);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:13.5px;line-height:1.6;color:var(--ink);resize:vertical}
   .vc-note-input::placeholder{color:var(--ink-mute)}
   .vc-note-input:focus{outline:none;box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 4px var(--ring)}
+  .vc-thesis-hint{margin:0 0 14px;font-size:12px;line-height:1.6;color:var(--ink-mute)}
+  .vc-thesis-fields{display:grid;gap:12px}
+  .vc-thesis-tabs{display:flex;gap:6px;margin:0 0 14px;padding:4px;border-radius:var(--r-md);background:var(--track)}
+  .vc-thesis-tab{flex:1;padding:9px 12px;border:0;border-radius:var(--r-sm);background:transparent;color:var(--ink-soft);font:inherit;font-size:12px;cursor:pointer}
+  .vc-thesis-tab[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 4px #0000000d}
+  .vc-thesis-tab:focus-visible{outline:2px solid var(--sun-ink);outline-offset:2px}
+  .vc-thesis-panel{display:grid;gap:12px}
+  .vc-thesis-panel[hidden]{display:none}
+  .vc-thesis-legacy{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+  .vc-thesis-followup{padding-top:18px;border-top:1px dashed var(--border)}
+  .vc-inputs > .vc-note{margin:20px 0 28px;padding-bottom:24px;border-bottom:1px dashed var(--border)}
+  .vc-thesis-field{display:grid;gap:6px;min-width:0;font-size:12px;color:var(--ink-soft)}
+  .vc-thesis-field .vc-note-input{min-height:76px}
+  .vc-thesis-notes{margin-top:12px;font-size:12px;color:var(--ink-soft)}
+  .vc-thesis-notes summary{cursor:pointer;margin-bottom:8px}
+  .vc-question{display:grid;gap:12px;padding:0 0 20px;border-bottom:1px solid var(--border)}
+  .vc-question:last-of-type{border-bottom:0;padding-bottom:0}
+  .vc-question-label{margin:0;font-size:14px;font-weight:500;line-height:1.6;color:var(--ink)}
+  .vc-question-help{margin:0;font-size:12px;font-weight:400;line-height:1.7;color:var(--ink-mute)}
+  .vc-question-example{font-size:12px;line-height:1.7;color:var(--ink-soft)}
+  .vc-question-example summary{cursor:pointer;padding:3px 0}
+  .vc-question-example>p,.vc-question-example>.vc-thesis-field{margin-top:10px}
+  .vc-question-example[hidden]{display:none}
+  .vc-question-action{justify-self:start;border:0;padding:3px 0;background:none;color:var(--ink-soft);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  .vc-impact-choices{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .vc-impact-chip{padding:8px 11px;border:1px solid var(--border);border-radius:var(--r-pill);background:var(--paper,#fff);color:var(--ink-soft);font:inherit;font-size:12px;cursor:pointer}
+  .vc-impact-chip:hover{border-color:var(--ink-soft);color:var(--ink)}
+  .vc-impact-chip:disabled{opacity:.4;cursor:default}
+  .vc-impact-list{display:grid;gap:12px}
+  .vc-impact-row{display:grid;gap:12px;padding:14px;background:var(--track);border-radius:var(--r-md);min-width:0}
+  .vc-impact-head{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
+  .vc-impact-head strong{font-weight:500}
+  .vc-impact-direction{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--ink-soft)}
+  .vc-impact-direction select{max-width:60%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--ink);font:inherit}
   .vc-submit{min-width:180px;height:48px;padding:0 28px;border:0;border-radius:var(--r-pill);background:var(--dark);color:#fff;cursor:pointer;font-family:var(--font);font-size:15px;font-weight:500;transition:background .15s,opacity .15s}
   .vc-submit:hover{background:#000}
   .vc-submit:disabled{opacity:.3;cursor:not-allowed}
@@ -772,7 +809,8 @@
     .vc-arow{grid-template-columns:1fr 1fr;gap:7px}
     .vc-arow .vc-label{grid-column:1 / -1}
     .vc-arow-head > :first-child{display:none} /* 列标题行的空占位格，窄屏时去掉才能对齐「保守 / 乐观」两列 */
-    .vc-savebar{grid-template-columns:1fr}
+    .vc-savebar{margin:auto -18px -22px;padding:16px 18px 22px}
+    .vc-savebar .vc-submit{width:100%}
     .vc-results{padding:18px 18px 22px}
   }
   /* 估值卡片列表 */
@@ -846,6 +884,13 @@
   .vcard-mark{margin-left:auto;border:0;cursor:pointer;font-family:var(--font);font-size:12px;color:#8a4a17;background:rgba(240,140,46,.12);border-radius:var(--r-pill);padding:4px 11px}
   .vcard-mark:hover{background:rgba(240,140,46,.22)}
   .vcard-note{margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);font-size:12.5px;line-height:1.6;color:var(--ink-soft);white-space:pre-wrap;word-break:break-word}
+  .vcard-thesis:empty{display:none}
+  .vcard-thesis{display:grid;gap:12px;margin-top:16px;padding:16px;border-radius:var(--r-md);background:var(--surface-soft,#f7f6f2);font-size:12.5px;line-height:1.65;overflow-wrap:anywhere}
+  .vcard-thesis strong{font-size:11px;font-weight:500;color:var(--ink-mute)}
+  .vcard-thesis-case{display:grid;gap:10px}
+  .vcard-thesis-case + .vcard-thesis-case{padding-top:14px;border-top:1px dashed var(--border)}
+  .vcard-thesis h4{margin:0;font-size:13px;font-weight:500;color:var(--ink)}
+  .vcard-thesis p{margin:3px 0 0;white-space:pre-wrap;color:var(--ink-soft)}
   .vcard-actions{margin-top:auto;padding-top:16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
   /* AI 复核：按钮 + 卡内结果块 */
   .vcard-ai{display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 13px;border:0;border-radius:var(--r-pill);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);
@@ -1043,6 +1088,9 @@
   <link rel="modulepreload" href="/shared/market.js">
   <link rel="modulepreload" href="/shared/metric-spark.js">
   <link rel="modulepreload" href="/shared/valuation-ui.js">
+<link rel="modulepreload" href="/shared/valuation/thesis.js">
+<link rel="modulepreload" href="/shared/valuation/thesis-questions.js">
+<link rel="modulepreload" href="/shared/valuation/resource-ai.js">
   <link rel="modulepreload" href="/shared/valuation/derivations.js">
   <link rel="modulepreload" href="/shared/valuation/facts.js">
   <link rel="modulepreload" href="/shared/valuation/index.js">
@@ -1217,6 +1265,7 @@ import { t, applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
 import { mountFeedback } from "/shared/feedback.js";
 import { mountValuationCalc } from "/shared/valuation-ui.js";
+import { cleanThesis, thesisEntries, THESIS_SCENARIOS } from "/shared/valuation/thesis.js";
 import { MODELS, modeFields } from "/shared/valuation/index.js";
 import { verifiedFacts, latestMetrics, assumptionChecks, marketViews, masterLenses, businessFacts } from "/shared/valuation/facts.js";
 import { aiErrorText } from "/shared/ai-panel.js";
@@ -3135,6 +3184,20 @@ function renderValuationPanel(item, panel, idBlock) {
     const vinfo = verdictOf({ ...c, fairLow: card.low, fairHigh: card.high }, VMSGS);
     const verd = document.createElement("div"); verd.className = "vcard-verdict " + vinfo.cls; verd.textContent = c.price > 0 ? vinfo.text : ""; if (!(c.price > 0)) verd.style.display = "none";
     const note = document.createElement("div"); note.className = "vcard-note"; note.textContent = card.note || ""; if (!card.note) note.style.display = "none";
+    const thesis = cleanThesis(card.thesis);
+    const story = document.createElement("div"); story.className = "vcard-thesis";
+    for (const scenario of [...THESIS_SCENARIOS, { key: "legacy", zh: "未分场景的旧记录", en: "Previous shared notes" }]) {
+      const fields = thesis[scenario.key]; if (!fields) continue;
+      const section = document.createElement("section"); section.className = "vcard-thesis-case";
+      const title = document.createElement("h4"); title.textContent = LANG === "zh" ? scenario.zh : scenario.en; section.append(title);
+      for (const field of thesisEntries(fields, LANG)) {
+        const row = document.createElement("div");
+        const label = document.createElement("strong"); label.textContent = field.label;
+        const text = document.createElement("p"); text.textContent = field.text;
+        row.append(label, text); section.append(row);
+      }
+      story.append(section);
+    }
     const actions = document.createElement("div"); actions.className = "vcard-actions";
     const picked = c.selectedValuationId === card.id;
     const sel = document.createElement("button"); sel.type = "button"; sel.className = "vcard-sel" + (picked ? " on" : "");
@@ -3173,7 +3236,7 @@ function renderValuationPanel(item, panel, idBlock) {
       mark.addEventListener("click", () => { card.reviewedAt = new Date().toISOString(); saveItem(item); renderOverview(); showList(); });
       chk.appendChild(mark);
     }
-    wrap.append(head, range, verd, sum, note);
+    wrap.append(head, range, verd, sum, story, note);
     if (lc) wrap.appendChild(chk);
     if (card.review) wrap.appendChild(reviewEl(card, model));
     wrap.append(revErr, actions);
@@ -3206,6 +3269,7 @@ function renderValuationPanel(item, panel, idBlock) {
         stock: { name: displayName(item), code: (c.ticker || "").toUpperCase(), currency: st.currency || "", price: c.price > 0 ? c.price : null },
         method: { key: model.key, label: model.label[LANG] || model.key },
         valuedAt: card.updatedAt || "",
+        thesis: cleanThesis(card.thesis),
         fields,
         result: { low: Math.min(card.low, card.high), high: Math.max(card.low, card.high), price: c.price || null },
         verified: verifiedFacts({ financials: annual && annual.financials, dividends: annual && annual.dividends, dps: parseFloat(st.dividendYield), lang: LANG }),
@@ -3303,6 +3367,7 @@ function renderValuationPanel(item, panel, idBlock) {
       initialDerivations: card ? card.derivations : undefined,
       initialSegments: card ? card.segments : undefined,
       initialNote: card ? card.note : undefined,
+      initialThesis: card ? card.thesis : undefined,
       refData: {
         financials: (item._financials && item._financials.annual && item._financials.annual.financials) || null,
         financialsQ: (item._financials && item._financials.quarter && item._financials.quarter.financials) || null,
@@ -3313,14 +3378,15 @@ function renderValuationPanel(item, panel, idBlock) {
       verdict: (low, high) => { const vv = verdictOf({ ...item.cfg, fairLow: low, fairHigh: high }, VMSGS); return { text: vv.text, cls: vv.cls }; },
       stock: editorStock(item),
       onCancel: () => finishValEdit(),
-      onDone: ({ method, inputs, low, high, note, derivations, segments }) => {
+      onDone: ({ method, inputs, low, high, note, thesis, derivations, segments }) => {
         const c = item.cfg; // 实时读取
         if (!Array.isArray(c.valuations)) c.valuations = [];
         if (card) {
-          Object.assign(card, { method, inputs, low, high, note, derivations, segments, updatedAt: new Date().toISOString() });
+          Object.assign(card, { method, inputs, low, high, note, thesis, derivations, segments, updatedAt: new Date().toISOString() });
+          delete card.review; delete card.reviewedAt;
           if (c.selectedValuationId === card.id) selectValuation(item, card, idBlock);
         } else {
-          const fresh = { id: newValuationId(), method, inputs, low, high, note, derivations, segments, updatedAt: new Date().toISOString() };
+          const fresh = { id: newValuationId(), method, inputs, low, high, note, thesis, derivations, segments, updatedAt: new Date().toISOString() };
           c.valuations.push(fresh);
           if (!c.selectedValuationId) selectValuation(item, fresh, idBlock); // 首张/无选中时自动设为合理区间
         }

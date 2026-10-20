@@ -1,4 +1,5 @@
 import { metricKey } from "../public/shared/metric-spark.js";
+import { cleanThesis } from "../public/shared/valuation/thesis.js";
 
 // 估值方法白名单（与 public/shared/valuation/* 的 model.key 一致）
 const METHODS = new Set(["fcff", "fcf", "fcfe", "ddm", "pe", "peg", "pb", "ps", "evebitda"]);
@@ -26,6 +27,7 @@ function validateValuations(raw) {
     if (!(low > 0) || !(high > low)) return { ok: false };
     out.push({ id: card.id, method: card.method, inputs: card.inputs, low, high,
       note: typeof card.note === "string" ? card.note.slice(0, 2000) : "",
+      thesis: cleanThesis(card.thesis),
       derivations: (card.derivations && typeof card.derivations === "object" && !Array.isArray(card.derivations)) ? card.derivations : {},
       segments: (card.segments && typeof card.segments === "object" && !Array.isArray(card.segments)) ? card.segments : {},
       updatedAt: typeof card.updatedAt === "string" ? card.updatedAt : "",

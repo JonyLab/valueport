@@ -331,6 +331,74 @@ describe("AI note draft", () => {
     expect((await r.json()).note).toBe("小米靠手机和 IoT 赚钱，用 P/E 估。\n关键假设：增速保守 8%。");
     expect((await SELF.fetch("https://x/api/my/ai/note", { method: "POST", headers: J, body: JSON.stringify(BODY) })).status).toBe(401);
   });
+  it("drafts structured thesis fields and rejects incomplete model output", async () => {
+    const { buildNotePrompt, parseThesis, validateNoteReq, buildReviewPrompt } = await import("../src/ai.js");
+    const thesis = { c: { story: "海外业务增长", assessment: "需求待核实", drivers: "营收增长保守 10%", signals: "跟踪海外收入，数据不足时待验证" } };
+    const body = { ...BODY, format: "thesis", scenario: "c", thesis };
+    expect(validateNoteReq(body)).toBeNull();
+    expect(validateNoteReq({ ...body, thesis: { story: 123 } })).toBe("bad thesis");
+    expect(validateNoteReq({ ...body, thesis: { story: "x".repeat(801) } })).toBe("bad thesis");
+    expect(validateNoteReq({ ...body, scenario: "both" })).toBe("scenario required");
+    expect(buildNotePrompt(body, "zh")).toContain("用户已写的投资逻辑（保留观点）：保守场景 · 核心判断：海外业务增长");
+    expect(parseThesis("```json\n" + JSON.stringify(thesis) + "\n```", "c")).toEqual(thesis);
+    expect(parseThesis(JSON.stringify(thesis), "o")).toBeNull();
+    expect(parseThesis('{"c":{"story":"partial"}}', "c")).toBeNull();
+    expect(parseThesis("not JSON", "c")).toBeNull();
+    const reviewPrompt = buildReviewPrompt({ stock: { name: "测试" }, method: { key: "pe" }, fields: CONTEXT.fields, result: { low: 1, high: 2 }, thesis }, "zh");
+    expect(reviewPrompt).toContain("验证条件：跟踪海外收入");
+    expect(reviewPrompt).toContain("待验证 / 数据不足");
+    const ck = await userCookie("aiuser-thesis");
+    for (const content of [JSON.stringify(thesis), '{"story":"partial"}']) {
+      fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" })
+        .reply(200, { choices: [{ message: { content } }] });
+      const r = await SELF.fetch("https://x/api/my/ai/note", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(body) });
+      expect(r.status).toBe(content.includes("partial") ? 502 : 200);
+      if (r.ok) expect(await r.json()).toEqual({ thesis });
+    }
+  });
+  it("allows story-first drafting without a model and isolates the selected case's inputs", async () => {
+    const { buildNotePrompt, validateNoteReq, parseThesis, buildSystemPrompt } = await import("../src/ai.js");
+    const first = { ...BODY, format: "thesis", scenario: "o", context: { ...CONTEXT, method: {}, fields: [] } };
+    expect(validateNoteReq(first)).toBeNull();
+    const prompt = buildNotePrompt(first, "zh");
+    expect(prompt).toContain("先研究生意并形成定性故事");
+    expect(prompt).toContain("不能先看估值结果或现价再倒编故事");
+    const cases = { c: { story: "竞争激烈" }, o: { story: "新品放量" } };
+    const translated = buildNotePrompt({ ...first, thesis: cases, context: { ...CONTEXT, fields: [{ k: "growth", col: "dual", value: { c: 7, o: 19 } }] } }, "zh");
+    expect(translated).toContain("growth｜数字｜19");
+    expect(translated).not.toContain("竞争激烈");
+    expect(translated).toContain("新品放量");
+    expect(buildSystemPrompt({ ...CONTEXT, thesis: cases }, "zh")).toContain("把每个故事分别翻译成该场景");
+    const complete = { story: "a", assessment: "b", drivers: "c", signals: "d" };
+    expect(parseThesis(JSON.stringify({ c: complete, o: complete }), "c")).toEqual({ c: complete });
+    expect(validateNoteReq({ ...first, thesis: { o: { story: 123 } } })).toBe("bad thesis");
+    const ck = await userCookie("aiuser-story-first");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" })
+      .reply(200, { choices: [{ message: { content: JSON.stringify({ o: complete }) } }] });
+    const r = await SELF.fetch("https://x/api/my/ai/note", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(first) });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ thesis: { o: complete } });
+  });
+  it("keeps evidence and causal impacts in guided drafts and rejects malformed mappings", async () => {
+    const { buildNotePrompt, validateNoteReq, parseThesis, buildSystemPrompt } = await import("../src/ai.js");
+    const thesis = { o: { story: "新品带动海外销售", evidence: "暂时没有依据", uncertainties: "复购情况待验证", impacts: [{ key: "growth", direction: "unknown", reason: "新品是否带来更多收入尚待验证" }], signals: "跟踪复购订单" } };
+    const body = { ...BODY, format: "thesis", scenario: "o", thesis };
+    expect(validateNoteReq(body)).toBeNull();
+    expect(parseThesis(JSON.stringify(thesis), "o")).toEqual(thesis);
+    expect(buildNotePrompt(body, "zh")).toContain("不能把故事里的预期当成已验证的证据");
+    expect(buildSystemPrompt({ ...CONTEXT, thesis }, "zh")).toContain("复购情况待验证");
+    for (const impacts of ["not array", [{ key: "fake", direction: "up", reason: "x" }], [{ key: "growth", direction: "sure", reason: "x" }]]) {
+      const bad = { o: { ...thesis.o, impacts } };
+      expect(validateNoteReq({ ...body, thesis: bad })).toBe("bad thesis");
+      expect(parseThesis(JSON.stringify(bad), "o")).toBeNull();
+    }
+    const ck = await userCookie("aiuser-guided-story");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" })
+      .reply(200, { choices: [{ message: { content: JSON.stringify(thesis) } }] });
+    const response = await SELF.fetch("https://x/api/my/ai/note", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(body) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ thesis });
+  });
 });
 
 describe("AI fundamentals brief", () => {

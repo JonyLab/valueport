@@ -64,6 +64,22 @@ describe("validateItem with valuations", () => {
     const bad = validateItem({ ...base, valuations: [{ ...card, review: { overall: "great" } }], selectedValuationId: "v1" });
     expect(bad.value.valuations[0].review).toBeUndefined();
   });
+  it("persists thesis fields alongside legacy notes and ignores malformed fields", () => {
+    const result = validateItem({ ...base, valuations: [{ ...card, note: "原备注", thesis: { story: "  海外增长  ", drivers: "x".repeat(900), signals: 123, extra: "ignore" } }] });
+    expect(result.ok).toBe(true);
+    const saved = result.value.valuations[0];
+    expect(saved.note).toBe("原备注");
+    expect(saved.thesis).toEqual({ legacy: { story: "海外增长", drivers: "x".repeat(800) } });
+    expect(validateItem({ ...base, valuations: [card] }).value.valuations[0].thesis).toEqual({});
+    const row = rowToItem({ valuations: JSON.stringify([saved]) });
+    expect(row.valuations[0].thesis).toEqual(saved.thesis);
+  });
+  it("round trips conservative and optimistic stories independently", () => {
+    const thesis = { c: { story: "竞争加剧", assessment: "历史低谷为参照", drivers: "利润率承压", signals: "跟踪市场份额" }, o: { story: "新品带来增长", assessment: "需求待验证", drivers: "利润率提升", signals: "跟踪新品收入" } };
+    const result = validateItem({ ...base, valuations: [{ ...card, thesis }] });
+    expect(result.ok).toBe(true);
+    expect(rowToItem({ valuations: JSON.stringify(result.value.valuations) }).valuations[0].thesis).toEqual(thesis);
+  });
   it("accepts valid valuations + selectedValuationId", () => {
     const r = validateItem({ ...base, valuations: [card], selectedValuationId: "v1" });
     expect(r.ok).toBe(true);

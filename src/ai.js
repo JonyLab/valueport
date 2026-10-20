@@ -4,6 +4,7 @@
 import { encryptJson, decryptJson } from "./crypto.js";
 import { METRICS, METRIC_KEYS, metricKey } from "../public/shared/metric-spark.js";
 import { countAi } from "./usage.js";
+import { cleanThesis, thesisLines, THESIS_FIELDS, THESIS_RESEARCH_FIELDS, THESIS_IMPACTS, IMPACT_DIRECTIONS, THESIS_LIMIT, THESIS_SCENARIOS } from "../public/shared/valuation/thesis.js";
 
 // 模型服务：用户在设置页配置自己的模型（ai_models 表）、在 AI 面板里切换（见 userAi()）；没选就用站点默认（wrangler.toml [vars] / secret）：
 //   AI_PROVIDER  workers-ai（默认，用 [ai] 绑定，无需 Key）| openai（OpenAI 兼容协议）| anthropic
@@ -105,6 +106,7 @@ export function validateChat(body) {
   if (messages[messages.length - 1].role !== "user") return "last message must be from user";
   if (!context || typeof context !== "object" || !Array.isArray(context.fields) || !context.fields.length || context.fields.length > (context.method?.key === "navsotp" ? 160 : 40)) return "context.fields required";
   if (badVerified(context.verified) || badVerified(context.market) || badVerified(context.lenses) || badVerified(context.business) || badVerified(context.metrics)) return "bad verified facts";
+  if (badThesis(context.thesis)) return "bad thesis";
   for (const f of context.fields) if (!f || typeof f.k !== "string" || (f.col !== "single" && f.col !== "dual")) return "bad field";
   if (JSON.stringify(context).length > 28000) return "context too large";
   return null;
@@ -134,6 +136,8 @@ export function buildSystemPrompt(context, lang) {
     ...verifiedBlock(c.verified),
     ...(Array.isArray(c.metrics) && c.metrics.length ? ["", "最新实际数据与历史区间（系统根据财报计算，以此为准）：", ...c.metrics.map((x) => "- " + x)] : []),
     ...viewsBlock(c.market, c.lenses),
+    ...(thesisLines(c.thesis, lang).length ? ["", "用户先形成的分场景故事与检验：", ...thesisLines(c.thesis, lang),
+      "先评估这些故事是否符合常识与历史，再把每个故事分别翻译成该场景的增长率、利润率、再投资和风险参数。逐项解释映射依据，不把两个故事混用，不为凑当前股价或预定估值倒推理由；若故事不可行或缺证据，先指出并建议修正故事。"] : []),
     "",
     "当前方法的输入字段（k｜名称｜类型｜单位｜当前值）：",
     fieldLines,
@@ -389,6 +393,7 @@ const METRIC_RULE = "可选带一个 metric：从这份白名单里选这句话�
 const REVIEW_OVERALL = new Set(["hold", "watch", "broken"]), REVIEW_STATUS = new Set(["ok", "watch", "broken"]);
 export function validateReviewReq(body) {
   if (!body || typeof body !== "object") return "bad body";
+  if (badThesis(body.thesis)) return "bad thesis";
   const { stock, method, fields, result } = body;
   if (!stock || typeof stock.name !== "string") return "stock required";
   if (!method || typeof method.key !== "string") return "method required";
@@ -413,6 +418,7 @@ export function buildReviewPrompt(body, lang) {
     ...(Array.isArray(business) && business.length ? ["生意本身（公司简介与收入构成）：", ...business.map((x) => "- " + x), ""] : []),
     "当初的假设（k｜名称｜单位｜当初填的值；两档为 保守 / 乐观）：",
     fieldLines,
+    ...thesisLines(body.thesis, lang).map((line) => "用户当初的投资逻辑：" + line),
     ...verifiedBlock(verified),
     ...(Array.isArray(metrics) && metrics.length ? ["", "最新实际数据（系统根据财报计算，以此为准）：", ...metrics.map((x) => "- " + x)] : []),
     ...viewsBlock(market, lenses),
@@ -422,6 +428,7 @@ export function buildReviewPrompt(body, lang) {
     "1. 有「假设对照」的字段，状态必须和对照结果一致：落在两档之间或高于两档（增速、利润率）→ ok；低于两档 → watch 或 broken（差得多才算 broken）；倍数类看当前与自身历史是否支持当初的目标倍数。其余逐项对照关键假设和最新实际数据：增速、利润率、倍数、折现率等是否还说得通。实际表现落在保守与乐观之间或更好 → ok；接近保守下沿或趋势在变差 → watch；明显跌破保守假设、或前提已经变了 → broken。没有对应数据的假设（如折现率、永续增速）只在有明确理由时才评价，不必每项都写。",
     "2. " + GROUNDING + SYNTHESIS + "可以对照分析师目标价区间和当初的合理价区间，差得很远时在总结里点出来。",
     "3. 不给买卖建议，只说假设是否成立、哪里需要调整。",
+    "同时在 summary 中分别回应保守与乐观场景的核心判断与验证条件，不把两个场景混成一个故事。一档不成立不代表另一档也不成立。缺少对应经营数据时明确写「待验证 / 数据不足」，不能据此判定逻辑失效，也不能当作已经验证成立。先说明故事是否需要修正，再讨论参数更新。",
     "4. 每项 check " + METRIC_RULE,
     "5. 正文不要罗列，结论全部放进回复最后的 ```json 代码块，格式严格如下：",
     '```json\n{"overall": "hold|watch|broken", "summary": "两三句话的总体判断（100 字以内）", "checks": [{"k": "字段k", "status": "ok|watch|broken", "reason": "一句话依据，写出最新实际数字和当初的假设，如：近三年营收复合 10.0%，低于保守 12%", "metric": "revenue"}]}\n```',
@@ -446,12 +453,25 @@ export function parseReview(text, fields) {
 
 // ── 投资逻辑备注草稿：保存估值前，根据当前假设 + 与 AI 的对话，起草「为什么给这个估值」，用户改完再存 ──
 const MAX_NOTE = 2000;
+function badThesis(raw) {
+  if (raw === undefined) return false;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return true;
+  const badFields = (value) => !value || typeof value !== "object" || Array.isArray(value)
+    || [...THESIS_FIELDS, ...THESIS_RESEARCH_FIELDS].some(({ key }) => value[key] !== undefined && (typeof value[key] !== "string" || value[key].length > THESIS_LIMIT))
+    || (value.impacts !== undefined && (!Array.isArray(value.impacts) || value.impacts.length > THESIS_IMPACTS.length || value.impacts.some((item) => !item
+      || !THESIS_IMPACTS.some(({ key }) => key === item.key) || !IMPACT_DIRECTIONS.includes(item.direction)
+      || typeof item.reason !== "string" || item.reason.length > THESIS_LIMIT)));
+  return badFields(raw) || ["c", "o", "legacy"].some((key) => raw[key] !== undefined && badFields(raw[key]));
+}
 export function validateNoteReq(body) {
   if (!body || typeof body !== "object") return "bad body";
+  if (body.format !== undefined && body.format !== "thesis") return "bad format";
+  if (body.format === "thesis" && !THESIS_SCENARIOS.some(({ key }) => key === body.scenario)) return "scenario required";
+  if (badThesis(body.thesis)) return "bad thesis";
   const { context, messages, note } = body;
-  if (!context || typeof context !== "object" || !Array.isArray(context.fields) || !context.fields.length || context.fields.length > 40) return "context.fields required";
+  if (!context || typeof context !== "object" || !Array.isArray(context.fields) || (body.format !== "thesis" && !context.fields.length) || context.fields.length > 160) return "context.fields required";
   for (const f of context.fields) if (!f || typeof f.k !== "string" || (f.col !== "single" && f.col !== "dual")) return "bad field";
-  if (badVerified(context.verified) || badVerified(context.market) || badVerified(context.lenses)) return "bad facts";
+  if (badVerified(context.verified) || badVerified(context.market) || badVerified(context.lenses) || badVerified(context.business)) return "bad facts";
   if (messages !== undefined) {
     if (!Array.isArray(messages) || messages.length > MAX_MSGS) return "bad messages";
     for (const m of messages) if (!m || (m.role !== "user" && m.role !== "assistant") || typeof m.content !== "string" || m.content.length > MAX_CHARS) return "bad message";
@@ -462,7 +482,12 @@ export function validateNoteReq(body) {
 }
 export function buildNotePrompt(body, lang) {
   const c = body.context, zh = lang !== "en";
-  const fieldLines = c.fields.map((f) => `- ${f.label || f.k}｜${f.unit === "%" ? "百分数" : f.money ? "金额" : (f.unit || "数字")}｜${fmtVal(f.value)}`).join("\n");
+  const structured = body.format === "thesis";
+  const scenario = THESIS_SCENARIOS.find(({ key }) => key === body.scenario);
+  const scenarioTitle = scenario ? (zh ? scenario.zh : scenario.en) : "";
+  const fieldLines = c.fields.map((f) => `- ${f.label || f.k}｜${f.unit === "%" ? "百分数" : f.money ? "金额" : (f.unit || "数字")}｜${fmtVal(structured && f.col === "dual" ? f.value?.[body.scenario] : f.value)}${f.isDefault ? "（方法默认值，尚未形成判断）" : ""}`).join("\n");
+  const existingThesis = cleanThesis(body.thesis);
+  const selectedThesis = structured ? { [body.scenario]: existingThesis[body.scenario], legacy: existingThesis.legacy } : existingThesis;
   const convo = Array.isArray(body.messages) && body.messages.length
     ? body.messages.map((m) => `${m.role === "user" ? "用户" : "AI"}：${String(m.content).replace(/```[\s\S]*?```/g, "（参数建议）").slice(0, 600)}`).join("\n") : "";
   return [
@@ -470,14 +495,17 @@ export function buildNotePrompt(body, lang) {
     zh ? "用中文写。" : "Write in English.",
     "",
     `标的：${c.stock && c.stock.name || ""}（${c.stock && c.stock.code || ""}）　币种：${c.stock && c.stock.currency || "未知"}　现价：${c.stock && c.stock.price || "未知"}`,
-    `估值方法：${c.method && c.method.label || ""}${c.facts && c.facts.currentConclusion ? "　当前结论：合理价 " + c.facts.currentConclusion : ""}`,
+    `估值方法：${c.method && c.method.label || ""}${!structured && c.facts && c.facts.currentConclusion ? "　当前结论：合理价 " + c.facts.currentConclusion : ""}`,
     "",
-    "用户填的假设（名称｜单位｜值；两档为 保守 / 乐观）：",
-    fieldLines,
+    structured ? `本次只写${scenarioTitle}。用户已有参数（只列这一档，不能当作故事的前提或已核实事实）：` : "用户填的假设（名称｜单位｜值；两档为 保守 / 乐观）：",
+    fieldLines || "尚未选择模型或填写数字：先研究生意并形成定性故事。",
+    ...(Array.isArray(c.business) && c.business.length ? ["公司业务资料：", ...c.business] : []),
     ...verifiedBlock(c.verified),
+    ...(structured && c.facts ? ["已提供的公司数据（缺项代表待研究，不得补造；不含计算所得估值）：", JSON.stringify(Object.fromEntries(Object.entries(c.facts).filter(([key]) => key !== "currentConclusion")))] : []),
     ...viewsBlock(c.market, c.lenses),
     ...(convo ? ["", "用户和 AI 在估值工作台里的对话（摘录）：", convo] : []),
     ...(body.note && body.note.trim() ? ["", "用户已经写的备注（保留其中的观点，在此基础上补全）：", body.note.trim()] : []),
+    ...thesisLines(selectedThesis, lang).map((line) => "用户已写的投资逻辑（保留观点）：" + line),
     "",
     "要求：",
     "1. 第一人称、写给未来的自己看，三到五行，每行一句，不要标题、不要 Markdown、不要编号以外的符号。",
@@ -485,7 +513,28 @@ export function buildNotePrompt(body, lang) {
     "3. " + GROUNDING + "对话里用户表达过的判断优先保留。",
     zh ? "4. 总共 200 字以内。" : "4. Under 120 words in total.",
     "5. 只写备注本身，不给买卖建议，不要开场白。",
+    ...(structured ? [
+      "本次遵循故事先于数字的顺序：先研究公司业务、管理层、竞争与宏观环境，形成该场景的定性故事；再用常识和历史数据检验可行性；然后解释增长、利润率、再投资和风险的方向；最后给出后续观察与修正条件。不能先看估值结果或现价再倒编故事。",
+      "缺少公司资料时明确标注研究空缺，不要编造管理层、竞争优势或历史表现。已有参数仅用于发现故事和数字的矛盾，默认参数不是用户的商业判断；没有数字时先写定性驱动力和待量化项，不强行补数。",
+      `本次输出格式覆盖上述纯文字格式：只返回当前${scenarioTitle}的 JSON，不得输出另一档，不要开场白：`,
+      JSON.stringify({ [body.scenario]: { story: "用普通人能理解的话描述公司未来会怎样，不写目标价或估值倍数", evidence: "支持判断的已有事实及来源；缺少依据时明确说暂时没有依据", uncertainties: "还没证实的预期、反面证据及需要补充的资料", impacts: [{ key: "growth", direction: "unknown", reason: "引用故事中的具体变化，解释它为何可能影响增长，尚未确认的方向用 unknown" }], signals: "哪些经营变化会促使先修正故事、再更新数字" } }),
+      "evidence 只能写已提供资料能支持的事实；不能把故事里的预期当成已验证的证据。impacts 只列故事实际涉及的影响，可为空，不硬凑齐所有类别。",
+      `impacts 的 key 只能是：${THESIS_IMPACTS.map((item) => `${item.key}（${item.zh}）`).join("、")}；direction 只能是 up / flat / down / unknown，相对公司当前状况表示增加、稳定、减少或未确定，不表示乐观或保守。不要替用户填具体参数。`,
+      "每个字段不超过 800 字符；没有依据的内容明确写待验证，不编造财务数字或来源。验证阈值若为建议，明确标为建议。",
+    ] : []),
   ].join("\n");
+}
+export function parseThesis(text, scenario) {
+  const blocks = [...String(text || "").matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)];
+  let raw;
+  try { raw = JSON.parse(blocks.length ? blocks[blocks.length - 1][1] : String(text || "")); } catch { return null; }
+  if (badThesis(raw)) return null;
+  const thesis = cleanThesis(raw);
+  const fields = thesis[scenario];
+  const complete = fields && ((fields.story && fields.evidence && fields.uncertainties && fields.signals && Array.isArray(raw[scenario]?.impacts))
+    || THESIS_FIELDS.every(({ key }) => fields[key]));
+  // A partial response should not erase the user's other fields.
+  return THESIS_SCENARIOS.some(({ key }) => key === scenario) && complete ? { [scenario]: fields } : null;
 }
 export function parseNote(text) {
   const t = plain(String(text || "").replace(/```[\s\S]*?```/g, "")).replace(/\n{3,}/g, "\n\n").trim();
@@ -817,6 +866,10 @@ export function registerAi(app, { chat = chatComplete } = {}) {
     const lang = body.lang === "en" ? "en" : "zh";
     const { text, res } = await runChat(c, buildNotePrompt(body, lang), [{ role: "user", content: lang === "en" ? "Draft the investment-thesis note for this valuation." : "帮我起草这张估值卡的投资逻辑备注。" }]);
     if (res) return res;
+    if (body.format === "thesis") {
+      const thesis = parseThesis(text, body.scenario);
+      return thesis ? c.json({ thesis }) : c.json({ error: "bad_ai_output" }, 502);
+    }
     const note = parseNote(text);
     if (!note) return c.json({ error: "bad_ai_output" }, 502);
     return c.json({ note });
