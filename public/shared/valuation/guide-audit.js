@@ -55,7 +55,7 @@ export function guideAuditLabels(item, lang = "zh") {
     missing_source: ["引用编号缺少对应资料", "A cited source is missing"],
     uncited: ["本段没有引用，尚未核验依据", "No citation; evidence has not been checked"],
     not_applicable: ["这是假设或待验证内容，不代表已发生", "An assumption or open question, not an established fact"],
-    unchecked: ["尚未完成语义核验", "Semantic check unavailable"],
+    unchecked: ["引用尚未核验", "Citation not checked"],
   };
   return { kind: kinds[item.kind]?.[zh ? 0 : 1] || "", support: support[item.support]?.[zh ? 0 : 1] || "",
     warning: ["partial", "unsupported", "contradicted", "missing_source", "uncertain", "uncited"].includes(item.support) };

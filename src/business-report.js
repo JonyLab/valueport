@@ -1,8 +1,18 @@
 // Original A-share periodic reports, discovered by security code rather than issuer adapters.
 const CATALOG = "https://www.cninfo.com.cn";
 const CDN = "https://static.cninfo.com.cn";
+const MAX_PDF_BYTES = 16 * 1024 * 1024;
 const compact = (s) => String(s || "").replace(/\s+/g, "");
-const numeric = (s) => /^-?[\d,]+(?:\.\d+)?$/.test(compact(s)) ? Number(compact(s).replace(/,/g, "")) : null;
+// Fullwidth digits/punctuation appear in some filings; percentages are kept as their numeric value.
+const halfwidth = (s) => compact(s).replace(/[\uff10-\uff19\uff0c\uff0e\uff05\uff0d]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+const numeric = (s) => { const v = halfwidth(s).replace(/%$/, ""); return /^-?[\d,]+(?:\.\d+)?$/.test(v) ? Number(v.replace(/,/g, "")) : null; };
+export const REPORT_FAILURES = ["download_failed", "too_large", "not_pdf", "identity_mismatch", "page_limit", "timeout", "parse_failed"];
+export function reportFailure(error) {
+  const message = String(error?.message || "");
+  if (error?.name === "AbortError" || error?.name === "TimeoutError" || /abort/i.test(message)) return "timeout";
+  return { report_request_failed: "download_failed", report_too_large: "too_large", report_not_pdf: "not_pdf",
+    report_identity_mismatch: "identity_mismatch", report_page_limit: "page_limit", report_text_limit: "page_limit" }[message] || "parse_failed";
+}
 
 async function bounded(response, limit) {
   if (!response.ok || !response.body) { await response.body?.cancel(); throw new Error("report_request_failed"); }
@@ -44,7 +54,7 @@ export async function discoverPeriodicReports(symbol, { fetchImpl = fetch, signa
   }), 1024000)));
   const identity = await post("/new/information/topSearch/detailOfQuery", { keyWord: code, maxSecNum: "10", maxListNum: "1" });
   const expectedPlate = { sh: "sse", sz: "szse", bj: "bse" }[symbol.slice(0, 2)];
-  const company = identity.keyBoardList?.find((item) => item.code === code && item.plate === expectedPlate && /^\d{1,20}$/.test(item.orgId));
+  const company = identity.keyBoardList?.find((item) => item.code === code && item.plate === expectedPlate && /^[A-Za-z0-9]{1,32}$/.test(item.orgId));
   if (!company) return { code, name: "", reports: [] };
   const end = new Date(now).toISOString().slice(0, 10), start = `${new Date(now).getUTCFullYear() - 3}-01-01`;
   const result = await post("/new/hisAnnouncement/query", { pageNum: "1", pageSize: "60", column: company.plate,
@@ -62,7 +72,12 @@ export function reportLines(items) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
     let line = lines.find((r) => Math.abs(r.y - y) < 2);
     if (!line) { line = { y, items: [] }; lines.push(line); }
-    line.items.push({ text: item.str.trim(), x, width: Number(item.width) || 0 });
+    const text = item.str.trim(), width = Number(item.width) || 0;
+    // pdf.js sometimes emits adjacent cells as one run ("59,920.77 59,806.65"); split so each amount keeps its own column.
+    if (/^-?[\d,.]+%?(?:\s+-?[\d,.]+%?)+$/.test(text)) {
+      const raw = item.str, perChar = width / Math.max(1, raw.length);
+      for (const m of raw.matchAll(/\S+/g)) line.items.push({ text: m[0], x: x + m.index * perChar, width: m[0].length * perChar });
+    } else line.items.push({ text, x, width });
   }
   return lines.sort((a, b) => b.y - a.y).map((line) => {
     line.items.sort((a, b) => a.x - b.x);
@@ -78,9 +93,17 @@ export function reportLines(items) {
 }
 
 function unitOf(text) {
-  const m = compact(text).match(/单位[:：](人民币)?(亿元|万元|千元|元)(?:币种[:：](人民币|美元|港元))?/);
-  if (!m || (!m[1] && m[3] !== "人民币")) return null;
-  return { currency: "CNY", unit: m[2], multiplier: { 元: 1, 千元: 1000, 万元: 10000, 亿元: 1e8 }[m[2]] };
+  // A-share reports are in RMB unless the unit line names another currency; never guess a foreign currency.
+  const t = compact(text), m = t.match(/单位[:：](人民币)?(亿元|万元|千元|百万元|元)(?:币种[:：](人民币|美元|港元|欧元|日元))?/);
+  if (!m || (m[3] && m[3] !== "人民币") || /单位[:：](?:美元|港元|港币|欧元|日元)|币种[:：](?:美元|港元|欧元|日元)/.test(t)) return null;
+  return { currency: "CNY", unit: m[2], multiplier: { 元: 1, 千元: 1000, 万元: 10000, 百万元: 1e6, 亿元: 1e8 }[m[2]] };
+}
+// Nearest unit line above (or on) a table start; a later table's unit must not leak upwards.
+function unitNear(lines, from, to) {
+  for (let i = Math.min(to, lines.length - 1); i >= Math.max(0, from); i--) {
+    if (/单位[:：]/.test(compact(lines[i].text))) return unitOf(lines.slice(i, i + 2).map((l) => l.text).join(" "));
+  }
+  return null;
 }
 
 function fourColumns(lines) {
@@ -88,35 +111,78 @@ function fourColumns(lines) {
     .find((cells) => cells.length === 4 && cells.map((i) => compact(i.text).replace(/^营业/, "")).join() === "收入,成本,收入,成本")
     ?.map((i) => i.x + i.width / 2);
 }
+// Current-period-only layouts: either a single 营业收入/营业成本 pair, or several segment pairs whose last pair sits under 合计.
+function pairColumns(lines) {
+  const at = lines.findIndex((line) => {
+    const cells = line.items.filter((i) => /^营业(收入|成本)$/.test(compact(i.text)));
+    return cells.length >= 2 && cells.length % 2 === 0 && cells.length === line.items.length
+      && cells.every((c, i) => compact(c.text) === (i % 2 ? "营业成本" : "营业收入"));
+  });
+  if (at < 0) return null;
+  const cells = lines[at].items, pair = cells.slice(-2).map((i) => i.x + i.width / 2);
+  if (cells.length > 2) {
+    const total = lines.slice(Math.max(0, at - 4), at).flatMap((l) => l.items).find((i) => compact(i.text) === "合计");
+    if (!total || Math.abs(total.x + total.width / 2 - (pair[0] + pair[1]) / 2) > (pair[1] - pair[0])) return null;
+  }
+  return { columns: pair, labelLimit: Math.min(...cells.map((i) => i.x)) - 2 };
+}
+
+const MAIN_END = /^(?:主营业务分(?:地区|销售模式|行业|业务)情况|主营业务收入按地区分析|分地区|分销售模式|分行业|分业务|按地区|按销售模式|公司主营业务数据统计口径.*)$/;
+// Column positions come from the numbers themselves; the header wording and line wrapping vary by exchange and issuer.
+function numericClusters(lines, labelLimit) {
+  const centers = lines.flatMap((line) => {
+    const cells = line.items.filter((i) => numeric(i.text) !== null && i.x > labelLimit);
+    return cells.length >= 3 ? cells.map((i) => i.x + i.width / 2) : [];
+  }).sort((a, b) => a - b);
+  const clusters = [];
+  for (const x of centers) { const last = clusters.at(-1); if (last && x - last.max < 18) { last.max = x; last.sum += x; last.n++; } else clusters.push({ max: x, sum: x, n: 1 }); }
+  return clusters.map((c) => c.sum / c.n);
+}
 
 export function extractMainBusinessTable(page) {
-  const lines = reportLines(page.items), start = lines.findIndex((l) => /^主营业务分产品情况$/.test(compact(l.text)));
+  const lines = reportLines(page.items);
+  let start = lines.findIndex((l) => /^主营业务分产品情况$/.test(compact(l.text))), label = "主营业务分产品（经营分析）", top = start;
+  if (start < 0) {
+    // Shenzhen layout: one table with 分行业/分产品/分地区 subsections, listing items above 10% of revenue or profit.
+    top = lines.findIndex((l) => /占公司营业收入或营业利润10%以上的/.test(compact(l.text)));
+    if (top >= 0) start = lines.findIndex((l, i) => i > top && i < top + 40 && /^分产品$/.test(compact(l.text)));
+    label = "主营业务分产品（占收入或利润 10% 以上的披露项）";
+  }
   if (start < 0) return null;
-  const unit = unitOf(lines.slice(Math.max(0, start - 30), start).map((l) => l.text).join(" "));
-  const end = lines.findIndex((l, i) => i > start && /^主营业务分(?:地区|销售模式|行业)情况$/.test(compact(l.text)));
+  const unit = unitNear(lines, Math.max(0, top - 30), start);
+  const end = lines.findIndex((l, i) => i > start && MAIN_END.test(compact(l.text)));
   if (!unit || end < 0) return null;
   const block = lines.slice(start + 1, end);
-  const header = block.find((l) => l.items.some((i) => compact(i.text) === "分产品"));
-  const upper = block.find((l) => l.items.some((i) => compact(i.text) === "毛利率比"));
-  const primary = header?.items.filter((i) => /^(营业收入|营业成本|毛利率)$/.test(compact(i.text)));
-  const secondary = upper?.items.filter((i) => /^(营业收入|营业成本|毛利率比)$/.test(compact(i.text)));
-  if (primary?.length !== 3 || secondary?.length !== 3) return null;
-  const columns = [...primary, ...secondary].map((i) => i.x + i.width / 2);
-  const raw = readRows(block.filter((l) => l.y < header.y - 8), columns);
+  const firstNumber = Math.min(...block.flatMap((l) => l.items.filter((i) => numeric(i.text) !== null).map((i) => i.x)));
+  const columns = numericClusters(block, Number.isFinite(firstNumber) ? firstNumber - 1 : Infinity);
+  if (columns.length < 3 || columns.length > 7) return null;
+  const parsed = readRows(block, columns.slice(0, 4));
+  const base = Math.min(...parsed.map((r) => r.labelX));
+  // "其中" rows and indented rows are components of the row above; summing them would double count.
+  const raw = parsed.filter((r) => !/^其中[:：]?/.test(r.name) && !(r.labelX > base + 4));
+  const tolerance = 0.06;
   if (!raw.length || raw.length > 30 || raw.some((r) => !r.name || r.values[0] < 0 || r.values[1] === null
-    || r.values[2] === null || (r.values[0] > 0 && Math.abs((1 - r.values[1] / r.values[0]) * 100 - r.values[2]) > 0.03))) return null;
+    || r.values[2] === null || (r.values[0] > 0 && Math.abs((1 - r.values[1] / r.values[0]) * 100 - r.values[2]) > tolerance))) return null;
   const subtotal = raw.reduce((sum, r) => sum + r.values[0] * unit.multiplier, 0);
   if (!(subtotal > 0)) return null;
-  return { scope: "management", basis: "listed_main_business_sum", label: "主营业务分产品（经营分析）", currency: unit.currency,
+  return { scope: "management", basis: "listed_main_business_sum", label, currency: unit.currency,
     originalUnit: unit.unit, pdfPage: page.page, subtotal, companyRevenue: null, coveragePercent: null,
     excerpt: lines.slice(start, end).map((l) => l.text).join("\n").slice(0, 6500),
-    rows: raw.map(({ name, values: [rev, cost, margin, growth] }) => ({ name: name.slice(0, 100), revenue: rev * unit.multiplier,
+    rows: raw.map(({ name, values: [rev, cost, margin, growth = null] }) => ({ name: name.slice(0, 100), revenue: rev * unit.multiplier,
       cost: cost * unit.multiplier, previousRevenue: null, sharePercent: rev * unit.multiplier / subtotal * 100,
       growthPercent: growth, grossMarginPercent: margin, derived: ["sharePercent"] })) };
 }
 
-function readRows(lines, columns) {
-  const firstBoundary = columns[0] - (columns[1] - columns[0]) / 2;
+// "营业收入合计" in the Shenzhen revenue-composition table is the company total used as a share denominator.
+export function extractRevenueTotal(page) {
+  const lines = reportLines(page.items), at = lines.findIndex((l) => compact(l.items[0]?.text) === "营业收入合计" && l.items.slice(1).some((i) => numeric(i.text) !== null));
+  if (at < 0 || !lines.slice(Math.max(0, at - 12), at).some((l) => /营业收入构成|营业收入整体情况/.test(compact(l.text)))) return null;
+  const unit = unitNear(lines, Math.max(0, at - 12), at), value = numeric(lines[at].items.find((i, n) => n && numeric(i.text) !== null).text);
+  return unit && value > 0 ? { value: value * unit.multiplier, pdfPage: page.page, currency: unit.currency } : null;
+}
+
+function readRows(lines, columns, labelLimit) {
+  const firstBoundary = labelLimit ?? columns[0] - (columns[1] - columns[0]) / 2;
   const numericRows = lines.flatMap((line) => {
     const values = columns.map(() => null);
     for (const item of line.items.filter((i) => i.x + i.width / 2 > firstBoundary)) {
@@ -131,25 +197,35 @@ function readRows(lines, columns) {
   return numericRows.map((row, index) => {
     const top = index ? (numericRows[index - 1].y + row.y) / 2 : row.y + 12;
     const bottom = index < numericRows.length - 1 ? (row.y + numericRows[index + 1].y) / 2 : row.y - 12;
-    const name = lines.filter((l) => l.y <= top && l.y > bottom).flatMap((l) => l.items.filter((i) => i.x + i.width / 2 < firstBoundary))
-      .map((i) => i.text).join("").replace(/\s+/g, "");
-    return { name, values: row.values };
+    const labels = lines.filter((l) => l.y <= top && l.y > bottom).flatMap((l) => l.items.filter((i) => i.x + i.width / 2 < firstBoundary));
+    return { name: labels.map((i) => i.text).join("").replace(/\s+/g, ""), labelX: Math.min(...labels.map((i) => i.x)), values: row.values };
   });
 }
 
+const PRODUCT_GROUP = /^(?:商品类型|产品类型|业务类型|商品或服务类型|按产品分类|按商品类型分类|按产品类型分类|按业务类型分类|按商品或服务类型分类)$/;
+const NEXT_GROUP = /^(?:小计|合计|按.{1,14}分类|(?:市场或客户|合同|客户|服务|销售渠道|经营地区)类型|按.{0,10}(?:地区|渠道|时间|期限|客户)|其他分类)$/;
 export function extractRevenueTable(page, { scope, companyRevenue = null } = {}) {
   if (scope !== "consolidated") return null;
   const lines = reportLines(page.items), start = lines.findIndex((l) => /营业收入[、和及]营业成本的分解信息/.test(compact(l.text)));
   if (start < 0) return null;
-  const tableLines = lines.slice(start), unit = unitOf(tableLines.slice(0, 8).map((l) => l.text).join(" "));
-  const columns = fourColumns(tableLines.slice(0, 12));
-  const product = tableLines.findIndex((l) => /^(商品类型|产品类型|按产品分类|按商品类型分类)$/.test(compact(l.text)));
+  const tableLines = lines.slice(start), unit = unitNear(tableLines, 0, 8);
+  const four = fourColumns(tableLines.slice(0, 12)), pair = four ? null : pairColumns(tableLines.slice(0, 12));
+  const columns = four || pair?.columns;
+  const product = tableLines.findIndex((l) => PRODUCT_GROUP.test(compact(l.items[0]?.text)));
   if (!unit || !columns || product < 0) return null;
-  const end = tableLines.findIndex((l, i) => i > product && /^(小计|合计|按经营地区分类|按地区分类)$/.test(compact(l.text)));
+  const end = tableLines.findIndex((l, i) => i > product && NEXT_GROUP.test(compact(l.items[0]?.text)));
   if (end < 0) return null;
-  const rawRows = readRows(tableLines.slice(product + 1, end + 1), columns);
-  const subtotal = rawRows.find((r) => /^(小计|合计)$/.test(r.name));
-  const rows = rawRows.filter((r) => r.name && !/^(小计|合计)$/.test(r.name));
+  const rawRows = readRows(tableLines.slice(product, end + 1), columns, pair?.labelLimit);
+  let subtotal = rawRows.find((r) => /^(小计|合计)$/.test(r.name));
+  // A group heading that carries amounts is that group's subtotal; otherwise the table's final 合计 closes a single-pair table.
+  const heading = rawRows.find((r) => PRODUCT_GROUP.test(r.name));
+  if (!subtotal && heading) subtotal = heading;
+  if (!subtotal) {
+    const stop = tableLines.findIndex((l, i) => i > end && /^(?:[（(]\d+[)）]|\d+[、.．]|[一二三四五六七八九十]+[、.．])/.test(compact(l.text)));
+    subtotal = readRows(tableLines.slice(end, stop < 0 ? end + 40 : stop), columns, pair?.labelLimit).find((r) => r.name === "合计");
+  }
+  const rows = rawRows.filter((r) => r.name && !/^(小计|合计)$/.test(r.name) && !PRODUCT_GROUP.test(r.name) && !/^其中[:：]?$/.test(r.name))
+    .map((r) => ({ ...r, name: r.name.replace(/^其中[:：]/, "") }));
   if (!subtotal || !rows.length || rows.length > 30 || rows.some((r) => r.values[0] < 0 || r.values[1] === null)) return null;
   const sum = rows.reduce((s, r) => s + r.values[0], 0);
   if (Math.abs(sum - subtotal.values[0]) > Math.max(1, Math.abs(subtotal.values[0]) * 0.000001)) return null;
@@ -160,7 +236,7 @@ export function extractRevenueTable(page, { scope, companyRevenue = null } = {})
     originalUnit: unit.unit, pdfPage: page.page, subtotal: total, companyRevenue,
     coveragePercent: companyRevenue?.value > 0 ? total / companyRevenue.value * 100 : null,
     excerpt: tableLines.slice(0, end + 1).map((l) => l.text).join("\n").slice(0, 6500),
-    rows: rows.map(({ name, values: [rev, cost, previousRev] }) => {
+    rows: rows.map(({ name, values: [rev, cost, previousRev = null] }) => {
       const revenue = rev * unit.multiplier, previousRevenue = previousRev === null ? null : previousRev * unit.multiplier;
       return { name: name.slice(0, 100), revenue, cost: cost * unit.multiplier, previousRevenue,
         sharePercent: revenue / total * 100,
@@ -170,14 +246,27 @@ export function extractRevenueTable(page, { scope, companyRevenue = null } = {})
     }) };
 }
 
+// Traditional-script covers (e.g. dual-listed banks) must still match the catalog's simplified short name.
+const SIMPLIFIED = { 銀: "银", 國: "国", 華: "华", 業: "业", 電: "电", 東: "东", 證: "证", 發: "发", 開: "开", 達: "达", 齊: "齐", 長: "长", 實: "实", 興: "兴", 機: "机", 車: "车", 鐵: "铁", 廣: "广", 豐: "丰", 寶: "宝", 礦: "矿", 藥: "药", 險: "险", 億: "亿", 報: "报", 碼: "码", 團: "团", 動: "动", 際: "际", 環: "环", 灣: "湾", 創: "创", 務: "务", 產: "产", 設: "设", 衛: "卫", 網: "网", 訊: "讯", 聯: "联", 貿: "贸", 運: "运", 遠: "远", 陽: "阳", 雲: "云", 順: "顺", 風: "风", 飛: "飞", 馬: "马", 龍: "龙" };
+const simplify = (s) => s.replace(/[\u3400-\u9fff]/g, (c) => SIMPLIFIED[c] || c);
+export function reportIdentityMatches(opening, identity, document) {
+  const flat = simplify(halfwidth(opening));
+  // Some issuers title the annual report "2025年度报告"; "半年度" can never satisfy the annual pattern.
+  const period = new RegExp(`${document.year}年${document.kind === "annual" ? "年?度" : "半年度"}报告`);
+  const name = simplify(compact(identity.name)).replace(/^\*?ST|^XD|^XR|^DR/i, "");
+  const issuer = new RegExp(`(?:公司|股票|证券|A股股票)代码[:：]?${identity.code}(?!\\d)`).test(flat) || (name.length >= 2 && flat.includes(name));
+  return issuer && period.test(flat);
+}
+
 export async function extractBusinessReportPdf(bytes, document, identity, { signal } = {}) {
-  if (bytes.length > 8 * 1024 * 1024 || new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") throw new Error("invalid_report_pdf");
+  if (bytes.length > MAX_PDF_BYTES) throw new Error("report_too_large");
+  if (new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") throw new Error("report_not_pdf");
   const { getDocumentProxy } = await import("unpdf");
   const pdf = await getDocumentProxy(bytes, { isEvalSupported: false, useSystemFonts: false, disableFontFace: true,
     useWorkerFetch: false, cMapUrl: undefined, standardFontDataUrl: undefined });
   try {
     if (pdf.numPages > 400) throw new Error("report_page_limit");
-    let scope = "unknown", companyRevenue = null, incomeTable = null, length = 0;
+    let scope = "unknown", companyRevenue = null, managementRevenue = null, incomeTable = null, length = 0, opening = "";
     const tables = [], notes = [];
     for (let page = 1; page <= pdf.numPages; page++) {
       signal?.throwIfAborted();
@@ -185,26 +274,28 @@ export async function extractBusinessReportPdf(bytes, document, identity, { sign
       const text = content.items.map((i) => typeof i.str === "string" ? i.str + (i.hasEOL ? "\n" : " ") : "").join("");
       length += text.length; if (length > 1500000) throw new Error("report_text_limit");
       const flat = compact(text);
-      if (page === 1 && (!new RegExp(`(?:公司|股票|证券)代码[:：]?${identity.code}`).test(flat)
-        || !flat.includes(identity.name) || !flat.includes(`${document.year}年${document.kind === "annual" ? "年度" : "半年度"}报告`))) throw new Error("report_identity_mismatch");
+      // Shenzhen covers often omit the security code and carry only the issuer name; check the first pages together.
+      if (page <= 5) opening += flat;
+      if ((page === Math.min(5, pdf.numPages)) && !reportIdentityMatches(opening, identity, document)) throw new Error("report_identity_mismatch");
       if (/^[一二三四五六七八九十百0-9]+[、.．]\s*合并[^\n]{0,20}报表[^\n]{0,20}注释\s*$/m.test(text)) scope = "consolidated";
       if (/^[一二三四五六七八九十百0-9]+[、.．]\s*母公司[^\n]{0,20}报表[^\n]{0,20}注释\s*$/m.test(text)) { scope = "parent"; incomeTable = null; }
       const lines = reportLines(content.items);
-      if (scope === "unknown" && tables.length < 3) {
-        const main = extractMainBusinessTable({ page, items: content.items }); if (main) tables.push(main);
+      if (scope === "unknown") {
+        managementRevenue ||= extractRevenueTotal({ page, items: content.items });
+        if (tables.length < 3) { const main = extractMainBusinessTable({ page, items: content.items }); if (main) tables.push(main); }
       }
       if (scope === "consolidated") {
-        const income = lines.findIndex((l) => /营业收入(?:和|及|、)营业成本情况/.test(compact(l.text)));
+        const income = lines.findIndex((l) => /营业收入(?:和|及|、)营业成本(?:情况)?$/.test(compact(l.text).replace(/^(?:[（(]?\d+[)）.．]|\d+[、.．])\.?/, "")));
         if (income >= 0) {
-          const block = lines.slice(income), unit = unitOf(block.slice(0, 8).map((l) => l.text).join(" ")), columns = fourColumns(block.slice(0, 12));
+          const block = lines.slice(income), unit = unitNear(block, 0, 8), columns = fourColumns(block.slice(0, 12));
           incomeTable = unit && columns ? { unit, columns } : null;
         }
         if (incomeTable) {
           const end = lines.findIndex((l) => /营业收入[、和及]营业成本的分解信息/.test(compact(l.text)));
           const incomeLines = lines.slice(income >= 0 ? income : 0, end < 0 ? undefined : end);
           const total = readRows(incomeLines, incomeTable.columns).find((r) => r.name === "合计");
-          if (total && total.values[0] > 0) companyRevenue = { value: total.values[0] * incomeTable.unit.multiplier, pdfPage: page, currency: incomeTable.unit.currency };
-          if (end >= 0) incomeTable = null;
+          if (total && total.values[0] > 0 && !companyRevenue) companyRevenue = { value: total.values[0] * incomeTable.unit.multiplier, pdfPage: page, currency: incomeTable.unit.currency };
+          if (end >= 0 || total) incomeTable = null;
         }
         const table = extractRevenueTable({ page, items: content.items }, { scope, companyRevenue });
         if (table && tables.length < 3) tables.push(table);
@@ -216,32 +307,44 @@ export async function extractBusinessReportPdf(bytes, document, identity, { sign
       }
       p.cleanup();
     }
+    const denominator = companyRevenue || managementRevenue;
     for (const table of tables) {
-      if (!table.companyRevenue && companyRevenue && companyRevenue.value >= table.subtotal * 0.999999) {
-        table.companyRevenue = companyRevenue; table.coveragePercent = table.subtotal / companyRevenue.value * 100;
+      if (!table.companyRevenue && denominator && denominator.value >= table.subtotal * 0.999999) {
+        table.companyRevenue = denominator; table.coveragePercent = table.subtotal / denominator.value * 100;
       }
     }
     return { ...document, pageCount: pdf.numPages, tables, notes,
-      status: tables.length ? "ok" : "unsupported_layout" };
+      status: tables.length ? "ok" : "unsupported_layout", ...(tables.length ? {} : { reason: "no_table" }) };
   } finally { await pdf.loadingTask.destroy(); }
 }
 
-export async function fetchBusinessReports(symbol, { fetchImpl = fetch, now = Date.now(), extractPdf = extractBusinessReportPdf } = {}) {
+export async function fetchBusinessReports(symbol, { fetchImpl = fetch, now = Date.now(), extractPdf = extractBusinessReportPdf, timeoutMs = 35000 } = {}) {
   if (!/^(sh|sz|bj)\d{6}$/.test(symbol)) return { status: "unsupported", symbol, reports: [] };
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 30000), reports = [];
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeoutMs), reports = [];
   let identity;
   try {
     identity = await discoverPeriodicReports(symbol, { fetchImpl, now, signal: controller.signal });
     for (const document of identity.reports) {
       try {
-        const bytes = await bounded(await fetchImpl(document.url, { signal: controller.signal, redirect: "manual", headers: { "User-Agent": "Mozilla/5.0", Referer: CATALOG + "/" } }), 8 * 1024 * 1024);
-        reports.push(await extractPdf(bytes, document, identity, { signal: controller.signal }));
-      } catch { reports.push({ ...document, status: "unavailable", tables: [], notes: [] }); }
+        const response = await fetchImpl(document.url, { signal: controller.signal, redirect: "manual", headers: { "User-Agent": "Mozilla/5.0", Referer: CATALOG + "/" } })
+          .catch((error) => { throw controller.signal.aborted ? error : new Error("report_request_failed"); });
+        const bytes = await bounded(response, MAX_PDF_BYTES);
+        const report = await extractPdf(bytes, document, identity, { signal: controller.signal });
+        if (report.status !== "ok") console.warn("business_report_no_table", symbol, document.period, `pages=${report.pageCount}`);
+        reports.push(report);
+      } catch (error) {
+        const reason = reportFailure(error);
+        // One line per failed report: enough to tell size, download, identity and parser failures apart in wrangler logs.
+        console.warn("business_report_failed", symbol, document.period, reason, String(error?.message || error).slice(0, 120));
+        reports.push({ ...document, status: "unavailable", reason, tables: [], notes: [] });
+      }
     }
     return { status: reports.some((r) => r.status === "ok") ? "ok" : identity.reports.length ? "unavailable" : "empty",
       symbol, name: identity.name, fetchedAt: new Date(now).toISOString(), reports };
-  } catch { return { status: "unavailable", symbol, fetchedAt: new Date(now).toISOString(), reports }; }
-  finally { clearTimeout(timer); }
+  } catch (error) {
+    console.warn("business_report_discovery_failed", symbol, String(error?.message || error).slice(0, 120));
+    return { status: "unavailable", symbol, fetchedAt: new Date(now).toISOString(), reports };
+  } finally { clearTimeout(timer); }
 }
 
 const TABLE = `CREATE TABLE IF NOT EXISTS business_report_snapshots (symbol TEXT PRIMARY KEY, snapshot_json TEXT NOT NULL, saved_at TEXT NOT NULL, refresh_after INTEGER NOT NULL)`;

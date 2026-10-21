@@ -30,17 +30,45 @@ export function cleanOfficialSite(raw, symbol) {
   const irUrl = publicManagementUrl(raw.irUrl) || website;
   const linkedHosts = [...new Set((Array.isArray(raw.linkedHosts) ? raw.linkedHosts : []).slice(0, 8)
     .filter((h) => typeof h === "string" && publicManagementUrl(`https://${h}/`) && new URL(`https://${h}/`).hostname === h))];
+  // SEC CIK found from the ticker; it binds accepted EDGAR archive URLs to this issuer.
+  const secCik = /^us/.test(symbol) && /^[1-9]\d{0,9}$/.test(String(raw.secCik ?? "")) ? String(raw.secCik) : "";
   return { symbol: managementText(symbol, 24), website, irUrl, origin: "longbridge_company_profile",
-    name: managementText(raw.name, 100), aliases: (Array.isArray(raw.aliases) ? raw.aliases : []).slice(0, 5).map((s) => managementText(s, 100)).filter((s) => s.length >= 2), linkedHosts };
+    name: managementText(raw.name, 100), aliases: (Array.isArray(raw.aliases) ? raw.aliases : []).slice(0, 6).map((s) => managementText(s, 100)).filter((s) => s.length >= 2), linkedHosts,
+    ...(secCik ? { secCik } : {}) };
 }
 export function sameCompanySite(raw, website) {
   const url = publicManagementUrl(raw), base = publicManagementUrl(website); if (!url || !base) return false;
   const host = new URL(url).hostname, root = new URL(base).hostname.replace(/^www\./, "");
   return host === root || host.endsWith("." + root);
 }
+// Regulator filings are accepted only as exact document paths: SEC archives of
+// this issuer's CIK, or HKEXnews listed-company announcement PDFs for HK symbols.
+export function regulatorFilingUrl(raw, site) {
+  const url = publicManagementUrl(raw); if (!url || !site) return null;
+  const u = new URL(url); if (u.search) return null;
+  if (u.hostname === "www.sec.gov") {
+    const m = u.pathname.match(/^\/Archives\/edgar\/data\/(\d{1,10})\/\d{18}\/[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.html?$/);
+    return m && site.secCik && /^us/.test(site.symbol || "") && String(Number(m[1])) === String(site.secCik) ? url : null;
+  }
+  if (u.hostname === "www1.hkexnews.hk") {
+    return /^hk/.test(site.symbol || "") && /^\/listedco\/listconews\/(?:sehk|gem)\/20\d{2}\/\d{4}\/[A-Za-z0-9_]{1,40}\.pdf$/i.test(u.pathname) ? url : null;
+  }
+  return null;
+}
 export function officialSourceUrl(raw, site) {
   const url = publicManagementUrl(raw); if (!url || !site) return null;
-  return sameCompanySite(url, site.website) || sameCompanySite(url, site.irUrl) || site.linkedHosts?.includes(new URL(url).hostname) ? url : null;
+  return sameCompanySite(url, site.website) || sameCompanySite(url, site.irUrl) || site.linkedHosts?.includes(new URL(url).hostname)
+    || regulatorFilingUrl(url, site) ? url : null;
+}
+
+// Short machine reasons for an official-source miss, per stage (IR, then SEC/HKEX).
+export const OFFICIAL_REASONS = ["no_company_website", "ir_blocked", "ir_unavailable", "ir_not_found", "ir_no_documents", "ir_documents_rejected",
+  "pdf_too_large", "pdf_parse_failed", "timeout", "sec_not_listed", "sec_unavailable", "sec_blocked", "sec_no_filings", "sec_documents_rejected",
+  "hkex_not_listed", "hkex_unavailable", "hkex_blocked", "hkex_no_filings", "hkex_documents_rejected"];
+export function cleanOfficialReason(raw) {
+  const codes = (typeof raw === "string" ? raw.split(",") : []).slice(0, 4)
+    .filter((code) => OFFICIAL_REASONS.includes(code.replace(/_\d{3}$/, "")) && /^[a-z_]+(?:_blocked_[1-5]\d{2})?$/.test(code));
+  return [...new Set(codes)].join(",");
 }
 
 export function cleanManagementResearch(raw) {
@@ -71,6 +99,7 @@ export function cleanManagementResearch(raw) {
     symbol: managementText(raw.symbol, 24), fetchedAt: managementText(raw.fetchedAt, 40),
     coverage: sources.some((s) => s.sourceType === "official") ? "official_and_recent_news" : "recent_news_and_related",
     ...(["ok", "empty", "unavailable", "not_configured"].includes(raw.officialStatus) ? { officialStatus: raw.officialStatus } : {}),
+    ...(cleanOfficialReason(raw.officialReason) ? { officialReason: cleanOfficialReason(raw.officialReason) } : {}),
     ...(officialSite ? { officialSite } : {}),
     ...(["saved", "refreshing", "refresh_failed"].includes(raw.storage?.status) ? { storage: { status: raw.storage.status,
       savedAt: managementText(raw.storage.savedAt, 40), checkedAt: managementText(raw.storage.checkedAt, 40) } } : {}),

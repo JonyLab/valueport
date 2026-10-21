@@ -1,13 +1,21 @@
-import { publicManagementUrl, cleanOfficialSite, sameCompanySite, officialSourceUrl, managementText } from "../public/shared/valuation/management-research.js";
+import { publicManagementUrl, cleanOfficialSite, sameCompanySite, officialSourceUrl, regulatorFilingUrl, managementText } from "../public/shared/valuation/management-research.js";
 
 import { signedGet, tencentToLongport } from "./longbridge.js";
 
 const MAX_PDF_BYTES = 4 * 1024 * 1024;
+// HKEX results announcements are often larger and longer; only their opening pages are read.
+const MAX_HKEX_PDF_BYTES = 12 * 1024 * 1024, HKEX_PDF_PAGES = 15;
+const TOTAL_BUDGET_MS = 18000, IR_BUDGET_MS = 9000;
+// SEC asks automated clients to declare themselves; SEC_USER_AGENT may add a contact address.
+const SEC_USER_AGENT = "ValuePort research bot (contact via site)";
+// 不带浏览器请求头时，不少 IR 站点（如 investor.apple.com）的反爬会直接返回 429
+const BROWSER_HEADERS = { "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  accept: "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf;q=0.8,*/*;q=0.7", "accept-language": "en-US,en;q=0.9,zh-CN;q=0.8" };
 const OUTLOOK = /\b(?:expect|guidance|outlook|forecast|optimistic|will|plans?|potential|ahead|future)\b|预计|預計|展望|指引|预期|預期|未来|未來/i;
 const OPERATING = /\b(?:revenue|margin|GMV|EBITDA|monetization|take rate|cost|loan|credit|NPL|bookings|profit|cash|investment|capital|logistics|fulfillment|risk|growth)\b|收入|营收|營收|利润|利潤|成本|资本|資本|现金|現金|增长|增長|毛利|信贷|信貸/i;
 
 async function readBounded(response, limit, signal) {
-  if (!response.ok || !response.body) { await response.body?.cancel(); throw new Error("official_unavailable"); }
+  if (!response.ok || !response.body) { await response.body?.cancel(); throw Object.assign(new Error("official_unavailable"), { status: response.status }); }
   if (Number(response.headers.get("content-length")) > limit) { await response.body.cancel(); throw new Error("official_too_large"); }
   const reader = response.body.getReader(), chunks = []; let size = 0;
   try {
@@ -24,17 +32,19 @@ async function readBounded(response, limit, signal) {
   return bytes;
 }
 
-export async function extractOfficialPdf(bytes, { signal } = {}) {
-  if (bytes.byteLength > MAX_PDF_BYTES || new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") throw new Error("invalid_official_pdf");
+export async function extractOfficialPdf(bytes, { signal, maxBytes = MAX_PDF_BYTES, firstPages = 0 } = {}) {
+  if (bytes.byteLength > maxBytes) throw new Error("official_pdf_too_large");
+  if (new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") throw new Error("invalid_official_pdf");
   // Lazy-load only when a discovered document is a PDF; do not load remote resources or JS actions.
   const { getDocumentProxy } = await import("unpdf");
   signal?.throwIfAborted();
   const pdf = await getDocumentProxy(bytes, { isEvalSupported: false, useSystemFonts: false, disableFontFace: true,
-    useWorkerFetch: false, cMapUrl: undefined, standardFontDataUrl: undefined });
+    useWorkerFetch: false, cMapUrl: undefined, standardFontDataUrl: undefined, verbosity: 0 });
   try {
-    if (pdf.numPages > 40) throw new Error("official_too_many_pages");
+    // firstPages reads a long filing's opening pages (management discussion) instead of rejecting it.
+    if (pdf.numPages > 40 && !firstPages) throw new Error("official_too_many_pages");
     const pages = []; let length = 0;
-    for (let page = 1; page <= pdf.numPages; page++) {
+    for (let page = 1; page <= Math.min(pdf.numPages, firstPages || 40); page++) {
       signal?.throwIfAborted();
       const docPage = await pdf.getPage(page), content = await docPage.getTextContent();
       const text = content.items.filter((item) => typeof item.str === "string").map((item) => item.str + (item.hasEOL ? "\n" : " ")).join("");
@@ -46,13 +56,16 @@ export async function extractOfficialPdf(bytes, { signal } = {}) {
   } finally { await pdf.loadingTask.destroy(); }
 }
 
-export function officialDocumentSource(document, pages, { site, format = "pdf" } = {}) {
+// Regulator paths pass issuerVerified: the filing came from the regulator's own index
+// for this issuer (SEC CIK / HKEX stock id), so a logo-only heading is acceptable.
+export function officialDocumentSource(document, pages, { site, format = "pdf", periodFromBody = false, issuerVerified = false } = {}) {
   if (!Array.isArray(pages) || !pages.length || pages.length > 40) throw new Error("invalid_official_pages");
   const opening = pages.slice(0, 2).join("\n"), all = pages.join("\n");
-  // Check the actual heading, not a search snippet or filename.
+  // Check the actual heading, not a search snippet or filename. Regulator filings
+  // may state the period in the opening body text instead.
   const header = managementText(pages[0], 1400);
-  const matchesPeriod = officialReportPeriod(header) === document.reportPeriod;
-  const matchesIssuer = site?.aliases.some((name) => header.toLowerCase().includes(name.toLowerCase()));
+  const matchesPeriod = (periodFromBody ? officialFilingPeriod(all) : officialReportPeriod(header)) === document.reportPeriod;
+  const matchesIssuer = issuerVerified || site?.aliases.some((name) => header.toLowerCase().includes(name.toLowerCase()));
   if (!matchesIssuer || !matchesPeriod || !/earnings|results|financial|业绩|業績|财报|財報|季度/i.test(header)) throw new Error("official_issuer_or_period_mismatch");
   const prepared = /\bprepared\s+remarks\b/i.test(header);
   const qaIncluded = /^\s*(?:Questions?\s*(?:and|&)\s*Answers?|Q\s*&\s*A\s*(?:Session)?|Question-and-Answer Session)\s*:?\s*$/im.test(all);
@@ -120,6 +133,30 @@ export function officialReportPeriod(raw) {
   if (m) return `${m[1] ? "FY" : ""}${m[2]} Q${qnum(m[3])}`;
   m = s.match(/(20\d{2})\s*(年|财年|財年)\s*第?([1-4一二三四])季(?:度)?/);
   if (m) return `${m[2] === "年" ? "" : "FY"}${m[1]} Q${qnum(m[3])}`;
+  // HK results titles: "THREE (AND SIX) MONTHS ENDED 30 JUNE 2026". The end date is a
+  // calendar date, so this is a calendar quarter (no FY prefix), whatever the fiscal year.
+  const months = { march: 1, june: 2, september: 3, december: 4 };
+  m = s.match(/\bthree(?: and (?:six|nine|twelve))? months(?: and (?:the )?year)? ended (?:(\d{1,2}) (march|june|september|december),? (20\d{2})|(march|june|september|december) (\d{1,2}),? (20\d{2}))\b/i);
+  if (m && Number(m[1] || m[5]) >= 28) return `${m[3] || m[6]} Q${months[(m[2] || m[4]).toLowerCase()]}`;
+  m = s.match(/截至\s*(20\d{2})\s*年\s*(3|6|9|12)\s*月\s*3[01]\s*日止?(?:三個月|三个月)/);
+  if (m) return `${m[1]} Q${Number(m[2]) / 3}`;
+  return "";
+}
+
+// Regulator filings may name the period only in the body (e.g. "fourth quarter of
+// fiscal year 2026"). Use the heading first, then the first explicit period whose
+// quarter agrees with any ordinal quarter in the heading.
+export function officialFilingPeriod(text) {
+  const all = String(text || ""), header = managementText(all, 1400), direct = officialReportPeriod(header);
+  const ordinal = header.match(/\b(first|second|third|fourth)[ -]quarter\b/i)?.[1].toLowerCase();
+  const want = ordinal ? { first: 1, second: 2, third: 3, fourth: 4 }[ordinal] : 0;
+  if (direct && (!want || direct.endsWith(`Q${want}`))) return direct;
+  let checked = 0;
+  for (const m of all.slice(0, 120000).matchAll(/\b(?:first|second|third|fourth)[ -]quarter\b|\bQ[1-4]\b|\bthree months\b/gi)) {
+    if (++checked > 60) break;
+    const period = officialReportPeriod(all.slice(Math.max(0, m.index - 40), m.index + 160));
+    if (period && (!want || period.endsWith(`Q${want}`))) return period;
+  }
   return "";
 }
 
@@ -237,12 +274,173 @@ async function searchOfficialLinks(env, site, fetcher, signal, now) {
   }).filter(Boolean);
 }
 
+// Machine reasons are short, stage-prefixed codes (see OFFICIAL_REASONS); never messages or URLs.
+const REASON_RANK = ["blocked", "timeout", "pdf_too_large", "pdf_parse_failed", "documents_rejected", "no_documents", "no_filings", "not_found", "not_listed", "unavailable"];
+const pickReason = (codes) => [...codes].sort((a, b) => REASON_RANK.findIndex((r) => a.includes(r)) - REASON_RANK.findIndex((r) => b.includes(r)))[0] || "";
+function failureReason(error, stage, { pdf = false } = {}) {
+  const message = String(error?.message || ""), status = Number(error?.status);
+  if (error?.name === "AbortError" || error?.name === "TimeoutError") return "timeout";
+  if (/pdf_too_large/.test(message) || (pdf && /official_too_large/.test(message))) return "pdf_too_large";
+  if ([401, 403, 429].includes(status)) return `${stage}_blocked_${status}`;
+  if (/mismatch|no_extractable|invalid_official_pages/.test(message)) return `${stage}_documents_rejected`;
+  if (pdf && !(error instanceof TypeError && /fetch|network/i.test(message)) && !/official_unavailable|request_limit|host_rejected|redirect/.test(message)) return "pdf_parse_failed";
+  return `${stage}_unavailable`;
+}
+const officialId = async (url) => {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(url));
+  return "official-" + [...new Uint8Array(hash).slice(0, 12)].map((n) => n.toString(16).padStart(2, "0")).join("");
+};
+const issuerAlias = (raw) => managementText(raw, 100).replace(/,?\s+\b(?:Limited|Ltd\.?|Inc\.?|Corporation|Corp\.?|Holdings?|Group|Company|Co\.?|PLC|N\.?V\.?|S\.?A\.?)\b\.?/gi, "").replace(/-[A-Z]{1,3}$/, "").trim();
+function addAlias(site, raw) {
+  const alias = issuerAlias(raw);
+  if (alias.length >= 3 && !site.aliases.some((a) => a.toLowerCase() === alias.toLowerCase())) site.aliases = [...site.aliases.slice(0, 5), alias];
+}
+
+// Regulator endpoints are fixed hosts; redirects are refused rather than followed.
+const REGULATOR_HOSTS = new Set(["www.sec.gov", "data.sec.gov", "www1.hkexnews.hk"]);
+async function regulatorFetch(fetcher, url, limit, signal, headers) {
+  const u = new URL(url); if (u.protocol !== "https:" || !REGULATOR_HOSTS.has(u.hostname)) throw new Error("official_host_rejected");
+  signal.throwIfAborted();
+  const response = await fetcher(u.href, { signal, redirect: "manual", headers });
+  if (response.status >= 300 && response.status < 400) { await response.body?.cancel(); throw Object.assign(new Error("official_redirect_rejected"), { status: response.status }); }
+  return readBounded(response, limit, signal);
+}
+const utf8 = (bytes) => new TextDecoder().decode(bytes);
+
+// company_tickers.json (~0.8 MB) is reduced to ticker -> [cik, title] and cached
+// per isolate, plus the Cache API when running in Workers with the real fetch.
+const secTickerMemo = new WeakMap(), SEC_TICKER_KEY = "https://sec-tickers.internal/v1", SEC_TICKER_TTL = 7 * 86400000;
+async function secTickerMap(fetcher, get, now) {
+  const memo = secTickerMemo.get(fetcher); if (memo && now - memo.at < SEC_TICKER_TTL) return memo.map;
+  const cache = fetcher === globalThis.fetch ? globalThis.caches?.default : null;
+  let map = null;
+  try { const hit = await cache?.match(SEC_TICKER_KEY); if (hit) map = await hit.json(); } catch { map = null; }
+  if (!map || typeof map !== "object") {
+    const raw = JSON.parse(utf8(await get("https://www.sec.gov/files/company_tickers.json", 3 * 1024 * 1024)));
+    map = {};
+    for (const item of Object.values(raw || {}).slice(0, 30000)) {
+      if (typeof item?.ticker === "string" && /^[A-Z0-9.-]{1,16}$/i.test(item.ticker) && Number.isInteger(item.cik_str) && item.cik_str > 0) map[item.ticker.toUpperCase()] = [item.cik_str, managementText(item.title, 100)];
+    }
+    await cache?.put(SEC_TICKER_KEY, Response.json(map, { headers: { "cache-control": `public, max-age=${SEC_TICKER_TTL / 1000}` } })).catch(() => {});
+  }
+  secTickerMemo.set(fetcher, { at: now, map });
+  return map;
+}
+
+// The filing index names each document's type; take the 8-K's EX-99.1 press release.
+export function secExhibitUrl(indexHtml, site) {
+  let fallback = null;
+  for (const row of String(indexHtml).matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+    const cells = [...row[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map((c) => managementText(decodeHtml(c[1].replace(/<[^>]*>/g, " ")), 80));
+    const type = cells.find((c) => /^EX-99(?:\.\d+)?$/i.test(c)); if (!type) continue;
+    const href = row[1].match(/href=["'](\/Archives\/edgar\/data\/[^"'?#]+\.html?)["']/i)?.[1];
+    const url = href && regulatorFilingUrl("https://www.sec.gov" + href, site); if (!url) continue;
+    if (/^EX-99\.1$/i.test(type)) return url;
+    fallback ||= url;
+  }
+  return fallback;
+}
+
+async function cachedOrFetched(ctx, url, load) {
+  const { symbol, now, documentStore, site } = ctx;
+  const cached = await documentStore?.getDocument(symbol, url, now);
+  if (cached && officialSourceUrl(cached.url, site) === cached.url) return { ...cached, cached: true };
+  const loaded = await load();
+  return { ...loaded, url, fetchedAt: new Date(now).toISOString(), cached: false };
+}
+
+async function secFilingSources(site, ctx) {
+  const { fetcher, signal, now, env, symbol } = ctx;
+  const headers = { "user-agent": managementText(env.SEC_USER_AGENT, 200) || SEC_USER_AGENT, accept: "application/json,text/html;q=0.9,*/*;q=0.5" };
+  const get = (url, limit) => regulatorFetch(fetcher, url, limit, signal, headers);
+  const ticker = symbol.slice(2).toUpperCase().replace(/\./g, "-");
+  const entry = (await secTickerMap(fetcher, get, now))[ticker];
+  if (!Array.isArray(entry)) return { sources: [], reason: "sec_not_listed" };
+  const [cik, title] = entry; site.secCik = String(cik); addAlias(site, title);
+  const submissions = JSON.parse(utf8(await get(`https://data.sec.gov/submissions/CIK${String(cik).padStart(10, "0")}.json`, 4 * 1024 * 1024)));
+  const recent = submissions?.filings?.recent || {}, filings = [], today = new Date(now).toISOString().slice(0, 10);
+  for (let i = 0; i < Math.min(recent.form?.length || 0, 1000) && filings.length < 2; i++) {
+    const accession = String(recent.accessionNumber?.[i] || ""), filingDate = String(recent.filingDate?.[i] || "");
+    if (recent.form[i] !== "8-K" || !/(?:^|,)\s*2\.02\b/.test(String(recent.items?.[i] || "")) || !/^\d{10}-\d{2}-\d{6}$/.test(accession)
+      || !/^20\d{2}-\d{2}-\d{2}$/.test(filingDate) || filingDate > today) continue;
+    filings.push({ accession, filingDate });
+  }
+  if (!filings.length) return { sources: [], reason: "sec_no_filings" };
+  const reasons = new Set();
+  for (const filing of filings) {
+    try {
+      const folder = `https://www.sec.gov/Archives/edgar/data/${cik}/${filing.accession.replace(/-/g, "")}/`;
+      const exhibit = secExhibitUrl(utf8(await get(folder + filing.accession + "-index.htm", 512000)), site);
+      if (!exhibit) { reasons.add("sec_documents_rejected"); continue; }
+      const doc = await cachedOrFetched({ ...ctx, site }, exhibit, async () => ({ format: "html", publishedAt: filing.filingDate,
+        pages: [officialHtmlText(utf8(await get(exhibit, 4 * 1024 * 1024)))] }));
+      const reportPeriod = officialFilingPeriod(doc.pages[0]);
+      if (!reportPeriod) { reasons.add("sec_documents_rejected"); continue; }
+      const document = { id: await officialId(exhibit), url: exhibit, title: `${site.name} ${reportPeriod} · Earnings release (SEC Form 8-K, Exhibit 99)`, sourceType: "official",
+        publisher: site.name, reportPeriod, publishedAt: doc.publishedAt || filing.filingDate, retrievedAt: doc.fetchedAt, documentType: "earnings_release" };
+      const source = officialDocumentSource(document, doc.pages, { site, format: "html", periodFromBody: true, issuerVerified: true });
+      if (!doc.cached) await ctx.documentStore?.putDocument(symbol, exhibit, { url: exhibit, pages: doc.pages, format: "html", fetchedAt: doc.fetchedAt, publishedAt: document.publishedAt }, now);
+      return { sources: [source] };
+    } catch (error) { reasons.add(failureReason(error, "sec")); if (signal.aborted) break; }
+  }
+  return { sources: [], failed: [...reasons].some((r) => !/documents_rejected/.test(r)), reason: pickReason(reasons) || "sec_documents_rejected" };
+}
+
+const hkexDate = (ms) => new Date(ms + 8 * 3600000).toISOString().slice(0, 10).replace(/-/g, "");
+async function hkexFilingSources(site, ctx) {
+  const { fetcher, signal, now, symbol } = ctx;
+  const headers = { ...BROWSER_HEADERS, accept: "application/json,text/javascript,application/pdf,*/*;q=0.5", referer: "https://www1.hkexnews.hk/search/titlesearch.xhtml" };
+  const get = (url, limit) => regulatorFetch(fetcher, url, limit, signal, headers);
+  const code = symbol.slice(2).replace(/^0+(?=\d)/, "").padStart(5, "0");
+  if (!/^\d{5}$/.test(code)) return { sources: [], reason: "hkex_not_listed" };
+  const prefix = utf8(await get(`https://www1.hkexnews.hk/search/prefix.do?callback=callback&lang=EN&type=A&name=${code}&market=SEHK`, 64000));
+  const stock = JSON.parse(prefix.trim().replace(/^callback\(/, "").replace(/\);?$/, ""))?.stockInfo?.find?.((item) => item?.code === code);
+  if (!Number.isInteger(stock?.stockId)) return { sources: [], reason: "hkex_not_listed" };
+  addAlias(site, stock.name);
+  const list = JSON.parse(utf8(await get(`https://www1.hkexnews.hk/search/titleSearchServlet.do?sortDir=0&sortByOptions=DateTime&category=0&market=SEHK&stockId=${stock.stockId}`
+    + `&documentType=-1&fromDate=${hkexDate(now - 400 * 86400000)}&toDate=${hkexDate(now)}&title=&searchType=1&t1code=10000&t2Gcode=3&t2code=-2&rowRange=40&lang=E`, 512000)));
+  const rows = typeof list?.result === "string" && list.result !== "null" ? JSON.parse(list.result) : [];
+  const filings = (Array.isArray(rows) ? rows.slice(0, 40) : []).filter((row) => /\[(?:Final|Interim|Quarterly) Results\]/i.test(row?.LONG_TEXT || "")
+    && String(row.STOCK_CODE || "").includes(code) && /^\/listedco\/listconews\/(?:sehk|gem)\/20\d{2}\/\d{4}\/[A-Za-z0-9_]+\.pdf$/i.test(row.FILE_LINK || "")).slice(0, 2);
+  if (!filings.length) return { sources: [], reason: "hkex_no_filings" };
+  const reasons = new Set();
+  for (const filing of filings) {
+    try {
+      const url = regulatorFilingUrl("https://www1.hkexnews.hk" + filing.FILE_LINK, site); if (!url) { reasons.add("hkex_documents_rejected"); continue; }
+      const size = String(filing.FILE_INFO || "").match(/([\d.]+)\s*(KB|MB)/i), bytes = size ? Number(size[1]) * (size[2].toUpperCase() === "MB" ? 1048576 : 1024) : 0;
+      if (bytes > MAX_HKEX_PDF_BYTES) { reasons.add("pdf_too_large"); continue; }
+      const date = String(filing.DATE_TIME || "").match(/^(\d{2})\/(\d{2})\/(20\d{2})/), publishedAt = date ? `${date[3]}-${date[2]}-${date[1]}` : "";
+      const title = managementText(decodeHtml(filing.TITLE || ""), 160), expected = officialReportPeriod(title);
+      const doc = await cachedOrFetched({ ...ctx, site }, url, async () => {
+        const pdf = await get(url, MAX_HKEX_PDF_BYTES).catch((error) => { throw /too_large/.test(error?.message) ? new Error("official_pdf_too_large") : error; });
+        try { return { format: "pdf", publishedAt, pages: await (ctx.extractPdf || extractOfficialPdf)(pdf, { signal, maxBytes: MAX_HKEX_PDF_BYTES, firstPages: HKEX_PDF_PAGES }) }; }
+        catch (error) { throw Object.assign(error, { pdf: true }); }
+      });
+      const reportPeriod = officialFilingPeriod(doc.pages.join("\n"));
+      if (!reportPeriod || (expected && expected !== reportPeriod)) { reasons.add("hkex_documents_rejected"); continue; }
+      const document = { id: await officialId(url), url, title: `${site.name} ${reportPeriod} · ${title || "Results announcement"}`, sourceType: "official",
+        publisher: site.name, reportPeriod, publishedAt: doc.publishedAt || publishedAt, retrievedAt: doc.fetchedAt, documentType: "earnings_release" };
+      const source = officialDocumentSource(document, doc.pages, { site, format: "pdf", periodFromBody: true, issuerVerified: true });
+      if (!doc.cached) await ctx.documentStore?.putDocument(symbol, url, { url, pages: doc.pages, format: "pdf", fetchedAt: doc.fetchedAt, publishedAt: document.publishedAt }, now);
+      return { sources: [source] };
+    } catch (error) { reasons.add(failureReason(error, "hkex", { pdf: !!error?.pdf })); if (signal.aborted) break; }
+  }
+  return { sources: [], failed: [...reasons].some((r) => !/documents_rejected/.test(r)), reason: pickReason(reasons) || "hkex_documents_rejected" };
+}
+
 export async function fetchOfficialManagementResearch(symbol, options = {}, env = {}) {
   if (!env.LONGBRIDGE_APP_KEY || !env.LONGBRIDGE_APP_SECRET || !env.LONGBRIDGE_ACCESS_TOKEN) return { status: "not_configured", sources: [] };
-  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 18000);
-  const fetcher = options.fetchImpl || fetch, signal = controller.signal, now = options.now || Date.now();
-  let site = null, requests = 0;
-  const finish = (status, sources = []) => ({ status, sources, ...(site ? { site: cleanOfficialSite(site, symbol) } : {}) });
+  // The company IR phase gets its own shorter budget so regulator fallbacks still have time.
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), options.timeoutMs ?? TOTAL_BUDGET_MS);
+  const irController = new AbortController(), irTimer = setTimeout(() => irController.abort(), options.irTimeoutMs ?? IR_BUDGET_MS);
+  const stopIr = () => irController.abort(); controller.signal.addEventListener("abort", stopIr, { once: true });
+  const fetcher = options.fetchImpl || fetch, signal = controller.signal, irSignal = irController.signal, now = options.now || Date.now();
+  let site = null, requests = 0; const stageReasons = [];
+  const finish = (status, sources = []) => {
+    const reason = sources.length ? "" : [...new Set(stageReasons.filter(Boolean))].slice(0, 3).join(",");
+    if (!sources.length) console.warn(`[official-research] ${symbol} status=${status} reason=${reason || "none"}`);
+    return { status, sources, ...(reason ? { reason } : {}), ...(site ? { site: cleanOfficialSite(site, symbol) } : {}) };
+  };
   try {
     const get = options.get || ((path, query) => signedGet(env, path, query, { signal, maxBytes: 256000, fetchImpl: options.fetchImpl }));
     const lp = tencentToLongport(symbol); if (!lp) return finish("empty");
@@ -250,7 +448,7 @@ export async function fetchOfficialManagementResearch(symbol, options = {}, env 
     if (profile?.code !== 0) return finish("unavailable");
     const d = profile.data || {}, rawWebsite = typeof d.website === "string" ? d.website.trim() : "";
     const website = publicManagementUrl(rawWebsite.replace(/^http:/i, "https:").replace(/^(?!https?:\/\/)/i, "https://"));
-    if (!website) return finish("empty");
+    if (!website) { stageReasons.push("no_company_website"); return finish("empty"); }
     const name = managementText(d.company_name || d.name, 100); if (!name) return finish("empty");
     const stem = new URL(website).hostname.replace(/^www\./, "").split(".")[0];
     const shortName = name.replace(/,?\s+\b(?:Limited|Ltd\.?|Inc\.?|Corporation|Corp\.?|Holdings?|Group|Company|Co\.?)\b\.?/gi, "").trim();
@@ -258,27 +456,28 @@ export async function fetchOfficialManagementResearch(symbol, options = {}, env 
       aliases: [...new Set([name, shortName, managementText(d.name, 100), stem.length >= 3 ? stem : ""].filter((s) => s.length >= 2))].slice(0, 5) };
     const knownSite = cleanOfficialSite(options.knownSite, symbol);
     if (knownSite?.website === website) { site.irUrl = knownSite.irUrl; site.linkedHosts = knownSite.linkedHosts; }
-    const request = async (initialUrl, limit) => {
+    const request = async (initialUrl, limit, phaseSignal = irSignal) => {
       let url = officialSourceUrl(initialUrl, site); if (!url) throw new Error("official_host_rejected");
       for (let hop = 0; hop <= 2; hop++) {
-        signal.throwIfAborted(); if (++requests > 18) throw new Error("official_request_limit");
-        const response = await fetcher(url, { signal, redirect: "manual" });
+        phaseSignal.throwIfAborted(); if (++requests > 18) throw new Error("official_request_limit");
+        const response = await fetcher(url, { signal: phaseSignal, redirect: "manual", headers: BROWSER_HEADERS });
         if (response.status >= 300 && response.status < 400) {
           const location = response.headers.get("location"); await response.body?.cancel();
           const next = location && officialSourceUrl(new URL(location, url).href, site);
           if (!next) throw new Error("official_redirect_rejected"); url = next; continue;
         }
-        return { bytes: await readBounded(response, limit, signal), url };
+        return { bytes: await readBounded(response, limit, phaseSignal), url };
       }
       throw new Error("official_redirect_limit");
     };
-    const searchP = searchOfficialLinks(env, site, fetcher, signal, now).catch(() => []);
-    const candidates = [], visited = new Set(), pages = [...new Set([site.irUrl, website])]; let failed = false, scriptsRead = 0;
+    const irReasons = new Set();
+    const searchP = searchOfficialLinks(env, site, fetcher, irSignal, now).catch(() => []);
+    const candidates = [], visited = new Set(), pages = [...new Set([site.irUrl, website])]; let failed = false, scriptsRead = 0, pagesLoaded = 0;
     // Follow a small number of actual IR links. Nothing is executed from a page.
     for (let pageIndex = 0; pageIndex < pages.length && pageIndex < 4; pageIndex++) {
       const current = pages[pageIndex]; if (visited.has(current)) continue; visited.add(current);
       try {
-        const { bytes, url } = await request(current, 1024000), html = new TextDecoder().decode(bytes);
+        const { bytes, url } = await request(current, 1024000), html = new TextDecoder().decode(bytes); pagesLoaded++;
         candidates.push(...discoverOfficialLinks(html, url, site));
         const entrances = discoverIrEntrances(html, url, site);
         for (const entrance of entrances) {
@@ -305,25 +504,27 @@ export async function fetchOfficialManagementResearch(symbol, options = {}, env 
           }
         }
         if (candidates.some((c) => c.call && c.score > 0)) break;
-      } catch { failed = true; }
-      if (signal.aborted) break;
+      } catch (error) { failed = true; irReasons.add(failureReason(error, "ir")); }
+      if (irSignal.aborted) break;
     }
     candidates.push(...await searchP);
     const rank = (a, b) => b.score - a.score || Number(b.call) - Number(a.call) || Number(b.release) - Number(a.release);
-    const queue = [...new Map(candidates.map((item) => [item.url, item])).values()].sort(rank).slice(0, 5), sources = [], read = new Set();
-    for (let index = 0; index < queue.length && index < 5; index++) {
+    const queue = [...new Map(candidates.map((item) => [item.url, item])).values()].sort(rank).slice(0, 5), read = new Set();
+    let sources = [];
+    for (let index = 0; index < queue.length && index < 5 && !irSignal.aborted; index++) {
       const candidate = queue[index]; if (read.has(candidate.url)) continue; read.add(candidate.url);
+      let pdf = /\.pdf(?:$|\?)/i.test(candidate.url);
       try {
         let cached = await options.documentStore?.getDocument(symbol, candidate.url, now);
         if (cached && !officialSourceUrl(cached.url, site)) cached = null;
-        let url, pdf, html = "", textPages, retrievedAt;
+        let url, html = "", textPages, retrievedAt;
         if (cached && officialSourceUrl(cached.url, site)) {
           url = cached.url; pdf = cached.format === "pdf"; textPages = cached.pages; retrievedAt = cached.fetchedAt;
         } else {
-          const response = await request(candidate.url, /\.pdf(?:$|\?)/i.test(candidate.url) ? MAX_PDF_BYTES : 1024000);
+          const response = await request(candidate.url, pdf ? MAX_PDF_BYTES : 1024000);
           url = response.url; pdf = new TextDecoder().decode(response.bytes.slice(0, 5)) === "%PDF-";
           html = pdf ? "" : new TextDecoder().decode(response.bytes);
-          textPages = pdf ? await (options.extractPdf || extractOfficialPdf)(response.bytes, { signal }) : [officialHtmlText(html)];
+          textPages = pdf ? await (options.extractPdf || extractOfficialPdf)(response.bytes, { signal: irSignal }) : [officialHtmlText(html)];
           retrievedAt = new Date(now).toISOString();
         }
         const header = managementText(textPages[0], 1400), reportPeriod = officialReportPeriod(header);
@@ -331,24 +532,43 @@ export async function fetchOfficialManagementResearch(symbol, options = {}, env 
           if (!pdf && queue.length < 8) queue.splice(index + 1, 0, ...discoverOfficialLinks(html, url, site).sort(rank).slice(0, 3));
           continue;
         }
-        if (candidate.expectedPeriod && candidate.expectedPeriod.replace(/^FY/, "") !== reportPeriod.replace(/^FY/, "")) { failed = true; continue; }
+        if (candidate.expectedPeriod && candidate.expectedPeriod.replace(/^FY/, "") !== reportPeriod.replace(/^FY/, "")) { failed = true; irReasons.add("ir_documents_rejected"); continue; }
         const publishedAt = cached?.publishedAt || (pdf ? candidate.publishedAt || "" : officialHtmlDate(html));
         if (publishedAt && Date.parse(publishedAt) > now) continue;
         if (/will (?:announce|release|report)|to (?:announce|release|report).*results|earnings (?:date|schedule)/i.test(header.slice(0, 400))) continue;
-        const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(url));
-        const id = "official-" + [...new Uint8Array(hash).slice(0, 12)].map((n) => n.toString(16).padStart(2, "0")).join("");
-        const document = { id, url, title: `${site.name} ${reportPeriod} · ${candidate.title || "Results"}`, sourceType: "official",
+        const document = { id: await officialId(url), url, title: `${site.name} ${reportPeriod} · ${candidate.title || "Results"}`, sourceType: "official",
           publisher: site.name, reportPeriod, publishedAt, retrievedAt, documentType: candidate.call || /prepared remarks|earnings call transcript/i.test(header) ? "earnings_call" : "earnings_release" };
         const source = officialDocumentSource(document, textPages, { site, format: pdf ? "pdf" : "html" });
-        signal.throwIfAborted(); sources.push(source);
+        irSignal.throwIfAborted(); sources.push(source);
         if (!cached) await options.documentStore?.putDocument(symbol, candidate.url, { url, pages: textPages, format: pdf ? "pdf" : "html", fetchedAt: retrievedAt, publishedAt }, now);
         // A current, explicitly dated catalog call needs no older fallback reads.
         if (candidate.call && candidate.score > 0) break;
-      } catch { failed = true; }
-      if (signal.aborted) break;
+      } catch (error) { failed = true; irReasons.add(failureReason(error, "ir", { pdf })); }
+    }
+    // A calendar-quarter IR document more than two quarters old is likely a stale
+    // directory entry; the regulator filing list is then checked for a newer one.
+    const nowDate = new Date(now), currentQuarter = nowDate.getUTCFullYear() * 4 + Math.floor(nowDate.getUTCMonth() / 3) + 1;
+    const stale = sources.length > 0 && sources.every((source) => {
+      const m = /^(20\d{2}) Q([1-4])$/.exec(source.reportPeriod); return m && currentQuarter - (Number(m[1]) * 4 + Number(m[2])) > 2;
+    });
+    if (!sources.length || stale) {
+      if (!sources.length) {
+        if (irSignal.aborted) { failed = true; irReasons.add("timeout"); }
+        if (!irReasons.size) irReasons.add(queue.length ? "ir_documents_rejected" : !pagesLoaded ? "ir_unavailable" : site.irUrl !== site.website || pages.length > 2 ? "ir_no_documents" : "ir_not_found");
+        stageReasons.push(pickReason(irReasons));
+      }
+      // Regulator fallbacks: SEC EDGAR 8-K Item 2.02 press releases (US), HKEXnews results announcements (HK).
+      const fallback = /^us/.test(symbol) ? secFilingSources : /^hk/.test(symbol) ? hkexFilingSources : null;
+      if (fallback && !signal.aborted) {
+        const ctx = { fetcher, signal, now, env, symbol, documentStore: options.documentStore, extractPdf: options.extractPdf };
+        const stage = fallback === secFilingSources ? "sec" : "hkex";
+        const result = await fallback(site, ctx).catch((error) => ({ sources: [], failed: true, reason: failureReason(error, stage) }));
+        if (!sources.length) { if (result.failed) failed = true; if (!result.sources.length) stageReasons.push(result.reason); }
+        sources = [...sources, ...result.sources];
+      }
     }
     sources.sort((a, b) => b.reportPeriod.replace("FY", "").localeCompare(a.reportPeriod.replace("FY", "")) || b.publishedAt.localeCompare(a.publishedAt));
     return finish(sources.length ? "ok" : failed || signal.aborted ? "unavailable" : "empty", sources.slice(0, 1));
-  } catch { return finish("unavailable"); }
-  finally { clearTimeout(timer); }
+  } catch (error) { stageReasons.push(failureReason(error, "ir")); return finish("unavailable"); }
+  finally { clearTimeout(timer); clearTimeout(irTimer); controller.signal.removeEventListener("abort", stopIr); }
 }

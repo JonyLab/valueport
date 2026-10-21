@@ -18,6 +18,47 @@ const node = (tag, cls, text) => {
 const object = (value) => value && typeof value === "object" && !Array.isArray(value);
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const cleanReferences = (raw) => Array.isArray(raw) ? raw.filter((line) => typeof line === "string").slice(0, 24).map((line) => line.slice(0, 1600)) : [];
+const icon = (name) => { const element = node("i", "ri-" + name); element.setAttribute("aria-hidden", "true"); return element; };
+
+// 估值数字沿用编辑页大号结果的写法：整数大号，小数（.num-dec）和币种缩小变淡；两个值时中间用「–」
+function valueNode(cls, values, r) {
+  const element = node("p", cls);
+  values.forEach((value, i) => {
+    if (i) element.append(node("span", "vc-flow-dash", "–"));
+    const text = r.fmt(value), at = text.search(/\.\d/), number = node("span", "vc-flow-num", at < 0 ? text : text.slice(0, at));
+    if (at >= 0) number.append(node("span", "num-dec", text.slice(at)));
+    element.append(number);
+  });
+  if (r.currency) element.append(node("span", "vc-flow-cur", r.currency));
+  return element;
+}
+// 单个情景的价值 vs 现价：与编辑页「高估 / 安全边际」徽章同款（价值低于现价 = 偏贵，红；高于现价 = 有余地，绿）
+function priceGapBadge(value, r, t) {
+  const gap = value / r.price - 1, pct = Math.round(Math.abs(gap) * 100);
+  return node("span", "vc-rverdict" + (pct < 1 ? "" : gap < 0 ? " v-over" : " v-under"),
+    pct < 1 ? t("与现价接近", "Close to the price") : gap < 0 ? t(`低于现价 ${pct}%`, `${pct}% below the price`) : t(`高于现价 ${pct}%`, `${pct}% above the price`));
+}
+// 「现价 529.27 USD」+ 徽章，一行；showPrice=false 时只放徽章（对照页卡片里现价已在上方汇总）
+function priceRow(r, t, badge, showPrice = true) {
+  const row = node("p", "vc-flow-result-vs"), cur = r.currency ? ` ${r.currency}` : "";
+  if (showPrice) row.append(node("span", "", t(`现价 ${r.fmt(r.price)}${cur}`, `Price ${r.fmt(r.price)}${cur}`)));
+  if (badge) row.append(badge);
+  return row;
+}
+// 提醒（示例值、方法变化等）用平静的金色提示；important 用于更需要留意的情况（保守高于乐观、算不出结果），仍不用报错红
+function notice(content, important = false) {
+  const box = node("div", "vc-guide-notice" + (important ? " important" : "")); box.setAttribute("role", "note");
+  const body = node("div", "");
+  if (typeof content === "string") body.append(node("p", "", content)); else body.append(...content);
+  box.append(icon(important ? "error-warning-line" : "information-line"), body);
+  return box;
+}
+// 折叠区标题：主文字 + 变淡的状态（如「本轮资料 · 11 条」）；箭头由 CSS 画
+function disclosureSummary(title, meta = "") {
+  const summary = node("summary", "", title);
+  if (meta) summary.append(node("span", "vc-guide-summary-meta", ` · ${meta}`));
+  return summary;
+}
 
 // 整条「从叙事到数字」的 AI 流程：经营变量问答 → 两个场景的草稿 → 选方法 → 逐项确认参数 → 看结果。
 // 每一步只显示当前这一屏；完成后交给编辑器的可修改面板。模型输出都按受约束的数据处理，数字只在用户确认后写入。
@@ -221,19 +262,23 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
     const list = node("ol", "vc-guide-progress"); list.setAttribute("aria-label", t("AI 引导进度", "AI guide progress"));
     const at = ["story", "review"].includes(state.stage) ? 0 : FLOW_STAGES.findIndex((s) => s.key === state.stage);
     FLOW_STAGES.forEach((stage, i) => {
-      let label = `${i < at ? "✓" : i + 1} ${zh ? stage.zh : stage.en}`; // 完成的步骤用 ✓，不只靠颜色区分
-      if (i === 0 && state.stage === "story") label += zh ? ` · 第 ${Math.min(state.turns.length + 1, questionCount())}/${questionCount()} 题` : ` · ${Math.min(state.turns.length + 1, questionCount())}/${questionCount()}`;
+      let label = `${i < at ? "" : `${i + 1} `}${zh ? stage.zh : stage.en}`; // 完成的步骤前面换成对勾图标，不只靠颜色区分
+      // 选题计划回来之前总题数未定：只显示「第 n 题」，避免先显示 1/4 再变成 1/3
+      const known = state.guideMode !== "drivers" || !!state.driverPlan, n = known ? Math.min(state.turns.length + 1, questionCount()) : state.turns.length + 1;
+      if (i === 0 && state.stage === "story") label += known ? (zh ? ` · 第 ${n}/${questionCount()} 题` : ` · ${n}/${questionCount()}`) : (zh ? ` · 第 ${n} 题` : ` · Question ${n}`);
       const item = node("li", i < at ? "done" : "", label); if (i === at) item.setAttribute("aria-current", "step");
+      if (i < at) item.prepend(icon("check-line"));
       if (i < at) item.setAttribute("aria-label", `${zh ? stage.zh : stage.en} · ${t("已完成", "done")}`); list.append(item);
     });
     return list;
   }
   function loader(content, shape) {
-    const box = node("div", "vc-guide-loader"), head = node("div", "vc-guide-loader-head"), icon = node("span", "vc-guide-spinner");
-    icon.setAttribute("aria-hidden", "true");
+    // is-question 等类名只用于给占位卡一个接近真实内容的最小高度，内容到达时不明显跳动
+    const box = node("div", "vc-guide-loader is-" + busy), head = node("div", "vc-guide-loader-head"), spinner = node("span", "vc-guide-spinner");
+    spinner.setAttribute("aria-hidden", "true");
     status.textContent = ({ question: t("正在结合公司资料准备问题…", "Preparing a question from company information…"), draft: caseKey ? t("正在根据你的回答整理估值思路…", "Organizing your answers into a valuation narrative…") : t("正在把你的回答整理成两个场景…", "Turning your answers into two cases…"),
       picks: t("正在按你的叙事挑选估值方法…", "Choosing methods that fit your story…"), params: t("正在按叙事和财报给出参数建议…", "Suggesting inputs from your story and the financials…") })[busy] || "";
-    head.append(icon, status, button(t("停止", "Stop"), () => active?.abort())); box.append(head);
+    head.append(spinner, status, button(t("停止", "Stop"), () => active?.abort())); box.append(head);
     const skeleton = node("div", "vc-guide-skeleton"); skeleton.setAttribute("aria-hidden", "true");
     for (const cls of shape) skeleton.append(node("span", cls));
     box.append(skeleton); content.append(box);
@@ -271,7 +316,7 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
       const popup = node("span", "vc-guide-cite-popover"); popup.setAttribute("popover", "auto"); popup.setAttribute("role", "tooltip");
       popup.id = `guide-source-${crypto.randomUUID()}`; trigger.setAttribute("aria-describedby", popup.id);
       popup.append(node("strong", "", t(`资料 [${number}]`, `Source [${number}]`)), node("span", "", sources.get(number) || t("本轮未提供这条资料，暂时无法核实这处引用。", "This source was not supplied for this question; the citation cannot be verified.")));
-      popup.append(node("span", "vc-guide-audit-detail", t("本段核验：", "Passage check: ") + (labels ? labels.support : t("尚未完成语义核验", "Semantic check unavailable"))));
+      popup.append(node("span", "vc-guide-audit-detail", t("引用核验：", "Citation check: ") + (labels ? labels.support : t("引用尚未核验", "Citation not checked"))));
       let closeTimer;
       const close = () => { clearTimeout(closeTimer); if (popup.matches(":popover-open")) popup.hidePopover(); };
       const show = () => {
@@ -318,7 +363,7 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
     fieldset.append(help);
     if (state.references.length) {
       const sources = node("details", "vc-guide-sources");
-      sources.append(node("summary", "", t(`本轮资料 · ${state.references.length} 条`, `Sources for this question · ${state.references.length}`)));
+      sources.append(disclosureSummary(t("本轮资料", "Sources for this question"), t(`${state.references.length} 条`, `${state.references.length}`)));
       sources.append(node("p", "vc-question-help", t("以下是本轮提供给 AI 的资料；未标注引用的陈述不代表已获这些资料支持。", "These excerpts were supplied to AI for this question. Uncited claims are not necessarily supported by them.")));
       const list = node("ol", "");
       state.references.forEach((text, i) => { const row = node("li", ""); row.append(node("strong", "", `[${i + 1}] `), document.createTextNode(text)); list.append(row); });
@@ -383,7 +428,9 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
 
   function renderReview(content) {
     const { c, o } = state.drafts;
-    const conflict = caseKey ? state.drafts[caseKey]?.conflict : state.drafts.conflict;
+    const rawConflict = caseKey ? state.drafts[caseKey]?.conflict : state.drafts.conflict;
+    // AI 有时把「没有冲突」也写进 conflict：这类说明不当作警告显示
+    const conflict = /(没有|无|未发现|不存在|并无)(明显|明确)?(的)?(冲突|矛盾|不一致)|\bno (obvious |clear |apparent |significant )?(conflicts?|contradictions?|inconsistenc(y|ies))\b/i.test(String(rawConflict || "")) ? "" : rawConflict;
     content.append(node("p", "vc-guide-lead", caseKey ? t(`这是根据你本轮回答整理的${caseName()}。核对假设、依据和待验证条件，再进入参数。`, `Review the ${caseName()} drawn from your answers, including its evidence and unverified conditions, before entering inputs.`) : state.guideMode === "drivers"
       ? t("以下是围绕你已选假设建议的保守、乐观情景。新增条件还需要你确认；请修改不符合想法的部分。", "These proposed downside and upside cases build on your selected assumptions. Review new conditions and edit anything that does not match your view.")
       : t("AI 根据你的回答写了两个场景。看看是否符合你的想法，之后随时能改。", "AI wrote both cases from your answers. Check they match your view; you can edit them anytime.")));
@@ -452,7 +499,7 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
     const picked = (state.picks?.picks || []).filter((p) => byKey.has(p.key));
     picked.forEach((p, i) => fieldset.append(choice(byKey.get(p.key), p.reason, p.suitability === "needs_review" ? t("待确认", "Needs review") : i ? t("备选", "Alternative") : t("推荐", "Recommended"), p)));
     const others = methods.filter((m) => !picked.some((p) => p.key === m.key));
-    const more = node("details", "vc-flow-more"); more.append(node("summary", "", t(`其他方法（${others.length}）`, `Other methods (${others.length})`)));
+    const more = node("details", "vc-flow-more"); more.append(disclosureSummary(t("其他方法", "Other methods"), t(`${others.length} 个`, `${others.length}`)));
     const moreList = node("div", "vc-guide-options vc-flow-more-list"); for (const m of others) moreList.append(choice(m, "", ""));
     more.append(moreList); more.open = !picked.length || others.some((m) => m.key === state.method);
     content.append(fieldset, more);
@@ -479,7 +526,16 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
     if (caseKey === "o") {
       content.append(node("p", "vc-question-help", t("共用方法与基础数据：", "Shared method and base data: ") + (hooks.methods().find((m) => m.key === hooks.currentMethod())?.title || hooks.currentMethod()) + " · " + hooks.fields().filter((f) => f.col === "single").map((f) => `${f.label} ${f.value ?? "—"}${f.unit || ""}`).join("；")));
     }
-    if (!state.rows?.some((r) => r.ai)) content.append(node("p", "vc-guide-error", t("这次 AI 没有给出可用的建议值，可以直接填，或重试。", "No usable suggestions this time. Fill them in yourself, or retry.")));
+    if (!state.rows?.some((r) => r.ai)) content.append(notice(t("这次 AI 没有给出可用的建议值，可以直接填，或重试。", "No usable suggestions this time. Fill them in yourself, or retry.")));
+    // AI 没给建议、表单里还是方法自带示例值的参数：不勾选也会照样进入估值，必须在最上面点名（不拦着继续）
+    const samples = notice(""), sampleBody = samples.lastElementChild; content.append(samples);
+    const sampleRows = () => (state.rows || []).filter((r) => !r.ai && !r.use && fields.get(r.k)?.isDefault);
+    function updateSamples() {
+      const names = sampleRows().map((r) => fields.get(r.k).label);
+      sampleBody.replaceChildren(node("strong", "", t("以下参数 AI 没有给出建议，仍是示例值，请按公司情况填写：", "AI gave no suggestion for these inputs; they are still sample values. Fill them in for this company: ") + names.join(t("、", ", "))),
+        node("p", "", t("示例值不是对这家公司的判断，不改也会直接用于估值。", "Sample values are not a view on this company, and will be used in the valuation unless you change them.")));
+      samples.hidden = !names.length; samples.style.display = names.length ? "" : "none"; // .vc-guide-notice 自带 display:flex，会盖过 hidden
+    }
     const list = node("div", "vc-flow-params");
     for (const row of state.rows || []) {
       const field = fields.get(row.k); if (!field) continue;
@@ -525,6 +581,7 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
     const next = button(t("下一步：看估值", "Next: see the value"), () => { applyRows(); go("result"); }, true);
     const why = node("p", "vc-question-help vc-flow-why"); // 主按钮不能点时说明原因
     function update() {
+      updateSamples();
       next.disabled = (state.rows || []).some((r) => r.use && (r.single ? !finite(r.v) : !(caseKey ? finite(r[caseKey]) : finite(r.c) && finite(r.o))));
       why.textContent = next.disabled ? caseKey ? t("请填完整当前情景勾选采用的参数。", "Complete every input marked Use for this case.") : t("勾选「采用」的参数需要填完整（两个场景都要填）。", "Fill in every input marked “Use” (both cases).") : ""; why.hidden = !next.disabled;
     }
@@ -538,21 +595,29 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
     const box = node("div", "vc-flow-result");
     if (r && finite(r.low) && finite(r.high)) {
       const lo = Math.min(r.low, r.high), hi = Math.max(r.low, r.high);
-      const cur = r.currency ? ` ${r.currency}` : "";
       box.append(node("p", "vc-flow-result-label", t("你的合理价值区间（每股，保守 – 乐观）", "Your fair value per share (conservative – optimistic)")),
-        node("p", "vc-flow-result-range", (lo === hi ? r.fmt(lo) : `${r.fmt(lo)} – ${r.fmt(hi)}`) + cur));
-      if (finite(r.price)) box.append(node("p", "vc-flow-result-price", t(`现价 ${r.fmt(r.price)}${cur}`, `Price ${r.fmt(r.price)}${cur}`) + (r.verdict ? ` · ${r.verdict}` : "")));
+        valueNode("vc-flow-result-range", lo === hi ? [lo] : [lo, hi], r));
+      if (finite(r.price)) box.append(priceRow(r, t, r.verdict ? node("span", "vc-rverdict" + (r.price < lo ? " v-under" : r.price > hi ? " v-over" : ""), r.verdict) : null));
       if (/安全边际|margin of safety/i.test(r.verdict)) box.append(node("p", "vc-flow-result-note", t("安全边际：现价比你算出的合理价值低多少。越高，买错的余地越大。", "Margin of safety: how far the price sits below your fair value. Higher leaves more room for error.")));
       if (r.method) box.append(node("p", "vc-flow-result-note", t(`方法：${r.method}`, `Method: ${r.method}`) + (r.inputs?.length ? t(` · ${r.inputs.join("，")}`, ` · ${r.inputs.join(", ")}`) : "")));
-      if (r.inverted) box.append(node("p", "vc-guide-error", t("保守场景算出的价值反而高于乐观场景，可能是两组参数填反了。可以返回上一步检查。", "The conservative case comes out higher than the optimistic one; the inputs may be swapped. Go back to check.")));
-      if (r.sample) box.append(node("p", "vc-guide-error", t("参数仍是方法自带的示例值，这个结果还不是你的判断。可以返回上一步填参数。", "Inputs are still the method's samples, so this is not your view yet. Go back to fill them in.")));
-      else if (r.samples?.length) box.append(node("p", "vc-guide-error", t(`这些参数仍是示例值：${r.samples.join("、")}。建议返回上一步按公司情况填写。`, `Still sample values: ${r.samples.join(", ")}. Consider going back to fill them in.`)));
-    } else box.append(node("p", "vc-guide-error", t("还算不出结果：", "Can't calculate yet: ") + (r?.missing?.length ? t(`${r.missing.join("、")} 还没填。`, `${r.missing.join(", ")} missing. `) : t("有参数没填完整。", "some inputs are missing. ")) + t("返回上一步补齐，或进入编辑后再填。", "Go back, or fill them in the editor.")));
+      if (r.inverted) box.append(notice(t("保守场景算出的价值反而高于乐观场景，可能是两组参数填反了。可以返回上一步检查。", "The conservative case comes out higher than the optimistic one; the inputs may be swapped. Go back to check."), true));
+      if (r.sample) box.append(notice(t("参数仍是方法自带的示例值，这个结果还不是你的判断。可以返回上一步填参数。", "Inputs are still the method's samples, so this is not your view yet. Go back to fill them in.")));
+      else if (r.samples?.length) box.append(notice(t(`这些参数仍是示例值：${r.samples.join("、")}。建议返回上一步按公司情况填写。`, `Still sample values: ${r.samples.join(", ")}. Consider going back to fill them in.`)));
+    } else box.append(notice(t("还算不出结果：", "Can't calculate yet: ") + (r?.missing?.length ? t(`${r.missing.join("、")} 还没填。`, `${r.missing.join(", ")} missing. `) : t("有参数没填完整。", "some inputs are missing. ")) + t("返回上一步补齐，或进入编辑后再填。", "Go back, or fill them in the editor."), true));
     // 能保存就在这里直接保存；不能保存（区间不完整、两档相同）时去编辑页补全
     const canSave = r?.canSave && !r.sample;
     content.append(box, node("p", "vc-guide-lead", canSave ? t("确认没问题就直接保存；也可以先去编辑页看看敏感性分析、再改改。", "Save now, or open the editor first to review sensitivity and adjust.") : t("还不能保存：先去编辑页把参数补完整，保守和乐观要算出不同的价值。", "Not ready to save: complete the inputs in the editor so the two cases give different values.")));
     const restart = node("button", "vc-guide-link", t("从头再来", "Start over")); restart.type = "button";
-    restart.addEventListener("click", () => { if (!confirm(t("清空引导里的问答，重新开始？已经填进表单的内容不受影响。", "Clear the guide's answers and start again? What's already in the form stays."))) return; state = empty(); notify(); render(true); });
+    // 页内二次确认：内嵌浏览器 / WebView 里原生 confirm() 可能被屏蔽直接返回 false，按钮就像没反应
+    restart.addEventListener("click", () => {
+      const ask = node("span", "vc-guide-restart-ask"); ask.setAttribute("role", "group");
+      const yes = node("button", "vc-guide-link", t("确认清空", "Clear answers")), no = node("button", "vc-guide-link", t("取消", "Cancel"));
+      yes.type = no.type = "button";
+      yes.addEventListener("click", () => { state = empty(); notify(); render(true); });
+      no.addEventListener("click", () => { ask.replaceWith(restart); restart.focus(); });
+      ask.append(node("span", "vc-question-help", t("清空引导里的问答，重新开始？已填进表单的内容不受影响。", "Clear the guide's answers and start again? What's already in the form stays.")), yes, no);
+      restart.replaceWith(ask); yes.focus();
+    });
     content.append(canSave
       ? actions(button(t("保存估值", "Save valuation"), () => hooks.save(), true), button(t("先去编辑页看看", "Open the editor first"), () => hooks.finish()), button(t("上一步", "Back"), () => go("params")), restart)
       : actions(button(t("去编辑页补全", "Complete in the editor"), () => hooks.finish(), true), button(t("上一步", "Back"), () => go("params")), restart));
@@ -563,10 +628,11 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
     const valid = finite(value) && value > 0 && !r?.missing?.length;
     const box = node("div", "vc-flow-result");
     box.append(node("p", "vc-flow-result-label", t(`${caseName()} · 每股合理价值`, `${caseName()} · fair value per share`)),
-      node("p", "vc-flow-result-range", valid ? `${r.fmt(value)} ${r.currency || ""}` : t("参数尚未完整", "Inputs incomplete")));
+      valid ? valueNode("vc-flow-result-range", [value], r) : node("p", "vc-flow-result-range empty", t("参数尚未完整", "Inputs incomplete")));
+    if (valid && finite(r.price) && r.price > 0) box.append(priceRow(r, t, priceGapBadge(value, r, t)));
     box.append(node("p", "vc-question-help", t("本情景参数已写入草稿，尚未保存为正式估值。", "This case’s inputs are in the draft; the valuation is not saved yet.")));
-    if (r?.samples?.length) box.append(node("p", "vc-guide-error", t(`仍需核对示例值：${r.samples.join("、")}`, `Review sample values: ${r.samples.join(", ")}`)));
-    if (!valid) box.append(node("p", "vc-guide-error", t(`请返回补齐：${r?.missing?.join("、") || "参数"}`, `Go back to complete: ${r?.missing?.join(", ") || "inputs"}`)));
+    if (r?.samples?.length) box.append(notice(t(`这些参数仍是方法自带的示例值，不是对这家公司的判断：${r.samples.join("、")}。建议返回修改参数。`, `Still the method's sample values, not a view on this company: ${r.samples.join(", ")}. Consider revising the inputs.`)));
+    if (!valid) box.append(notice(t(`请返回补齐：${r?.missing?.join("、") || "参数"}`, `Go back to complete: ${r?.missing?.join(", ") || "inputs"}`), true));
     const next = button(singleCase ? t("确认单场景估值", "Confirm single-case valuation") : caseKey === "c" ? t("保守情景完成，开始乐观情景", "Conservative case complete; start optimistic case") : t("乐观情景完成，对比两个情景", "Optimistic case complete; compare cases"), () => hooks.completeCase(), true);
     next.disabled = !valid;
     content.append(box, actions(next, button(t("返回修改参数", "Revise inputs"), () => go("params")), button(t("去编辑页核对", "Review in editor"), () => hooks.exit())));
@@ -601,7 +667,9 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
     const planText = state.driverPlan.status === "used"
       ? t("已按公司资料选出关键变量", "Key drivers selected from company evidence")
       : t("先从经营变量出发；具体业务适配仍待确认", "Starting with business drivers; company fit still needs confirmation");
-    box.append(node("p", "vc-question-help", planText + (current && state.stage === "story" ? t(` · 本题：${current.zh}`, ` · This question: ${current.en}`) : "")));
+    // 答题时：「本题 · 需求与销量」做成题目上方的一行小标题（选题说明变淡跟在后面），不再是灰底框
+    const asking = !!(current && state.stage === "story" && state.question);
+    if (!asking && state.turns.length) box.append(node("p", "vc-question-help", planText));
     if (state.turns.length) {
       box.append(node("strong", "", t("已选主叙事假设", "Selected narrative assumptions")), node("p", "vc-question-help", t("点击可返回修改；后续回答需重新确认。", "Click to revise. Subsequent answers will need reconfirmation.")));
       const list = node("div", "vc-guide-assumption-list");
@@ -618,7 +686,11 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
       });
       box.append(list);
     }
-    content.append(box);
+    if (box.childElementCount) content.append(box);
+    if (asking) {
+      const eyebrow = node("p", "vc-guide-eyebrow"); eyebrow.append(node("strong", "", t(`本题 · ${current.zh}`, `This question · ${current.en}`)), node("span", "", ` · ${planText}`));
+      content.append(eyebrow);
+    }
   }
 
   function render(focus = false) {
@@ -632,8 +704,9 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
     else host.append(progress());
     const content = node("div", "vc-guide-content"); host.append(content);
     const revenue = businessReportElement(state.businessReports, lang, { onRetry: hooks.retryBusinessReports }); if (revenue) content.append(revenue);
-    const management = managementResearchElement(state.managementResearch, lang, { onRetry: hooks.retryManagementResearch }); if (management) content.append(management);
-    if (["story", "review"].includes(state.stage) && !busy) renderAssumptions(content);
+    // 开始页只讲接下来做什么：财报季研究依据和「本题」提示等开始答题后再显示（保守、乐观两个开始页保持一致）
+    const management = !intro && managementResearchElement(state.managementResearch, lang, { onRetry: hooks.retryManagementResearch }); if (management) content.append(management);
+    if (["story", "review"].includes(state.stage) && !busy && !intro) renderAssumptions(content);
     // 方法 / 参数两步自己在原地显示错误和重试；其他步骤在顶部显示
     if (error && !["method", "params"].includes(state.stage)) {
       const box = node("div", "vc-flow-retry"); box.setAttribute("role", "alert");
@@ -641,7 +714,7 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
       const change = switchModelButton(); if (change) box.append(change);
       content.append(box);
     }
-    if (busy) loader(content, busy === "draft" ? ["line", "line short", "card", "card"] : busy === "params" ? ["line", "line short", "card", "card", "card"] : ["line", "line short", "opt", "opt", "opt"]);
+    if (busy) loader(content, busy === "draft" ? ["line", "line short", "card", "card"] : busy === "params" ? ["line", "line short", "card", "card", "card"] : ["line", "line short", "opt", "opt", "opt", "opt"]);
     else if (state.stage === "review" && state.drafts) renderReview(content);
     // 恢复到这两步但还没有数据时，渲染完再去取（不能在渲染中途触发新的渲染）
     // 卡片隐藏时（「自己填写」模式下恢复草稿）不自动调用 AI，等用户回到引导再取
@@ -657,16 +730,16 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
       state.turns.length ? button(t("上一步", "Back"), () => { error = ""; backQuestion(); notify(); render(true); }) : null));
     else renderIntro(content);
     if (!busy && state.audit && ["story", "review"].includes(state.stage) && (state.question || state.drafts)) {
-      if (state.audit.status === "used") host.append(node("p", "vc-guide-audit-note", t("Jev 按本轮提供的资料核对陈述与引用；未独立验证原始来源，也不代表预测会兑现。", "Jev checks passages against the supplied excerpts; original sources and future outcomes have not been independently verified.")));
-      else if (state.audit.status === "unavailable") host.append(node("p", "vc-guide-audit-note", t("Jev 语义核验暂不可用，引用内容仍可展开查看；本轮陈述未通过语义核验。", "Jev semantic checks are unavailable. You can still inspect the sources; these passages have not been checked.")));
+      if (state.audit.status === "used") host.append(node("p", "vc-guide-audit-note", t("已按本轮提供的资料核对陈述与引用；未独立验证原始来源，也不代表预测会兑现。", "Passages were checked against the supplied excerpts; original sources and future outcomes have not been independently verified.")));
+      else if (state.audit.status === "unavailable") host.append(node("p", "vc-guide-audit-note", t("引用核验暂不可用，引用内容仍可展开查看；本轮陈述尚未核对。", "Citation checks are unavailable. You can still inspect the sources; these passages have not been checked.")));
     }
     if (state.turns.length && ["story", "review"].includes(state.stage)) {
-      const history = node("details", "vc-guide-history"); history.append(node("summary", "", t(`已回答 ${state.turns.length} 个问题 · 查看记录`, `${state.turns.length} answers · Review history`)));
+      const history = node("details", "vc-guide-history"); history.append(disclosureSummary(t(`已回答 ${state.turns.length} 个问题`, `${state.turns.length} answers`), t("查看记录", "Review history")));
       for (const turn of state.turns) history.append(node("p", "vc-guide-history-q", turn.question), node("p", "", turn.answer));
       host.append(history);
     }
     if (state.references.length && state.stage === "review") {
-      const references = node("details", "vc-guide-history"); references.append(node("summary", "", t("全部参考资料（带编号）", "All source material (numbered)")));
+      const references = node("details", "vc-guide-history"); references.append(disclosureSummary(t("全部参考资料", "All source material"), t(`${state.references.length} 条，带编号`, `${state.references.length}, numbered`)));
       state.references.forEach((line, i) => references.append(node("p", "", `[${i + 1}] ${line}`))); host.append(references);
     }
     if (locked) for (const control of host.querySelectorAll("button,input,textarea,select")) control.disabled = true;
@@ -730,10 +803,16 @@ export function mountValuationFlow(host, options) {
   const basisKey = () => JSON.stringify([hooks.currentMethod(), hooks.sharedKey?.() || "", hooks.fields().map((f) => [f.k, f.col, f.col === "single" ? f.value : null])]);
   const capture = () => { if (child && state.activeCase !== "compare") state.cases[state.activeCase] = child.snapshot(); };
   const notify = () => { if (destroyed) return; capture(); updateNavigation(); onChange?.(); };
+  // 步骤胶囊文字；已完成的步骤末尾加对勾图标（读屏读「· 已完成」）
+  function paintStep(b, key) {
+    const label = key === "compare" ? (single() ? t("2 确认估值", "2 Confirm valuation") : t("3 对照估值", "3 Compare values")) : (key === "c" ? "1 " : "2 ") + name(key), done = !!state.completed[key];
+    b.replaceChildren(document.createTextNode(label)); b.classList.toggle("done", done);
+    if (done) { b.append(icon("check-line")); b.setAttribute("aria-label", label + t(" · 已完成", " · done")); } else b.removeAttribute("aria-label");
+  }
   function updateNavigation() {
     for (const b of host.querySelectorAll("[data-case-key]")) {
       const key = b.dataset.caseKey;
-      b.textContent = (key === "compare" ? (single() ? t("2 确认估值", "2 Confirm valuation") : t("3 对照估值", "3 Compare values")) : (key === "c" ? "1 " : "2 ") + name(key)) + (state.completed[key] ? " ✓" : "");
+      paintStep(b, key);
       b.disabled = locked || (key === "o" && !state.completed.c) || (key === "compare" && !(state.completed.c && (single() || state.completed.o)));
     }
   }
@@ -763,9 +842,13 @@ export function mountValuationFlow(host, options) {
     render(); onChange?.();
   }
   function compare(content) {
+    content.classList.add("vc-thesis-guide", "vc-guide-card"); // 对照页和各情景页一样放在同一种卡片里（吸底按钮的渐变才能和底色对齐）
     if (single()) {
       const r = hooks.result("c"), value = r?.low;
-      content.append(node("h3", "vc-guide-title", t("单场景估值", "Single-case valuation")), node("p", "vc-flow-result-range", finite(value) ? `${r.fmt(value)} ${r.currency || ""}` : "—"), node("p", "", state.cases.c?.drafts?.c?.story || ""));
+      content.append(node("h3", "vc-guide-title", t("单场景估值", "Single-case valuation")), finite(value) ? valueNode("vc-flow-result-range", [value], r) : node("p", "vc-flow-result-range empty", "—"));
+      if (finite(value) && finite(r.price) && r.price > 0) content.append(priceRow(r, t, priceGapBadge(value, r, t)));
+      if (r?.samples?.length) content.append(notice(t(`仍需核对示例值：${r.samples.join("、")}`, `Review sample values: ${r.samples.join(", ")}`)));
+      content.append(node("p", "", state.cases.c?.drafts?.c?.story || ""));
       const rows = node("dl", "");
       for (const f of hooks.fields()) rows.append(node("dt", "", f.label), node("dd", "", `${f.col === "dual" ? f.value?.c ?? "—" : f.value ?? "—"}${f.unit || ""}`));
       content.append(rows, node("p", "vc-question-help", t("这是一个条件情景下的估值，不代表未来价格确定会达到。", "This valuation depends on one set of assumptions; it is not a guaranteed future price.")));
@@ -776,9 +859,21 @@ export function mountValuationFlow(host, options) {
     const r = hooks.result(), grid = node("div", "vc-flow-cases");
     content.append(node("h3", "vc-guide-title", t("对比保守与乐观情景", "Compare conservative and optimistic cases")),
       node("p", "vc-guide-lead", t("两边分别完成引导，沿用相同方法和基础数据。核对经营假设如何造成估值差异。", "Both interviews are complete, using the same method and base data. Review how their business assumptions explain the value difference.")));
+    // 汇总行：同编辑页大号结果——「低 – 高 币种」，下面一行现价 + 高估 / 安全边际徽章
+    if (r && finite(r.low) && finite(r.high)) {
+      const lo = Math.min(r.low, r.high), hi = Math.max(r.low, r.high), hero = node("div", "vc-flow-result vc-flow-compare-hero");
+      hero.append(node("p", "vc-flow-result-label", t("合理价值区间（每股，低 – 高）", "Fair value per share (low – high)")), valueNode("vc-flow-result-range", lo === hi ? [lo] : [lo, hi], r));
+      if (finite(r.price) && r.price > 0) hero.append(priceRow(r, t, r.verdict ? node("span", "vc-rverdict" + (r.price < lo ? " v-under" : r.price > hi ? " v-over" : ""), r.verdict) : null));
+      content.append(hero);
+    }
+    // 提示放在卡片上方：两张卡片很长，放在下面会被滚出视野，而保存按钮一直可见
+    if (r?.inverted) content.append(notice(t("保守估值高于乐观估值，请核对两组假设及参数；不会自动交换数值。", "The conservative value exceeds the optimistic value. Check the assumptions and inputs; values have not been swapped."), true));
+    if (r?.samples?.length) content.append(notice(t(`仍需核对示例值：${r.samples.join("、")}`, `Review sample values: ${r.samples.join(", ")}`)));
     for (const key of ["c", "o"]) {
       const box = node("section", "vc-flow-case " + key), page = state.cases[key], draft = page?.drafts?.[key], value = key === "c" ? r?.low : r?.high;
-      box.append(node("h4", "", name(key)), node("p", "vc-flow-result-range", finite(value) ? `${r.fmt(value)} ${r.currency || ""}` : "—"), node("p", "", draft?.story || ""));
+      box.append(node("h4", "", name(key)), finite(value) ? valueNode("vc-flow-result-range", [value], r) : node("p", "vc-flow-result-range empty", "—"));
+      if (finite(value) && finite(r.price) && r.price > 0) box.append(priceRow(r, t, priceGapBadge(value, r, t), false));
+      box.append(node("p", "", draft?.story || ""));
       if (draft?.uncertainties) box.append(node("strong", "", t("待验证条件", "Conditions to verify")), node("p", "", draft.uncertainties));
       const list = node("dl", "");
       for (const field of hooks.fields().filter((f) => f.col === "dual")) {
@@ -787,8 +882,6 @@ export function mountValuationFlow(host, options) {
       box.append(list, button(t("返回修改", "Revise this case"), () => { state.completed[key] = false; open(key); })); grid.append(box);
     }
     content.append(grid);
-    if (r?.inverted) content.append(node("p", "vc-guide-error", t("保守估值高于乐观估值，请核对两组假设及参数；不会自动交换数值。", "The conservative value exceeds the optimistic value. Check the assumptions and inputs; values have not been swapped.")));
-    if (r?.samples?.length) content.append(node("p", "vc-guide-error", t(`仍需核对示例值：${r.samples.join("、")}`, `Review sample values: ${r.samples.join(", ")}`)));
     const actions = node("div", "vc-guide-actions vc-guide-sticky");
     if (r?.canSave && !r.sample) actions.append(button(t("保存估值", "Save valuation"), () => hooks.save(), true));
     actions.append(button(t("去编辑页核对", "Review in editor"), () => hooks.finish(), !r?.canSave)); content.append(actions);
@@ -808,13 +901,13 @@ export function mountValuationFlow(host, options) {
     }
     const steps = node("nav", "vc-guide-progress"); steps.setAttribute("aria-label", t("情景引导进度", "Case guide progress"));
     for (const key of (single() ? ["c", "compare"] : ["c", "o", "compare"])) {
-      const b = button((key === "compare" ? (single() ? t("2 确认估值", "2 Confirm valuation") : t("3 对照估值", "3 Compare values")) : (key === "c" ? "1 " : "2 ") + name(key)) + (state.completed[key] ? " ✓" : ""), () => open(key));
+      const b = button("", () => open(key)); paintStep(b, key);
       b.disabled = locked || (key === "o" && !state.completed.c) || (key === "compare" && !(state.completed.c && (single() || state.completed.o)));
       b.dataset.caseKey = key;
       if (key === state.activeCase) b.setAttribute("aria-current", "step"); steps.append(b);
     }
     host.append(steps);
-    if (state.basisChanged && state.activeCase !== "compare") host.append(node("p", "vc-guide-error", t("估值方法、基础数据或已确认参数已变化。问答已保留，请重新确认参数后再对照。", "The method, base data or confirmed inputs changed. Your answers are kept; reconfirm inputs before comparing.")));
+    if (state.basisChanged && state.activeCase !== "compare") host.append(notice(t("估值方法、基础数据或已确认参数已变化。问答已保留，请重新确认参数后再对照。", "The method, base data or confirmed inputs changed. Your answers are kept; reconfirm inputs before comparing.")));
     const content = node("div", "vc-scenario-content"); host.append(content);
     if (state.activeCase === "compare") { compare(content); return; }
     const key = state.activeCase;

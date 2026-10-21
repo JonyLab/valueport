@@ -57,10 +57,12 @@ td.dim{color:var(--ink-mute)}
 <script type="module">
 import { t, applyI18n } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
+import { mountGlobalAi } from "/shared/global-ai.js";
 import { mountUsage } from "/shared/owner-usage.js";
 applyI18n();
 document.title = t("o_title") + " · ValuePort";
 mountLangMenu(document.getElementById("corner"));
+mountGlobalAi(document.getElementById("corner"), { getPage: () => ({ kind: "other", path: location.pathname, title: document.title }) }); // 全站 AI 助手
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 // 菜单：按 location.hash 切换右侧内容，刷新后停在原处

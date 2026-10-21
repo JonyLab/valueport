@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { selectPeriodicReports, discoverPeriodicReports, extractRevenueTable, extractMainBusinessTable, fetchBusinessReports } from "../src/business-report.js";
+import { selectPeriodicReports, discoverPeriodicReports, extractRevenueTable, extractMainBusinessTable, fetchBusinessReports,
+  extractRevenueTotal, reportIdentityMatches, reportFailure, extractBusinessReportPdf } from "../src/business-report.js";
 import { cleanBusinessReports, businessReportFacts } from "../public/shared/valuation/business-report.js";
 import { cleanFlowState } from "../public/shared/valuation/thesis-guide-ui.js";
 
@@ -110,5 +111,114 @@ describe("revenue table boundaries and calculations", () => {
     const facts = businessReportFacts(snapshot()); expect(facts.join("\n")).toContain("不得当成完整业务构成");
     const state = cleanFlowState({ stage: "story", turns: [], businessReports: snapshot() });
     expect(state.businessReports.reports[0].tables[0].pdfPage).toBe(2); expect(cleanFlowState(state)).toEqual(state);
+  });
+});
+
+// Layouts observed in real 2025/2026 filings (Shanghai, Shenzhen, STAR); coordinates are simplified.
+const pageOf = (rows, page = 9) => {
+  const items = [];
+  for (const [y, cells] of rows) for (const [str, x, width = 40] of cells) items.push({ str, transform: [1, 0, 0, 10, x, y], width });
+  return { page, items };
+};
+describe("real report layouts", () => {
+  it("accepts alphanumeric cninfo org ids such as gssh0600519", async () => {
+    const fetchImpl = vi.fn(async (url) => Response.json(url.endsWith("detailOfQuery")
+      ? { keyBoardList: [{ code: "600001", orgId: "gssh0600001", plate: "sse", zwjc: "示例公司" }] } : { announcements: [announcement] }));
+    const result = await discoverPeriodicReports("sh600001", { fetchImpl, now });
+    expect(result.reports).toHaveLength(1);
+    const bad = vi.fn(async () => Response.json({ keyBoardList: [{ code: "600001", orgId: "../x", plate: "sse" }] }));
+    expect((await discoverPeriodicReports("sh600001", { fetchImpl: bad, now })).reports).toEqual([]);
+  });
+  it("matches report identity on Shenzhen covers without codes, traditional script and 年度报告 titles", () => {
+    const id = { code: "000001", name: "平安银行" }, annual = { year: 2025, kind: "annual" }, interim = { year: 2026, kind: "interim" };
+    expect(reportIdentityMatches("平安银行股份有限公司2025年年度报告", id, annual)).toBe(true);
+    expect(reportIdentityMatches("宜宾五粮液股份有限公司2025年度报告", { code: "000858", name: "五粮液" }, annual)).toBe(true);
+    expect(reportIdentityMatches("2026年半年度報告A股股票代碼：600036招商銀行股份有限公司", { code: "600036", name: "招商银行" }, interim)).toBe(true);
+    expect(reportIdentityMatches("平安银行股份有限公司2026年半年度报告", id, annual)).toBe(false);
+    expect(reportIdentityMatches("其他银行股份有限公司2025年年度报告", id, annual)).toBe(false);
+    expect(reportIdentityMatches("公司代码：0000012平安2025年年度报告", { code: "000001", name: "X" }, annual)).toBe(false);
+  });
+  it("reads the Shenzhen 10% table: percent cells, glued amounts and 其中 components are not double counted", () => {
+    const page = pageOf([
+      [642, [["（2）占公司营业收入或营业利润10%以上的行业、产品、地区、销售模式的情况", 57, 300]]],
+      [589, [["单位：千元", 494]]],
+      [555, [["营业收入", 161], ["营业成本", 229], ["毛利率", 302]]],
+      [451, [["分产品", 42]]],
+      [430, [["智能家居业务", 42], ["299,927,239", 167], ["210,259,540", 235], ["29.90%", 321], ["11.28%", 390], ["11.40%", 458]]],
+      [410, [["商业及工业解决方案", 42], ["122,752,958 97,204,037", 167, 108], ["20.81%", 321], ["17.47%", 389], ["18.33%", 458]]],
+      [390, [["其中：楼宇科技", 42], ["35,790,825", 171], ["24,846,935", 240], ["30.58%", 321], ["25.72%", 389], ["24.99%", 458]]],
+      [369, [["机器人与自动化", 68], ["31,010,933", 171], ["24,403,714", 240], ["21.31%", 321], ["8.05%", 394], ["9.01%", 462]]],
+      [308, [["其他", 42], ["33,771,534", 171], ["28,525,951", 240], ["15.53%", 321], ["1.96%", 394], ["-0.60%", 459]]],
+      [288, [["分地区", 42]]],
+    ], 50);
+    const table = extractMainBusinessTable(page);
+    expect(table.rows.map((r) => r.name)).toEqual(["智能家居业务", "商业及工业解决方案", "其他"]);
+    expect(table.originalUnit).toBe("千元"); expect(table.rows[1]).toMatchObject({ revenue: 122752958000, grossMarginPercent: 20.81, growthPercent: 17.47 });
+    expect(table.subtotal).toBe((299927239 + 122752958 + 33771534) * 1000);
+  });
+  it("reads Shanghai main-business tables with wrapped names and one-decimal margins", () => {
+    const page = pageOf([
+      [709, [["单位：千元 币种：人民币", 379, 100]]],
+      [637, [["主营业务分产品情况", 263, 80]]],
+      [616, [["主营业务", 172], ["主营业务", 235], ["毛利率", 294]]], [610, [["分产品", 107]]], [603, [["收入", 182], ["成本", 246], ["（%）", 296]]],
+      [582, [["集成电路晶圆", 90, 50], ["增加 2.7 个", 479]]],
+      [575, [["62,794,043", 167], ["49,450,277", 230], ["21.3", 304, 15], ["17.9", 375, 15], ["14.1", 446, 15]]],
+      [568, [["制造代工", 90, 40], ["百分点", 500]]],
+      [547, [["其他主营业务", 90, 50], ["3,786,198", 172, 35], ["2,574,795", 236, 35], ["32.0", 304, 15], ["-2.0", 375, 15], ["-17.0", 441, 20]]],
+      [526, [["主营业务分销售模式情况", 253, 90]]],
+    ], 26);
+    const table = extractMainBusinessTable(page);
+    expect(table.rows.map((r) => r.name)).toEqual(["集成电路晶圆制造代工", "其他主营业务"]);
+    expect(table.rows[0].revenue).toBe(62794043000);
+  });
+  it("reads single-pair notes tables that close with the table total, and segment tables under 合计", () => {
+    const single = pageOf([
+      [382, [["(2).营业收入、营业成本的分解信息", 90, 150]]], [347, [["单位：元", 416], ["币种：人民币", 468]]],
+      [333, [["合计", 357]]], [326, [["合同分类", 134]]], [319, [["营业收入", 276], ["营业成本", 418]]],
+      [305, [["商品类型", 90]]],
+      [291, [["茅台酒", 111], ["146,499,906,480.49", 268, 70], ["9,484,757,825.54", 420, 65]]],
+      [276, [["其他系列酒", 111], ["22,274,678,707.16", 274, 65], ["5,321,142,314.05", 420, 65]]],
+      [262, [["其他业务", 111], ["63,517,327.14", 295, 50], ["86,377,431.32", 436, 50]]],
+      [248, [["按经营地区分类", 90, 60]]],
+      [234, [["国内", 111], ["163,979,986,160.04", 268, 70], ["14,489,319,958.16", 415, 70]]],
+      [163, [["合计", 145], ["168,838,102,514.79", 268, 70], ["14,892,277,570.91", 415, 70]]],
+      [133, [["(3).履约义务的说明", 90, 80]]],
+    ], 107);
+    const table = extractRevenueTable(single, { scope: "consolidated" });
+    expect(table.rows.map((r) => r.name)).toEqual(["茅台酒", "其他系列酒", "其他业务"]);
+    expect(table.subtotal).toBeCloseTo(168838102514.79, 1); expect(table.rows[0].previousRevenue).toBeNull(); expect(table.rows[0].growthPercent).toBeNull();
+    const segments = pageOf([
+      [525, [["营业收入、营业成本的分解信息：", 57, 150]]], [511, [["单位：千元", 494]]],
+      [495, [["分部甲", 172], ["分部乙", 316], ["合计", 461]]],
+      [477, [["营业收入", 164], ["营业成本", 233], ["营业收入", 296], ["营业成本", 354], ["营业收入", 417], ["营业成本", 486]]],
+      [460, [["业务类型", 62], ["100", 166], ["60", 235], ["20", 302], ["10", 360], ["120", 419], ["70", 488]]],
+      [443, [["产品甲", 62], ["100", 166], ["60", 235], ["100", 419], ["60", 488]]],
+      [426, [["产品乙", 62], ["20", 302], ["10", 360], ["20", 419], ["10", 488]]],
+      [408, [["按经营地区分类", 62]]],
+    ], 195);
+    const grouped = extractRevenueTable(segments, { scope: "consolidated" });
+    expect(grouped.rows.map((r) => [r.name, r.revenue, r.cost])).toEqual([["产品甲", 100000, 60000], ["产品乙", 20000, 10000]]);
+    expect(grouped.subtotal).toBe(120000);
+  });
+  it("takes the Shenzhen revenue-composition total as the company denominator", () => {
+    const page = pageOf([[328, [["（1）营业收入构成", 86, 80]]], [271, [["单位：千元", 494]]], [220, [["营业收入合计", 62, 50], ["423,701,834", 183], ["100.00%", 272]]]], 24);
+    expect(extractRevenueTotal(page)).toEqual({ value: 423701834000, pdfPage: 24, currency: "CNY" });
+  });
+  it("names each failure so the UI can explain it and logs can tell causes apart", async () => {
+    expect(reportFailure(new Error("report_too_large"))).toBe("too_large");
+    expect(reportFailure(Object.assign(new Error("x"), { name: "AbortError" }))).toBe("timeout");
+    expect(reportFailure(new Error("weird"))).toBe("parse_failed");
+    await expect(extractBusinessReportPdf(new TextEncoder().encode("<html>"), document, { code: "600001", name: "示例公司" })).rejects.toThrow("report_not_pdf");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchImpl = vi.fn(async (url) => {
+      if (url.endsWith("detailOfQuery")) return Response.json({ keyBoardList: [{ code: "600001", plate: "sse", orgId: "1", zwjc: "示例公司" }] });
+      if (url.endsWith("query")) return Response.json({ announcements: [announcement] });
+      return new Response("x", { headers: { "content-length": String(17 * 1024 * 1024) } });
+    });
+    const result = await fetchBusinessReports("sh600001", { fetchImpl, now });
+    expect(result.reports[0]).toMatchObject({ status: "unavailable", reason: "too_large" });
+    expect(warn).toHaveBeenCalledWith("business_report_failed", "sh600001", "2026 H1", "too_large", "report_too_large"); warn.mockRestore();
+    const clean = cleanBusinessReports(result); expect(clean.reports[0].reason).toBe("too_large"); expect(clean.reports[0].pageCount).toBeNull();
+    expect(cleanBusinessReports({ ...result, reports: [{ ...result.reports[0], reason: "<script>" }] }).reports[0].reason).toBeUndefined();
   });
 });

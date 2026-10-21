@@ -103,7 +103,9 @@ function modelTitle(model, lang) {
 export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, initialThesis, initialScenarioMode, initialManagementResearch, initialDerivations, initialSegments, refData = {}, verdict, onDone, onCancel, stock, draftKey, initialUpdatedAt = "", loadGuideData }) {
   const L = TX[lang] || TX.zh;
   const tx = (k) => L[k];
-  const draftStore = valuationDraftStore(draftKey, initialUpdatedAt), restored = draftStore.read();
+  const draftStore = valuationDraftStore(draftKey, initialUpdatedAt), stored = draftStore.read();
+  // 草稿记下所属标的：标的不符（旧版本写入的串号草稿）直接丢弃，不把别家公司的问答带进来
+  const restored = stored && (stored.state.symbol === undefined || stored.state.symbol === (stock?.symbol || "")) ? stored : null;
   if (restored) {
     const saved = restored.state;
     if (typeof saved.method === "string" && MODELS.some((model) => model.key === saved.method)) initialMethod = saved.method;
@@ -1809,7 +1811,13 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
           const sample = summaryCard.classList.contains("vc-hero-sample");
           const shown = model ? modeFields(model, currentMode).filter((f) => f.col === "dual" && lastForm[f.k] && Number.isFinite(lastForm[f.k].c)).slice(0, 3)
             .map((f) => `${textFor(f.label, lang, f.k)} ${lastForm[f.k].c}${f.unit === "%" ? "%" : ""}–${lastForm[f.k].o}${f.unit === "%" ? "%" : ""}`) : [];
-          const samples = model ? modeFields(model, currentMode).filter((f) => f.col === "dual" && f.default !== undefined && (scenario ? lastForm[f.k]?.[scenario] === f.default : lastForm[f.k]?.c === f.default && lastForm[f.k]?.o === f.default)).map((f) => `${textFor(f.label, lang, f.k)} ${f.default}${f.unit === "%" ? "%" : ""}`) : [];
+          // 对照时任一情景仍是示例值都要列出（只有一边是示例值时注明哪一边），否则示例值造成的估值差异会被藏起来
+          const samples = model ? modeFields(model, currentMode).filter((f) => f.col === "dual" && f.default !== undefined).flatMap((f) => {
+            const x = lastForm[f.k], c = x?.c === f.default, o = x?.o === f.default;
+            if (scenario ? x?.[scenario] !== f.default : !c && !o) return [];
+            const side = scenario || (c && o) ? "" : zh ? `（${c ? "保守" : "乐观"}）` : ` (${c ? "conservative" : "optimistic"})`;
+            return [`${textFor(f.label, lang, f.k)} ${f.default}${f.unit === "%" ? "%" : ""}${side}`];
+          }) : [];
           return { low: lo, high: hi, price: ctx && ctx.price, currency: (stock && stock.currency) || "", method: model ? textFor(methodMenuMeta(model)?.title, lang, modelTitle(model, lang)) : "", inputs: shown, samples,
             inverted: ok && lo > hi, // 保守场景算出的价值反而更高：多半是两组参数填反了
             verdict: !sample && v && v.text && v.text !== "—" ? v.text : "", sample, missing, canSave: !submitBtn.disabled, fmt: (x) => fmt(x, "—") }; // 示例参数不给判定
@@ -1843,7 +1851,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // ── 未保存改动：用户第一次点击 / 按键时记一份基线（页面自动预填、异步补的数据不算改动），离开时和当前状态比 ──
   let baseline; // undefined = 还没记
   function draftState() {
-    return { scenarioMode: valuationMode, method: MODELS[activeIdx]?.key || null, inputs: cleanForm(lastForm), derivations: currentDerivations(), segments: { enabled: !!segments?.enabled, rows: segments?.rows || [] }, note: noteInput.value.trim(), thesis: readThesis(),
+    return { symbol: stock?.symbol || "", scenarioMode: valuationMode, method: MODELS[activeIdx]?.key || null, inputs: cleanForm(lastForm), derivations: currentDerivations(), segments: { enabled: !!segments?.enabled, rows: segments?.rows || [] }, note: noteInput.value.trim(), thesis: readThesis(),
       ...(managementData ? { managementResearch: managementData } : {}), ...(businessData ? { businessReports: businessData } : {}), activeScenario: activeThesisScenario, editorTab: activeEditorTab, mode: flowMode ? "guide" : "manual", flow: flow ? flow.snapshot() : null };
   }
   function persistDraft() {

@@ -202,7 +202,7 @@
   .vd-pendedit{background:var(--track) !important;color:var(--ink-soft) !important;font-size:16px}
   .vd-pendedit:hover{background:var(--track-edge) !important;color:var(--ink) !important}
   .vd-backrow-right{display:flex;align-items:center;gap:8px}
-  .ve-head-right{margin-left:auto}
+  .ve-head-right{margin-left:auto;display:flex;align-items:center;gap:8px}
   /* 身份区 */
   /* 第一行名称（主），第二行 代码徽章 + 市场 · 交易所 · 币种（次） */
   .vd-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;margin:0 4px 26px}
@@ -673,7 +673,7 @@
   .vc-thesis-modes button{padding:8px 14px;border:1px solid var(--border);border-radius:var(--r-pill);font:inherit;font-size:12px;color:var(--ink-soft);background:transparent;cursor:pointer}
   .vc-thesis-modes button[aria-pressed="true"]{background:var(--dark);border-color:var(--dark);color:#fff}
   .vc-thesis-manual{display:grid;gap:20px}
-  .vc-thesis-manual[hidden],.vc-thesis-guide[hidden],.vc-note-ai[hidden],.vc-guide-error[hidden]{display:none}
+  .vc-thesis-manual[hidden],.vc-thesis-guide[hidden],.vc-note-ai[hidden],.vc-guide-error[hidden],.vc-guide-notice[hidden]{display:none}
   .vc-thesis-guide{display:grid;gap:16px;min-width:0}
   /* 引导卡片：和字段说明的 .vc-guide 同名，这里单独定样式（实色背景，吸底按钮的渐变才能和它对齐） */
   .vc-guide-card .vc-guide-context,.vc-guide-card .vc-question-help,.vc-guide-card .vc-guide-option small,.vc-guide-card .vc-guide-progress,.vc-guide-card .vc-guide-tag,
@@ -681,10 +681,11 @@
   .vc-guide-card .vc-guide-tag{background:#fff;box-shadow:inset 0 0 0 1px var(--border)}
   .vc-management-research{margin:12px 0;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:12px;line-height:1.65;overflow-wrap:anywhere}
   .vc-management-research summary{cursor:pointer;font-weight:600}
+  .vc-management-research a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
   .vc-management-research>p,.vc-management-research small{color:var(--ink-soft)}
   .vc-management-research small{display:block;margin:4px 0}
   .vc-management-research article{border-top:1px solid var(--border);margin-top:12px;padding-top:12px}
-  .vc-management-research article>a{font-weight:600;color:inherit}
+  .vc-management-research article>a{font-weight:600;color:inherit;text-decoration-color:var(--border)}
   .vc-management-research article>strong{display:block;margin-top:10px;font-size:11px;font-weight:500}
   .vc-management-research blockquote{margin:4px 0 10px;padding-left:10px;border-left:2px solid var(--border);white-space:pre-wrap}
   .vc-business-table-wrap{overflow-x:auto;margin:10px 0}
@@ -693,6 +694,15 @@
   .vc-business-reports th:first-child{text-align:left;white-space:normal;min-width:110px}
   .vc-business-reports section>strong{display:block;margin-top:10px}
   .vc-business-reports article>details{margin-top:12px}
+  .vc-business-reports>summary{display:flex;align-items:center;gap:6px;width:fit-content;max-width:100%;list-style:none;font-size:12.5px;font-weight:500;line-height:1.6;color:var(--ink-soft);transition:color .15s}
+  .vc-business-reports>summary::-webkit-details-marker{display:none}
+  .vc-business-reports>summary::before{content:"";flex:none;width:5px;height:5px;margin:0 3px 0 2px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+  .vc-business-reports[open]>summary::before{transform:translateY(-2px) rotate(45deg)}
+  .vc-business-reports>summary:hover{color:var(--ink)}
+  .vc-business-reports>summary:focus-visible{outline:2px solid var(--ring-border);outline-offset:3px;border-radius:4px}
+  .vc-business-reports>.vc-guide-secondary{margin-top:4px;padding:6px 14px;font-size:12px}
+  .vc-business-reports article>p{margin:4px 0 0;color:var(--ink-soft)}
+  @media (prefers-reduced-motion:reduce){.vc-business-reports>summary::before{transition:none}}
   .vc-thesis-guide.vc-guide-card{--guide-bg:#faf9f6;grid-column:auto;margin:0;padding:22px 24px 24px;gap:18px;background:var(--guide-bg);border-radius:var(--r-lg);font-size:13px;color:var(--ink)}
   @media(max-width:600px){.vc-thesis-guide.vc-guide-card{padding:18px 16px 20px}}
   .vc-guide-title{margin:0;font-size:17px;font-weight:500;line-height:1.5;overflow-wrap:anywhere;outline-offset:4px}
@@ -700,16 +710,47 @@
   .vc-guide-progress li{flex:1;padding:8px 4px;border-bottom:2px solid var(--border);text-align:center}
   .vc-guide-progress li[aria-current="step"]{border-color:var(--sun);color:var(--ink)}
   .vc-guide-progress li.done{border-color:var(--ink-soft);color:var(--ink-soft)}
-  .vc-guide-content{display:grid;gap:14px}
+  /* 情景步骤胶囊：当前步骤用金色强调（与步骤下划线一致），未解锁的步骤变淡 */
+  .vc-guide-progress li i{margin-right:3px;font-size:13px;line-height:1;vertical-align:-2px;color:var(--ink)}
+  nav.vc-guide-progress{flex-wrap:wrap}
+  .vc-guide-progress > .vc-guide-secondary{display:inline-flex;align-items:center;gap:4px;padding:6px 14px;font-size:12px;transition:background-color .15s,border-color .15s,color .15s}
+  .vc-guide-progress > .vc-guide-secondary:not(:disabled):not([aria-current]):hover{border-color:var(--ink-mute);color:var(--ink)}
+  .vc-guide-progress > .vc-guide-secondary[aria-current="step"]{background:var(--sun-soft);border-color:var(--sun);color:var(--sun-ink);font-weight:500}
+  /* 未解锁：不再整体变透明（太淡读不清），改为虚线细框 + 浅灰字 */
+  .vc-guide-progress > .vc-guide-secondary:disabled{opacity:1;border-style:dashed;border-color:var(--border);color:var(--ink-mute);cursor:default}
+  /* 已完成：文字略淡，末尾一个墨色对勾 */
+  .vc-guide-progress > .vc-guide-secondary.done:not([aria-current]){color:var(--ink-soft)}
+  .vc-guide-progress > .vc-guide-secondary.done i{font-size:14px;line-height:1;color:var(--ink)}
+  .vc-guide-progress > .vc-guide-secondary.done[aria-current] i{color:var(--sun-ink)}
+  /* 情景介绍卡居中且较窄时，胶囊条与它同宽对齐 */
+  .vc-guide-progress:has(+ .vc-scenario-content.intro){width:100%;max-width:560px;margin-inline:auto;box-sizing:border-box}
+  .vc-guide-progress + .vc-scenario-content.vc-guide-card.intro{margin-top:4px}
+  .vc-guide-content{display:grid;gap:16px} /* 区块间距 16；题目内部 4 / 8 / 12 */
   .vc-guide-lead,.vc-guide-context{margin:0;font-size:13px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink-soft)}
   .vc-guide-context{padding:12px 14px;background:var(--track);border-radius:var(--r-md)}
-  .vc-guide-options{display:grid;gap:9px;margin:0;padding:0;border:0;min-width:0}
-  .vc-guide-options legend{float:left;width:100%;margin:0 0 4px;font-size:18px;line-height:1.55;font-weight:500;color:var(--ink);text-wrap:pretty}
-  .vc-guide-options legend+.vc-guide-context{float:left;width:100%;margin:0 0 14px;padding:0;background:none;font-size:12.5px;line-height:1.75;color:var(--ink-mute)}
-  .vc-guide-answer-help{margin:0 0 3px}
-  .vc-guide-sources{font-size:12px;color:var(--ink-soft);margin-bottom:5px;min-width:0}
-  .vc-guide-sources > summary{width:fit-content;cursor:pointer;padding:4px 0;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--border)}
-  .vc-guide-sources > summary:focus-visible{outline:2px solid var(--ring-border);outline-offset:3px}
+  .vc-guide-options{display:grid;gap:10px;margin:0;padding:0;border:0;min-width:0}
+  .vc-guide-options legend{float:left;width:100%;margin:0 0 8px;font-size:18px;line-height:1.55;font-weight:500;color:var(--ink);text-wrap:pretty}
+  .vc-guide-options legend+.vc-guide-context{float:left;width:100%;margin:0 0 12px;padding:0;background:none;font-size:12.5px;line-height:1.75;color:var(--ink-mute)}
+  .vc-guide-answer-help{margin:0 0 4px}
+  /* 题目上方的小标题：「本题 · 需求与销量」稍深，选题说明变淡跟在后面 */
+  .vc-guide-eyebrow{margin:0;font-size:12px;line-height:1.6;color:var(--ink-mute);overflow-wrap:anywhere}
+  .vc-guide-eyebrow strong{font-weight:500;color:var(--ink-soft)}
+  .vc-guide-eyebrow + .vc-guide-options{margin-top:-10px} /* 紧贴题目：16 - 10 = 6px */
+  .vc-guide-sources{font-size:12px;color:var(--ink-soft);margin-bottom:4px;min-width:0}
+  /* 引导里所有折叠区（财报季研究依据、收入结构、本轮资料、其他方法、已回答记录）用同一种标题：自绘箭头，展开时转向下 */
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary{display:flex;align-items:center;gap:6px;width:fit-content;max-width:100%;padding:4px 0;border-radius:4px;list-style:none;cursor:pointer;font-size:12.5px;font-weight:500;line-height:1.6;color:var(--ink-soft);text-decoration:none;transition:color .15s}
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary::-webkit-details-marker{display:none}
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary::before{content:"";flex:none;width:5px;height:5px;margin:0 3px 0 2px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more)[open] > summary::before{transform:translateY(-2px) rotate(45deg)}
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary:hover{color:var(--ink)}
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary:focus-visible{outline:2px solid var(--ring-border);outline-offset:3px}
+  .vc-guide-summary-meta{font-weight:400;color:var(--ink-mute)}
+  @media (prefers-reduced-motion:reduce){.vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary::before{transition:none}}
+  /* 引导里的财报季研究 / 收入结构：收起时只是一行标题，展开的内容与标题文字对齐 */
+  .vc-thesis-guide .vc-management-research{margin:0;padding:0;border:0;border-radius:0;min-width:0}
+  .vc-thesis-guide .vc-management-research > :not(summary){margin-left:16px}
+  .vc-thesis-guide .vc-management-research > p{margin-block:6px}
+  .vc-thesis-guide .vc-management-research > .vc-guide-secondary{margin-top:4px;padding:6px 14px;font-size:12px}
   .vc-guide-sources > p{margin-top:8px}
   .vc-guide-sources ol{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px;max-height:240px;overflow:auto;overscroll-behavior:contain}
   .vc-guide-sources li{padding:8px 10px;border-radius:var(--r-sm);background:var(--track);line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -727,8 +768,9 @@
   .vc-guide-audit-note{margin:16px 0 0;color:var(--ink-soft);font-size:11px;line-height:1.7}
   .vc-guide-assumptions{display:grid;gap:8px;min-width:0;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--track)}
   .vc-guide-assumptions > strong{font-size:12px;font-weight:500}
-  .vc-guide-assumption-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:8px}
-  .vc-guide-assumption-list button{display:grid;gap:4px;text-align:left;border-radius:var(--r-sm);background:#fff;padding:10px 12px;min-width:0}
+  .vc-guide-assumption-list{display:flex;flex-wrap:wrap;gap:8px}
+  /* 每个已选假设等宽撑满一行，避免按内容收缩造成间隙不齐 */
+  .vc-guide-assumption-list button{flex:1 1 210px;align-content:start;justify-self:stretch;max-width:100%;display:grid;gap:4px;text-align:left;border-radius:var(--r-sm);background:#fff;padding:10px 12px;min-width:0}
   .vc-guide-assumption-list strong{font-size:12px;font-weight:500}
   .vc-guide-assumption-list span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
   .vc-guide-coverage{padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md);background:#f4f5f2;font-size:12px;line-height:1.75;color:var(--ink-soft)}
@@ -738,11 +780,15 @@
   .vc-guide-tag{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:var(--r-pill);background:var(--track);font-size:11px;font-weight:400;line-height:1.7;color:var(--ink-mute);vertical-align:3px}
   .vc-guide-link{justify-self:start;padding:2px 0;border:0;background:none;font:inherit;font-size:12.5px;color:var(--ink-soft);cursor:pointer;text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:3px}
   .vc-guide-link:hover{color:var(--ink);text-decoration-color:currentColor}
+  .vc-guide-restart-ask{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+  .vc-guide-restart-ask .vc-question-help{margin:0}
   .vc-guide-link[hidden],.vc-guide-note[hidden],.vc-question-help[hidden]{display:none}
-  .vc-guide-sticky{position:sticky;bottom:0;z-index:1;margin:0 -4px;padding:12px 4px;background:linear-gradient(to top,var(--guide-bg,#faf9f6) 70%,transparent)}
-  .vc-guide-option{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-md);background:#fff;cursor:pointer;min-width:0;transition:border-color .15s,background-color .15s,box-shadow .15s}
-  .vc-guide-option:hover{border-color:var(--ink-mute)}
-  .vc-guide-option:has(input:checked){border-color:var(--sun-ink);background:var(--sun-soft,#fff5ce)}
+  /* 吸底按钮：上方 16px 渐变淡出，底部留出安全区；滚到底时它在文档流里，不会盖住最后一个选项 */
+  .vc-guide-sticky{position:sticky;bottom:0;z-index:1;margin:0 -4px;padding:16px 4px max(14px,env(safe-area-inset-bottom));background:linear-gradient(to top,var(--guide-bg,#faf9f6) calc(100% - 16px),transparent)}
+  .vc-guide-option{display:flex;align-items:flex-start;gap:12px;min-height:44px;box-sizing:border-box;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-md);background:#fff;cursor:pointer;min-width:0;transition:border-color .15s,background-color .15s,box-shadow .15s}
+  .vc-guide-option:not(:has(input:checked)):hover{border-color:var(--ink-mute)}
+  /* 选中态与悬停无关：浅暖底 + 金色描边，悬停不再变色 */
+  .vc-guide-option:has(input:checked),.vc-guide-option:has(input:checked):hover{border-color:var(--sun);background:#fffaea;box-shadow:inset 0 0 0 1px var(--sun)}
   .vc-guide-option:focus-within{outline:2px solid var(--ring-border);outline-offset:2px}
   .vc-guide-option input{flex:none;margin-top:4px;accent-color:var(--dark)}
   .vc-guide-option span{flex:1;display:grid;gap:4px;min-width:0;overflow-wrap:anywhere}
@@ -776,6 +822,7 @@
   .vc-flow-top .vc-guide-secondary{padding:6px 14px;font-size:12px}
   .vc-flow-cases{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   @media(max-width:600px){.vc-flow-cases{grid-template-columns:minmax(0,1fr)}}
+  .vc-flow-cases > .vc-flow-case:only-child{grid-column:1 / -1} /* 分情景复核只有一张卡：占满整行 */
   .vc-flow-case{display:grid;gap:8px;align-content:start;padding:14px 16px;border-radius:var(--r-md);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);overflow-wrap:anywhere}
   .vc-flow-case h4{margin:0;font-size:12px;font-weight:500;color:var(--ink-mute)}
   .vc-flow-case.o h4{color:var(--sun-ink)}
@@ -783,7 +830,19 @@
   .vc-flow-case dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:4px 0 0;font-size:12px;line-height:1.65}
   .vc-flow-case dt{color:var(--ink-mute)}
   .vc-flow-case dd{margin:0;color:var(--ink-soft)}
-  .vc-flow-more summary{cursor:pointer;font-size:12.5px;color:var(--ink-soft)}
+  /* 对照页 / 选择页：卡片内无类名的段落和小标题，对齐引导流程的 12–13px、字重 500 */
+  .vc-flow-case > p:not([class]),.vc-scenario-content > p:not([class]){margin:0;font-size:13px;line-height:1.75;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+  .vc-flow-case > strong{margin-top:4px;font-size:12px;font-weight:500;color:var(--ink-mute)}
+  .vc-flow-case > dl,.vc-scenario-content > dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:4px 0 0;padding-top:10px;border-top:1px solid var(--divider);font-size:12px;line-height:1.65}
+  .vc-scenario-content > dl dt{color:var(--ink-mute)}
+  .vc-flow-case > dl dd,.vc-scenario-content > dl dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .vc-flow-case > .vc-flow-result-range,.vc-scenario-content > .vc-flow-result-range{margin:0;line-height:1.25} /* 去掉 p 的默认上下外边距，数字紧跟情景名 */
+  .vc-flow-case > .vc-flow-result-range{font-size:30px}
+  .vc-flow-case > .vc-flow-result-vs{margin:-2px 0 2px}
+  .vc-scenario-content > .vc-flow-result-vs{margin:-10px 0 0} /* 单场景确认页：现价行紧跟数字 */
+  /* 对照页顶部汇总：区间 + 现价，同编辑页结果区 */
+  .vc-flow-compare-hero{padding:16px 20px 18px}
+  .vc-flow-case > .vc-guide-secondary{margin-top:4px}
   .vc-flow-more-list{margin-top:10px}
   .vc-flow-params{display:grid;gap:10px}
   .vc-flow-param{display:grid;gap:8px;padding:14px 16px;border:1px dashed var(--border);border-radius:var(--r-md);background:rgba(255,255,255,.6);transition:border-color .15s,background-color .15s}
@@ -822,11 +881,30 @@
   .vc-flow-result{display:grid;gap:4px;padding:18px 20px;border-radius:var(--r-md);background:#fff;box-shadow:inset 0 0 0 1px var(--divider)}
   .vc-flow-result p{margin:0}
   .vc-flow-result-label{font-size:12px;color:var(--ink-mute)}
-  .vc-flow-result-range{font-size:30px;font-weight:500;letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
+  /* 估值数字：与编辑页 .vc-rlow 同一套——细体大号整数，小数 .num-dec 缩小，币种小号浅色 */
+  .vc-flow-result-range{display:flex;flex-wrap:wrap;align-items:baseline;font-size:44px;font-weight:400;letter-spacing:-.035em;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .vc-flow-result-range.empty{font-size:15px;letter-spacing:0;line-height:1.6;color:var(--ink-mute)}
+  .vc-flow-dash{padding:0 .12em;color:var(--ink-mute)}
+  .vc-flow-cur{margin-left:8px;font-size:13px;font-weight:400;letter-spacing:0;color:var(--ink-mute)}
   .vc-flow-result-price{font-size:13px;color:var(--ink-soft)}
+  /* 现价行：「现价 529.27 USD」+ 与编辑页同款的 高估 / 安全边际 徽章（缩小一号） */
+  .vc-flow-result-vs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;font-size:13px;line-height:1.5;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .vc-flow-result > .vc-flow-result-vs{margin-top:8px}
+  .vc-flow-result-vs .vc-rverdict{height:24px;margin:0;padding:0 10px;font-size:12px}
+  .vc-flow-result > .vc-question-help{margin-top:10px}
+  .vc-flow-result > .vc-guide-notice{margin-top:8px}
   .vc-guide-conflict{display:grid;gap:4px;padding:12px 14px;border-radius:var(--r-md);background:#fdf0e3;box-shadow:inset 0 0 0 1px #f0cfa8;font-size:13px;line-height:1.6;color:var(--ink-soft)}
   .vc-guide-conflict strong{font-weight:500;color:#a4561a}
   .vc-guide-conflict p{margin:0}
+  /* 提醒（示例值、方法变化等）：平静的浅金底，不用报错红；.important 用于保守高于乐观、算不出结果等更需留意的情况 */
+  .vc-guide-notice{display:flex;align-items:flex-start;gap:8px;margin:0;padding:10px 14px;border-radius:var(--r-md);background:rgba(246,207,74,.14);box-shadow:inset 0 0 0 1px rgba(246,207,74,.5);font-size:12.5px;line-height:1.7;color:var(--sun-ink);overflow-wrap:anywhere}
+  .vc-guide-notice > i{flex:none;font-size:15px;line-height:21px;color:var(--sun-ink);opacity:.75}
+  .vc-guide-notice > div{flex:1;display:grid;gap:2px;min-width:0}
+  .vc-guide-notice p{margin:0}
+  .vc-guide-notice strong{font-weight:500}
+  .vc-guide-notice strong + p{color:var(--ink-soft)}
+  .vc-guide-notice.important{background:#fdf0e3;box-shadow:inset 0 0 0 1px #f0cfa8;color:#8a4613}
+  .vc-guide-notice.important > i{color:#a4561a;opacity:1}
   .vc-guide-other{width:100%;margin-top:6px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:#fff;font:inherit;font-size:13px;line-height:1.5;color:var(--ink);cursor:text}
   .vc-guide-other:focus{outline:none;border-color:var(--sun-ink)}
   .vc-guide-other[hidden]{display:none}
@@ -837,17 +915,21 @@
   .vc-guide-loader-head .vc-guide-status{flex:1;min-width:0}
   .vc-guide-loader-head .vc-guide-secondary{padding:6px 14px;font-size:12px}
   .vc-guide-skeleton{display:grid;gap:9px}
-  .vc-guide-skeleton span{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--track) 25%,var(--divider) 50%,var(--track) 75%);background-size:200% 100%;animation:vcGuideShimmer 1.4s ease-in-out infinite}
+  /* 占位卡给一个接近真实内容的最小高度，内容到达时不明显跳动 */
+  .vc-guide-loader{align-content:start}
+  .vc-guide-loader.is-question{min-height:420px}
+  .vc-guide-loader.is-draft{min-height:320px}
+  .vc-guide-loader.is-params,.vc-guide-loader.is-picks{min-height:360px}
+  .vc-guide-skeleton span{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,rgba(29,29,27,.05) 30%,rgba(29,29,27,.10) 50%,rgba(29,29,27,.05) 70%);background-size:220% 100%;animation:vcGuideShimmer 1.6s ease-in-out infinite}
   .vc-guide-skeleton .short{width:60%}
-  .vc-guide-skeleton .opt{height:44px;border-radius:var(--r-md)}
+  .vc-guide-skeleton .opt{height:52px;border-radius:var(--r-md)}
   .vc-guide-skeleton .card{height:64px;border-radius:var(--r-md)}
   .vc-guide-skeleton .line+.opt,.vc-guide-skeleton .line+.card{margin-top:6px}
   @keyframes vcGuideShimmer{from{background-position:100% 0}to{background-position:-100% 0}}
   @keyframes vcGuideSpin{to{transform:rotate(360deg)}}
-  @media (prefers-reduced-motion:reduce){.vc-guide-spinner,.vc-guide-skeleton span{animation:none}}
+  @media (prefers-reduced-motion:reduce){.vc-guide-spinner,.vc-guide-skeleton span{animation:none}.vc-guide-skeleton span{background:rgba(29,29,27,.06)}}
   .vc-guide-error{margin:0;font-size:12px;line-height:1.7;color:var(--red);overflow-wrap:anywhere}
   .vc-guide-history{font-size:12px;line-height:1.7;color:var(--ink-soft);overflow-wrap:anywhere}
-  .vc-guide-history summary{cursor:pointer}
   .vc-guide-history p{white-space:pre-wrap}
   .vc-guide-history-q{font-weight:500;margin-bottom:4px}
   .vc-guide-review{padding:14px;background:var(--track);border-radius:var(--r-md);overflow-wrap:anywhere}
@@ -902,7 +984,8 @@
   .vc-workbench.vc-guiding{grid-template-columns:minmax(0,820px);justify-content:center}
   .vc-workbench.vc-guiding > .vc-results{display:none}
   .vc-workbench.vc-guiding .vc-guide-hide{display:none}
-  .vc-workbench.vc-guiding .vc-inputs{align-self:start;padding:0;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+  /* stretch：让栏高等于网格行高，.vc-col 的 overflow:auto 才能滚动；左右留 8px 防止标题首字、卡片阴影和焦点框被裁切，负外边距抵消宽度变化 */
+  .vc-workbench.vc-guiding .vc-inputs{align-self:stretch;padding:0 8px;margin:0 -8px;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
   .vc-workbench.vc-guiding .vc-story-panel > .vc-note{margin-top:0}
   .vc-guide-option .vc-guide-tag{display:inline-block;margin-left:8px;vertical-align:1px}
   .vc-workbench.vc-guiding .vc-story-panel > .vc-note{margin-bottom:0;padding-bottom:0;border-bottom:0}
@@ -914,6 +997,11 @@
     .vc-guide-link,.vc-question-action{padding:10px 0;min-height:40px}
     .vc-flow-top .vc-guide-secondary,.vc-guide-loader-head .vc-guide-secondary{min-height:40px}
     .vc-flow-retry .vc-guide-primary{width:100%}
+    .vc-guide-progress > .vc-guide-secondary{min-height:40px}
+    .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary{min-height:40px}
+    .vc-flow-result-range{font-size:36px}
+    .vc-flow-case > .vc-flow-result-range{font-size:28px}
+    .vc-flow-compare-hero{padding:14px 16px 16px}
   }
   /* 抽屉占右侧 410 + 16 + 12 间隙；内容区最宽 1600 居中，宽屏时右侧本来就有空白 → 只让出真正重叠的那部分，够宽就不让 */
   @media (min-width:1300px){ body.vc-ai-open .vc-workbench{margin-right:max(0px,calc(438px - clamp(16px,3vw,44px) - (100vw - min(100vw,1600px)) / 2))} }
@@ -1055,6 +1143,7 @@
   @media (max-width:1100px){
     .vc-workbench{grid-template-columns:minmax(0,1fr);align-content:start;overflow:auto}
     .vc-col{overflow:visible;min-height:auto} /* 整块滚动时各栏按内容撑开（分栏各自滚动时才需要 min-height:0） */
+    .vc-workbench.vc-guiding .vc-inputs{padding:0;margin:0} /* 栏不再自己滚动，不会裁切；去掉负外边距以免窄屏出现横向滚动 */
   }
   @media (max-width:900px){
     body.ve-mode{overflow:auto}
@@ -1090,7 +1179,7 @@
   .vmap-lab.picked{color:var(--ink);font-weight:500}
   .vmap-pick{font-size:10.5px;font-weight:500;color:var(--sun-ink);background:var(--sun);border-radius:var(--r-pill);padding:2px 8px}
   .vmap-track{position:relative;height:44px;grid-column:2}
-  .vmap-bar{position:absolute;top:15px;bottom:15px;border-radius:var(--r-pill);background:rgba(29,29,27,.22);z-index:1}
+  .vmap-bar{position:absolute;top:15px;bottom:15px;border-radius:var(--r-pill);background:rgba(29,29,27,.22)} /* 不建层叠上下文：端点数字才能盖在现价虚线上面 */
   .vmap-track.picked .vmap-bar{background:var(--sun)}
   .vmap-point{position:absolute;top:50%;width:0;height:0;z-index:3}
   .vmap-value{position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;padding:5px 10px;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft);font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
@@ -1102,11 +1191,12 @@
   .vmap-end{position:absolute;top:50%;transform:translateY(-50%);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;font-variant-numeric:tabular-nums}
   .vmap-end.lo{right:100%;margin-right:6px}
   .vmap-end.hi{left:100%;margin-left:6px}
+  .vmap-end.near-now{z-index:3;padding:1px 6px;border-radius:var(--r-pill);background:var(--card-solid);box-shadow:0 0 0 3px var(--card-solid)}
   .vmap-now{position:absolute;top:-7px;bottom:-7px;width:0;border-left:1px dashed var(--ink-soft);pointer-events:none;z-index:2}
   .vmap-now.first{top:-4px}
-  .vmap-zone{position:absolute;top:-7px;bottom:-7px;pointer-events:none;background:linear-gradient(to right,color-mix(in srgb,var(--zone-color) 22%,transparent),color-mix(in srgb,var(--zone-color) 4%,transparent))}
+  .vmap-zone{position:absolute;top:-7px;bottom:-7px;pointer-events:none;background:linear-gradient(to right,color-mix(in srgb,var(--zone-color) 4%,transparent),color-mix(in srgb,var(--zone-color) 22%,transparent))} /* 贴着阈值虚线最深，向外渐淡 */
   .vmap-zone.strike{left:0;border-right:1px dashed var(--zone-color)}
-  .vmap-zone.bubble{right:0;border-left:1px dashed var(--zone-color);background:linear-gradient(to right,color-mix(in srgb,var(--zone-color) 4%,transparent),color-mix(in srgb,var(--zone-color) 22%,transparent))}
+  .vmap-zone.bubble{right:0;border-left:1px dashed var(--zone-color);background:linear-gradient(to right,color-mix(in srgb,var(--zone-color) 22%,transparent),color-mix(in srgb,var(--zone-color) 4%,transparent))}
   .vmap-zone-labels{grid-column:2;display:flex;justify-content:space-between;gap:12px;padding-top:2px;font-size:11px;line-height:1.5;font-variant-numeric:tabular-nums}
   .vmap-zone-label{display:flex;flex-direction:column;gap:1px;min-width:0}
   .vmap-zone-label:last-child{text-align:right}
@@ -1114,8 +1204,9 @@
   .vmap-zone-label span{font-size:10.5px;color:var(--ink-soft)}
   .vmap-now-tag{position:absolute;bottom:100%;left:0;transform:translate(-50%,-2px);white-space:nowrap;font-size:11px;font-weight:500;
     color:var(--ink-soft);background:#fff;box-shadow:inset 0 0 0 1px var(--border);border-radius:var(--r-pill);padding:3px 9px;font-variant-numeric:tabular-nums}
-  .vmap-axis{grid-column:2;position:relative;height:16px;border-top:1px dashed var(--border);margin-top:4px}
-  .vmap-axis span{position:absolute;top:4px;transform:translateX(-50%);font-size:10.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .vmap-axis{grid-column:2;position:relative;height:18px;border-top:1px solid var(--divider);margin-top:4px}
+  .vmap-axis span{position:absolute;top:6px;transform:translateX(-50%);font-size:10.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .vmap-axis span::before{content:"";position:absolute;left:50%;top:-6px;width:1px;height:4px;background:var(--border)}
   .vmap-lab.axis{min-height:0}
   .vmap .vsec-head{margin-bottom:26px}
   @media (max-width:760px){
@@ -1359,6 +1450,7 @@
   <link rel="modulepreload" href="/shared/i18n.js">
   <link rel="modulepreload" href="/shared/langmenu.js">
   <link rel="modulepreload" href="/shared/feedback.js">
+  <link rel="modulepreload" href="/shared/global-ai.js">
   <link rel="modulepreload" href="/shared/feedback-core.js">
   <link rel="modulepreload" href="/shared/market.js">
   <link rel="modulepreload" href="/shared/metric-spark.js">
@@ -1559,6 +1651,7 @@ import { MKT_LABEL } from "/shared/market.js";
 import { t, applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
 import { mountFeedback } from "/shared/feedback.js";
+import { mountGlobalAi, watchlistPage } from "/shared/global-ai.js";
 import { mountValuationCalc } from "/shared/valuation-ui.js";
 import { cleanThesis, thesisEntries, THESIS_SCENARIOS } from "/shared/valuation/thesis.js";
 import { persistValuation } from "/shared/valuation/save.js";
@@ -1595,6 +1688,7 @@ const VMSGS = {
 // 语言切换（全站共用组件）：看板顶栏一个；详情页、估值工作台隐藏顶栏，各自在页头再挂一个
 mountLangMenu(document.getElementById("topActions")).id = "langMenu";
 mountFeedback(document.getElementById("topActions")); // 反馈入口（只对已登录用户显示）
+mountGlobalAi(document.getElementById("topActions"), { getPage: watchlistPage, extraHosts: ".vd-backrow-right, .ve-head-right" }); // 全站 AI 助手（⌘K；详情页、估值编辑页隐藏顶栏，按钮自动补到它们自己的右上角）
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 const ZONE_KEYS = ZONES.map((z) => z.key);
@@ -3351,7 +3445,7 @@ function renderValuationPanel(item, panel, idBlock) {
       const picked = c.selectedValuationId === k.id;
       const { l, tr } = row(model ? (model.label[LANG] || model.key) : k.method, picked ? "picked" : "");
       const single = k.scenarioMode === "single" && k.low === k.high;
-      if (picked) { const s = document.createElement("span"); s.className = "vmap-pick"; s.textContent = single ? (zh ? "合理价值" : "Fair value") : zh ? "合理区间" : "Fair range"; l.appendChild(s); }
+      if (picked) { const s = document.createElement("span"); s.className = "vmap-pick"; s.textContent = zh ? "钟摆采用" : "In use"; s.title = zh ? "钟摆按这张卡的区间划分" : "The pendulum uses this card's range"; l.appendChild(s); }
       const x0 = X(Math.min(k.low, k.high)), x1 = X(Math.max(k.low, k.high));
       if (single) {
         const point = document.createElement("div"); point.className = "vmap-point" + (x0 < 20 ? " edge-start" : x0 > 80 ? " edge-end" : ""); point.style.left = x0 + "%";
@@ -3359,8 +3453,9 @@ function renderValuationPanel(item, panel, idBlock) {
         point.appendChild(value); tr.appendChild(point); return;
       }
       const bar = document.createElement("div"); bar.className = "vmap-bar"; bar.style.left = x0 + "%"; bar.style.width = Math.max(0.8, x1 - x0) + "%";
-      const e0 = document.createElement("span"); e0.className = "vmap-end lo"; e0.textContent = fmtPx(Math.min(k.low, k.high));
-      const e1 = document.createElement("span"); e1.className = "vmap-end hi"; e1.textContent = fmtPx(Math.max(k.low, k.high));
+      const near = (x) => p > 0 && Math.abs(X(p) - x) < 7 ? " near-now" : "";
+      const e0 = document.createElement("span"); e0.className = "vmap-end lo" + near(x0); e0.textContent = fmtPx(Math.min(k.low, k.high));
+      const e1 = document.createElement("span"); e1.className = "vmap-end hi" + near(x1); e1.textContent = fmtPx(Math.max(k.low, k.high));
       bar.append(e0, e1); tr.appendChild(bar);
     });
     // 现价竖线：每条轨道各画一段，上下伸进行间距里首尾相接；第一段顶上挂现价标签
@@ -3371,7 +3466,7 @@ function renderValuationPanel(item, panel, idBlock) {
         tr.appendChild(seg);
       });
     }
-    // 两端区域向图外延伸；渐变越往外越深，虚线精确标出阈值。各行首尾相接。
+    // 两端区域向图外延伸；渐变贴着阈值虚线最深、向外渐淡，虚线精确标出阈值。各行首尾相接。
     if (valued) {
       const tracks = [...grid.querySelectorAll(".vmap-track")];
       const labels = document.createElement("div"); labels.className = "vmap-zone-labels";
@@ -3391,9 +3486,9 @@ function renderValuationPanel(item, panel, idBlock) {
     // 价格轴刻度
     const axL = document.createElement("div"); axL.className = "vmap-lab axis";
     const ax = document.createElement("div"); ax.className = "vmap-axis";
-    const step = niceStep((hi - lo) / 5);
-    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
-      const s = document.createElement("span"); s.style.left = X(v) + "%"; s.textContent = fmtPx(v); ax.appendChild(s);
+    const step = niceStep((hi - lo) / 5), digits = step >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(step) - 1e-9));
+    for (let i = Math.ceil(lo / step); i * step <= hi + 1e-9; i++) {
+      const v = i * step, s = document.createElement("span"); s.style.left = X(v) + "%"; s.textContent = v.toFixed(digits); ax.appendChild(s);
     }
     grid.append(axL, ax);
     wrap.appendChild(grid);

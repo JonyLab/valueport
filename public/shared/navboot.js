@@ -50,4 +50,17 @@
       host.insertBefore(f, host.querySelector(".lang-menu"));
     }
   } catch (e) { /* ignore */ }
+  // ⑥ 本次会话已确认登录（/shared/global-ai.js 记下的 gai_cap，或反馈的 fb_cap）：AI 助手按钮先放静态占位（在反馈按钮之前），mountGlobalAi 原地替换
+  try {
+    if (host && (sessionStorage.getItem("gai_cap") || sessionStorage.getItem("fb_cap")) && !host.querySelector(".gai-btn")) {
+      var g = document.createElement("button"); g.type = "button"; g.className = "btn icon gai-btn"; g.setAttribute("data-static", "");
+      g.setAttribute("aria-label", lang === "zh" ? "AI 助手" : "AI assistant");
+      g.innerHTML = '<i class="ri-sparkling-2-line" aria-hidden="true"></i>';
+      host.insertBefore(g, host.querySelector(".fb-btn") || host.querySelector(".lang-menu"));
+    }
+    // ⑦ 上一页 AI 助手抽屉开着（宽屏）：首帧就让出右侧（html.gai-open），gai-boot 先画抽屉底色占位，模块加载后换成真抽屉
+    if (sessionStorage.getItem("gai_open") === "1" && (sessionStorage.getItem("gai_cap") || sessionStorage.getItem("fb_cap")) && window.innerWidth > 760) {
+      document.documentElement.classList.add("gai-open", "gai-boot");
+    }
+  } catch (e) { /* ignore */ }
 })();

@@ -354,6 +354,7 @@
   <link rel="modulepreload" href="/shared/i18n.js">
   <link rel="modulepreload" href="/shared/langmenu.js">
   <link rel="modulepreload" href="/shared/feedback.js">
+  <link rel="modulepreload" href="/shared/global-ai.js">
   <link rel="modulepreload" href="/shared/feedback-core.js">
   <link rel="modulepreload" href="/shared/pf-query.js">
   <link rel="modulepreload" href="/shared/ai-panel.js">
@@ -417,6 +418,7 @@
 import { applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
 import { mountFeedback } from "/shared/feedback.js";
+import { mountGlobalAi } from "/shared/global-ai.js";
 import { computeAnchors, priceToPhi, structValid, ZONES, marketLabel } from "/shared/core.js";
 import { driftText, driftTolerance, driftStatus, driftAction } from "/shared/holding.js";
 import { validatePfQuery, runPfQuery, dropFilter } from "/shared/pf-query.js";
@@ -427,6 +429,8 @@ const zh = LANG === "zh";
 const T = (a, b) => (zh ? a : b);
 mountLangMenu(document.getElementById("topActions"));
 mountFeedback(document.getElementById("topActions")); // 反馈入口（只对已登录用户显示）
+// 全站 AI 助手：隐私起见只告诉 AI「在资产页」，不带任何持仓、金额（持仓数据在本地加密）
+mountGlobalAi(document.getElementById("topActions"), { getPage: () => ({ kind: "portfolio", path: location.pathname, title: document.title }) });
 
 // ---------- 小工具 ----------
 const $ = (id) => document.getElementById(id);

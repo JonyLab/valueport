@@ -506,6 +506,7 @@ describe("optional company-specific thesis guide", () => {
     expect(conservative).toContain("所有选项都必须是不利或不及预期的方向"); expect(conservative).not.toContain("所有选项都必须是有利的方向");
     const summary = buildThesisGuidePrompt({ ...body, scenario: "c", turns: Array(3).fill({ question: "q", answer: "a" }) }, "zh");
     expect(summary).toContain("conflict"); expect(summary).toContain("与保守场景相反");
+    expect(summary).toContain("conflict 必须是空字符串"); expect(summary).toContain("写进 uncertainties");
     const evidence = buildThesisGuidePrompt({ ...body, turns: [{ question: "q", answer: "a" }] }, "zh");
     expect(evidence).toContain("引用公司资料编号"); expect(evidence).toContain("反面证据");
   });
@@ -525,8 +526,21 @@ describe("optional company-specific thesis guide", () => {
     expect(parseThesisGuide(JSON.stringify(question), 2, true)).toMatchObject({ type: "question", question: question.question, selection: "single" });
     const both = parseThesisGuide(JSON.stringify({ type: "summary", drafts: { c: draft, o: draft, conflict: "保守那一轮偏乐观" } }), 5, true);
     expect(both.drafts.c.story).toBe(draft.story); expect(both.drafts.conflict).toBe("保守那一轮偏乐观");
+    const noConflict = parseThesisGuide(JSON.stringify({ type: "summary", drafts: { c: draft, o: draft, conflict: "两轮回答没有明显冲突。" } }), 5, true);
+    expect(noConflict.drafts).not.toHaveProperty("conflict"); expect(noConflict.drafts.c.story).toBe(draft.story);
     expect(parseThesisGuide(JSON.stringify({ type: "summary", drafts: { c: draft } }), 5, true)).toBeNull(); // 两份都要有
     expect(parseThesisGuide(JSON.stringify({ type: "summary", draft }), 5, true)).toBeNull();
+  });
+  it("drops conflict text that says there is no conflict and keeps the caveat as an uncertainty", async () => {
+    const { parseThesisGuide, clearNoConflict } = await import("../src/ai.js");
+    const base = { story: "iPhone 销量稳定", evidence: "暂无依据", uncertainties: "服务收入待验证", signals: "建议跟踪", impacts: [] };
+    const parsed = parseThesisGuide(JSON.stringify({ type: "summary", draft: { ...base, conflict: "三项判断没有明显冲突。但 iPhone 销量稳定不等于全公司收入稳定。" } }), 3);
+    expect(parsed.draft).not.toHaveProperty("conflict");
+    expect(parsed.draft.uncertainties).toBe("服务收入待验证\niPhone 销量稳定不等于全公司收入稳定。");
+    for (const text of ["无明显冲突", "未发现冲突。", "回答之间不存在矛盾", "No obvious conflict.", "There is no contradiction between the answers."]) expect(clearNoConflict({ ...base, conflict: text })).toEqual(base);
+    for (const text of ["保守场景却判断增长加快", "回答偏乐观，与保守方向不一致", "Optimistic answers conflict with the conservative case"]) expect(clearNoConflict({ ...base, conflict: text }).conflict).toBe(text);
+    expect(clearNoConflict({ ...base, uncertainties: "x".repeat(795), conflict: "没有冲突，但需要更多资料" })).toEqual({ ...base, uncertainties: "x".repeat(795) });
+    expect(clearNoConflict(base)).toBe(base);
   });
   it("completes three contextual question rounds, accepts typed uncertainty and previews a bounded summary", async () => {
     const cookie = await userCookie("guided_three_rounds"); const turns = [];

@@ -85,15 +85,88 @@
   .mc-callout{margin-top:14px;font-size:13.5px;line-height:1.7;color:var(--ink-soft);background:rgba(246,207,74,.16);border-radius:var(--r-md);padding:11px 15px}
   .mc-foot{margin:26px 4px 8px;text-align:center;font-size:13px;color:var(--ink-mute);line-height:1.8}
   .mc-foot q{display:block;font-size:15px;color:var(--ink-soft);quotes:"「" "」"}
-  @media (max-width:1100px){ .mc-markets{grid-template-columns:1fr} .mc-zones{grid-template-columns:repeat(3,minmax(0,1fr))} }
+  /* 市场列数跟着「显示几个市场」走 */
+  .mc-markets{grid-template-columns:repeat(var(--n,3),minmax(0,1fr))}
+  /* 自定义：页头右侧的按钮 + 浮层（≤600px 变底部抽屉） */
+  .mc-hero-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mc-cust{position:relative}
+  .mc-cust-btn i{font-size:15px}
+  .mc-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:320px;padding:14px;border-radius:var(--r-lg);background:var(--card-solid);box-shadow:0 18px 50px -12px rgba(40,35,20,.28),0 0 0 1px var(--divider)}
+  .mc-pop[hidden],.mc-scrim[hidden]{display:none}
+  .mc-pop-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 4px 10px}
+  .mc-pop-h b{font-size:15px;font-weight:500}
+  .mc-pop-h small{font-size:12px;color:var(--ink-mute)}
+  .mc-pop-l{font-size:11.5px;color:var(--ink-mute);margin:10px 6px 4px;letter-spacing:.02em}
+  .mc-row{display:flex;align-items:center;gap:6px;min-height:48px;padding:6px 4px 6px 10px;border-radius:var(--r-sm)}
+  .mc-row:hover{background:var(--track)}
+  .mc-row-n{flex:1;min-width:0;font-size:14px}
+  .mc-row-n small{display:block;margin-top:1px;font-size:11.5px;color:var(--ink-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mc-row.off .mc-row-n{color:var(--ink-mute)}
+  .mc-mv{width:30px;height:30px;border:0;border-radius:50%;background:none;color:var(--ink-soft);cursor:pointer;font-size:16px;display:inline-flex;align-items:center;justify-content:center}
+  .mc-mv:hover:not(:disabled){background:var(--track-edge,rgba(29,29,27,.1));color:var(--ink)}
+  .mc-mv:disabled{opacity:.25;cursor:default}
+  .mc-sw{position:relative;flex:none;width:40px;height:24px;margin-left:4px}
+  .mc-sw input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+  .mc-sw span{position:absolute;inset:0;border-radius:var(--r-pill);background:rgba(29,29,27,.14);transition:background .18s;pointer-events:none}
+  .mc-sw span::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .18s}
+  .mc-sw input:checked + span{background:var(--dark)}
+  .mc-sw input:checked + span::after{transform:translateX(16px)}
+  .mc-sw input:focus-visible + span{box-shadow:0 0 0 3px var(--sun-soft)}
+  .mc-pop-f{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 4px 0;padding-top:10px;border-top:1px solid var(--divider);font-size:12px;color:var(--ink-mute)}
+  .mc-pop-f button{border:0;background:none;padding:4px 0;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  .mc-pop-f button:disabled{opacity:.4;cursor:default;text-decoration:none}
+  .mc-scrim{position:fixed;inset:0;z-index:29;background:transparent}
+  @media (max-width:600px){ .mc-scrim{background:rgba(29,29,27,.18)} }
+  /* 市场脉搏：每个市场一栏，三只指数 + 一年走势 */
+  .mc-pulse{display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,1fr));gap:12px}
+  .mc-pm{display:flex;flex-direction:column;gap:4px;padding:14px 16px 12px;border-radius:var(--r-lg);background:rgba(29,29,27,.035);min-width:0}
+  .mc-pm-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .mc-pm-h b{font-size:15px;font-weight:500}
+  .mc-pm-h small{font-size:11.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mc-pm-say{font-size:12.5px;line-height:1.6;color:var(--ink-soft);margin:2px 0 6px;min-height:20px}
+  .mc-ix{display:grid;grid-template-columns:minmax(0,1fr) 84px auto;align-items:center;gap:4px 12px;padding:8px 0;border-top:1px solid var(--divider)}
+  .mc-ix-n{font-size:13px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mc-ix-n small{display:block;font-size:11px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .mc-ix-v{text-align:right;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mc-ix-v small{display:block;font-size:12px}
+  .mc-up{color:var(--green)} .mc-dn{color:var(--red)} .mc-flat{color:var(--ink-mute)} .mc-neu{color:var(--ink-soft)} /* 利率升降不分好坏，不上色 */
+  .mc-spark{display:block;width:84px;height:28px;overflow:visible}
+  .mc-spark path{fill:none;stroke:var(--ink-soft);stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round}
+  .mc-spark.up path{stroke:var(--green)} .mc-spark.dn path{stroke:var(--red)}
+  .mc-miss{font-size:12.5px;color:var(--ink-mute)}
+  .mc-src{margin-top:12px;font-size:11.5px;color:var(--ink-mute);line-height:1.6}
+  .mc-err{display:flex;align-items:center;justify-content:center;gap:8px;min-height:120px;padding:16px;border-radius:var(--r-md);background:rgba(255,255,255,.4);background-image:var(--hatch);font-size:13px;color:var(--ink-soft);text-align:center}
+  .mc-err button{border:0;background:none;padding:0;font:inherit;color:var(--ink);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  /* 利率 · 汇率 · 商品：小方块 */
+  .mc-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  .mc-tile{display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:var(--r-md);background:rgba(29,29,27,.035);min-width:0}
+  .mc-tile-k{font-size:12.5px;color:var(--ink-soft);display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mc-tile-k i{color:var(--ink-mute);cursor:help}
+  .mc-tile-v{font-size:22px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .mc-tile-c{font-size:12px;font-variant-numeric:tabular-nums;display:flex;gap:8px;flex-wrap:wrap}
+  .mc-tile-d{font-size:11px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .mc-tile .mc-spark{width:100%;height:24px;margin-top:2px}
+  .mc-tile.sk-t{min-height:96px}
+  @media (max-width:1100px){ .mc-markets,.mc-pulse{grid-template-columns:1fr} .mc-zones{grid-template-columns:repeat(3,minmax(0,1fr))} }
+  @media (max-width:820px){ .mc-tiles{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width:600px){
+    .mc-pop{position:fixed;left:0;right:0;top:auto;bottom:0;width:auto;max-height:80vh;overflow:auto;border-radius:var(--r-xl) var(--r-xl) 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+    .mc-hero-r{width:100%;justify-content:space-between}
+    .mc-ix{grid-template-columns:minmax(0,1fr) 64px auto}
+    .mc-spark{width:64px}
+    .mc-ix-n small{white-space:normal}
+    .mc-tile-v{font-size:19px}
+  }
   @media (max-width:560px){ .mc-card{padding:18px 16px} .mc-zones{grid-template-columns:repeat(2,minmax(0,1fr))} }
 </style>
   <!-- 模块依赖整棵树先声明：浏览器一次并行拉取，不用等上一层下载完才发现下一层 -->
   <link rel="modulepreload" href="/shared/core.js">
   <link rel="modulepreload" href="/shared/gauge.js">
+  <link rel="modulepreload" href="/shared/macro-board.js">
   <link rel="modulepreload" href="/shared/i18n.js">
   <link rel="modulepreload" href="/shared/langmenu.js">
   <link rel="modulepreload" href="/shared/feedback.js">
+  <link rel="modulepreload" href="/shared/global-ai.js">
   <link rel="modulepreload" href="/shared/feedback-core.js">
   <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页 -->
   <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"},{"href_matches":"/macro"}]},"eagerness":"moderate"}]}</script>
@@ -118,13 +191,30 @@
       <div class="mc-meta" id="mcMeta"></div>
       <div class="mc-chips" id="mcVerdict"></div>
     </div>
-    <span class="mc-badge" id="mcBadge" hidden></span>
+    <div class="mc-hero-r">
+      <span class="mc-badge" id="mcBadge" hidden></span>
+      <div class="mc-cust">
+        <button class="btn sm ghost mc-cust-btn" id="mcCustBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="mcCustPop"><i class="ri-equalizer-line" aria-hidden="true"></i><span id="mcCustLabel"></span></button>
+        <div class="mc-scrim" id="mcScrim" hidden></div>
+        <div class="mc-pop" id="mcCustPop" role="dialog" aria-labelledby="mcCustTitle" hidden></div>
+      </div>
+    </div>
   </div>
 
   <div class="mc-grid">
-    <section class="mc-card">
+    <section class="mc-card" id="mcLevel">
       <div class="mc-head"><div><div class="mc-title" id="mcLevelTitle"></div><div class="mc-sub" id="mcLevelSub"></div></div></div>
       <div class="mc-markets" id="mcMarkets"><div class="sk-card" style="min-height:300px"></div><div class="sk-card"></div><div class="sk-card"></div></div>
+    </section>
+    <section class="mc-card" id="mcPulse">
+      <div class="mc-head"><div><div class="mc-title" id="mcPulseTitle"></div><div class="mc-sub" id="mcPulseSub"></div></div></div>
+      <div class="mc-pulse" id="mcPulseBody"></div>
+      <div class="mc-src" id="mcPulseSrc"></div>
+    </section>
+    <section class="mc-card" id="mcCross">
+      <div class="mc-head"><div><div class="mc-title" id="mcCrossTitle"></div><div class="mc-sub" id="mcCrossSub"></div></div></div>
+      <div class="mc-tiles" id="mcCrossBody"></div>
+      <div class="mc-src" id="mcCrossSrc"></div>
     </section>
     <section class="mc-card" id="mcGravity">
       <div class="mc-head"><div><div class="mc-title" id="mcGravTitle"></div><div class="mc-sub" id="mcGravSub"></div></div><div class="mc-ctl" id="mcGravCtl"></div></div>
@@ -147,12 +237,15 @@
 import { applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
 import { mountFeedback } from "/shared/feedback.js";
+import { mountGlobalAi } from "/shared/global-ai.js";
 import { Gauge } from "/shared/gauge.js";
 import { ZONES, structValid, computeAnchors, priceToPhi } from "/shared/core.js";
+import { PREFS_KEY, DEFAULT_PREFS, normalizePrefs, parsePrefs, serializePrefs, visibleMarkets, isDefaultPrefs, toggleMarket, moveMarket, setCross, pickNewer, marketSummary, sparkPath } from "/shared/macro-board.js";
 
 applyI18n();
 mountLangMenu(document.getElementById("topActions"));
 mountFeedback(document.getElementById("topActions")); // 反馈入口（只对已登录用户显示）
+mountGlobalAi(document.getElementById("topActions"), { getPage: () => ({ kind: "macro", path: location.pathname, title: document.title }) }); // 全站 AI 助手（只对已登录用户显示）
 const zh = LANG === "zh", T = (a, b) => (zh ? a : b);
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -169,6 +262,24 @@ const IND = {
   cn_pe: { name: T("全 A 股市盈率（TTM）", "All A-share P/E (TTM)"), tip: T("沪深两市全部 A 股的市盈率（东方财富，2017 年起）。历史较短，分位仅供参考。", "P/E of all A-shares (eastmoney, since 2017). Short history — treat the percentile with care.") },
   cn_erp: { name: T("股债性价比", "Equity vs bond yield"), tip: T("全 A 股盈利收益率（1 / PE）减 10 年国债收益率。越低越贵，按反向计入水位。", "All A-share earnings yield (1/PE) minus the 10-year CGB yield. Lower is pricier, so it counts inversely.") },
 };
+// 市场脉搏里的指数、利率与汇率商品的名字
+const IDX = {
+  spx: T("标普 500", "S&P 500"), ndx: T("纳斯达克综指", "Nasdaq Composite"), dji: T("道琼斯", "Dow Jones"),
+  hsi: T("恒生指数", "Hang Seng"), hstech: T("恒生科技", "Hang Seng Tech"), hscei: T("国企指数", "HS China Enterprises"),
+  sse: T("上证指数", "SSE Composite"), csi300: T("沪深 300", "CSI 300"), chinext: T("创业板指", "ChiNext"),
+};
+const PULSE_NAMES = { us: [IDX.spx, IDX.ndx, IDX.dji].join(" · "), hk: [IDX.hsi, IDX.hstech, IDX.hscei].join(" · "), cn: [IDX.sse, IDX.csi300, IDX.chinext].join(" · ") };
+const RATE = {
+  us10y: { name: T("美国 10 年国债", "US 10Y Treasury"), tip: T("美国 10 年期国债收益率（月度，multpl）。全球资产定价的「引力」。", "US 10-year Treasury yield (monthly, multpl) — the gravity on asset prices worldwide.") },
+  us_real10y: { name: T("美国 10 年实际利率", "US 10Y real yield"), tip: T("10 年期 TIPS 收益率（月度，multpl）：扣掉通胀预期后的真实回报，对成长股估值影响最大。", "10-year TIPS yield (monthly, multpl): the after-inflation risk-free return, which weighs most on growth valuations.") },
+  cn10y: { name: T("中国 10 年国债", "China 10Y govt bond"), tip: T("中国 10 年期国债收益率（东方财富，取每月最后一个观测值）。", "China 10-year government bond yield (eastmoney, last observation each month).") },
+};
+const CROSS = {
+  usdcny: { name: T("美元 / 人民币", "USD / CNY"), d: 4, tip: T("在岸人民币汇率（腾讯行情）。", "Onshore yuan rate (Tencent quotes).") },
+  usdhkd: { name: T("美元 / 港元", "USD / HKD"), d: 4, tip: T("联系汇率区间 7.75–7.85：贴近 7.85 弱方保证时，金管局会收紧港元流动性，港股资金面偏紧。", "Pegged band 7.75–7.85: near the 7.85 weak side the HKMA drains liquidity, tightening Hong Kong funding.") },
+  gold: { name: T("黄金", "Gold"), d: 2, pre: "$", unit: T("美元 / 盎司", "USD/oz"), tip: T("COMEX 黄金主力期货（腾讯行情）。", "COMEX gold front-month futures (Tencent quotes).") },
+  wti: { name: T("WTI 原油", "WTI crude"), d: 2, pre: "$", unit: T("美元 / 桶", "USD/bbl"), tip: T("NYMEX WTI 原油主力期货（腾讯行情）。", "NYMEX WTI crude front-month futures (Tencent quotes).") },
+};
 const QUOTES = [
   [T("利率之于资产价格，如同引力之于苹果。", "Interest rates act on asset prices like gravity on an apple."), T("巴菲特", "Buffett")],
   [T("反过来想，总是反过来想。", "Invert, always invert."), T("芒格", "Munger")],
@@ -184,15 +295,97 @@ const q = QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
 $("mcQuote").textContent = q[0]; $("mcFootNote").textContent = `—— ${q[1]}　·　${T("数据按月更新。这一页每月看一次就够了。", "Data updates monthly. Looking once a month is plenty.")}`;
 $("mcLevelTitle").textContent = T("市场水位", "Market level");
 $("mcLevelSub").textContent = T("各指标在自身历史里的分位，平均成一个水位：0–10 击球区 · 10–30 低估 · 30–70 合理 · 70–90 高估 · 90–100 泡沫区", "Each gauge's percentile in its own history, averaged: 0–10 strike · 10–30 cheap · 30–70 fair · 70–90 pricey · 90–100 bubble");
+$("mcPulseTitle").textContent = T("市场脉搏", "Market pulse");
+$("mcPulseSub").textContent = T("主要指数的今日涨跌与近一年走势——只作参照，水位才是这一页的重点", "Today's moves and the past year for the main indices — context only; the level above is what matters");
+$("mcCrossTitle").textContent = T("利率 · 汇率 · 商品", "Rates · FX · Commodities");
+$("mcCrossSub").textContent = T("引力（利率）是月度的；汇率与商品是今天的价格", "Rates (the gravity) are monthly; FX and commodities are today's prices");
 $("mcGravTitle").textContent = T("引力：股票盈利收益率 vs 10 年国债", "Gravity: earnings yield vs 10-year bonds");
 $("mcGravSub").textContent = T("利率越高，未来盈利折回今天越不值钱；两条线的差就是股票多给你的补偿", "Higher rates make future earnings worth less today; the gap is what stocks pay you extra");
 
-// ---------- 宏观数据 ----------
-let gMkt = "us", gRange = "all"; // 引力图的市场 / 区间选择（要在 renderMarkets 调用之前声明）
-let macro = null;
-try { const r = await fetch("/api/macro", { cache: "no-cache" }); macro = r.ok ? await r.json() : null; } catch { macro = null; } // 每次回源校验，别用旧缓存
-if (!macro) { $("mcMarkets").innerHTML = ""; $("mcMarkets").appendChild(el("div", "mc-pending", T("宏观数据暂时拿不到，稍后再来。", "Macro data is unavailable right now."))); }
-else renderMarkets(macro);
+// ---------- 显示偏好：哪些市场、什么顺序、要不要「利率 · 汇率 · 商品」（本机 localStorage；登录后同步到账户） ----------
+let signedIn = false, prefs = parsePrefs(localStorage.getItem(PREFS_KEY));
+const remotePrefs = fetch("/api/my/macro-prefs", { cache: "no-store" })
+  .then((r) => (r.ok ? r.json().then((j) => ({ signedIn: true, prefs: j.prefs || null })) : { signedIn: false }))
+  .catch(() => ({ signedIn: false }));
+if (!prefs) { const r = await remotePrefs; signedIn = r.signedIn; prefs = r.prefs || normalizePrefs(DEFAULT_PREFS); } // 这台设备第一次来：先看账户里有没有，免得白拉隐藏的市场
+else remotePrefs.then((r) => {
+  signedIn = r.signedIn;
+  if (!signedIn) return;
+  const best = pickNewer(prefs, r.prefs);
+  if (r.prefs && best.at === r.prefs.at && best.at > prefs.at) applyPrefs(best, { sync: false });
+  else if (prefs.at > 0 && (!r.prefs || prefs.at > r.prefs.at)) pushPrefs();
+  renderCust();
+});
+let pushTimer = 0;
+function pushPrefs() {
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => { fetch("/api/my/macro-prefs", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ prefs }) }).catch(() => {}); }, 600);
+}
+function applyPrefs(p, { sync = true } = {}) {
+  prefs = normalizePrefs(p);
+  try { localStorage.setItem(PREFS_KEY, serializePrefs(prefs)); } catch { /* 隐私模式 */ }
+  if (sync && signedIn) pushPrefs();
+  ensureData(); renderAll(); renderCust();
+}
+const vis = () => visibleMarkets(prefs);
+
+// ---------- 数据：只拉可见的市场；隐藏的市场不请求。每块各自 loading / ok / error ----------
+let gMkt = "us", gRange = "all"; // 引力图的市场 / 区间选择
+const MAC = { markets: {}, gravity: {}, rates: null, updatedAt: null, st: {}, ratesSt: null }; // st[市场] = loading | ok | error
+const PUL = { markets: {}, cross: null, ts: null, st: {}, crossSt: null };
+async function loadMacro(keys, withRates) {
+  for (const k of keys) MAC.st[k] = "loading";
+  if (withRates) MAC.ratesSt = "loading";
+  let d = null;
+  try { const r = await fetch("/api/macro?markets=" + keys.join(","), { cache: "no-cache" }); d = r.ok ? await r.json() : null; } catch { d = null; } // 每次回源校验，别用旧缓存
+  for (const k of keys) {
+    const m = d && d.markets && d.markets.find((x) => x && x.key === k);
+    MAC.st[k] = m ? "ok" : "error";
+    if (m) { MAC.markets[k] = m; if (d.gravity && d.gravity[k]) MAC.gravity[k] = d.gravity[k]; }
+  }
+  if (d) { MAC.rates = d.rates || []; MAC.ratesSt = "ok"; MAC.updatedAt = d.updatedAt || MAC.updatedAt; } else if (MAC.ratesSt !== "ok") MAC.ratesSt = "error";
+  renderLevel(); renderGravity(); renderPulse(); renderCross(); renderVerdict(); renderMineSay();
+}
+async function loadPulse(keys, withCross) {
+  for (const k of keys) PUL.st[k] = "loading";
+  if (withCross) PUL.crossSt = "loading";
+  let d = null;
+  try { const r = await fetch(`/api/macro/pulse?markets=${keys.join(",")}&cross=${withCross ? 1 : 0}`); d = r.ok ? await r.json() : null; } catch { d = null; }
+  for (const k of keys) {
+    const list = d && d.markets && d.markets[k];
+    const ok = list && list.some((x) => !x.missing);
+    PUL.st[k] = ok ? "ok" : "error";
+    if (ok) PUL.markets[k] = list;
+  }
+  if (withCross) { const ok = d && d.cross && d.cross.some((x) => !x.missing); PUL.crossSt = ok ? "ok" : "error"; if (ok) PUL.cross = d.cross; }
+  if (d && d.ts) PUL.ts = d.ts;
+  renderPulse(); renderCross();
+}
+function ensureData() {
+  const v = vis();
+  const needM = v.filter((k) => !MAC.st[k] || MAC.st[k] === "error");
+  const needRates = prefs.cross && (!MAC.ratesSt || MAC.ratesSt === "error");
+  if (needM.length || (needRates && !Object.values(MAC.st).includes("loading"))) loadMacro(needM, needRates);
+  const needP = v.filter((k) => !PUL.st[k] || PUL.st[k] === "error");
+  const needX = prefs.cross && (!PUL.crossSt || PUL.crossSt === "error");
+  if (needP.length || needX) loadPulse(needP, needX);
+}
+const liveMarkets = () => vis().map((k) => MAC.markets[k]).filter((m) => m && !m.pending);
+function renderAll() { renderLevel(); renderPulse(); renderCross(); renderGravity(); renderVerdict(); renderMineSay(); }
+
+// 某一块拉不到：只在这一块里说，并给个重试
+function errBox(text, retry) {
+  const b = el("div", "mc-err"); b.append(ri("cloud-off-line"), document.createTextNode(text));
+  if (retry) { const btn = el("button", "", T("重试", "Retry")); btn.type = "button"; btn.addEventListener("click", retry); b.appendChild(btn); }
+  return b;
+}
+function allHiddenBox() {
+  const b = el("div", "mc-pending");
+  b.append(document.createTextNode(T("所有市场都隐藏了。", "All markets are hidden. ")));
+  const btn = el("button", "btn sm", T("自定义显示", "Choose markets")); btn.type = "button"; btn.style.marginLeft = "10px";
+  btn.addEventListener("click", (e) => { e.stopPropagation(); openCust(true); }); b.appendChild(btn);
+  return b;
+}
 
 // 钟摆复用：把百分位当「价格」，合理区间 30–70，安全边际 / 泡沫阈值换算成 10 和 90 两条线
 function marketGauge(mount, m) {
@@ -203,13 +396,21 @@ function marketGauge(mount, m) {
   if (svg) requestAnimationFrame(() => { try { const b = svg.getBBox(); if (b.width) svg.setAttribute("viewBox", `${b.x - 6} ${b.y - 6} ${b.width + 12} ${b.height + 12}`); } catch {} });
   g.swingIn();
 }
-function renderMarkets(d) {
-  const box = $("mcMarkets"); box.innerHTML = "";
-  for (const m of d.markets) {
+let levelSig = ""; // 同样的内容不重画（钟摆每次重画都会重新摆进来）
+function renderLevel() {
+  const box = $("mcMarkets"), v = vis();
+  const sig = v.map((k) => k + ":" + (MAC.st[k] || "")).join("|");
+  if (sig === levelSig) return; levelSig = sig;
+  box.innerHTML = ""; box.style.setProperty("--n", String(Math.max(1, v.length)));
+  if (!v.length) { box.style.setProperty("--n", "1"); box.appendChild(allHiddenBox()); return; }
+  for (const k of v) {
+    const st = MAC.st[k], m = MAC.markets[k];
+    if (st === "loading" || !st) { const sk = el("div", "sk-card"); sk.style.minHeight = "300px"; box.appendChild(sk); continue; }
     const card = el("div", "mc-mkt");
-    const top = el("div", "mc-mkt-top"); top.appendChild(el("span", "mc-mkt-name", MKT[m.key]));
+    const top = el("div", "mc-mkt-top"); top.appendChild(el("span", "mc-mkt-name", MKT[k]));
+    if (st === "error" || !m) { card.append(top, errBox(T("估值数据暂时拿不到", "Valuation data unavailable"), () => { MAC.st[k] = null; ensureData(); })); box.appendChild(card); continue; }
     if (m.pending) {
-      card.append(top, el("div", "mc-pending", T("港股：恒生指数的长历史估值（PE / PB / 股息率）还没接入。在那之前，港股标的请看你自己在自选里给的区间。", "Hong Kong: long Hang Seng valuation history (P/E, P/B, yield) isn't wired in yet. Until then, rely on your own watchlist ranges.")));
+      card.append(top, el("div", "mc-pending", T("这个市场的长历史估值数据还没拉到。在那之前，请看你自己在自选里给的区间。", "Long valuation history for this market isn't available yet. Until then, rely on your own watchlist ranges.")));
       box.appendChild(card); continue;
     }
     const zb = el("span", "mc-mkt-zone", ZN[m.zone]); zb.style.background = ZONES[m.zone].hex; top.appendChild(zb);
@@ -219,8 +420,8 @@ function renderMarkets(d) {
     for (const x of m.indicators) {
       const meta = IND[x.key] || { name: x.key, tip: "" };
       const row = el("div", "mc-ind");
-      const k = el("span", "mc-ind-k", meta.name); const info = ri("information-line"); info.title = meta.tip; k.appendChild(info);
-      row.append(k, el("span", "mc-ind-v", `${x.value}${x.unit === "%" ? "%" : x.unit === "pp" ? " pp" : ""}`));
+      const kk = el("span", "mc-ind-k", meta.name); const info = ri("information-line"); info.title = meta.tip; kk.appendChild(info);
+      row.append(kk, el("span", "mc-ind-v", `${x.value}${x.unit === "%" ? "%" : x.unit === "pp" ? " pp" : ""}`));
       // 五段条：位置 = 「贵的程度」分位（风险溢价类已反向）
       const bar = el("div", "mc-pbar");
       const curZone = x.expensive < 10 ? 0 : x.expensive < 30 ? 1 : x.expensive < 70 ? 2 : x.expensive < 90 ? 3 : 4;
@@ -233,14 +434,120 @@ function renderMarkets(d) {
     box.appendChild(card);
     marketGauge(gm, m);
   }
-  renderGravity(d.gravity);
+}
+
+// ---------- 市场脉搏：三只指数的当日涨跌 + 一年走势（只作参照，不必天天看） ----------
+const NS = "http://www.w3.org/2000/svg";
+function spark(values, cls) {
+  const d = sparkPath(values, 100, 28);
+  const svg = document.createElementNS(NS, "svg"); svg.setAttribute("viewBox", "0 0 100 28"); svg.setAttribute("preserveAspectRatio", "none"); svg.setAttribute("class", "mc-spark" + (cls ? " " + cls : "")); svg.setAttribute("aria-hidden", "true");
+  if (d) { const p = document.createElementNS(NS, "path"); p.setAttribute("d", d); p.setAttribute("vector-effect", "non-scaling-stroke"); svg.appendChild(p); }
+  return svg;
+}
+const dirCls = (v) => (!Number.isFinite(v) || v === 0 ? "mc-flat" : v > 0 ? "mc-up" : "mc-dn");
+const pctTxt = (v, d = 2) => (Number.isFinite(v) ? (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d) + "%" : "—");
+const fmtNum = (v, d = 2) => (Number.isFinite(v) ? v.toLocaleString(zh ? "zh-CN" : "en-US", { minimumFractionDigits: d, maximumFractionDigits: d }) : "—");
+const shortTime = (t) => (t ? t.slice(5) : ""); // "2026-10-21 10:43" → "10-21 10:43"
+function renderPulse() {
+  const sec = $("mcPulse"), v = vis();
+  sec.hidden = !v.length;
+  if (!v.length) return;
+  const box = $("mcPulseBody"); box.innerHTML = ""; box.style.setProperty("--n", String(v.length));
+  for (const k of v) {
+    const st = PUL.st[k], list = PUL.markets[k];
+    const col = el("div", "mc-pm");
+    const h = el("div", "mc-pm-h"); h.appendChild(el("b", "", MKT[k]));
+    col.appendChild(h);
+    if (st === "loading" || !st) {
+      const s1 = el("span", "sk sk-line"); s1.style.width = "80%"; s1.style.margin = "6px 0 10px"; col.appendChild(s1);
+      for (let i = 0; i < 3; i++) { const r = el("div", "mc-ix"); const a = el("span", "sk sk-line"); a.style.width = "70%"; const b = el("span", "sk"); b.style.height = "24px"; const c = el("span", "sk sk-line"); c.style.width = "56px"; r.append(a, b, c); col.appendChild(r); }
+      box.appendChild(col); continue;
+    }
+    if (st === "error" || !list) { col.appendChild(errBox(T("行情暂时拿不到", "Quotes unavailable"), () => { PUL.st[k] = null; ensureData(); })); box.appendChild(col); continue; }
+    const t = list.map((x) => x.time).filter(Boolean).sort().pop();
+    if (t) h.appendChild(el("small", "", T(`截至 ${shortTime(t)}`, `as of ${shortTime(t)}`)));
+    const m = MAC.markets[k];
+    const say = marketSummary({ indices: list.filter((x) => !x.missing).map((x) => ({ name: IDX[x.key] || x.key, pct: x.pct, chg1y: x.chg1y, fromHigh: x.fromHigh })), level: m && !m.pending ? m.level : undefined, zoneName: m && !m.pending ? ZN[m.zone] : undefined }, zh ? "zh" : "en");
+    col.appendChild(el("div", "mc-pm-say", say));
+    for (const x of list) {
+      const r = el("div", "mc-ix");
+      const n = el("span", "mc-ix-n", IDX[x.key] || x.key);
+      if (x.missing) { r.append(n, el("span"), el("span", "mc-miss", T("暂缺", "n/a"))); col.appendChild(r); continue; }
+      if (Number.isFinite(x.chg1y)) n.appendChild(el("small", "", T(`一年 ${pctTxt(x.chg1y, 1)} · 距高点 ${pctTxt(x.fromHigh, 1)}`, `1y ${pctTxt(x.chg1y, 1)} · ${pctTxt(x.fromHigh, 1)} from high`)));
+      const val = el("span", "mc-ix-v", fmtNum(x.price)); val.appendChild(el("small", dirCls(x.pct), pctTxt(x.pct)));
+      const sp = x.spark ? spark(x.spark, x.chg1y > 0 ? "up" : x.chg1y < 0 ? "dn" : "") : el("span");
+      if (x.spark) sp.setAttribute("aria-label", T("近一年走势", "1-year trend"));
+      r.append(n, sp, val); col.appendChild(r);
+    }
+    box.appendChild(col);
+  }
+  const ts = PUL.ts ? new Date(PUL.ts) : null;
+  $("mcPulseSrc").textContent = T(`指数：腾讯行情（可能有 15 分钟延时），走势线为近一年日收盘${ts ? ` · 抓取于 ${ts.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}` : ""}`, `Indices: Tencent quotes (may be delayed ~15 min); trend lines are 1-year daily closes${ts ? ` · fetched ${ts.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}` : ""}`);
+}
+
+// ---------- 利率 · 汇率 · 商品 ----------
+function tile(k, tip) {
+  const t = el("div", "mc-tile"); const kk = el("div", "mc-tile-k", k);
+  if (tip) { const i = ri("information-line"); i.title = tip; kk.appendChild(i); }
+  t.appendChild(kk); return t;
+}
+const ppTxt = (v) => (Number.isFinite(v) ? (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v).toFixed(2) : "—");
+function renderCross() {
+  const sec = $("mcCross"); sec.hidden = !prefs.cross;
+  if (!prefs.cross) return;
+  const box = $("mcCrossBody"); box.innerHTML = "";
+  const skel = () => { const t = el("div", "mc-tile sk-t"); const a = el("span", "sk sk-line"); a.style.width = "60%"; const b = el("span", "sk"); b.style.height = "26px"; b.style.width = "70%"; b.style.marginTop = "6px"; const c = el("span", "sk sk-line"); c.style.width = "45%"; c.style.marginTop = "6px"; t.append(a, b, c); return t; };
+  const miss = (t, retry) => { t.append(el("div", "mc-tile-v mc-flat", "—"), el("div", "mc-tile-d", T("暂时拿不到", "Unavailable"))); if (retry) { t.style.cursor = "pointer"; t.title = T("点一下重试", "Click to retry"); t.addEventListener("click", retry, { once: true }); } return t; };
+  // 利率（月度）：美 10Y、美实际利率、中 10Y、中美利差
+  const rates = MAC.rates || [], R = (key) => rates.find((x) => x.key === key);
+  const rateTile = (key) => {
+    const meta = RATE[key], t = tile(meta.name, meta.tip);
+    if (MAC.ratesSt === "loading" || !MAC.ratesSt) return skel();
+    const x = R(key);
+    if (!x) return miss(t, MAC.ratesSt === "error" ? () => { MAC.ratesSt = null; ensureData(); } : null);
+    const c = el("div", "mc-tile-c");
+    if (x.chg1m !== null) c.appendChild(el("span", "mc-neu", T(`月 ${ppTxt(x.chg1m)}`, `1m ${ppTxt(x.chg1m)}`)));
+    if (x.chg1y !== null) c.appendChild(el("span", "mc-neu", T(`年 ${ppTxt(x.chg1y)}`, `1y ${ppTxt(x.chg1y)}`)));
+    t.append(el("div", "mc-tile-v", x.value.toFixed(2) + "%"), c, spark(x.spark), el("div", "mc-tile-d", T(`${x.date} · 月度`, `${x.date} · monthly`)));
+    return t;
+  };
+  for (const key of ["us10y", "us_real10y", "cn10y"]) box.appendChild(rateTile(key));
+  // 中美利差：两条月度序列按月对齐后相减
+  {
+    const a = R("us10y"), b = R("cn10y"), t = tile(T("中美 10 年利差", "US–China 10Y spread"), T("美国 10 年国债收益率 − 中国 10 年国债收益率。利差越大，人民币资产相对美元资产的利息吸引力越弱，汇率压力通常越大。", "US 10-year yield minus China 10-year yield. A wider gap usually means more pressure on the yuan."));
+    if (MAC.ratesSt === "loading" || !MAC.ratesSt) box.appendChild(skel());
+    else if (!a || !b) box.appendChild(miss(t));
+    else {
+      const n = Math.min(a.spark.length, b.spark.length), s = a.spark.slice(-n).map((v, i) => Math.round((v - b.spark.slice(-n)[i]) * 100) / 100);
+      const v = a.value - b.value, prev = s.length > 1 ? s[s.length - 2] : NaN;
+      const c = el("div", "mc-tile-c"); if (Number.isFinite(prev)) c.appendChild(el("span", "mc-flat", T(`上月 ${prev.toFixed(2)} pp`, `last month ${prev.toFixed(2)} pp`)));
+      t.append(el("div", "mc-tile-v", (v > 0 ? "+" : "") + v.toFixed(2) + " pp"), c, spark(s), el("div", "mc-tile-d", a.date === b.date ? a.date : `${a.date} / ${b.date}`));
+      box.appendChild(t);
+    }
+  }
+  // 汇率与商品（日内，腾讯）
+  for (const key of ["usdcny", "usdhkd", "gold", "wti"]) {
+    const meta = CROSS[key], t = tile(meta.name, meta.tip);
+    if (PUL.crossSt === "loading" || !PUL.crossSt) { box.appendChild(skel()); continue; }
+    const x = (PUL.cross || []).find((y) => y.key === key);
+    if (!x || x.missing) { box.appendChild(miss(t, PUL.crossSt === "error" ? () => { PUL.crossSt = null; ensureData(); } : null)); continue; }
+    const c = el("div", "mc-tile-c"); c.appendChild(el("span", dirCls(x.pct), T(`今日 ${pctTxt(x.pct)}`, `today ${pctTxt(x.pct)}`)));
+    t.append(el("div", "mc-tile-v", (meta.pre || "") + fmtNum(x.price, meta.d)), c, el("div", "mc-tile-d", (x.time ? shortTime(x.time) + T("（北京时间）", " (Beijing)") : "") + (meta.unit ? ` · ${meta.unit}` : "")));
+    box.appendChild(t);
+  }
+  $("mcCrossSrc").textContent = T("利率：multpl（美债，月度）、东方财富（中债）；汇率与商品：腾讯行情（黄金为 COMEX、原油为 NYMEX WTI 主力期货）。", "Rates: multpl (US Treasuries, monthly), eastmoney (China govt bonds); FX & commodities: Tencent quotes (COMEX gold, NYMEX WTI front-month futures).");
 }
 
 // ---------- 引力长线 ----------
-function renderGravity(G) {
+function renderGravity() {
+  const G = MAC.gravity, sec = $("mcGravity");
+  const opts = vis().filter((k) => G[k]);
+  sec.hidden = !opts.length; // 没有显示中的市场（或都还没到）就不画
+  if (!opts.length) return;
+  if (!opts.includes(gMkt)) gMkt = opts[0];
   const ctl = $("mcGravCtl"); ctl.innerHTML = "";
-  const seg = (opts, cur, pick) => { const s = el("div", "mc-seg"); for (const [k, lab] of opts) { const b = el("button", k === cur ? "on" : "", lab); b.type = "button"; b.addEventListener("click", () => { pick(k); renderGravity(G); }); s.appendChild(b); } return s; };
-  ctl.append(seg([["us", MKT.us], ["hk", MKT.hk], ["cn", MKT.cn]], gMkt, (k) => { gMkt = k; }), seg([["10", T("10 年", "10Y")], ["20", T("20 年", "20Y")], ["all", T("全部", "All")]], gRange, (k) => { gRange = k; }));
+  const seg = (opts, cur, pick) => { const s = el("div", "mc-seg"); for (const [k, lab] of opts) { const b = el("button", k === cur ? "on" : "", lab); b.type = "button"; b.addEventListener("click", () => { pick(k); renderGravity(); }); s.appendChild(b); } return s; };
+  ctl.append(...(opts.length > 1 ? [seg(opts.map((k) => [k, MKT[k]]), gMkt, (k) => { gMkt = k; })] : []), seg([["10", T("10 年", "10Y")], ["20", T("20 年", "20Y")], ["all", T("全部", "All")]], gRange, (k) => { gRange = k; }));
   const g = G[gMkt];
   const since = gRange === "all" ? "" : `${new Date().getFullYear() - Number(gRange)}-01`;
   const cut = (s) => (s || []).filter(([d]) => d >= since);
@@ -337,32 +644,97 @@ async function renderMine() {
     a.append(dot, document.createTextNode(it.name || it.ticker), el("small", "", z === 0 ? T("已在击球区", "in the strike zone") : T(`距击球区 ${toStrike.toFixed(0)}%`, `${toStrike.toFixed(0)}% to strike`)));
     nb.appendChild(a);
   });
-  // 和市场水位互相印证：市场便宜 → 去更新估值；市场贵 → 击球区里的名字更要复核
-  const say = $("mcMineSay");
-  const pricey = macro && macro.markets.some((m) => !m.pending && m.zone >= 3);
-  const cheapMkt = macro && macro.markets.some((m) => !m.pending && m.zone <= 1);
-  if (cheapMkt) { say.hidden = false; say.textContent = T("有市场整体落在低估以下：这时最该做的是把自选里的估值更新一遍，而不是急着下单。", "A market is cheap overall: the best move is refreshing your watchlist valuations, not rushing to buy."); }
-  else if (pricey && counts[0] + counts[1] > 0) { say.hidden = false; say.textContent = T("市场整体偏贵，但你的自选里仍有便宜的名字：这正是自下而上的机会——先复核它们的护城河和假设，再决定。", "The market is pricey, yet some of your names are cheap — bottom-up opportunities. Re-check their moats and assumptions first."); }
   $("mcMine").hidden = false;
+  mine = counts;
+  renderMineSay(); renderVerdict();
   return counts;
 }
-const mine = await renderMine();
+let mine = null;
+// 和市场水位互相印证：市场便宜 → 去更新估值；市场贵 → 击球区里的名字更要复核（只看显示中的市场）
+function renderMineSay() {
+  const say = $("mcMineSay");
+  if (!mine) return;
+  const live = liveMarkets();
+  const pricey = live.some((m) => m.zone >= 3), cheapMkt = live.some((m) => m.zone <= 1);
+  say.hidden = true;
+  if (cheapMkt) { say.hidden = false; say.textContent = T("有市场整体落在低估以下：这时最该做的是把自选里的估值更新一遍，而不是急着下单。", "A market is cheap overall: the best move is refreshing your watchlist valuations, not rushing to buy."); }
+  else if (pricey && mine[0] + mine[1] > 0) { say.hidden = false; say.textContent = T("市场整体偏贵，但你的自选里仍有便宜的名字：这正是自下而上的机会——先复核它们的护城河和假设，再决定。", "The market is pricey, yet some of your names are cheap — bottom-up opportunities. Re-check their moats and assumptions first."); }
+}
 
-// 页头一句话：规则生成（不用 AI，不做预测）
-if (macro) {
-  const live = macro.markets.filter((m) => !m.pending);
+// 页头一句话：规则生成（不用 AI，不做预测）；只算显示中的市场
+function renderVerdict() {
+  const v = vis();
+  const settled = v.every((k) => MAC.st[k] === "ok" || MAC.st[k] === "error");
+  const live = liveMarkets();
   const chips = $("mcVerdict"); chips.innerHTML = "";
   const chip = (color, label, strong, rest) => { const c = el("span", "mc-chip"); if (color) { const d = el("i"); d.style.background = color; c.appendChild(d); } c.append(document.createTextNode(label + " · "), el("b", "", strong)); if (rest) c.append(document.createTextNode(" " + rest)); chips.appendChild(c); };
   for (const m of live) chip(ZONES[m.zone].hex, MKT[m.key], ZN[m.zone], T(`${m.level} 分位`, `P${m.level}`));
   if (mine) chip("", T("自选", "Watchlist"), T(`击球区 ${mine[0]}`, `${mine[0]} strike`), T(`· 低估 ${mine[1]}`, `· ${mine[1]} undervalued`));
-  const go = live.some((m) => m.zone <= 1) || (mine && mine[0] > 0);
-  const badge = $("mcBadge"); badge.hidden = false; badge.className = "mc-badge" + (go ? " go" : "");
-  badge.replaceChildren(ri(go ? "search-eye-line" : "cup-line"), document.createTextNode(go ? T("值得翻一翻自选", "Worth a look at your watchlist") : T("本月无需行动", "Nothing to do this month")));
-  const upd = macro.updatedAt ? new Date(macro.updatedAt) : null;
+  const badge = $("mcBadge");
+  if (!settled || (!live.length && !mine)) badge.hidden = true;
+  else {
+    const go = live.some((m) => m.zone <= 1) || (mine && mine[0] > 0);
+    badge.hidden = false; badge.className = "mc-badge" + (go ? " go" : "");
+    badge.replaceChildren(ri(go ? "search-eye-line" : "cup-line"), document.createTextNode(go ? T("值得翻一翻自选", "Worth a look at your watchlist") : T("本月无需行动", "Nothing to do this month")));
+  }
+  const upd = MAC.updatedAt ? new Date(MAC.updatedAt) : null;
   const days = lastVisit ? Math.floor((Date.now() - lastVisit) / 86400000) : null;
-  $("mcMeta").textContent = [upd ? T(`数据更新于 ${upd.toLocaleDateString("zh-CN")}`, `Data updated ${upd.toLocaleDateString("en-US")}`) : "",
+  $("mcMeta").textContent = [upd ? T(`估值数据更新于 ${upd.toLocaleDateString("zh-CN")}`, `Valuation data updated ${upd.toLocaleDateString("en-US")}`) : "",
     days === null ? T("第一次来", "First visit") : days === 0 ? T("今天来过", "Visited earlier today") : T(`上次来看是 ${days} 天前`, `Last visit ${days} days ago`)].filter(Boolean).join(" · ");
 }
+
+// ---------- 自定义：显示哪些市场、顺序、要不要「利率 · 汇率 · 商品」 ----------
+const custBtn = $("mcCustBtn"), pop = $("mcCustPop"), scrim = $("mcScrim");
+function custLabel() {
+  const n = prefs.hidden.length;
+  $("mcCustLabel").textContent = T("自定义", "Customize") + (n ? T(`（隐藏 ${n}）`, ` (${n} hidden)`) : "");
+}
+function sw(checked, label, onChange) {
+  const w = el("label", "mc-sw"); const i = el("input"); i.type = "checkbox"; i.checked = checked; i.setAttribute("role", "switch"); i.setAttribute("aria-label", label);
+  i.addEventListener("change", () => onChange(i.checked)); w.append(i, el("span")); return w;
+}
+function renderCust() {
+  custLabel();
+  if (pop.hidden) return;
+  const focusKey = document.activeElement && pop.contains(document.activeElement) ? document.activeElement.dataset.f : null;
+  pop.innerHTML = "";
+  const h = el("div", "mc-pop-h"); const tt = el("b", "", T("显示哪些市场", "Markets to show")); tt.id = "mcCustTitle";
+  h.append(tt, el("small", "", T("箭头调整顺序", "Arrows reorder"))); pop.appendChild(h);
+  prefs.order.forEach((k, i) => {
+    const on = !prefs.hidden.includes(k);
+    const row = el("div", "mc-row" + (on ? "" : " off"));
+    const n = el("div", "mc-row-n", MKT[k]); n.appendChild(el("small", "", PULSE_NAMES[k])); row.appendChild(n);
+    const mv = (dir, icon, label) => { const b = el("button", "mc-mv"); b.type = "button"; b.dataset.f = `${k}:${dir}`; b.setAttribute("aria-label", `${MKT[k]} ${label}`); b.disabled = dir < 0 ? i === 0 : i === prefs.order.length - 1; b.appendChild(ri(icon)); b.addEventListener("click", () => applyPrefs(moveMarket(prefs, k, dir))); return b; };
+    row.append(mv(-1, "arrow-up-s-line", T("上移", "move up")), mv(1, "arrow-down-s-line", T("下移", "move down")));
+    const s = sw(on, T(`显示${MKT[k]}`, `Show ${MKT[k]}`), (c) => applyPrefs(toggleMarket(prefs, k, c))); s.querySelector("input").dataset.f = `${k}:sw`;
+    row.appendChild(s); pop.appendChild(row);
+  });
+  pop.appendChild(el("div", "mc-pop-l", T("其他", "Other")));
+  const row = el("div", "mc-row" + (prefs.cross ? "" : " off"));
+  const n = el("div", "mc-row-n", T("利率 · 汇率 · 商品", "Rates · FX · Commodities")); n.appendChild(el("small", "", T("美中 10 年国债、美元兑人民币 / 港元、黄金、原油", "US/China 10Y, USD/CNY, USD/HKD, gold, oil"))); row.appendChild(n);
+  const s = sw(prefs.cross, T("显示利率、汇率与商品", "Show rates, FX and commodities"), (c) => applyPrefs(setCross(prefs, c))); s.querySelector("input").dataset.f = "cross:sw";
+  row.appendChild(s); pop.appendChild(row);
+  const f = el("div", "mc-pop-f");
+  f.appendChild(el("span", "", signedIn ? T("已同步到你的账户", "Synced to your account") : T("保存在这台设备上", "Saved on this device")));
+  const reset = el("button", "", T("恢复默认", "Reset")); reset.type = "button"; reset.dataset.f = "reset"; reset.disabled = isDefaultPrefs(prefs);
+  reset.addEventListener("click", () => applyPrefs({ ...DEFAULT_PREFS, at: Date.now() }));
+  f.appendChild(reset); pop.appendChild(f);
+  const back = focusKey && pop.querySelector(`[data-f="${focusKey}"]`);
+  if (back && !back.disabled) back.focus(); else if (focusKey) (pop.querySelector("input") || pop).focus();
+}
+function openCust(on) {
+  pop.hidden = !on; scrim.hidden = !on; custBtn.setAttribute("aria-expanded", String(on));
+  if (on) { renderCust(); const first = pop.querySelector("input"); if (first) first.focus(); }
+}
+custBtn.addEventListener("click", () => openCust(pop.hidden));
+scrim.addEventListener("click", () => openCust(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) { openCust(false); custBtn.focus(); } });
+document.addEventListener("click", (e) => { const path = e.composedPath(); if (!pop.hidden && !path.includes(pop) && !path.includes(custBtn)) openCust(false); }); // 用 composedPath：点上下移后浮层会重画，事件目标已不在 DOM 里
+
+// ---------- 启动：先画骨架，可见的市场各自去拉；自选另起一路 ----------
+custLabel();
+ensureData(); renderAll();
+renderMine();
 </script>
 </body>
 </html>

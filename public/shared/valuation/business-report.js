@@ -2,6 +2,9 @@ const text = (s, max) => typeof s === "string" ? s.replace(/[\x00-\x1f]/g, " ").
 const finite = (n) => typeof n === "number" && Number.isFinite(n);
 export const businessReportUrl = (url) => typeof url === "string" && /^https:\/\/static\.cninfo\.com\.cn\/finalpage\/\d{4}-\d{2}-\d{2}\/\d+\.pdf$/i.test(url) ? url : null;
 
+// Why a report yielded no table; the server sets these and the UI explains them per report.
+export const REPORT_REASONS = ["download_failed", "too_large", "not_pdf", "identity_mismatch", "page_limit", "timeout", "parse_failed", "no_table"];
+
 export function cleanBusinessReports(raw) {
   if (!raw || !["ok", "empty", "unavailable", "unsupported"].includes(raw.status)) return null;
   const reports = [];
@@ -34,7 +37,8 @@ export function cleanBusinessReports(raw) {
     }
     reports.push({ kind: report.kind, year: report.year, period: `${report.year} ${report.kind === "annual" ? "FY" : "H1"}`,
       title: text(report.title, 200), url, publishedAt: text(report.publishedAt, 10), pageCount,
-      status: tables.length ? "ok" : ["unavailable", "unsupported_layout"].includes(report.status) ? report.status : "unsupported_layout", tables,
+      status: tables.length ? "ok" : ["unavailable", "unsupported_layout"].includes(report.status) ? report.status : "unsupported_layout",
+      ...(!tables.length && REPORT_REASONS.includes(report.reason) ? { reason: report.reason } : {}), tables,
       notes: (Array.isArray(report.notes) ? report.notes : []).filter((n) => validPage(n?.pdfPage) && text(n.excerpt, 650)).slice(0, 3)
         .map((n) => ({ pdfPage: n.pdfPage, excerpt: text(n.excerpt, 650) })) });
   }

@@ -135,7 +135,7 @@ export async function fetchManagementResearch(env, symbol, name = "", options = 
   if (official.status === "not_configured") return news;
   const sources = [...official.sources, ...news.sources].slice(0, 3);
   return cleanManagementResearch({ ...news, status: sources.length ? "ok" : official.status === "unavailable" || news.status === "unavailable" ? "unavailable" : "empty",
-    officialStatus: official.status, ...(official.site ? { officialSite: official.site } : {}), sources });
+    officialStatus: official.status, ...(official.reason ? { officialReason: official.reason } : {}), ...(official.site ? { officialSite: official.site } : {}), sources });
 }
 
 export function registerManagementResearch(app, { fetchResearch = fetchManagementResearch, now = Date.now } = {}) {

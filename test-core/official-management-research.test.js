@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { fetchOfficialManagementResearch, officialDocumentSource, officialReportPeriod, officialHtmlText, discoverIrEntrances, discoverOfficialLinks, discoverCatalogDocuments, extractOfficialPdf } from "../src/official-management-research.js";
-import { cleanManagementResearch, managementReferences, officialSourceUrl, publicManagementUrl } from "../public/shared/valuation/management-research.js";
+import { fetchOfficialManagementResearch, officialDocumentSource, officialReportPeriod, officialFilingPeriod, officialHtmlText, discoverIrEntrances, discoverOfficialLinks, discoverCatalogDocuments, extractOfficialPdf, secExhibitUrl } from "../src/official-management-research.js";
+import { cleanManagementResearch, cleanOfficialSite, managementReferences, officialSourceUrl, publicManagementUrl } from "../public/shared/valuation/management-research.js";
+import { officialReasonText } from "../public/shared/valuation/management-research-ui.js";
 import { fetchManagementResearch } from "../src/management-research.js";
 import { textPdf } from "../test-helpers/pdf.js";
 
@@ -170,5 +171,136 @@ describe("official provenance, document boundaries and period semantics", () => 
     await expect(extractOfficialPdf(new TextEncoder().encode("<html>not a PDF</html>"))).rejects.toThrow(/invalid/);
     const controller = new AbortController(); controller.abort();
     await expect(extractOfficialPdf(textPdf([["Example"]]), { signal: controller.signal })).rejects.toThrow();
+  });
+});
+
+describe("regulator fallbacks (SEC EDGAR / HKEXnews) and diagnosable reasons", () => {
+  const secIndex = (doc) => `<table><tr><td>1</td><td>8-K</td><td><a href="/ix?doc=/Archives/edgar/data/1234567/000123456726000018/new-20260730.htm">new-20260730.htm</a></td><td>8-K</td></tr>
+    <tr class="evenRow"><td>2</td><td>EX-99.1</td><td><a href="/Archives/edgar/data/1234567/000123456726000018/${doc}">${doc}</a></td><td>EX-99.1</td></tr></table>`;
+  const exhibit = '<html><body><p>Exhibit 99.1</p><p>Example reports fourth quarter results</p><p>Example Corp. today announced results for the quarter ended June 30, 2026.</p>'
+    + "<p>Revenue was 90 billion dollars and increased 18 percent in the fourth quarter of fiscal year 2026, while operating income and cash flow grew with cloud demand.</p>"
+    + "<p>We expect capital investment to continue growing in the next fiscal year to support capacity for customer demand and revenue growth.</p></body></html>";
+  const submissions = { filings: { recent: { form: ["10-K", "8-K", "8-K"], items: ["", "5.07", "2.02,9.01"],
+    accessionNumber: ["0001234567-26-000020", "0001234567-26-000019", "0001234567-26-000018"], filingDate: ["2026-08-01", "2026-07-31", "2026-07-30"], reportDate: ["", "", "2026-07-30"] } } };
+  const secFetch = (calls, overrides = {}) => async (url, init) => {
+    calls.push({ url, ua: init.headers?.["user-agent"] });
+    if (url.startsWith("https://www.example.com/")) return new Response("Too Many Requests", { status: 429 });
+    if (url === "https://www.sec.gov/files/company_tickers.json") return Response.json({ 0: { cik_str: 1234567, ticker: "NEW", title: "EXAMPLE CORP" }, 1: { cik_str: 7654321, ticker: "OTHER", title: "Other Inc" } });
+    if (url === "https://data.sec.gov/submissions/CIK0001234567.json") return Response.json(overrides.submissions || submissions);
+    if (url.endsWith("/000123456726000018/0001234567-26-000018-index.htm")) return new Response(secIndex("ex991.htm"));
+    if (url.endsWith("/000123456726000018/ex991.htm")) return new Response(exhibit);
+    throw new Error("unexpected " + url);
+  };
+
+  it("falls back to the SEC 8-K Item 2.02 Exhibit 99.1 when the IR site blocks automated access", async () => {
+    const calls = [], result = await fetchOfficialManagementResearch("usNEW", { now, get: profile, fetchImpl: secFetch(calls) }, env);
+    expect(result.status).toBe("ok"); expect(result.reason).toBeUndefined();
+    expect(result.sources[0]).toMatchObject({ url: "https://www.sec.gov/Archives/edgar/data/1234567/000123456726000018/ex991.htm", reportPeriod: "FY2026 Q4",
+      publishedAt: "2026-07-30", documentType: "earnings_release", sourceType: "official", publisher: "Example Limited", format: "html", qaCoverage: "not_included" });
+    expect(result.site.secCik).toBe("1234567");
+    // SEC requests declare an automated client; IR pages keep browser-like headers.
+    expect(calls.filter((c) => /sec\.gov/.test(c.url)).every((c) => /^ValuePort research bot/.test(c.ua))).toBe(true);
+    expect(calls.find((c) => c.url.startsWith("https://www.example.com/")).ua).toMatch(/Mozilla/);
+    const clean = cleanManagementResearch({ status: "ok", symbol: "usNEW", officialSite: result.site, sources: result.sources });
+    expect(clean.sources[0].url).toBe(result.sources[0].url);
+  });
+
+  it("reports stage reasons when neither IR nor SEC yields a document, and they survive cleaning and merging", async () => {
+    const empty = { filings: { recent: { form: ["8-K"], items: ["5.07"], accessionNumber: ["0001234567-26-000019"], filingDate: ["2026-07-31"] } } };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await fetchOfficialManagementResearch("usNEW", { now, get: profile, fetchImpl: secFetch([], { submissions: empty }) }, env);
+    expect(result).toMatchObject({ status: "unavailable", reason: "ir_blocked_429,sec_no_filings", sources: [] });
+    expect(warn.mock.calls.some(([line]) => /usNEW .*reason=ir_blocked_429,sec_no_filings/.test(line))).toBe(true);
+    warn.mockRestore();
+    const merged = await fetchManagementResearch(env, "usNEW", "", { now, get: profile, fetchImpl: secFetch([], { submissions: empty }) });
+    expect(merged.officialReason).toBe("ir_blocked_429,sec_no_filings");
+    expect(cleanManagementResearch({ status: "empty", symbol: "usNEW", officialReason: "ir_blocked_429,<script>,timeout_999,sec_no_filings" }).officialReason).toBe("ir_blocked_429,sec_no_filings");
+    expect(officialReasonText("ir_blocked_429,sec_no_filings")).toBe("公司投资者关系网站拒绝了自动访问（429）；已尝试 SEC 公告，暂未找到业绩公告。");
+    expect(officialReasonText("ir_no_documents,hkex_unavailable", "en")).toMatch(/^The IR page .*tried HKEXnews, but it could not be reached\.$/);
+    expect(officialReasonText("bogus")).toBe("");
+  });
+
+  it("caps the IR phase so a hanging IR site still leaves time for the SEC fallback", async () => {
+    const base = secFetch([]), fetchImpl = (url, init) => url.startsWith("https://www.example.com/")
+      ? new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason), { once: true })) : base(url, init);
+    const result = await fetchOfficialManagementResearch("usNEW", { now, get: profile, fetchImpl, irTimeoutMs: 30 }, env);
+    expect(result.status).toBe("ok"); expect(result.sources[0].url).toMatch(/^https:\/\/www\.sec\.gov\//);
+    const noFilings = { filings: { recent: { form: [], items: [], accessionNumber: [], filingDate: [] } } }, base2 = secFetch([], { submissions: noFilings });
+    const slow = await fetchOfficialManagementResearch("usNEW", { now, get: profile, irTimeoutMs: 30, fetchImpl: (url, init) => url.startsWith("https://www.example.com/")
+      ? new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason), { once: true })) : base2(url, init) }, env);
+    expect(slow).toMatchObject({ status: "unavailable", reason: "timeout,sec_no_filings" });
+  });
+
+  it("falls back to HKEXnews results announcements for HK symbols, reading only the opening pages", async () => {
+    const calls = [], pdfUrl = "https://www1.hkexnews.hk/listedco/listconews/sehk/2026/0818/2026081801014.pdf";
+    const rows = [{ LONG_TEXT: "Announcements and Notices - [Date of Board Meeting]", STOCK_CODE: "09999", TITLE: "DATE OF BOARD MEETING", FILE_LINK: "/listedco/listconews/sehk/2026/0717/2026071700987.pdf", FILE_INFO: "490KB", DATE_TIME: "17/07/2026 19:00" },
+      { LONG_TEXT: "Announcements and Notices - [Interim Results]", STOCK_CODE: "09999", TITLE: "RESULTS ANNOUNCEMENT FOR THE THREE AND SIX MONTHS ENDED JUNE 30, 2026", FILE_LINK: "/listedco/listconews/sehk/2026/0818/2026081801014.pdf", FILE_INFO: "6.5MB", DATE_TIME: "18/08/2026 17:25" }];
+    const fetchImpl = async (url) => {
+      calls.push(url);
+      if (url === "https://www.example.com/") return new Response("<p>No investor links here</p>");
+      if (url.startsWith("https://www1.hkexnews.hk/search/prefix.do")) { expect(url).toContain("name=09999"); return new Response('callback({"more":"1","stockInfo":[{"stockId":190371,"code":"09999","name":"EXAMPLE-W"}]});'); }
+      if (url.startsWith("https://www1.hkexnews.hk/search/titleSearchServlet.do")) { expect(url).toContain("stockId=190371"); return Response.json({ result: JSON.stringify(rows) }); }
+      if (url === pdfUrl) return new Response("%PDF-hkex");
+      throw new Error("unexpected " + url);
+    };
+    // The announcement heading carries only a logo; issuer identity comes from the HKEX index.
+    const hkPages = ["Hong Kong Exchanges and Clearing Limited take no responsibility for the contents of this announcement.\nRESULTS ANNOUNCEMENT FOR THE THREE AND SIX MONTHS ENDED JUNE 30, 2026\nRevenue grew 20 percent to 100 billion and gross profit margin improved, driven by smartphone shipments and lower component costs.",
+      "We expect investment in research and capacity to continue growing in the second half, supporting revenue growth in new businesses."];
+    const extractPdf = vi.fn(async () => hkPages);
+    const result = await fetchOfficialManagementResearch("hk09999", { now, get: profile, fetchImpl, extractPdf }, env);
+    expect(result.status).toBe("ok");
+    expect(result.sources[0]).toMatchObject({ url: pdfUrl, reportPeriod: "2026 Q2", publishedAt: "2026-08-18", documentType: "earnings_release", format: "pdf", pageCount: 2 });
+    expect(extractPdf.mock.calls[0][1]).toMatchObject({ firstPages: 15, maxBytes: 12 * 1024 * 1024 });
+    expect(calls).not.toContain("https://www1.hkexnews.hk/listedco/listconews/sehk/2026/0717/2026071700987.pdf");
+    expect(cleanManagementResearch({ status: "ok", symbol: "hk09999", officialSite: result.site, sources: result.sources }).sources).toHaveLength(1);
+  });
+
+  it("reports hkex_no_filings and ir_not_found when nothing is listed", async () => {
+    const fetchImpl = async (url) => url === "https://www.example.com/" ? new Response("<p>Home</p>")
+      : url.includes("prefix.do") ? new Response('callback({"stockInfo":[{"stockId":1,"code":"09999","name":"EXAMPLE"}]});')
+        : url.includes("titleSearchServlet") ? Response.json({ result: "null" }) : new Response("", { status: 404 });
+    const result = await fetchOfficialManagementResearch("hk09999", { now, get: profile, fetchImpl }, env);
+    expect(result).toMatchObject({ status: "empty", reason: "ir_not_found,hkex_no_filings" });
+  });
+
+  it("only accepts exact regulator document paths bound to the issuer", () => {
+    const us = { ...site(), secCik: "1234567" }, hk = { ...site(), symbol: "hk09999" };
+    expect(officialSourceUrl("https://www.sec.gov/Archives/edgar/data/1234567/000123456726000018/ex991.htm", us)).toBeTruthy();
+    expect(officialSourceUrl("https://www.sec.gov/Archives/edgar/data/0001234567/000123456726000018/ex991.htm", us)).toBeTruthy();
+    for (const url of ["https://www.sec.gov/Archives/edgar/data/7654321/000123456726000018/ex991.htm", "https://www.sec.gov/cgi-bin/browse-edgar?CIK=1234567",
+      "https://www.sec.gov/Archives/edgar/data/1234567/000123456726000018/ex991.htm?x=1", "https://sec.gov.evil.org/Archives/edgar/data/1234567/000123456726000018/ex991.htm",
+      "https://www1.hkexnews.hk/listedco/listconews/sehk/2026/0818/2026081801014.pdf"]) expect(officialSourceUrl(url, us)).toBeNull();
+    expect(officialSourceUrl("https://www.sec.gov/Archives/edgar/data/1234567/000123456726000018/ex991.htm", site())).toBeNull();
+    expect(officialSourceUrl("https://www1.hkexnews.hk/listedco/listconews/sehk/2026/0818/2026081801014.pdf", hk)).toBeTruthy();
+    expect(officialSourceUrl("https://www1.hkexnews.hk/search/titlesearch.xhtml", hk)).toBeNull();
+    expect(cleanOfficialSite({ ...us, symbol: "usNEW" }, "usNEW").secCik).toBe("1234567");
+    expect(cleanOfficialSite({ ...hk, secCik: "1234567" }, "hk09999").secCik).toBeUndefined();
+    expect(cleanOfficialSite({ ...us, secCik: "12ab" }, "usNEW").secCik).toBeUndefined();
+    expect(secExhibitUrl(secIndex("ex991.htm"), us)).toBe("https://www.sec.gov/Archives/edgar/data/1234567/000123456726000018/ex991.htm");
+    expect(secExhibitUrl(secIndex("ex991.htm").replace(/1234567/g, "7654321"), us)).toBeNull();
+  });
+
+  it("reads HK calendar-quarter titles and body-stated fiscal periods without guessing", () => {
+    expect(officialReportPeriod("ANNOUNCEMENT OF THE RESULTS FOR THE THREE AND SIX MONTHS ENDED 30 JUNE 2026")).toBe("2026 Q2");
+    expect(officialReportPeriod("RESULTS FOR THE THREE MONTHS ENDED MARCH 31, 2026")).toBe("2026 Q1");
+    expect(officialReportPeriod("FOR THE SIX MONTHS ENDED 30 JUNE 2026")).toBe("");
+    expect(officialReportPeriod("three months ended June 15, 2026")).toBe("");
+    expect(officialFilingPeriod("Example reports fourth quarter results\n\nfor the quarter ended June 30, 2026. Growth in the fourth quarter of fiscal year 2026 was strong.")).toBe("FY2026 Q4");
+    expect(officialFilingPeriod("Example reports fourth quarter results\n\nIn the third quarter of fiscal year 2026 we grew.")).toBe("");
+  });
+
+  it("checks HKEX for a newer filing when the IR directory only offers a stale quarter", async () => {
+    const stalePdf = "https://www.example.com/q1-2025.pdf", newPdf = "https://www1.hkexnews.hk/listedco/listconews/sehk/2026/0818/2026081801014.pdf";
+    const fetchImpl = async (url) => {
+      if (url === "https://www.example.com/") return new Response('<a href="/q1-2025.pdf">Example Q1 2025 Results</a>');
+      if (url === stalePdf || url === newPdf) return new Response("%PDF-x");
+      if (url.includes("prefix.do")) return new Response('callback({"stockInfo":[{"stockId":1,"code":"09999","name":"EXAMPLE"}]});');
+      if (url.includes("titleSearchServlet")) return Response.json({ result: JSON.stringify([{ LONG_TEXT: "[Interim Results]", STOCK_CODE: "09999", TITLE: "RESULTS FOR THE THREE AND SIX MONTHS ENDED 30 JUNE 2026", FILE_LINK: "/listedco/listconews/sehk/2026/0818/2026081801014.pdf", FILE_INFO: "700KB", DATE_TIME: "18/08/2026 17:25" }]) });
+      throw new Error("unexpected " + url);
+    };
+    const body = "\nRevenue grew 20 percent and operating profit margin improved, driven by smartphone shipments and lower component costs.";
+    const extractPdf = async (bytes, opts) => opts?.firstPages ? ["Example RESULTS FOR THE THREE AND SIX MONTHS ENDED 30 JUNE 2026" + body] : ["Example Q1 2025 Results" + body];
+    const result = await fetchOfficialManagementResearch("hk09999", { now, get: profile, fetchImpl, extractPdf }, env);
+    expect(result.sources[0]).toMatchObject({ url: newPdf, reportPeriod: "2026 Q2" });
   });
 });

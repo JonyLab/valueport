@@ -1,5 +1,26 @@
 import { cleanBusinessReports } from "./business-report.js";
 
+// 时间戳按本地时间显示到分钟（2026-10-21 22:09）；解析不了就原样显示
+const pad = (n) => String(n).padStart(2, "0");
+function localTime(value) {
+  const date = new Date(value); if (!value || Number.isNaN(date.getTime())) return String(value ?? "");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+// Per-report explanation of an empty result; never phrased as "the company did not disclose".
+function failureText(report, t) {
+  const pages = report.pageCount ? t(`（共 ${report.pageCount} 页）`, ` (${report.pageCount} pages)`) : "";
+  return {
+    no_table: t(`已读取原报告${pages}，但未找到可自动识别的收入分解表；可打开原报告核对。`, `The report was read${pages}, but no revenue table could be recognised automatically; check the original.`),
+    too_large: t("文件过大，未能解析；可打开原报告查看。", "The file is too large to parse; open the original report."),
+    download_failed: t("报告下载失败，可稍后重试。", "The report could not be downloaded; retry later."),
+    not_pdf: t("下载到的不是 PDF 文件，未能解析。", "The download was not a PDF and could not be parsed."),
+    identity_mismatch: t("报告封面与公司或报告期对不上，已跳过以免误读。", "The cover does not match the company or period, so it was skipped."),
+    page_limit: t("报告篇幅过长，未能完整解析；可打开原报告查看。", "The report is too long to parse fully; open the original report."),
+    timeout: t("解析超时，可稍后重试。", "Parsing timed out; retry later."),
+  }[report.reason] || t("本报告暂未成功提取，不能据此断定没有收入结构披露。", "Extraction was unsuccessful; this does not establish non-disclosure.");
+}
+
 export function businessReportElement(raw, lang = "zh", { onRetry } = {}) {
   const data = cleanBusinessReports(raw); if (!data || data.status === "unsupported") return null;
   const en = lang === "en", t = (zh, english) => en ? english : zh;
@@ -7,16 +28,32 @@ export function businessReportElement(raw, lang = "zh", { onRetry } = {}) {
   const link = (label, report, page) => { const a = node("a", label); a.href = report.url + (page ? `#page=${page}` : ""); a.target = "_blank"; a.rel = "noopener noreferrer"; return a; };
   const box = node("details"); box.className = "vc-management-research vc-business-reports";
   const count = data.reports.filter((r) => r.tables.length).length;
-  box.append(node("summary", t(`收入结构 · ${count} 份年报 / 中报`, `Revenue mix · ${count} annual / interim reports`)));
+  // 提取到才默认展开；没提取到时收起，标题直接写明状态
+  box.open = count > 0;
+  const summary = node("summary", t("收入结构", "Revenue mix")), meta = node("span", " · " + (count
+    ? t(`${count} 份年报 / 中报`, `${count} annual / interim report${count > 1 ? "s" : ""}`)
+    : data.reports.length ? t("未能提取", "not extracted")
+      : data.status === "empty" ? t("未找到报表", "no reports found") : t("暂未取得", "not retrieved yet")));
+  meta.className = "vc-guide-summary-meta"; summary.append(meta); box.append(summary);
   if (!count) {
-    box.append(node("p", t("尚未取得可可靠识别的收入分解表。未提取不代表公司未披露；可打开原报告核对。", "No revenue table could be reliably extracted. This does not establish non-disclosure; check the original report.")));
-    if (onRetry) { const retry = node("button", t("重新查找报表", "Retry reports")); retry.type = "button"; retry.addEventListener("click", async () => { retry.disabled = true; try { await onRetry(); } finally { retry.disabled = false; } }); box.append(retry); }
+    box.append(node("p", data.reports.length
+      ? t("尚未取得能可靠识别的收入分解表。未提取不代表公司未披露；可打开原报告核对。", "No revenue table could be reliably extracted. This does not establish non-disclosure; check the original report.")
+      : data.status === "empty" ? t("公开目录中未找到近年的年报或半年报。", "No recent annual or interim report was found in the public catalog.")
+        : t("报表目录暂时获取失败，可以重试。", "The report catalog could not be retrieved; retry later.")));
+    if (onRetry) {
+      const label = t("重新查找报表", "Retry reports"), retry = node("button", label); retry.type = "button"; retry.className = "vc-guide-secondary";
+      retry.addEventListener("click", async () => {
+        retry.disabled = true; retry.textContent = t("正在查找…", "Retrieving…");
+        try { await onRetry(); } finally { retry.disabled = false; retry.textContent = label; }
+      });
+      box.append(retry);
+    }
   }
-  if (count) box.append(node("p", t("按公开目录取得的年报和最新中报分别展示；不自动年化，不合并不同业务口径。* 为根据原文计算，缺失值保留为空。", "Annual and latest interim reports from the checked catalog are shown separately. No automatic annualization or merging of business definitions. * Calculated from the source; missing values remain blank.")));
   for (const report of data.reports) {
     const article = node("article"); article.append(link(`${report.period} · ${report.title}`, report));
-    article.append(node("small", t(`披露：${report.publishedAt} · PDF ${report.pageCount || "—"} 页`, `Published ${report.publishedAt} · ${report.pageCount || "—"} PDF pages`)));
-    if (!report.tables.length) article.append(node("p", t("本报告暂未成功提取，不能据此断定没有收入结构披露。", "Extraction was unsuccessful; this does not establish non-disclosure.")));
+    const pages = report.pageCount ? t(` · PDF ${report.pageCount} 页`, ` · ${report.pageCount} PDF pages`) : "";
+    article.append(node("small", t(`披露：${report.publishedAt}${pages}`, `Published ${report.publishedAt}${pages}`)));
+    if (!report.tables.length) article.append(node("p", failureText(report, t)));
     report.tables.forEach((table, index) => {
       const section = node(index ? "details" : "section");
       section.append(node(index ? "summary" : "strong", table.label));
@@ -46,6 +83,10 @@ export function businessReportElement(raw, lang = "zh", { onRetry } = {}) {
     }
     box.append(article);
   }
-  if (data.storage) box.append(node("small", data.storage.status === "refresh_failed" ? t("更新失败，暂用上次保存的报表。", "Refresh failed; showing saved reports.") : t("资料已保存，下次可直接复用。", "Saved for reuse.")));
+  const saved = data.storage?.savedAt ? localTime(data.storage.savedAt) : "";
+  if (data.storage) box.append(node("small", data.storage.status === "refresh_failed"
+    ? t(`更新失败，暂用上次保存的报表${saved ? `（${saved}）` : ""}。`, `Refresh failed; showing saved reports${saved ? ` (${saved})` : ""}.`)
+    : t(`资料已保存${saved ? `（${saved}）` : ""}，下次可直接复用。`, `Saved for reuse${saved ? ` (${saved})` : ""}.`)));
+  else if (data.fetchedAt) box.append(node("small", t("资料快照：", "Source snapshot: ") + localTime(data.fetchedAt)));
   return box;
 }

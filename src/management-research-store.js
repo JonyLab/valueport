@@ -33,7 +33,7 @@ export function mergeResearchRefresh(previous, current) {
   }));
   if (oldOfficial.length && (!newOfficial.length || older)) {
     const news = current?.status === "ok" ? current.sources.filter((source) => source.sourceType !== "official") : [];
-    return { failed: true, research: cleanManagementResearch({ ...previous, officialStatus: older ? "unavailable" : current?.officialStatus || "unavailable",
+    return { failed: true, research: cleanManagementResearch({ ...previous, officialStatus: older ? "unavailable" : current?.officialStatus || "unavailable", officialReason: older ? "" : current?.officialReason || "",
       sources: [...oldOfficial, ...news].slice(0, 3) }) };
   }
   return current?.status === "ok" ? { failed: false, research: current } : { failed: true, research: previous };

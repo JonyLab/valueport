@@ -10,6 +10,7 @@ import { cleanDriverPlan, GUIDE_DRIVERS } from "../public/shared/valuation/guide
 import { methodReadiness } from "../public/shared/valuation/method-readiness.js";
 import { METRICS, METRIC_KEYS, metricKey } from "../public/shared/metric-spark.js";
 import { countAi } from "./usage.js";
+import { registerAssist } from "./ai-assist.js";
 import { SearchError, searchCompany, searchPrompt, searchMetadata } from "./web-search.js";
 import { cleanManagementResearch, managementReferences, managementPrompt } from "../public/shared/valuation/management-research.js";
 import { cleanThesis, thesisLines, THESIS_FIELDS, THESIS_RESEARCH_FIELDS, THESIS_IMPACTS, IMPACT_DIRECTIONS, THESIS_LIMIT, THESIS_SCENARIOS } from "../public/shared/valuation/thesis.js";
@@ -612,6 +613,22 @@ const FLOW_STAGE_RULES = {
 };
 const GUIDE_FOLLOWUP_RULE = "避免重复追问：逐项核对用户已经回答的内容，本轮只补充尚未覆盖的信息；不同场景、年份、资料依据或财务影响不能因关键词相似而混为一谈。缺资料就问能否补充来源或保留待验证，不让用户再猜一遍。只有用户明确承认并接受同一风险，才能记录为主动承担风险；只说产量增长、没提风险或说不确定都不算接受。已接受的风险仍需记录和跟踪，不反复劝用户改答案，也不视为风险消失。";
 
+// conflict 会在界面上显示为橙色警告，只能承载真正的矛盾；注意事项与待验证条件属于 uncertainties
+const CONFLICT_RULE = "conflict 规则：只有当用户回答整体指向与场景方向相反（例如保守场景却给出偏乐观判断、乐观场景却给出偏悲观判断）、回答彼此矛盾，或与公司资料事实冲突时才填写 conflict。没有这类矛盾时 conflict 必须是空字符串 \"\"，不要写“没有明显冲突”“三项判断一致”之类的说明。注意事项、未验证条件、推论边界（如“单项稳定不等于整体稳定”）写进 uncertainties，不放进 conflict。";
+
+// 模型有时在 conflict 里写“没有明显冲突，但……”。以“无冲突”开头的视为没有冲突：清空 conflict，余下的提醒并入 uncertainties
+const NO_CONFLICT = /^(?:[^，,。.;；:：!！?？\n]{0,24}?)(?:没有|无|未发现|未见|不存在|并无|并不存在|看不出|并未发现)(?:任何|明显|明确|实质性?|直接|显著)?的?(?:冲突|矛盾|不一致)|^\s*(?:there\s+(?:is|are)\s+|i\s+see\s+|we\s+see\s+)?no\s+(?:obvious\s+|clear\s+|apparent\s+|real\s+|significant\s+|direct\s+|major\s+)?(?:conflicts?|contradictions?|inconsistenc(?:y|ies))\b/i;
+export function clearNoConflict(draft) {
+  if (!draft || typeof draft.conflict !== "string" || !NO_CONFLICT.test(draft.conflict.trim())) return draft;
+  const { conflict, ...rest } = draft;
+  const note = conflict.trim().replace(/^[^。.;；!！?？\n]*[。.;；!！?？\n]?/, "").replace(/^\s*(?:但是|但|不过|然而|只是|however|but)[，,\s]*/i, "").trim();
+  if (note && typeof rest.uncertainties === "string" && !rest.uncertainties.includes(note)) {
+    const merged = rest.uncertainties.trim() ? rest.uncertainties.trim() + "\n" + note : note;
+    if (merged.length <= 800) rest.uncertainties = merged;
+  }
+  return rest;
+}
+
 export function buildDriverGuidePrompt(body, lang) {
   const plan = cleanDriverPlan(body.driverPlan);
   const drivers = plan.keys.map((key) => GUIDE_DRIVERS.find((d) => d.key === key));
@@ -635,13 +652,13 @@ export function buildDriverGuidePrompt(body, lang) {
       + "提供 2–4 个简短、可比较的单选判断（如偏弱／大致稳定／偏强，或延期／按计划／提前）。label 建议 24 字以内；detail 一句话解释可能影响，不重复标题。一个选项只代表一个判断，不把价格偏强与特定宏观原因、并购、股东回报等多个假设捆绑。界面已有‘其他’和‘不确定’，不要再生成。不得照搬通用收入/利润/现金模板，除非资料只支持这些变量。"
       + '只返回 {"type":"question","context":"为什么问及引用或缺口","question":"一个问题","selection":"single","options":[{"id":"a","label":"判断一","detail":"条件性影响"},{"id":"b","label":"判断二","detail":"条件性影响"}]}。不要添加‘叙事假设’标签或 HTML。'
       : "已完成全部经营变量。先按用户实际回答保留主叙事，再提出围绕同一组变量的保守和乐观两套条件性草稿，供用户确认。不能把用户的偏强主叙事偷换成已经表达过的保守判断。新增的保守/乐观变化须在 uncertainties 明确标记‘建议情景，待你确认’，不要声称用户已经选择。用户不确定的变量仍保持不确定，不编造量化幅度。逐项检查常识、历史和再投资约束：条件之间有张力时温和提示，不自动改写用户观点。evidence 只放提供资料支持的事实及编号，缺依据就写暂无依据；signals 中的新增观察项标为建议。impacts 只记录有解释的方向，不补造数值。"
-      + '只返回 {"type":"summary","drafts":{"c":{"story":"保守条件性叙事","evidence":"已有依据及编号，或暂无依据","uncertainties":"新增情景条件待确认、缺口及反面证据","impacts":[{"key":"growth","direction":"down","reason":"具体条件如何影响经营"}],"signals":"建议跟踪的变化"},"o":{"story":"乐观条件性叙事","evidence":"已有依据","uncertainties":"新增条件待确认","impacts":[],"signals":"建议观察"},"conflict":"可选，主叙事假设之间的张力"}}。每个文字字段最多 800 字符，conflict 最多 400。'
+      + '只返回 {"type":"summary","drafts":{"c":{"story":"保守条件性叙事","evidence":"已有依据及编号，或暂无依据","uncertainties":"新增情景条件待确认、缺口及反面证据","impacts":[{"key":"growth","direction":"down","reason":"具体条件如何影响经营"}],"signals":"建议跟踪的变化"},"o":{"story":"乐观条件性叙事","evidence":"已有依据","uncertainties":"新增条件待确认","impacts":[],"signals":"建议观察"},"conflict":"仅当回答之间或与场景方向真正矛盾时填写，否则为空字符串"}}。每个文字字段最多 800 字符，conflict 最多 400。' + CONFLICT_RULE
       + `impacts key 只能为 ${THESIS_IMPACTS.map((d) => d.key).join(",")}；direction 只能为 up/flat/down/unknown，每场景最多6项，允许为空。`,
     ...(single ? [
       `单情景规则覆盖上述双情景总结格式：本轮只引导${scenario}情景（${body.scenario}）。回答、草稿及财务影响均仅属于本情景，不能从另一边的回答推导，也不能生成另一情景。`,
       body.singleCase ? "本轮是用户自己认为最合理的单一主情景，不是保守或乐观情景。不强制向弱或强的方向引导，允许合理的增长、稳定、收缩或不确定；不能生成第二情景。" : body.scenario === "c" ? "保守意味着审慎但合理，不强制所有业务衰退；根据提供事实，可以选择稳定、温和增长或较弱兑现，说明暂不计入的增长与风险。" : "乐观需要合理的实现条件、订单或产能兑现、竞争和再投资约束；不把最大增速、最高利润率和最低投入机械叠加。",
       current ? "本题只问当前变量在本情景下的判断，选项保持同一变量、同一时间范围，允许用户选择不确定；不得要求同时回答两种情景。"
-        : '只返回 {"type":"summary","draft":{"story":"本情景的用户判断","evidence":"资料支持的事实及编号或暂无依据","uncertainties":"缺口、反面证据与待验证条件","impacts":[],"signals":"建议跟踪指标","conflict":"可选，一致性提醒"}}。只总结本轮明确回答，不新增另一情景或未选假设；每段最多800字符。',
+        : '只返回 {"type":"summary","draft":{"story":"本情景的用户判断","evidence":"资料支持的事实及编号或暂无依据","uncertainties":"缺口、反面证据与待验证条件","impacts":[],"signals":"建议跟踪指标","conflict":"仅当回答与本情景方向或彼此真正矛盾时填写，否则为空字符串"}}。只总结本轮明确回答，不新增另一情景或未选假设；每段最多800字符。' + CONFLICT_RULE,
     ] : []),
   ].join("\n\n");
 }
@@ -671,9 +688,9 @@ function buildFlowGuidePrompt(body, lang) {
     "总结时逐项核对用户到底选择或说了什么；只记录这些判断和直接的因果解释。未选择的选项、你推断的新前提和更强的结论都要删除。例如用户说‘收入可能增加，但配送成本也可能上升，利润率不确定’，不能总结成‘成本不增加’或‘利润率改善’，应分别记录收入的条件性变化和利润率仍不确定。建议跟踪项必须标明是建议。",
     stage ? `本轮是第 ${body.turns.length + 1}/${FLOW_STEPS.length} 轮，主题 ${stage.key}。只问一个容易回答的问题。` + FLOW_STAGE_RULES[stage.key]
       : "五轮已完成。不要再提问，按用户实际表达的判断分别整理保守（c）和乐观（o）两份草稿：c 用核心叙事 + 保守那一轮，o 用核心叙事 + 乐观那一轮；依据与影响按回答分配到对应场景。不能把未选择的选项写进结论。没有确认的事实只写入 uncertainties；evidence 只能引用提供资料里的具体事实（带编号）或用户明确给出来源的依据，不能写「用户已有研究」这类空话，确实没有就写暂无依据。用户说不确定时保持不确定。"
-        + "检查一致性：如果保守那一轮的回答其实偏乐观、乐观那一轮其实偏悲观，或与公司资料里的事实冲突，在 conflict 里用 1–2 句直接指出，不要顺着改写结论；没有冲突就省略 conflict。",
+        + "检查一致性：如果保守那一轮的回答其实偏乐观、乐观那一轮其实偏悲观，或与公司资料里的事实冲突，在 conflict 里用 1–2 句直接指出，不要顺着改写结论。" + CONFLICT_RULE,
     stage ? '只返回 JSON：{"type":"question","context":"为什么问，依据来自哪里或缺什么","question":"一个问题","selection":"single 或 multiple","options":[{"id":"a","label":"可选回答","detail":"简短解释"},{"id":"b","label":"另一种回答","detail":"简短解释"}]}。question 最长 600 字符，context 最长 800，每个 label 最长 160，每个 detail 最长 240。不要输出 HTML、Markdown、代码或额外操作。'
-      : '只返回 JSON：{"type":"summary","drafts":{"c":{"story":"保守场景的定性叙事","evidence":"支持的已有事实；没有则明确暂无依据","uncertainties":"仍待验证与反面证据","impacts":[{"key":"growth","direction":"down","reason":"叙事中的哪件事可能造成这一变化"}],"signals":"待跟踪事项；没有确认的阈值不能补造"},"o":{同样的字段，乐观场景},"conflict":"可选：与场景方向或资料冲突之处"}}。每个文字字段最长 800 字符，conflict 最长 400。impacts 可以为空，不硬凑齐，每个场景最多 6 项。',
+      : '只返回 JSON：{"type":"summary","drafts":{"c":{"story":"保守场景的定性叙事","evidence":"支持的已有事实；没有则明确暂无依据","uncertainties":"仍待验证与反面证据","impacts":[{"key":"growth","direction":"down","reason":"叙事中的哪件事可能造成这一变化"}],"signals":"待跟踪事项；没有确认的阈值不能补造"},"o":{同样的字段，乐观场景},"conflict":"仅当确有矛盾时填写，否则为空字符串"}}。每个文字字段最长 800 字符，conflict 最长 400。impacts 可以为空，不硬凑齐，每个场景最多 6 项。',
     ...(!stage ? [`impacts 的 key 只能是 ${THESIS_IMPACTS.map((item) => item.key + "=" + item.zh).join("、")}；direction 只能是 up/flat/down/unknown，表示增加/稳定/减少/不确定。不能含具体参数或价值。`] : []),
     lang === "en" ? "FINAL OUTPUT REQUIREMENT: Write EVERY user-visible string in English, including question, context, option label/detail, and ALL draft fields (story, evidence, uncertainties, impact reason, signals). The Chinese JSON examples above describe the schema only; translate their contents. Return JSON only." : "最终检查：所有选项与解释必须区分条件假设和已知事实；总结的 evidence 只写已提供资料或用户明确附来源的事实。未证实判断只能放叙事或 uncertainties，不能称为已观察的事实。不要因为没有提供计划就声称公司没有计划或断定只依赖某种扩张方式。",
   ].join("\n\n");
@@ -722,9 +739,9 @@ export function buildThesisGuidePrompt(body, lang) {
         : stage.key === "evidence" ? "承接用户的叙事，问依据和反面证据。选项要直接引用公司资料编号（如「[2] 显示……」），每个选项说明它支持还是削弱用户的叙事；至少一个选项是反面证据或与叙事冲突的事实；资料不足时有一个选项是「目前没有资料能支持，需要核实」。不要问「会不会持续」这类只能凭感觉回答的问题。"
         : "承接叙事与依据，问这些变化首先影响收入、利润率、再投资、风险、资本回报或分红中的哪几项，原因是什么；不要让用户猜估值数字。")
       : "三轮已完成。不要再提问，整理用户实际表达的判断，不能把未选择的选项写进结论。没有确认的事实只写入 uncertainties；evidence 只能引用提供资料里的具体事实（带编号）或用户明确给出来源的依据，不能写「用户已有研究」这类空话，确实没有就写暂无依据。用户说不确定时保持不确定。"
-        + `检查一致性：如果用户的回答整体指向与${scenario.zh}相反的方向（例如保守场景却判断增长加快），或与公司资料里的事实冲突，在 conflict 里用 1–2 句直接指出，不要顺着改写结论；没有冲突就省略 conflict。`,
+        + `检查一致性：如果用户的回答整体指向与${scenario.zh}相反的方向（例如保守场景却判断增长加快），或与公司资料里的事实冲突，在 conflict 里用 1–2 句直接指出，不要顺着改写结论。` + CONFLICT_RULE,
     stage ? '只返回 JSON：{"type":"question","context":"为什么问，依据来自哪里或缺什么","question":"一个问题","selection":"single 或 multiple","options":[{"id":"a","label":"可选回答","detail":"简短解释"},{"id":"b","label":"另一种回答","detail":"简短解释"}]}。question 最长 600 字符，context 最长 800，每个 label 最长 160，每个 detail 最长 240。不要输出 HTML、Markdown、代码或额外操作。'
-      : '只返回 JSON：{"type":"summary","draft":{"story":"未来的定性叙事","evidence":"支持的已有事实；没有则明确暂无依据","uncertainties":"仍待验证与反面证据","impacts":[{"key":"growth","direction":"unknown","reason":"叙事中的哪件事可能造成这一变化"}],"signals":"待跟踪事项；没有确认的阈值不能补造，建议观察项要标为建议","conflict":"可选：与场景方向或资料冲突之处"}}。每个文字字段最长 800 字符，conflict 最长 400。impacts 可以为空，不硬凑齐，最多 6 项。',
+      : '只返回 JSON：{"type":"summary","draft":{"story":"未来的定性叙事","evidence":"支持的已有事实；没有则明确暂无依据","uncertainties":"仍待验证与反面证据","impacts":[{"key":"growth","direction":"unknown","reason":"叙事中的哪件事可能造成这一变化"}],"signals":"待跟踪事项；没有确认的阈值不能补造，建议观察项要标为建议","conflict":"仅当确有矛盾时填写，否则为空字符串"}}。每个文字字段最长 800 字符，conflict 最长 400。impacts 可以为空，不硬凑齐，最多 6 项。',
     ...(!stage ? [`impacts 的 key 只能是 ${THESIS_IMPACTS.map((item) => item.key + "=" + item.zh).join("、")}；direction 只能是 up/flat/down/unknown，表示增加/稳定/减少/不确定。不能含具体参数或价值。`] : []),
     lang === "en" ? "FINAL OUTPUT REQUIREMENT: Write EVERY user-visible string in English, including question, context, option label/detail, and ALL draft fields (story, evidence, uncertainties, impact reason, signals). The Chinese JSON examples above describe the schema only; translate their contents. Return JSON only." : "最终检查：所有选项与解释必须区分条件假设和已知事实；总结的 evidence 只写已提供资料或用户明确附来源的事实。未证实判断只能放叙事或 uncertainties，不能称为已观察的事实。不要因为没有提供计划就声称公司没有计划或断定只依赖某种扩张方式。",
   ].join("\n\n");
@@ -737,14 +754,14 @@ export function parseThesisGuide(text, turns, flow = false) {
   if (flow) {
     if (turns < FLOW_STEPS.length) return guideQuestion(raw);
     const drafts = raw?.type === "summary" && guideDrafts(raw.drafts);
-    return drafts ? { type: "summary", drafts } : null;
+    return drafts ? { type: "summary", drafts: clearNoConflict(drafts) } : null;
   }
   if (turns < GUIDE_STEPS.length) {
     const question = guideQuestion(raw);
     return question && turns === 2 ? { ...question, selection: "multiple" } : question;
   }
   const draft = raw?.type === "summary" && guideDraft(raw.draft);
-  return draft ? { type: "summary", draft } : null;
+  return draft ? { type: "summary", draft: clearNoConflict(draft) } : null;
 }
 
 // ── 基本面解读：把十年财报浓缩成三条要点 + 一两个风险（只用系统算好的事实，不做估值、不给买卖建议）──
@@ -1074,7 +1091,7 @@ export function registerAi(app, { chat = chatComplete } = {}) {
     const jev = await recommendWithJev(c.env, c.get("uid"), body, BUSINESS_TYPES);
     const decided = jev.status === "used";
     const explanationBody = decided ? { ...body, methods: jev.picks.map((p) => body.methods.find((m) => m.key === p.key)) } : body;
-    const decisionPrompt = decided ? "\n封闭判断模块已经确定方法顺序：" + jev.picks.map((p) => p.key).join("、")
+    const decisionPrompt = decided ? "\n系统已确定方法顺序：" + jev.picks.map((p) => p.key).join("、")
       + "。只解释这些方法，保持顺序，不得重选或因缺数据删除方法。未知数据明确说需要补充，不能编造。"
       + (jev.classification.type ? " 生意类型已判定为：" + jev.classification.type : " 生意分类尚不确定，不要假装已经确认。") : "";
     const { text, res } = await runChat(c, buildMethodPrompt(explanationBody, lang) + decisionPrompt, [{ role: "user", content: lang === "en" ? "Which valuation methods fit this company?" : "这家公司适合用哪些估值方法？" }]);
@@ -1156,4 +1173,5 @@ export function registerAi(app, { chat = chatComplete } = {}) {
     return c.json({ review: { ...checked, version: REVIEW_VERSION, scenarioMode: reviewMode(body), valuedAt: body.valuedAt || "", evidence, at: new Date().toISOString() } });
   });
   registerPortfolioQuery(app, runChat); // 资产页提问
+  registerAssist(app, runChat); // 全站 AI 助手（右上角入口）
 }

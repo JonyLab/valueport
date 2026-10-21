@@ -29,6 +29,7 @@
   .disclaim{font-size:12.5px;color:var(--ink-mute);margin-top:34px;padding-top:16px;border-top:1px dashed var(--border)}
   .hidden{display:none}
   .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+  #langSlot{display:flex;align-items:center;gap:8px}
   @media (max-width:640px){ .article{padding:22px 18px 26px} .article td:first-child{white-space:normal} }
 </style>
 </head>
@@ -111,6 +112,7 @@
     <script type="module">
     import { LANG } from "/shared/i18n.js";
     import { mountLangMenu } from "/shared/langmenu.js";
+    import { mountGlobalAi } from "/shared/global-ai.js";
     document.documentElement.lang = LANG === "zh" ? "zh-CN" : "en";
     document.title = LANG === "zh" ? "什么是合理价值 · 常见估值方法" : "What is Fair Value · Valuation Methods";
     const backLink = document.getElementById("backLink");
@@ -126,6 +128,7 @@
     document.getElementById(LANG === "zh" ? "art-en" : "art-zh").classList.add("hidden");
     document.getElementById(LANG === "zh" ? "art-zh" : "art-en").classList.remove("hidden");
     mountLangMenu(document.getElementById("langSlot"));
+    mountGlobalAi(document.getElementById("langSlot"), { getPage: () => ({ kind: "other", path: location.pathname, title: document.title, summary: LANG === "zh" ? "估值方法介绍页：合理价值、安全边际与常见估值方法" : "Guide page: fair value, margin of safety and common valuation methods" }) }); // 全站 AI 助手
     </script>
   </div>
 </div>

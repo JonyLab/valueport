@@ -49,7 +49,7 @@ export function cleanMethodDecision(value) {
 
 export function methodDecisionText(value, lang = "zh") {
   const decision = cleanMethodDecision(value); if (!decision) return "";
-  if (decision.status === "fallback") return lang === "en" ? "Jev did not return a usable decision; using the regular AI recommendation." : "Jev 未给出可用结论，本次使用常规 AI 推荐。";
-  return lang === "en" ? "Jev assessed fit; you choose the method." + (decision.classification.needsReview ? " Business classification needs review." : "")
-    : "Jev 辅助判断适配度，最终由你选择。" + (decision.classification.needsReview ? "业务分类仍有不确定性，请核对。" : "");
+  if (decision.status === "fallback") return lang === "en" ? "Enhanced check did not complete this time; showing the regular recommendation." : "本次增强判断未成功，以下为常规推荐。";
+  return lang === "en" ? "Method fit has been checked against the company evidence; you choose the method." + (decision.classification.needsReview ? " Business classification needs review." : "")
+    : "已按公司资料辅助判断方法适配度，最终由你选择。" + (decision.classification.needsReview ? "业务分类仍有不确定性，请核对。" : "");
 }
