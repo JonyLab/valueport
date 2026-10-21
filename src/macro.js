@@ -8,6 +8,8 @@
 //   FRED 公开 CSV：NCBEILQ027S（非金融企业股权市值，百万美元，季度）、GDP（十亿美元，季度）——只用于市值 / GDP，拿不到就缺这一项
 //   东方财富：中国 10 年国债（RPTA_WEB_TREASURYYIELD.EMM00166466）、全 A 股 PE(TTM) 与总市值（RPT_VALUEMARKET，代码 000300，2017 年起）
 
+import { MACRO_MARKETS, PREFS_KEY, normalizePrefs, serializePrefs, parsePrefs } from "../public/shared/macro-board.js";
+
 const FRED = (id) => `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}`;
 const MULTPL = (p) => `https://www.multpl.com/${p}/table/by-month`;
 const EM = "https://datacenter-web.eastmoney.com/api/data/v1/get";
@@ -181,8 +183,28 @@ function market(key, indicators) {
 }
 const pairs = (s, from) => s.filter((p) => !from || p.date >= from).map((p) => [p.date, Math.round(p.value * 100) / 100]);
 
+// 利率卡片：最新值、较上月 / 一年前的变化（百分点）、近 3 年月度走势
+function rate(key, series) {
+  const n = series.length;
+  if (!n) return null;
+  const cur = series[n - 1], r2 = (v) => Math.round(v * 100) / 100;
+  const diff = (k) => (n > k ? r2(cur.value - series[n - 1 - k].value) : null);
+  return { key, value: r2(cur.value), date: cur.date, chg1m: diff(1), chg1y: diff(12), spark: series.slice(-36).map((p) => r2(p.value)) };
+}
+export function buildRates(series) {
+  const s = (k) => series[k] || [];
+  return [rate("us10y", s("US_10Y")), rate("us_real10y", s("US_REAL10Y")), rate("cn10y", s("CN_10Y"))].filter(Boolean);
+}
+// ?markets=us,hk → 合法、去重、保序；没传参数 = 全部；传了空串 = 一个都不要
+export function parseMarketsParam(q) {
+  if (q === undefined || q === null) return MACRO_MARKETS.slice();
+  const out = [];
+  for (const k of String(q).toLowerCase().split(",").map((x) => x.trim())) if (MACRO_MARKETS.includes(k) && !out.includes(k)) out.push(k);
+  return out;
+}
+
 const HK_FROM = "2000-01";
-export function buildMacro(series, updatedAt) {
+export function buildMacro(series, updatedAt, markets = MACRO_MARKETS) {
   const s = (k) => series[k] || [];
   const usBuffett = quarterlyRatio(s("US_EQUITY"), s("US_GDP"));
   const usEY = s("US_CAPE").map((p) => ({ date: p.date, value: 100 / p.value }));          // CAPE 盈利收益率 %
@@ -193,8 +215,7 @@ export function buildMacro(series, updatedAt) {
   const hkPE = s("HK_PE").filter((p) => p.date >= HK_FROM);
   const hkEY = hkPE.map((p) => ({ date: p.date, value: 100 / p.value }));
   const hkERP = combine(hkEY, s("US_10Y"), (ey, y) => ey - y);
-  return {
-    updatedAt,
+  const all = {
     markets: [
       market("us", [
         indicator("buffett", usBuffett, { unit: "%", digits: 0 }),
@@ -217,9 +238,137 @@ export function buildMacro(series, updatedAt) {
       hk: { ey: pairs(hkEY), y10: pairs(s("US_10Y"), hkEY.length ? hkEY[0].date : "") },
     },
   };
+  // 只返回请求的市场（隐藏的市场不下发，引力长线是响应里最大的一块）
+  const want = markets.filter((k) => MACRO_MARKETS.includes(k));
+  const gravity = {};
+  for (const k of want) gravity[k] = all.gravity[k];
+  return { updatedAt, markets: want.map((k) => all.markets.find((m) => m.key === k)), gravity, rates: buildRates(series) };
+}
+
+// ---------- 市场脉搏：指数日涨跌 + 一年走势、汇率与商品（腾讯行情，免费、延时，和 /api/quotes 同一个源） ----------
+export const PULSE_INDICES = {
+  us: [{ key: "spx", sym: "us.INX" }, { key: "ndx", sym: "us.IXIC" }, { key: "dji", sym: "us.DJI" }],
+  hk: [{ key: "hsi", sym: "hkHSI" }, { key: "hstech", sym: "hkHSTECH" }, { key: "hscei", sym: "hkHSCEI" }],
+  cn: [{ key: "sse", sym: "sh000001" }, { key: "csi300", sym: "sh000300" }, { key: "chinext", sym: "sz399006" }],
+};
+export const PULSE_CROSS = [{ key: "usdcny", sym: "whUSDCNY" }, { key: "usdhkd", sym: "whUSDHKD" }, { key: "gold", sym: "hf_GC" }, { key: "wti", sym: "hf_CL" }];
+const QT = "https://qt.gtimg.cn/q=";
+const KLINE = (sym, n) => `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${sym},day,,,${n},qfq`;
+const SPARK_DAYS = 250, SPARK_POINTS = 60;
+
+// 行情时间三种写法：2026-10-21 10:43:40 / 2026/10/21 18:31:19 / 20261021161500 → "2026-10-21 10:43"
+export function normTime(s) {
+  const t = String(s || "").trim();
+  let m = /^(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2})/.exec(t);
+  if (m) return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}`;
+  m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/.exec(t);
+  if (m) return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}`;
+  m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  return m ? t : "";
+}
+const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : NaN; };
+// 一条行情 → { price, prevClose, change, pct, time }；三种格式：
+//   指数（us./hk/sh/sz）：~ 分隔，3 现价、4 昨收、30 时间、31 涨跌、32 涨跌幅
+//   外汇（wh*）：~ 分隔，3 现价、5 时间、6 昨收、12 涨跌、13 涨跌幅
+//   期货（hf_*）：, 分隔，0 现价、6 时刻、7 昨结、12 日期
+export function parsePulseQuote(sym, raw) {
+  let price, prev, change, pct, time;
+  if (/^hf_/.test(sym)) {
+    const f = String(raw).split(",");
+    price = num(f[0]); prev = num(f[7]); time = normTime(`${f[12] || ""} ${f[6] || ""}`);
+  } else if (/^(wh|fx)/.test(sym)) {
+    const f = String(raw).split("~");
+    price = num(f[3]); prev = num(f[6]); change = num(f[12]); pct = num(f[13]); time = normTime(f[5]);
+  } else {
+    const f = String(raw).split("~");
+    price = num(f[3]); prev = num(f[4]); change = num(f[31]); pct = num(f[32]); time = normTime(f[30]);
+  }
+  if (!(price > 0)) return null;
+  if (!Number.isFinite(change) && prev > 0) change = price - prev;
+  if (!Number.isFinite(pct) && prev > 0) pct = (price / prev - 1) * 100;
+  const r = (v, d) => (Number.isFinite(v) ? Math.round(v * 10 ** d) / 10 ** d : null);
+  return { price: r(price, 4), prevClose: prev > 0 ? r(prev, 4) : null, change: r(change, 4), pct: r(pct, 2), time };
+}
+export function parsePulseQuotes(text) {
+  const out = {};
+  const re = /v_([A-Za-z0-9._]+)="([^"]*)"/g;
+  let m;
+  while ((m = re.exec(String(text || "")))) { const q = parsePulseQuote(m[1], m[2]); if (q) out[m[1]] = q; }
+  return out;
+}
+// 日 K 接口 → [[date, close]]（升序）；指数在 day 里，个股在 qfqday 里
+export function parseTencentKline(json, sym) {
+  const d = json && json.data && json.data[sym];
+  const rows = (d && (d.qfqday || d.day)) || [];
+  return rows.map((r) => [String(r[0]), num(r[2])]).filter(([date, c]) => /^\d{4}-\d{2}-\d{2}$/.test(date) && c > 0).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+}
+// 一年日线 → 走势点（等距抽样到 ≤ n 个，保留最后一个）+ 一年涨跌、距一年高点
+export function klineStats(rows, price, n = SPARK_POINTS) {
+  if (!rows || rows.length < 2) return null;
+  const closes = rows.map((r) => r[1]);
+  const lastPx = price > 0 ? price : closes[closes.length - 1];
+  const step = Math.max(1, Math.ceil(closes.length / n));
+  const spark = closes.filter((_, i) => (closes.length - 1 - i) % step === 0);
+  if (price > 0 && rows.length) spark[spark.length - 1] = lastPx; // 最后一点对齐现价（盘中日线收盘还没定）
+  const hi = Math.max(...closes, lastPx), lo = Math.min(...closes, lastPx);
+  const r1 = (v) => Math.round(v * 10) / 10;
+  return { spark: spark.map((v) => Math.round(v * 100) / 100), from: rows[0][0], chg1y: r1((lastPx / closes[0] - 1) * 100), fromHigh: r1((lastPx / hi - 1) * 100), hi: Math.round(hi * 100) / 100, lo: Math.round(lo * 100) / 100 };
+}
+async function fetchGbkText(fetchImpl, url, ttl) {
+  const r = await fetchImpl(url, { cf: { cacheTtl: ttl, cacheEverything: true }, signal: AbortSignal.timeout(8000) });
+  if (!r.ok) throw new Error(`${url} → HTTP ${r.status}`);
+  return new TextDecoder("gbk").decode(await r.arrayBuffer());
+}
+// markets：要的市场（隐藏的不拉）；cross：要不要汇率 / 商品。任一源失败只让对应卡片显示「暂缺」
+export async function fetchPulse(fetchImpl, markets, { cross = true } = {}) {
+  const idx = markets.flatMap((k) => PULSE_INDICES[k] || []);
+  const syms = [...idx.map((x) => x.sym), ...(cross ? PULSE_CROSS.map((x) => x.sym) : [])];
+  const errors = {};
+  let quotes = {};
+  const klines = {};
+  await Promise.all([
+    syms.length ? fetchGbkText(fetchImpl, QT + syms.join(","), 30).then((t) => { quotes = parsePulseQuotes(t); }).catch((e) => { errors.quotes = String(e && e.message || e).slice(0, 200); }) : null,
+    ...idx.map(({ sym }) => fetchImpl(KLINE(sym, SPARK_DAYS), { cf: { cacheTtl: 1800, cacheEverything: true }, signal: AbortSignal.timeout(8000) })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`kline ${sym} → HTTP ${r.status}`))))
+      .then((j) => { klines[sym] = parseTencentKline(j, sym); })
+      .catch((e) => { errors["kline:" + sym] = String(e && e.message || e).slice(0, 200); })),
+  ]);
+  const item = ({ key, sym }, withSpark) => {
+    const q = quotes[sym];
+    const st = withSpark ? klineStats(klines[sym], q && q.price) : null;
+    if (!q && !st) return { key, missing: true };
+    return { key, ...(q || { price: st.spark[st.spark.length - 1], change: null, pct: null, time: "" }), ...(st || {}) };
+  };
+  const out = { ts: new Date().toISOString(), source: "tencent", markets: {}, errors };
+  for (const k of markets) out.markets[k] = (PULSE_INDICES[k] || []).map((x) => item(x, true));
+  if (cross) out.cross = PULSE_CROSS.map((x) => item(x, false));
+  return out;
 }
 
 export function registerMacro(app, { fetchImpl } = {}) {
+  // 市场脉搏（公开）：只拉请求里的市场；?cross=0 不要汇率 / 商品
+  app.get("/api/macro/pulse", async (c) => {
+    const markets = parseMarketsParam(c.req.query("markets"));
+    const cross = c.req.query("cross") !== "0";
+    if (!markets.length && !cross) return c.json({ ts: new Date().toISOString(), markets: {}, errors: {} });
+    const out = await fetchPulse(fetchImpl || fetch, markets, { cross });
+    c.header("Cache-Control", "public, max-age=60"); // 腾讯行情本身是延时的，一分钟足够
+    return c.json(out);
+  });
+  // 市场显示偏好（登录用户跨设备同步；/api/my/* 的登录校验在 index.js 里统一做）。存在 settings 表的 macro_prefs 键
+  app.get("/api/my/macro-prefs", async (c) => {
+    let row = null;
+    try { row = await c.env.DB.prepare("SELECT value FROM settings WHERE user_id=? AND key=?").bind(c.get("uid"), PREFS_KEY).first(); } catch { row = null; }
+    return c.json({ prefs: row ? parsePrefs(row.value) : null });
+  });
+  app.put("/api/my/macro-prefs", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body.prefs !== "object" || !body.prefs) return c.json({ error: "prefs required" }, 400);
+    const prefs = normalizePrefs({ ...body.prefs, at: body.prefs.at || Date.now() });
+    await c.env.DB.prepare("INSERT INTO settings (user_id,key,value) VALUES (?,?,?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value")
+      .bind(c.get("uid"), PREFS_KEY, serializePrefs(prefs)).run();
+    return c.json({ ok: true, prefs });
+  });
   // 公开数据，不区分用户；库里没有就当场拉一次（之后由 cron 每周刷新）
   app.get("/api/macro", async (c) => {
     let at = await fetchedAt(c.env.DB);
@@ -231,6 +380,6 @@ export function registerMacro(app, { fetchImpl } = {}) {
     }
     const series = await loadSeries(c.env.DB);
     c.header("Cache-Control", "public, max-age=600"); // 数据按周刷新，客户端缓存 10 分钟足够
-    return c.json(buildMacro(series, at));
+    return c.json(buildMacro(series, at, parseMarketsParam(c.req.query("markets"))));
   });
 }

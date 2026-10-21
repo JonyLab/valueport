@@ -164,7 +164,7 @@ export function verifiedFacts({ financials, dividends, dps, price, eps, financia
 export function latestMetrics({ financials, financialsQ, valuationRefs, valuedAt, lang = "zh" } = {}) {
   const zh = lang !== "en";
   const out = [];
-  const pct = (v) => (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
+  const pct = (v) => (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
   const yoy = (s) => (s.length >= 2 && s[s.length - 2].value > 0 ? (s[s.length - 1].value / s[s.length - 2].value - 1) * 100 : NaN);
   const cagr3 = (s) => { if (s.length < 4) return NaN; const a = s[s.length - 4].value, b = s[s.length - 1].value; return a > 0 && b > 0 ? (Math.pow(b / a, 1 / 3) - 1) * 100 : NaN; };
   const REV = series(financials, "IS", "OperatingRevenue"), NI = series(financials, "IS", "NetProfit");
@@ -190,8 +190,8 @@ export function latestMetrics({ financials, financialsQ, valuationRefs, valuedAt
   const mLine = (s, zhName, enName) => {
     if (!s.length) return;
     const l = s[s.length - 1].value, prev = s.slice(-4, -1), avg = prev.length ? prev.reduce((a, b) => a + b.value, 0) / prev.length : NaN;
-    out.push(zh ? `${zhName}：最新 ${l.toFixed(1)}%` + (Number.isFinite(avg) ? `，前三年均值 ${avg.toFixed(1)}%` : "")
-      : `${enName}: latest ${l.toFixed(1)}%` + (Number.isFinite(avg) ? `, prior 3-year average ${avg.toFixed(1)}%` : ""));
+    out.push(zh ? `${zhName}：最新 ${l.toFixed(2)}%` + (Number.isFinite(avg) ? `，前三年均值 ${avg.toFixed(2)}%` : "")
+      : `${enName}: latest ${l.toFixed(2)}%` + (Number.isFinite(avg) ? `, prior 3-year average ${avg.toFixed(2)}%` : ""));
   };
   mLine(margin(OI, REV), "营业利润率", "Operating margin");
   mLine(margin(NI, REV), "净利率", "Net margin");
@@ -209,8 +209,8 @@ export function latestMetrics({ financials, financialsQ, valuationRefs, valuedAt
   for (const [k, name] of [["pe", "P/E"], ["pb", "P/B"], ["ps", "P/S"]]) {
     const r = valuationRefs && valuationRefs[k];
     if (!r || !Number.isFinite(r.current)) continue;
-    out.push(zh ? `当前 ${name} ${r.current.toFixed(1)}` + (Number.isFinite(r.own5y) ? `，自身五年中位 ${r.own5y.toFixed(1)}` : "") + (Number.isFinite(r.industryMedian) ? `，行业中位 ${r.industryMedian.toFixed(1)}` : "")
-      : `Current ${name} ${r.current.toFixed(1)}` + (Number.isFinite(r.own5y) ? `, own 5-year median ${r.own5y.toFixed(1)}` : "") + (Number.isFinite(r.industryMedian) ? `, industry median ${r.industryMedian.toFixed(1)}` : ""));
+    out.push(zh ? `当前 ${name} ${r.current.toFixed(2)}` + (Number.isFinite(r.own5y) ? `，自身五年中位 ${r.own5y.toFixed(2)}` : "") + (Number.isFinite(r.industryMedian) ? `，行业中位 ${r.industryMedian.toFixed(2)}` : "")
+      : `Current ${name} ${r.current.toFixed(2)}` + (Number.isFinite(r.own5y) ? `, own 5-year median ${r.own5y.toFixed(2)}` : "") + (Number.isFinite(r.industryMedian) ? `, industry median ${r.industryMedian.toFixed(2)}` : ""));
   }
   return out;
 }

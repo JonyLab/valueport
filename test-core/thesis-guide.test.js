@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { guideQuestion, guideDraft, guideDrafts, guideAnswer, cleanGuideState, validGuideTurns, FLOW_STEPS } from "../public/shared/valuation/thesis-guide.js";
+import { guideQuestion, guideDraft, guideDrafts, guideAnswer, cleanGuideState, validGuideTurns, FLOW_STEPS, citedGuideReferences } from "../public/shared/valuation/thesis-guide.js";
 import { valuationDraftStore } from "../public/shared/valuation/editor-draft.js";
 import { valuationChange, persistValuation } from "../public/shared/valuation/save.js";
 
@@ -88,13 +88,23 @@ describe("valuation save transaction", () => {
 
 describe("two-case flow drafts", () => {
   it("needs both cases, keeps conflict as a separate warning and bounds the flow turns", () => {
-    const d = guideDrafts({ c: draft, o: { ...draft, story: "乐观故事" }, conflict: " 保守偏乐观 " });
-    expect(d.c.story).toBe(draft.story); expect(d.o.story).toBe("乐观故事"); expect(d.conflict).toBe("保守偏乐观");
+    const d = guideDrafts({ c: draft, o: { ...draft, story: "乐观叙事" }, conflict: " 保守偏乐观 " });
+    expect(d.c.story).toBe(draft.story); expect(d.o.story).toBe("乐观叙事"); expect(d.conflict).toBe("保守偏乐观");
     expect(d.c).not.toHaveProperty("conflict");
     expect(guideDrafts({ c: draft })).toBeNull();
     expect(guideDrafts({ c: draft, o: draft, conflict: "x".repeat(401) })).toBeNull();
     expect(FLOW_STEPS).toHaveLength(5);
     expect(validGuideTurns(Array(5).fill({ question: "q", answer: "a" }), FLOW_STEPS.length)).toBe(true);
     expect(validGuideTurns(Array(5).fill({ question: "q", answer: "a" }))).toBe(false); // 单场景仍是 3 轮
+  });
+});
+
+describe("guide source numbering", () => {
+  it("maps repeated citations to the original source indices, including missing sources", () => {
+    const references = ["公司简介", "营收", "利润", "自由现金流波动", "净负债"];
+    expect(citedGuideReferences("资料[5]、[4]与［5］；用户[Q2]；未知[9]", references)).toEqual([
+      { number: 4, text: "自由现金流波动" }, { number: 5, text: "净负债" }, { number: 9, text: null },
+    ]);
+    expect(citedGuideReferences("没有资料引用", references)).toEqual([]);
   });
 });

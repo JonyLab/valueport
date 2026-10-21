@@ -4,11 +4,11 @@ import { MODELS, modeFields } from "../public/shared/valuation/index.js";
 
 describe("scenario stories", () => {
   it("keeps scenarios separate and normalizes legacy records without assigning them a case", () => {
-    const raw = { c: { story: "  竞争加剧  " }, o: { story: "新品放量" }, story: "旧的共享故事" };
+    const raw = { c: { story: "  竞争加剧  " }, o: { story: "新品放量" }, story: "旧的共享叙事" };
     const clean = cleanThesis(raw);
-    expect(clean).toEqual({ c: { story: "竞争加剧" }, o: { story: "新品放量" }, legacy: { story: "旧的共享故事" } });
+    expect(clean).toEqual({ c: { story: "竞争加剧" }, o: { story: "新品放量" }, legacy: { story: "旧的共享叙事" } });
     expect(cleanThesis(clean)).toEqual(clean);
-    expect(thesisLines(clean)).toEqual(["保守场景 · 核心判断：竞争加剧", "乐观场景 · 核心判断：新品放量", "未分场景的旧记录 · 核心判断：旧的共享故事"]);
+    expect(thesisLines(clean)).toEqual(["保守场景 · 核心判断：竞争加剧", "乐观场景 · 核心判断：新品放量", "未分场景的旧记录 · 核心判断：旧的共享叙事"]);
   });
   it("supports one unfinished story without inventing another one", () => {
     expect(cleanThesis({ o: { story: "只写了乐观场景", assessment: null }, c: [] })).toEqual({ o: { story: "只写了乐观场景" } });
@@ -41,7 +41,7 @@ describe("scenario stories", () => {
 describe("fieldStoryHint", () => {
   it("restates each case's direction and reason next to the matching input, and stays silent otherwise", () => {
     const thesis = { c: { story: "s", impacts: [{ key: "margin", direction: "flat", reason: "直销放缓" }] }, o: { story: "s", impacts: [{ key: "margin", direction: "up", reason: "直销占比提升" }, { key: "growth", direction: "unknown", reason: "" }] } };
-    expect(fieldStoryHint("netMargin", thesis)).toBe("你的故事：利润率 — 保守场景 稳定（直销放缓）；乐观场景 改善（直销占比提升）");
+    expect(fieldStoryHint("netMargin", thesis)).toBe("你的叙事：利润率 — 保守场景 稳定（直销放缓）；乐观场景 改善（直销占比提升）");
     expect(fieldStoryHint("revGrowth", thesis)).toBeNull(); // 只有「还不确定」且没写原因
     expect(fieldStoryHint("targetPE", thesis)).toBeNull(); // 没有对应的影响项
     expect(fieldStoryHint("netMargin", {})).toBeNull();

@@ -202,7 +202,7 @@
   .vd-pendedit{background:var(--track) !important;color:var(--ink-soft) !important;font-size:16px}
   .vd-pendedit:hover{background:var(--track-edge) !important;color:var(--ink) !important}
   .vd-backrow-right{display:flex;align-items:center;gap:8px}
-  .ve-head-right{margin-left:auto}
+  .ve-head-right{margin-left:auto;display:flex;align-items:center;gap:8px}
   /* 身份区 */
   /* 第一行名称（主），第二行 代码徽章 + 市场 · 交易所 · 币种（次） */
   .vd-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;margin:0 4px 26px}
@@ -432,7 +432,14 @@
   .vc-inputs,.vc-results{display:flex;flex-direction:column;gap:22px;align-self:stretch;background:rgba(255,255,255,.86);border:1px solid var(--card-edge);
     border-radius:var(--r-xl);box-shadow:0 1px 2px rgba(60,50,20,.05),0 18px 40px -24px rgba(60,50,20,.32);padding:22px 26px 26px}
   /* 阴影向下最多延伸 18+40-24=34px，外层 padding-bottom:40px 留足，不会被 overflow:hidden 切出直线 */
-  .vc-inputs > .vc-prof-sec,.vc-inputs .vc-form > .vc-card{padding-top:22px;border-top:1px dashed var(--border)}
+  .vc-params-panel > .vc-prof-sec,.vc-inputs .vc-form > .vc-card{padding-top:22px;border-top:1px dashed var(--border)}
+  .vc-editor-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-22px;z-index:3;margin:-22px -26px 0;padding:16px 26px 12px;background:#fff;border-bottom:1px solid var(--border);border-radius:var(--r-xl) var(--r-xl) 0 0}
+  .vc-editor-tabs{display:flex;gap:4px;padding:3px;background:var(--track);border-radius:var(--r-md)}
+  .vc-editor-tab{border:0;border-radius:6px;padding:8px 20px;background:transparent;color:var(--ink-soft);font:inherit;font-size:13px;cursor:pointer}
+  .vc-editor-tab[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(29,29,27,.1)}
+  .vc-editor-tab:focus-visible{outline:2px solid var(--sun-ink);outline-offset:2px}
+  .vc-editor-panel{display:flex;flex-direction:column;gap:22px;min-width:0}
+  .vc-editor-panel[hidden],.vc-editor-bar[hidden]{display:none !important}
   .vc-inputs .vc-card{background:none;border:0;border-radius:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0}
   .vc-inputs .vc-card-head{margin-left:0;margin-right:0}
   .vc-method-head{padding:2px 2px 0}
@@ -444,6 +451,17 @@
   .vc-method-change{display:inline-flex;align-items:center;gap:5px;height:32px;padding:0 13px;border:0;border-radius:var(--r-pill);
     background:var(--track);cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);transition:background .15s,color .15s}
   .vc-method-change:hover{background:var(--track-edge);color:var(--ink)}
+  .vc-method-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .vc-method-actions:empty,.vc-method-actions[hidden]{display:none}
+  .vc-method-head.empty .vc-method-change:first-child{background:var(--dark);color:#fff}
+  .vc-method-head.empty .vc-method-change:first-child:hover{background:#000}
+  .vc-method-head.empty .vc-method-change{height:38px;padding:0 16px}
+  .vc-colhead[hidden]{display:none}
+  .vc-data-details > summary{cursor:pointer;font-size:13px;color:var(--ink-soft);margin:0}
+  .vc-data-details > summary:focus-visible{outline:2px solid var(--ring-border);outline-offset:4px}
+  .vc-data-details[open] > summary{margin-bottom:12px}
+  .vc-data-details .vc-question-help{margin-bottom:12px}
+  .vc-empty-method .vc-guide-link{margin-left:6px}
   .vc-method-desc{margin-top:6px;font-size:13.5px;line-height:1.6;color:var(--ink-soft)}
   /* 中栏：大号结果（参考稿的 264.00 hrs / $2,647）+ 区间 vs 现价条 */
   .vc-hero{padding:0}
@@ -643,7 +661,7 @@
   .vc-thesis-panel[hidden]{display:none}
   .vc-thesis-legacy{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
   .vc-thesis-followup{padding-top:18px;border-top:1px dashed var(--border)}
-  .vc-inputs > .vc-note{margin:20px 0 28px;padding-bottom:24px;border-bottom:1px dashed var(--border)}
+  .vc-story-panel > .vc-note{margin:0}
   .vc-thesis-field{display:grid;gap:6px;min-width:0;font-size:12px;color:var(--ink-soft)}
   .vc-thesis-field .vc-note-input{min-height:76px}
   .vc-thesis-notes{margin-top:12px;font-size:12px;color:var(--ink-soft)}
@@ -655,33 +673,122 @@
   .vc-thesis-modes button{padding:8px 14px;border:1px solid var(--border);border-radius:var(--r-pill);font:inherit;font-size:12px;color:var(--ink-soft);background:transparent;cursor:pointer}
   .vc-thesis-modes button[aria-pressed="true"]{background:var(--dark);border-color:var(--dark);color:#fff}
   .vc-thesis-manual{display:grid;gap:20px}
-  .vc-thesis-manual[hidden],.vc-thesis-guide[hidden],.vc-note-ai[hidden],.vc-guide-error[hidden]{display:none}
+  .vc-thesis-manual[hidden],.vc-thesis-guide[hidden],.vc-note-ai[hidden],.vc-guide-error[hidden],.vc-guide-notice[hidden]{display:none}
   .vc-thesis-guide{display:grid;gap:16px;min-width:0}
   /* 引导卡片：和字段说明的 .vc-guide 同名，这里单独定样式（实色背景，吸底按钮的渐变才能和它对齐） */
   .vc-guide-card .vc-guide-context,.vc-guide-card .vc-question-help,.vc-guide-card .vc-guide-option small,.vc-guide-card .vc-guide-progress,.vc-guide-card .vc-guide-tag,
   .vc-flow-case dt,.vc-flow-param-check,.vc-flow-intro small,.vc-flow-intro-note,.vc-flow-result-label,.vc-flow-param-values label{color:var(--ink-soft) !important}
   .vc-guide-card .vc-guide-tag{background:#fff;box-shadow:inset 0 0 0 1px var(--border)}
-  .vc-thesis-guide.vc-guide-card{--guide-bg:#fdf6dd;grid-column:auto;margin:0;padding:22px 24px 6px;gap:18px;background:var(--guide-bg);border-radius:var(--r-lg);font-size:13px;color:var(--ink)}
-  @media(max-width:600px){.vc-thesis-guide.vc-guide-card{padding:18px 16px 4px}}
+  .vc-management-research{margin:12px 0;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:12px;line-height:1.65;overflow-wrap:anywhere}
+  .vc-management-research summary{cursor:pointer;font-weight:600}
+  .vc-management-research a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+  .vc-management-research>p,.vc-management-research small{color:var(--ink-soft)}
+  .vc-management-research small{display:block;margin:4px 0}
+  .vc-management-research article{border-top:1px solid var(--border);margin-top:12px;padding-top:12px}
+  .vc-management-research article>a{font-weight:600;color:inherit;text-decoration-color:var(--border)}
+  .vc-management-research article>strong{display:block;margin-top:10px;font-size:11px;font-weight:500}
+  .vc-management-research blockquote{margin:4px 0 10px;padding-left:10px;border-left:2px solid var(--border);white-space:pre-wrap}
+  .vc-business-table-wrap{overflow-x:auto;margin:10px 0}
+  .vc-business-reports table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+  .vc-business-reports th,.vc-business-reports td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+  .vc-business-reports th:first-child{text-align:left;white-space:normal;min-width:110px}
+  .vc-business-reports section>strong{display:block;margin-top:10px}
+  .vc-business-reports article>details{margin-top:12px}
+  .vc-business-reports>summary{display:flex;align-items:center;gap:6px;width:fit-content;max-width:100%;list-style:none;font-size:12.5px;font-weight:500;line-height:1.6;color:var(--ink-soft);transition:color .15s}
+  .vc-business-reports>summary::-webkit-details-marker{display:none}
+  .vc-business-reports>summary::before{content:"";flex:none;width:5px;height:5px;margin:0 3px 0 2px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+  .vc-business-reports[open]>summary::before{transform:translateY(-2px) rotate(45deg)}
+  .vc-business-reports>summary:hover{color:var(--ink)}
+  .vc-business-reports>summary:focus-visible{outline:2px solid var(--ring-border);outline-offset:3px;border-radius:4px}
+  .vc-business-reports>.vc-guide-secondary{margin-top:4px;padding:6px 14px;font-size:12px}
+  .vc-business-reports article>p{margin:4px 0 0;color:var(--ink-soft)}
+  @media (prefers-reduced-motion:reduce){.vc-business-reports>summary::before{transition:none}}
+  .vc-thesis-guide.vc-guide-card{--guide-bg:#faf9f6;grid-column:auto;margin:0;padding:22px 24px 24px;gap:18px;background:var(--guide-bg);border-radius:var(--r-lg);font-size:13px;color:var(--ink)}
+  @media(max-width:600px){.vc-thesis-guide.vc-guide-card{padding:18px 16px 20px}}
   .vc-guide-title{margin:0;font-size:17px;font-weight:500;line-height:1.5;overflow-wrap:anywhere;outline-offset:4px}
   .vc-guide-progress{display:flex;gap:6px;list-style:none;margin:0;padding:0;font-size:12px;color:var(--ink-mute)}
   .vc-guide-progress li{flex:1;padding:8px 4px;border-bottom:2px solid var(--border);text-align:center}
   .vc-guide-progress li[aria-current="step"]{border-color:var(--sun);color:var(--ink)}
   .vc-guide-progress li.done{border-color:var(--ink-soft);color:var(--ink-soft)}
-  .vc-guide-content{display:grid;gap:14px}
+  /* 情景步骤胶囊：当前步骤用金色强调（与步骤下划线一致），未解锁的步骤变淡 */
+  .vc-guide-progress li i{margin-right:3px;font-size:13px;line-height:1;vertical-align:-2px;color:var(--ink)}
+  nav.vc-guide-progress{flex-wrap:wrap}
+  .vc-guide-progress > .vc-guide-secondary{display:inline-flex;align-items:center;gap:4px;padding:6px 14px;font-size:12px;transition:background-color .15s,border-color .15s,color .15s}
+  .vc-guide-progress > .vc-guide-secondary:not(:disabled):not([aria-current]):hover{border-color:var(--ink-mute);color:var(--ink)}
+  .vc-guide-progress > .vc-guide-secondary[aria-current="step"]{background:var(--sun-soft);border-color:var(--sun);color:var(--sun-ink);font-weight:500}
+  /* 未解锁：不再整体变透明（太淡读不清），改为虚线细框 + 浅灰字 */
+  .vc-guide-progress > .vc-guide-secondary:disabled{opacity:1;border-style:dashed;border-color:var(--border);color:var(--ink-mute);cursor:default}
+  /* 已完成：文字略淡，末尾一个墨色对勾 */
+  .vc-guide-progress > .vc-guide-secondary.done:not([aria-current]){color:var(--ink-soft)}
+  .vc-guide-progress > .vc-guide-secondary.done i{font-size:14px;line-height:1;color:var(--ink)}
+  .vc-guide-progress > .vc-guide-secondary.done[aria-current] i{color:var(--sun-ink)}
+  /* 情景介绍卡居中且较窄时，胶囊条与它同宽对齐 */
+  .vc-guide-progress:has(+ .vc-scenario-content.intro){width:100%;max-width:560px;margin-inline:auto;box-sizing:border-box}
+  .vc-guide-progress + .vc-scenario-content.vc-guide-card.intro{margin-top:4px}
+  .vc-guide-content{display:grid;gap:16px} /* 区块间距 16；题目内部 4 / 8 / 12 */
   .vc-guide-lead,.vc-guide-context{margin:0;font-size:13px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink-soft)}
   .vc-guide-context{padding:12px 14px;background:var(--track);border-radius:var(--r-md)}
-  .vc-guide-options{display:grid;gap:9px;margin:0;padding:0;border:0;min-width:0}
-  .vc-guide-options legend{float:left;width:100%;margin:0 0 4px;font-size:18px;line-height:1.55;font-weight:500;color:var(--ink);text-wrap:pretty}
-  .vc-guide-options legend+.vc-guide-context{float:left;width:100%;margin:0 0 14px;padding:0;background:none;font-size:12.5px;line-height:1.75;color:var(--ink-mute)}
+  .vc-guide-options{display:grid;gap:10px;margin:0;padding:0;border:0;min-width:0}
+  .vc-guide-options legend{float:left;width:100%;margin:0 0 8px;font-size:18px;line-height:1.55;font-weight:500;color:var(--ink);text-wrap:pretty}
+  .vc-guide-options legend+.vc-guide-context{float:left;width:100%;margin:0 0 12px;padding:0;background:none;font-size:12.5px;line-height:1.75;color:var(--ink-mute)}
+  .vc-guide-answer-help{margin:0 0 4px}
+  /* 题目上方的小标题：「本题 · 需求与销量」稍深，选题说明变淡跟在后面 */
+  .vc-guide-eyebrow{margin:0;font-size:12px;line-height:1.6;color:var(--ink-mute);overflow-wrap:anywhere}
+  .vc-guide-eyebrow strong{font-weight:500;color:var(--ink-soft)}
+  .vc-guide-eyebrow + .vc-guide-options{margin-top:-10px} /* 紧贴题目：16 - 10 = 6px */
+  .vc-guide-sources{font-size:12px;color:var(--ink-soft);margin-bottom:4px;min-width:0}
+  /* 引导里所有折叠区（财报季研究依据、收入结构、本轮资料、其他方法、已回答记录）用同一种标题：自绘箭头，展开时转向下 */
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary{display:flex;align-items:center;gap:6px;width:fit-content;max-width:100%;padding:4px 0;border-radius:4px;list-style:none;cursor:pointer;font-size:12.5px;font-weight:500;line-height:1.6;color:var(--ink-soft);text-decoration:none;transition:color .15s}
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary::-webkit-details-marker{display:none}
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary::before{content:"";flex:none;width:5px;height:5px;margin:0 3px 0 2px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more)[open] > summary::before{transform:translateY(-2px) rotate(45deg)}
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary:hover{color:var(--ink)}
+  .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary:focus-visible{outline:2px solid var(--ring-border);outline-offset:3px}
+  .vc-guide-summary-meta{font-weight:400;color:var(--ink-mute)}
+  @media (prefers-reduced-motion:reduce){.vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary::before{transition:none}}
+  /* 引导里的财报季研究 / 收入结构：收起时只是一行标题，展开的内容与标题文字对齐 */
+  .vc-thesis-guide .vc-management-research{margin:0;padding:0;border:0;border-radius:0;min-width:0}
+  .vc-thesis-guide .vc-management-research > :not(summary){margin-left:16px}
+  .vc-thesis-guide .vc-management-research > p{margin-block:6px}
+  .vc-thesis-guide .vc-management-research > .vc-guide-secondary{margin-top:4px;padding:6px 14px;font-size:12px}
+  .vc-guide-sources > p{margin-top:8px}
+  .vc-guide-sources ol{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px;max-height:240px;overflow:auto;overscroll-behavior:contain}
+  .vc-guide-sources li{padding:8px 10px;border-radius:var(--r-sm);background:var(--track);line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+  .vc-guide-cite{display:inline !important}
+  .vc-guide-cite-trigger{display:inline;border:0;border-bottom:1px dotted currentColor;border-radius:3px;padding:0 2px;background:none;color:var(--ink);font:inherit;font-weight:500;line-height:inherit;cursor:help;vertical-align:baseline}
+  .vc-guide-cite-trigger:hover,.vc-guide-cite-trigger:focus-visible{background:var(--track);outline:2px solid var(--ring-border);outline-offset:2px}
+  .vc-guide-cite-popover{position:fixed;inset:auto;margin:0;box-sizing:border-box;max-width:calc(100vw - 24px);max-height:min(320px,calc(100dvh - 24px));overflow:auto;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-md);background:#fff;color:var(--ink-soft);box-shadow:0 8px 28px rgba(29,29,27,.14);font-family:var(--font);font-size:12.5px;font-weight:400;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;text-align:left;cursor:text}
+  .vc-guide-cite-popover:not(:popover-open){display:none !important}
+  .vc-guide-cite-popover:popover-open{display:block !important}
+  .vc-guide-cite-popover>strong{display:block;margin-bottom:6px;font-size:12px;font-weight:500;color:var(--ink)}
+  .vc-guide-cite-popover>span{display:block !important}
+  .vc-guide-card .vc-guide-audit{display:inline-block;flex:none;justify-self:start;width:fit-content;max-width:100%;box-sizing:border-box;margin:4px 0 2px 6px;padding:1px 6px;border-radius:4px;background:#f0f1ef;color:var(--ink-soft);font-size:10.5px;font-weight:400;line-height:1.7;vertical-align:baseline}
+  .vc-guide-audit.warning{background:#f7eeea;color:#8a4c36}
+  .vc-guide-audit-detail{margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11.5px}
+  .vc-guide-audit-note{margin:16px 0 0;color:var(--ink-soft);font-size:11px;line-height:1.7}
+  .vc-guide-assumptions{display:grid;gap:8px;min-width:0;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--track)}
+  .vc-guide-assumptions > strong{font-size:12px;font-weight:500}
+  .vc-guide-assumption-list{display:flex;flex-wrap:wrap;gap:8px}
+  /* 每个已选假设等宽撑满一行，避免按内容收缩造成间隙不齐 */
+  .vc-guide-assumption-list button{flex:1 1 210px;align-content:start;justify-self:stretch;max-width:100%;display:grid;gap:4px;text-align:left;border-radius:var(--r-sm);background:#fff;padding:10px 12px;min-width:0}
+  .vc-guide-assumption-list strong{font-size:12px;font-weight:500}
+  .vc-guide-assumption-list span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+  .vc-guide-coverage{padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md);background:#f4f5f2;font-size:12px;line-height:1.75;color:var(--ink-soft)}
+  .vc-guide-coverage p{margin:0}
+  .vc-guide-coverage blockquote{margin:10px 0;padding-left:12px;border-left:2px solid var(--border);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
+  .vc-guide-coverage .vc-guide-secondary{margin-top:10px}
   .vc-guide-tag{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:var(--r-pill);background:var(--track);font-size:11px;font-weight:400;line-height:1.7;color:var(--ink-mute);vertical-align:3px}
   .vc-guide-link{justify-self:start;padding:2px 0;border:0;background:none;font:inherit;font-size:12.5px;color:var(--ink-soft);cursor:pointer;text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:3px}
   .vc-guide-link:hover{color:var(--ink);text-decoration-color:currentColor}
+  .vc-guide-restart-ask{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+  .vc-guide-restart-ask .vc-question-help{margin:0}
   .vc-guide-link[hidden],.vc-guide-note[hidden],.vc-question-help[hidden]{display:none}
-  .vc-guide-sticky{position:sticky;bottom:0;z-index:1;margin:0 -4px;padding:12px 4px;background:linear-gradient(to top,var(--guide-bg,#fbf3dc) 70%,transparent)}
-  .vc-guide-option{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-md);background:#fff;cursor:pointer;min-width:0;transition:border-color .15s,background-color .15s,box-shadow .15s}
-  .vc-guide-option:hover{border-color:var(--ink-mute)}
-  .vc-guide-option:has(input:checked){border-color:var(--sun-ink);background:var(--sun-soft,#fff5ce)}
+  /* 吸底按钮：上方 16px 渐变淡出，底部留出安全区；滚到底时它在文档流里，不会盖住最后一个选项 */
+  .vc-guide-sticky{position:sticky;bottom:0;z-index:1;margin:0 -4px;padding:16px 4px max(14px,env(safe-area-inset-bottom));background:linear-gradient(to top,var(--guide-bg,#faf9f6) calc(100% - 16px),transparent)}
+  .vc-guide-option{display:flex;align-items:flex-start;gap:12px;min-height:44px;box-sizing:border-box;padding:14px 16px;border:1px solid var(--border);border-radius:var(--r-md);background:#fff;cursor:pointer;min-width:0;transition:border-color .15s,background-color .15s,box-shadow .15s}
+  .vc-guide-option:not(:has(input:checked)):hover{border-color:var(--ink-mute)}
+  /* 选中态与悬停无关：浅暖底 + 金色描边，悬停不再变色 */
+  .vc-guide-option:has(input:checked),.vc-guide-option:has(input:checked):hover{border-color:var(--sun);background:#fffaea;box-shadow:inset 0 0 0 1px var(--sun)}
   .vc-guide-option:focus-within{outline:2px solid var(--ring-border);outline-offset:2px}
   .vc-guide-option input{flex:none;margin-top:4px;accent-color:var(--dark)}
   .vc-guide-option span{flex:1;display:grid;gap:4px;min-width:0;overflow-wrap:anywhere}
@@ -697,7 +804,7 @@
   .vc-flow-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
   .vc-guiding-mount > .vc-workflow{display:none}
   /* 开始页：窄一点、居中，像一张邀请卡；四步预览 + 一个主按钮 */
-  .vc-thesis-guide.vc-guide-card.intro{max-width:560px;width:100%;margin:clamp(12px,6vh,64px) auto 0;padding:32px 32px 28px;gap:20px;box-shadow:0 18px 48px -28px rgba(120,90,20,.35)}
+  .vc-thesis-guide.vc-guide-card.intro{max-width:560px;width:100%;margin:clamp(12px,6vh,64px) auto 0;padding:32px 32px 28px;gap:20px;box-shadow:0 18px 48px -28px rgba(40,40,36,.16)}
   .vc-guide-card.intro .vc-guide-title{font-size:22px;line-height:1.4;letter-spacing:-.01em}
   .vc-flow-intro-lead{margin:-8px 0 0;font-size:14px;line-height:1.75;color:var(--ink-soft)}
   .vc-flow-intro{display:grid;gap:4px;margin:0;padding:0;list-style:none;counter-reset:intro}
@@ -715,6 +822,7 @@
   .vc-flow-top .vc-guide-secondary{padding:6px 14px;font-size:12px}
   .vc-flow-cases{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   @media(max-width:600px){.vc-flow-cases{grid-template-columns:minmax(0,1fr)}}
+  .vc-flow-cases > .vc-flow-case:only-child{grid-column:1 / -1} /* 分情景复核只有一张卡：占满整行 */
   .vc-flow-case{display:grid;gap:8px;align-content:start;padding:14px 16px;border-radius:var(--r-md);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);overflow-wrap:anywhere}
   .vc-flow-case h4{margin:0;font-size:12px;font-weight:500;color:var(--ink-mute)}
   .vc-flow-case.o h4{color:var(--sun-ink)}
@@ -722,13 +830,25 @@
   .vc-flow-case dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:4px 0 0;font-size:12px;line-height:1.65}
   .vc-flow-case dt{color:var(--ink-mute)}
   .vc-flow-case dd{margin:0;color:var(--ink-soft)}
-  .vc-flow-more summary{cursor:pointer;font-size:12.5px;color:var(--ink-soft)}
+  /* 对照页 / 选择页：卡片内无类名的段落和小标题，对齐引导流程的 12–13px、字重 500 */
+  .vc-flow-case > p:not([class]),.vc-scenario-content > p:not([class]){margin:0;font-size:13px;line-height:1.75;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+  .vc-flow-case > strong{margin-top:4px;font-size:12px;font-weight:500;color:var(--ink-mute)}
+  .vc-flow-case > dl,.vc-scenario-content > dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:4px 0 0;padding-top:10px;border-top:1px solid var(--divider);font-size:12px;line-height:1.65}
+  .vc-scenario-content > dl dt{color:var(--ink-mute)}
+  .vc-flow-case > dl dd,.vc-scenario-content > dl dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .vc-flow-case > .vc-flow-result-range,.vc-scenario-content > .vc-flow-result-range{margin:0;line-height:1.25} /* 去掉 p 的默认上下外边距，数字紧跟情景名 */
+  .vc-flow-case > .vc-flow-result-range{font-size:30px}
+  .vc-flow-case > .vc-flow-result-vs{margin:-2px 0 2px}
+  .vc-scenario-content > .vc-flow-result-vs{margin:-10px 0 0} /* 单场景确认页：现价行紧跟数字 */
+  /* 对照页顶部汇总：区间 + 现价，同编辑页结果区 */
+  .vc-flow-compare-hero{padding:16px 20px 18px}
+  .vc-flow-case > .vc-guide-secondary{margin-top:4px}
   .vc-flow-more-list{margin-top:10px}
   .vc-flow-params{display:grid;gap:10px}
   .vc-flow-param{display:grid;gap:8px;padding:14px 16px;border:1px dashed var(--border);border-radius:var(--r-md);background:rgba(255,255,255,.6);transition:border-color .15s,background-color .15s}
   .vc-flow-param.on{border:1px solid var(--sun-ink);background:#fff}
   .vc-flow-use{font-size:12px;color:var(--ink-soft)}
-  textarea.vc-flow-story{width:100%;min-height:0;padding:8px 10px;border:1px solid transparent;border-radius:var(--r-sm);background:var(--guide-bg,#fdf6dd);font:inherit;font-size:14px;line-height:1.7;color:var(--ink);resize:vertical}
+  textarea.vc-flow-story{width:100%;min-height:0;padding:8px 10px;border:1px solid transparent;border-radius:var(--r-sm);background:var(--guide-bg,#faf9f6);font:inherit;font-size:14px;line-height:1.7;color:var(--ink);resize:vertical}
   textarea.vc-flow-story:hover{border-color:var(--border)}
   textarea.vc-flow-story:focus{outline:none;border-color:var(--sun-ink);background:#fff}
   .vc-flow-impacts-label{margin:2px 0 0;font-size:12px;color:var(--ink-soft)}
@@ -761,31 +881,55 @@
   .vc-flow-result{display:grid;gap:4px;padding:18px 20px;border-radius:var(--r-md);background:#fff;box-shadow:inset 0 0 0 1px var(--divider)}
   .vc-flow-result p{margin:0}
   .vc-flow-result-label{font-size:12px;color:var(--ink-mute)}
-  .vc-flow-result-range{font-size:30px;font-weight:500;letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
+  /* 估值数字：与编辑页 .vc-rlow 同一套——细体大号整数，小数 .num-dec 缩小，币种小号浅色 */
+  .vc-flow-result-range{display:flex;flex-wrap:wrap;align-items:baseline;font-size:44px;font-weight:400;letter-spacing:-.035em;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .vc-flow-result-range.empty{font-size:15px;letter-spacing:0;line-height:1.6;color:var(--ink-mute)}
+  .vc-flow-dash{padding:0 .12em;color:var(--ink-mute)}
+  .vc-flow-cur{margin-left:8px;font-size:13px;font-weight:400;letter-spacing:0;color:var(--ink-mute)}
   .vc-flow-result-price{font-size:13px;color:var(--ink-soft)}
+  /* 现价行：「现价 529.27 USD」+ 与编辑页同款的 高估 / 安全边际 徽章（缩小一号） */
+  .vc-flow-result-vs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;font-size:13px;line-height:1.5;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .vc-flow-result > .vc-flow-result-vs{margin-top:8px}
+  .vc-flow-result-vs .vc-rverdict{height:24px;margin:0;padding:0 10px;font-size:12px}
+  .vc-flow-result > .vc-question-help{margin-top:10px}
+  .vc-flow-result > .vc-guide-notice{margin-top:8px}
   .vc-guide-conflict{display:grid;gap:4px;padding:12px 14px;border-radius:var(--r-md);background:#fdf0e3;box-shadow:inset 0 0 0 1px #f0cfa8;font-size:13px;line-height:1.6;color:var(--ink-soft)}
   .vc-guide-conflict strong{font-weight:500;color:#a4561a}
   .vc-guide-conflict p{margin:0}
+  /* 提醒（示例值、方法变化等）：平静的浅金底，不用报错红；.important 用于保守高于乐观、算不出结果等更需留意的情况 */
+  .vc-guide-notice{display:flex;align-items:flex-start;gap:8px;margin:0;padding:10px 14px;border-radius:var(--r-md);background:rgba(246,207,74,.14);box-shadow:inset 0 0 0 1px rgba(246,207,74,.5);font-size:12.5px;line-height:1.7;color:var(--sun-ink);overflow-wrap:anywhere}
+  .vc-guide-notice > i{flex:none;font-size:15px;line-height:21px;color:var(--sun-ink);opacity:.75}
+  .vc-guide-notice > div{flex:1;display:grid;gap:2px;min-width:0}
+  .vc-guide-notice p{margin:0}
+  .vc-guide-notice strong{font-weight:500}
+  .vc-guide-notice strong + p{color:var(--ink-soft)}
+  .vc-guide-notice.important{background:#fdf0e3;box-shadow:inset 0 0 0 1px #f0cfa8;color:#8a4613}
+  .vc-guide-notice.important > i{color:#a4561a;opacity:1}
   .vc-guide-other{width:100%;margin-top:6px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:#fff;font:inherit;font-size:13px;line-height:1.5;color:var(--ink);cursor:text}
   .vc-guide-other:focus{outline:none;border-color:var(--sun-ink)}
   .vc-guide-other[hidden]{display:none}
-  /* AI 准备问题时：闪光图标 + 状态文字 + 问题/选项骨架，和 AI 面板的 pending 节奏一致 */
+  /* 准备内容时用进度环与状态文字说明当前工作。 */
   .vc-guide-loader{display:grid;gap:14px;padding:16px;border-radius:var(--r-md);background:#fff;box-shadow:inset 0 0 0 1px var(--divider)}
   .vc-guide-loader-head{display:flex;align-items:center;gap:8px}
-  .vc-guide-loader-head i{font-size:16px;color:var(--sun-ink);animation:vcAiPulse 1.2s ease-in-out infinite}
+  .vc-guide-spinner{display:block;flex:none;width:14px;height:14px;border:2px solid var(--divider);border-top-color:var(--sun-ink);border-radius:50%;animation:vcGuideSpin .9s linear infinite}
   .vc-guide-loader-head .vc-guide-status{flex:1;min-width:0}
   .vc-guide-loader-head .vc-guide-secondary{padding:6px 14px;font-size:12px}
   .vc-guide-skeleton{display:grid;gap:9px}
-  .vc-guide-skeleton span{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--track) 25%,var(--divider) 50%,var(--track) 75%);background-size:200% 100%;animation:vcGuideShimmer 1.4s ease-in-out infinite}
+  /* 占位卡给一个接近真实内容的最小高度，内容到达时不明显跳动 */
+  .vc-guide-loader{align-content:start}
+  .vc-guide-loader.is-question{min-height:420px}
+  .vc-guide-loader.is-draft{min-height:320px}
+  .vc-guide-loader.is-params,.vc-guide-loader.is-picks{min-height:360px}
+  .vc-guide-skeleton span{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,rgba(29,29,27,.05) 30%,rgba(29,29,27,.10) 50%,rgba(29,29,27,.05) 70%);background-size:220% 100%;animation:vcGuideShimmer 1.6s ease-in-out infinite}
   .vc-guide-skeleton .short{width:60%}
-  .vc-guide-skeleton .opt{height:44px;border-radius:var(--r-md)}
+  .vc-guide-skeleton .opt{height:52px;border-radius:var(--r-md)}
   .vc-guide-skeleton .card{height:64px;border-radius:var(--r-md)}
   .vc-guide-skeleton .line+.opt,.vc-guide-skeleton .line+.card{margin-top:6px}
   @keyframes vcGuideShimmer{from{background-position:100% 0}to{background-position:-100% 0}}
-  @media (prefers-reduced-motion:reduce){.vc-guide-loader-head i,.vc-guide-skeleton span{animation:none}}
+  @keyframes vcGuideSpin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.vc-guide-spinner,.vc-guide-skeleton span{animation:none}.vc-guide-skeleton span{background:rgba(29,29,27,.06)}}
   .vc-guide-error{margin:0;font-size:12px;line-height:1.7;color:var(--red);overflow-wrap:anywhere}
   .vc-guide-history{font-size:12px;line-height:1.7;color:var(--ink-soft);overflow-wrap:anywhere}
-  .vc-guide-history summary{cursor:pointer}
   .vc-guide-history p{white-space:pre-wrap}
   .vc-guide-history-q{font-weight:500;margin-bottom:4px}
   .vc-guide-review{padding:14px;background:var(--track);border-radius:var(--r-md);overflow-wrap:anywhere}
@@ -840,10 +984,11 @@
   .vc-workbench.vc-guiding{grid-template-columns:minmax(0,820px);justify-content:center}
   .vc-workbench.vc-guiding > .vc-results{display:none}
   .vc-workbench.vc-guiding .vc-guide-hide{display:none}
-  .vc-workbench.vc-guiding .vc-inputs{align-self:start;padding:0;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
-  .vc-workbench.vc-guiding .vc-inputs > .vc-note{margin-top:0}
+  /* stretch：让栏高等于网格行高，.vc-col 的 overflow:auto 才能滚动；左右留 8px 防止标题首字、卡片阴影和焦点框被裁切，负外边距抵消宽度变化 */
+  .vc-workbench.vc-guiding .vc-inputs{align-self:stretch;padding:0 8px;margin:0 -8px;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+  .vc-workbench.vc-guiding .vc-story-panel > .vc-note{margin-top:0}
   .vc-guide-option .vc-guide-tag{display:inline-block;margin-left:8px;vertical-align:1px}
-  .vc-workbench.vc-guiding .vc-inputs > .vc-note{margin-bottom:0;padding-bottom:0;border-bottom:0}
+  .vc-workbench.vc-guiding .vc-story-panel > .vc-note{margin-bottom:0;padding-bottom:0;border-bottom:0}
   .vc-guide-content{animation:vcGuideIn .28s cubic-bezier(.22,1,.36,1)}
   @keyframes vcGuideIn{from{opacity:0;transform:translateY(6px)}}
   @media (prefers-reduced-motion:reduce){.vc-guide-content,.vc-next-step{animation:none}}
@@ -852,6 +997,11 @@
     .vc-guide-link,.vc-question-action{padding:10px 0;min-height:40px}
     .vc-flow-top .vc-guide-secondary,.vc-guide-loader-head .vc-guide-secondary{min-height:40px}
     .vc-flow-retry .vc-guide-primary{width:100%}
+    .vc-guide-progress > .vc-guide-secondary{min-height:40px}
+    .vc-thesis-guide :is(.vc-management-research,.vc-guide-sources,.vc-guide-history,.vc-flow-more) > summary{min-height:40px}
+    .vc-flow-result-range{font-size:36px}
+    .vc-flow-case > .vc-flow-result-range{font-size:28px}
+    .vc-flow-compare-hero{padding:14px 16px 16px}
   }
   /* 抽屉占右侧 410 + 16 + 12 间隙；内容区最宽 1600 居中，宽屏时右侧本来就有空白 → 只让出真正重叠的那部分，够宽就不让 */
   @media (min-width:1300px){ body.vc-ai-open .vc-workbench{margin-right:max(0px,calc(438px - clamp(16px,3vw,44px) - (100vw - min(100vw,1600px)) / 2))} }
@@ -867,6 +1017,9 @@
   .vc-ai-mmenu{position:absolute;top:calc(100% + 6px);left:-2px;z-index:5;display:flex;flex-direction:column;gap:1px;width:300px;max-height:60vh;overflow:auto;padding:6px;background:#fff;border-radius:var(--r-md);
     box-shadow:0 1px 2px rgba(60,50,20,.06),0 16px 36px -14px rgba(60,50,20,.35)}
   .vc-ai-mmenu[hidden]{display:none}
+  .vc-ai-inline-models{position:fixed;inset:auto;margin:0;box-sizing:border-box;max-height:calc(100dvh - 24px);border:0}
+  .vc-ai-inline-models:popover-open{display:flex;gap:1px}
+  .vc-ai-inline-models:not(:popover-open){display:none}
   .vc-ai-histwrap{position:relative;flex:none}
   .vc-ai-hmenu{left:auto;right:-2px;width:300px}
   .vc-ai-hrow{display:flex;align-items:center;gap:2px;border-radius:var(--r-sm)}
@@ -915,7 +1068,7 @@
   .vc-ai-msg.error .vc-ai-mact{color:var(--red)}
   @keyframes vcAiPulse{50%{opacity:.45}}
   .vc-ai-sugg{width:100%;background:#fff;border-radius:var(--r-lg);box-shadow:inset 0 0 0 1px var(--divider);padding:14px 14px 12px}
-  /* 情景分析：保守（灰点）/ 乐观（暖黄点）各一块，故事 + 关键假设列表 + 可能错在哪 / 跟踪信号 */
+  /* 情景分析：保守（灰点）/ 乐观（暖黄点）各一块，叙事 + 关键假设列表 + 可能错在哪 / 跟踪信号 */
   .vc-ai-scheck{display:flex;align-items:flex-start;gap:5px;margin-top:4px;font-size:11.5px;line-height:1.55;color:var(--ink-mute)}
   .vc-ai-scheck i{font-size:13px;margin-top:1px;color:var(--sun-ink)}
   .vc-ai-scens{display:flex;flex-direction:column;gap:8px;margin:2px 0 10px}
@@ -990,6 +1143,7 @@
   @media (max-width:1100px){
     .vc-workbench{grid-template-columns:minmax(0,1fr);align-content:start;overflow:auto}
     .vc-col{overflow:visible;min-height:auto} /* 整块滚动时各栏按内容撑开（分栏各自滚动时才需要 min-height:0） */
+    .vc-workbench.vc-guiding .vc-inputs{padding:0;margin:0} /* 栏不再自己滚动，不会裁切；去掉负外边距以免窄屏出现横向滚动 */
   }
   @media (max-width:900px){
     body.ve-mode{overflow:auto}
@@ -1024,20 +1178,35 @@
   .vmap-lab{font-size:13.5px;color:var(--ink-soft);min-width:0;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
   .vmap-lab.picked{color:var(--ink);font-weight:500}
   .vmap-pick{font-size:10.5px;font-weight:500;color:var(--sun-ink);background:var(--sun);border-radius:var(--r-pill);padding:2px 8px}
-  .vmap-track{position:relative;height:30px;grid-column:2}
-  .vmap-bar{position:absolute;top:7px;bottom:7px;border-radius:var(--r-pill);background:rgba(29,29,27,.22)}
+  .vmap-track{position:relative;height:44px;grid-column:2}
+  .vmap-bar{position:absolute;top:15px;bottom:15px;border-radius:var(--r-pill);background:rgba(29,29,27,.22)} /* 不建层叠上下文：端点数字才能盖在现价虚线上面 */
   .vmap-track.picked .vmap-bar{background:var(--sun)}
+  .vmap-point{position:absolute;top:50%;width:0;height:0;z-index:3}
+  .vmap-value{position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;padding:5px 10px;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft);font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
+  .vmap-track.picked .vmap-value{background:var(--sun);color:var(--sun-ink)}
+  .vmap-point::after{content:"";position:absolute;top:17px;left:-2px;width:4px;height:7px;border-radius:var(--r-pill);background:var(--ink-mute)}
+  .vmap-track.picked .vmap-point::after{background:var(--sun)}
+  .vmap-point.edge-start .vmap-value{transform:translate(0,-50%)}
+  .vmap-point.edge-end .vmap-value{transform:translate(-100%,-50%)}
   .vmap-end{position:absolute;top:50%;transform:translateY(-50%);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;font-variant-numeric:tabular-nums}
   .vmap-end.lo{right:100%;margin-right:6px}
   .vmap-end.hi{left:100%;margin-left:6px}
-  .vmap-now{position:absolute;top:-7px;bottom:-7px;width:0;border-left:1.5px dashed var(--ink);pointer-events:none;z-index:2}
+  .vmap-end.near-now{z-index:3;padding:1px 6px;border-radius:var(--r-pill);background:var(--card-solid);box-shadow:0 0 0 3px var(--card-solid)}
+  .vmap-now{position:absolute;top:-7px;bottom:-7px;width:0;border-left:1px dashed var(--ink-soft);pointer-events:none;z-index:2}
   .vmap-now.first{top:-4px}
-  .vmap-ref{position:absolute;top:-7px;bottom:-7px;width:0;border-left:1.5px dashed;pointer-events:none}
-  .vmap-ref-tag{position:absolute;top:100%;left:0;transform:translate(-50%,4px);white-space:nowrap;font-size:11px;font-weight:500;font-variant-numeric:tabular-nums}
+  .vmap-zone{position:absolute;top:-7px;bottom:-7px;pointer-events:none;background:linear-gradient(to right,color-mix(in srgb,var(--zone-color) 4%,transparent),color-mix(in srgb,var(--zone-color) 22%,transparent))} /* 贴着阈值虚线最深，向外渐淡 */
+  .vmap-zone.strike{left:0;border-right:1px dashed var(--zone-color)}
+  .vmap-zone.bubble{right:0;border-left:1px dashed var(--zone-color);background:linear-gradient(to right,color-mix(in srgb,var(--zone-color) 22%,transparent),color-mix(in srgb,var(--zone-color) 4%,transparent))}
+  .vmap-zone-labels{grid-column:2;display:flex;justify-content:space-between;gap:12px;padding-top:2px;font-size:11px;line-height:1.5;font-variant-numeric:tabular-nums}
+  .vmap-zone-label{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .vmap-zone-label:last-child{text-align:right}
+  .vmap-zone-label strong{font-weight:500}
+  .vmap-zone-label span{font-size:10.5px;color:var(--ink-soft)}
   .vmap-now-tag{position:absolute;bottom:100%;left:0;transform:translate(-50%,-2px);white-space:nowrap;font-size:11px;font-weight:500;
-    color:#fff;background:var(--dark);border-radius:var(--r-pill);padding:3px 9px;font-variant-numeric:tabular-nums}
-  .vmap-axis{grid-column:2;position:relative;height:16px;border-top:1px dashed var(--border);margin-top:18px} /* 上方留出击球线/泡沫线标签的位置 */
-  .vmap-axis span{position:absolute;top:4px;transform:translateX(-50%);font-size:10.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+    color:var(--ink-soft);background:#fff;box-shadow:inset 0 0 0 1px var(--border);border-radius:var(--r-pill);padding:3px 9px;font-variant-numeric:tabular-nums}
+  .vmap-axis{grid-column:2;position:relative;height:18px;border-top:1px solid var(--divider);margin-top:4px}
+  .vmap-axis span{position:absolute;top:6px;transform:translateX(-50%);font-size:10.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
+  .vmap-axis span::before{content:"";position:absolute;left:50%;top:-6px;width:1px;height:4px;background:var(--border)}
   .vmap-lab.axis{min-height:0}
   .vmap .vsec-head{margin-bottom:26px}
   @media (max-width:760px){
@@ -1046,7 +1215,7 @@
     .vmap-lab{font-size:12px}
   }
   /* 估值卡片网格 */
-  .vcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:12px}
+  .vcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:12px;align-items:start}
   .vcard{display:flex;flex-direction:column;border-radius:var(--r-lg);padding:20px 22px 16px;background:rgba(29,29,27,.035);transition:box-shadow .15s,background .15s}
   .vcard.on{background:#fff;box-shadow:0 0 0 2px var(--sun)}
   .vcard-head{display:flex;align-items:center;gap:8px}
@@ -1062,6 +1231,12 @@
   .vcard-mark{margin-left:auto;border:0;cursor:pointer;font-family:var(--font);font-size:12px;color:#8a4a17;background:rgba(240,140,46,.12);border-radius:var(--r-pill);padding:4px 11px}
   .vcard-mark:hover{background:rgba(240,140,46,.22)}
   .vcard-note{margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);font-size:12.5px;line-height:1.6;color:var(--ink-soft);white-space:pre-wrap;word-break:break-word}
+  .vcard-details{margin-top:14px;border-top:1px solid var(--border)}
+  .vcard-details > summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 0 0;cursor:pointer;list-style:none;font-size:12.5px;color:var(--ink-soft)}
+  .vcard-details > summary::-webkit-details-marker{display:none}
+  .vcard-details > summary::after{content:"+";font-size:18px;line-height:1;color:var(--ink-mute)}
+  .vcard-details[open] > summary::after{content:"−"}
+  .vcard-details > summary:focus-visible{outline:2px solid var(--sun-ink);outline-offset:4px;border-radius:3px}
   .vcard-thesis:empty{display:none}
   .vcard-thesis{display:grid;gap:12px;margin-top:16px;padding:16px;border-radius:var(--r-md);background:var(--surface-soft,#f7f6f2);font-size:12.5px;line-height:1.65;overflow-wrap:anywhere}
   .vcard-thesis strong{font-size:11px;font-weight:500;color:var(--ink-mute)}
@@ -1086,13 +1261,25 @@
   .vrev-stale{margin-top:8px;font-size:12px;color:#a4561a}
   .vrev-sum{margin-top:10px;font-size:13px;line-height:1.65;color:var(--ink)}
   .vrev-checks{margin-top:10px;display:flex;flex-direction:column}
-  .vrev-row{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px dashed var(--border)}
+  .vrev-row{display:grid;gap:9px;padding:16px 0;border-top:1px dashed var(--border)}
+  .vrev-row-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .vrev-state{font-size:11px;color:var(--ink-mute)}
+  .vrev-state.ok{color:var(--green)} .vrev-state.watch{color:#a4561a} .vrev-state.broken{color:var(--red)}
+  .vrev-data{display:grid;gap:6px;margin:0;padding:10px 12px;border-radius:var(--r-sm);background:var(--track);font-size:12px;line-height:1.65}
+  .vrev-data>div{display:grid;grid-template-columns:5em minmax(0,1fr);gap:8px}
+  .vrev-data dt{color:var(--ink-mute)} .vrev-data dd{margin:0;color:var(--ink);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+  .vrev-condition{margin:0;font-size:12px;line-height:1.7;color:var(--ink-soft)}
+  .vrev-note,.vrev-source{margin:0;font-size:11px;line-height:1.65;color:var(--ink-mute)}
+  .vrev-trend{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--ink-mute)}
+  .vrev-trend .ai-spark{margin-top:0}
+  .vrev.stale{background:var(--track);box-shadow:none}
+  .vrev-badge.stale{background:var(--card-solid);color:var(--ink-soft)}
   .vrev-dot{flex:none;width:8px;height:8px;margin-top:6px;border-radius:50%}
   .vrev-dot.ok{background:var(--green)} .vrev-dot.watch{background:#f08c2e} .vrev-dot.broken{background:var(--red)}
   .vrev-main{min-width:0;flex:1}
   .vrev-k{font-size:12.5px;color:var(--ink)}
   .vrev-v{margin-left:8px;font-size:11.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
-  .vrev-why{margin-top:2px;font-size:12px;line-height:1.55;color:var(--ink-soft)}
+  .vrev-why{margin:0;font-size:12px;line-height:1.55;color:var(--ink-soft)}
   .vrev-go{display:inline-flex;align-items:center;gap:4px;margin-top:10px;padding:0;border:0;background:none;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink);text-decoration:underline;text-underline-offset:2px}
   .vrev-err{margin-top:10px;font-size:12px;color:var(--red)}
   .vrev-err[hidden]{display:none}
@@ -1214,6 +1401,7 @@
   .cfg-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
   .cfg-name{font-size:17px;font-weight:500}
   /* AI 模型设置 */
+  .jev-settings [hidden]{display:none !important}
   .ai-intro{margin:0 0 12px}
   .ai-default{margin:4px 0 16px}
   .ai-default-sel{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:38px}
@@ -1262,11 +1450,14 @@
   <link rel="modulepreload" href="/shared/i18n.js">
   <link rel="modulepreload" href="/shared/langmenu.js">
   <link rel="modulepreload" href="/shared/feedback.js">
+  <link rel="modulepreload" href="/shared/global-ai.js">
   <link rel="modulepreload" href="/shared/feedback-core.js">
   <link rel="modulepreload" href="/shared/market.js">
   <link rel="modulepreload" href="/shared/metric-spark.js">
   <link rel="modulepreload" href="/shared/valuation-ui.js">
 <link rel="modulepreload" href="/shared/valuation/thesis.js">
+<link rel="modulepreload" href="/shared/valuation/review.js">
+<link rel="modulepreload" href="/shared/valuation/review-ui.js">
 <link rel="modulepreload" href="/shared/valuation/thesis-questions.js">
 <link rel="modulepreload" href="/shared/valuation/save.js">
 <link rel="modulepreload" href="/shared/valuation/editor-draft.js">
@@ -1283,6 +1474,16 @@
   <link rel="modulepreload" href="/shared/valuation/workbench.js">
   <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页，点击后几乎立即切换（Chrome 系浏览器支持，其他浏览器忽略） -->
   <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"},{"href_matches":"/macro"}]},"eagerness":"moderate"}]}</script>
+<link rel="modulepreload" href="/shared/jev-settings.js">
+<link rel="modulepreload" href="/shared/valuation/guide-audit.js">
+<link rel="modulepreload" href="/shared/valuation/guide-drivers.js">
+<link rel="modulepreload" href="/shared/valuation/guide-routing.js">
+<link rel="modulepreload" href="/shared/valuation/management-research-loader.js">
+<link rel="modulepreload" href="/shared/valuation/business-report.js">
+<link rel="modulepreload" href="/shared/valuation/business-report-ui.js">
+<link rel="modulepreload" href="/shared/valuation/management-research-ui.js">
+<link rel="modulepreload" href="/shared/valuation/management-research.js">
+<link rel="modulepreload" href="/shared/valuation/method-readiness.js">
 </head>
 <body class="booting">
 <div class="page">
@@ -1380,6 +1581,7 @@
     <div class="cfg-block" id="aiCfg">
       <div class="cfg-top"><span class="cfg-name" id="aiCfgName">AI 模型</span><span class="save-state" id="aiSave"></span></div>
       <div id="aiCfgBody"></div>
+      <div id="jevCfgBody" style="margin-top:20px"></div>
     </div>
     <!-- 数据：导出自选与估值卡（JSON 备份） -->
     <div class="cfg-block" id="dataCfg">
@@ -1439,6 +1641,9 @@
 
 
 <script type="module">
+import { mountJevSettings } from "/shared/jev-settings.js";
+import { reviewNeedsUpdate, reviewMode, scopeReviewFields, buildReviewEvidence } from "/shared/valuation/review.js";
+import { reviewElement } from "/shared/valuation/review-ui.js";
 import { Gauge } from "/shared/gauge.js";
 import { Bar } from "/shared/bar.js";
 import { verdictOf, structValid, hasFairRange, applyZoneColors, computeAnchors, priceToPhi, ZONES, marketLabel } from "/shared/core.js";
@@ -1446,11 +1651,12 @@ import { MKT_LABEL } from "/shared/market.js";
 import { t, applyI18n, LANG } from "/shared/i18n.js";
 import { mountLangMenu } from "/shared/langmenu.js";
 import { mountFeedback } from "/shared/feedback.js";
+import { mountGlobalAi, watchlistPage } from "/shared/global-ai.js";
 import { mountValuationCalc } from "/shared/valuation-ui.js";
 import { cleanThesis, thesisEntries, THESIS_SCENARIOS } from "/shared/valuation/thesis.js";
 import { persistValuation } from "/shared/valuation/save.js";
 import { MODELS, modeFields } from "/shared/valuation/index.js";
-import { verifiedFacts, latestMetrics, assumptionChecks, marketViews, masterLenses, businessFacts, isFinancialCompany } from "/shared/valuation/facts.js";
+import { verifiedFacts, latestMetrics, marketViews, masterLenses, businessFacts, isFinancialCompany } from "/shared/valuation/facts.js";
 import { aiErrorText } from "/shared/ai-panel.js";
 import { METRICS, metricKey, metricSeries, sparkGeom } from "/shared/metric-spark.js";
 import { holdingFor, driftText } from "/shared/holding.js";
@@ -1482,6 +1688,7 @@ const VMSGS = {
 // 语言切换（全站共用组件）：看板顶栏一个；详情页、估值工作台隐藏顶栏，各自在页头再挂一个
 mountLangMenu(document.getElementById("topActions")).id = "langMenu";
 mountFeedback(document.getElementById("topActions")); // 反馈入口（只对已登录用户显示）
+mountGlobalAi(document.getElementById("topActions"), { getPage: watchlistPage, extraHosts: ".vd-backrow-right, .ve-head-right" }); // 全站 AI 助手（⌘K；详情页、估值编辑页隐藏顶栏，按钮自动补到它们自己的右上角）
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 const ZONE_KEYS = ZONES.map((z) => z.key);
@@ -1721,13 +1928,14 @@ function latestAnnualEnd(financials) { // 年报 / 季报都适用：取最新�
 }
 // 最近一次「看过」这张卡的时间：编辑保存、AI 复核、手动「标记已复核」三者取最新 → { at: ISO, how: "edit"|"ai"|"mark" }
 function lastChecked(card) {
-  const c = [[card.updatedAt, "edit"], [card.review && card.review.at, "ai"], [card.reviewedAt, "mark"]]
+  const c = [[card.updatedAt, "edit"], [!reviewNeedsUpdate(card) && card.review && card.review.at, "ai"], [card.reviewedAt, "mark"]]
     .filter(([t]) => typeof t === "string" && Number.isFinite(Date.parse(t))).sort((a, b) => Date.parse(b[0]) - Date.parse(a[0]));
   return c.length ? { at: c[0][0], how: c[0][1] } : null;
 }
 function reviewReasonsFor(card, symbol) {
   const lc = card && lastChecked(card); if (!lc) return null;
   const at = Date.parse(lc.at), zh = LANG === "zh", out = [];
+  if (reviewNeedsUpdate(card)) out.push(zh ? "复核口径或假设已更新" : "Review method or assumptions changed");
   const months = Math.floor((Date.now() - at) / (30.44 * 86400000));
   if (Date.now() - at > REVIEW_DAYS * 86400000) out.push(zh ? `${months} 个月未复核` : `not reviewed for ${months} months`);
   const fp = cachedFp(symbol);
@@ -2266,7 +2474,7 @@ function trySubmitModal() {
   // 内在价值区间可选：两个都空 = 未估值，放行；只要填了一个就按完整区间校验
   if (c.fairLow > 0 || c.fairHigh > 0) {
     if (!(c.fairLow > 0)) flag("fairLow", t("m_err_low"));
-    else if (!(c.fairHigh > c.fairLow)) flag("fairHigh", t("m_err_high"));
+    else if (!(c.fairHigh > c.fairLow) && !(selectedCard(c)?.scenarioMode === "single" && c.fairHigh === c.fairLow)) flag("fairHigh", t("m_err_high"));
     if (!(c.mos > 0 && c.mos < 100)) flag("mos", t("m_err_mos"));
     if (!(c.ext > 0)) flag("ext", t("m_err_ext"));
   }
@@ -2331,6 +2539,7 @@ const viewValEdit = document.getElementById("viewValEdit");
 const pageHeadEl = document.querySelector(".page-head");
 const btnSettings = document.getElementById("btnSettings");
 let detailGauge = null, detailItem = null, detailGwrap = null, detailIdBlock = null, detailValRefresh = null, detailAddValuation = null;
+let detailGoFinancials = null;
 let detailGoFund = null; // 切到基本面 tab 并滚到某一分节（AI 结论旁的迷你图点击用）
 
 // ---------- 详情页「我的持仓」：资产页持仓表里这只股票的信息（数量、成本、盈亏、占比、目标偏离与建议、各账户） ----------
@@ -2555,6 +2764,7 @@ function renderDetail(item, initialTab = "val") {
     tabsNav.appendChild(b); panels.appendChild(p); tabEls.push(b); panelEls.push(p);
   });
   const panelOf = (kind) => panelEls[defs.findIndex((d) => d.kind === kind)];
+  detailGoFinancials = () => { tabEls[defs.findIndex((d) => d.kind === "fin")].click(); panelOf("fin").scrollIntoView({ block: "start", behavior: "auto" }); };
   detailGoFund = (sec) => {
     tabEls[defs.findIndex((d) => d.kind === "fund")].click();
     const p = panelOf("fund");
@@ -3087,7 +3297,7 @@ function assumeSummary(model, inputs) {
     const v = inputs[f.k]; if (!v || typeof v !== "object") return;
     const lab = (f.label && f.label[LANG]) || f.k;
     const unit = f.unit === "%" ? "%" : "";
-    parts.push(`${lab} ${v.c}–${v.o}${unit}`);
+    parts.push(`${lab} ${v.c === v.o ? v.c : `${v.c}–${v.o}`}${unit}`);
   });
   return parts.join(" · ");
 }
@@ -3208,7 +3418,7 @@ function renderValuationPanel(item, panel, idBlock) {
     panel.appendChild(list);
   }
 
-  // 估值区间对照图（football field）：线性价格轴，每张估值卡一行（低~高条），竖线标现价，虚线标击球线/泡沫线
+  // 估值区间对照图：线性价格轴，每张估值卡一行，竖线标现价，两端渐变表示击球区/泡沫区。
   function valuationMap(cards) {
     const c = item.cfg, zh = LANG === "zh", p = c.price;
     const valued = structValid(c);
@@ -3216,7 +3426,7 @@ function renderValuationPanel(item, panel, idBlock) {
     const pts = [p > 0 ? p : NaN, ...(valued ? [a[1], a[4]] : []), ...cards.flatMap((k) => [k.low, k.high])].filter((v) => Number.isFinite(v) && v > 0);
     const wrap = document.createElement("div"); wrap.className = "vmap";
     const title = document.createElement("div"); title.className = "vsec-head";
-    title.innerHTML = `<span class="vsec-title">${zh ? "估值区间对照" : "Valuation map"}</span>`;
+    title.innerHTML = `<span class="vsec-title">${zh ? "估值对照" : "Valuation map"}</span>`;
     wrap.appendChild(title);
     if (!pts.length) return wrap;
     let lo = Math.min(...pts), hi = Math.max(...pts);
@@ -3234,11 +3444,18 @@ function renderValuationPanel(item, panel, idBlock) {
       const model = MODELS.find((m) => m.key === k.method);
       const picked = c.selectedValuationId === k.id;
       const { l, tr } = row(model ? (model.label[LANG] || model.key) : k.method, picked ? "picked" : "");
-      if (picked) { const s = document.createElement("span"); s.className = "vmap-pick"; s.textContent = zh ? "合理区间" : "Fair range"; l.appendChild(s); }
+      const single = k.scenarioMode === "single" && k.low === k.high;
+      if (picked) { const s = document.createElement("span"); s.className = "vmap-pick"; s.textContent = zh ? "钟摆采用" : "In use"; s.title = zh ? "钟摆按这张卡的区间划分" : "The pendulum uses this card's range"; l.appendChild(s); }
       const x0 = X(Math.min(k.low, k.high)), x1 = X(Math.max(k.low, k.high));
+      if (single) {
+        const point = document.createElement("div"); point.className = "vmap-point" + (x0 < 20 ? " edge-start" : x0 > 80 ? " edge-end" : ""); point.style.left = x0 + "%";
+        const value = document.createElement("span"); value.className = "vmap-value"; value.textContent = (zh ? "合理价值 " : "Fair value ") + fmtPx(k.low);
+        point.appendChild(value); tr.appendChild(point); return;
+      }
       const bar = document.createElement("div"); bar.className = "vmap-bar"; bar.style.left = x0 + "%"; bar.style.width = Math.max(0.8, x1 - x0) + "%";
-      const e0 = document.createElement("span"); e0.className = "vmap-end lo"; e0.textContent = fmtPx(Math.min(k.low, k.high));
-      const e1 = document.createElement("span"); e1.className = "vmap-end hi"; e1.textContent = fmtPx(Math.max(k.low, k.high));
+      const near = (x) => p > 0 && Math.abs(X(p) - x) < 7 ? " near-now" : "";
+      const e0 = document.createElement("span"); e0.className = "vmap-end lo" + near(x0); e0.textContent = fmtPx(Math.min(k.low, k.high));
+      const e1 = document.createElement("span"); e1.className = "vmap-end hi" + near(x1); e1.textContent = fmtPx(Math.max(k.low, k.high));
       bar.append(e0, e1); tr.appendChild(bar);
     });
     // 现价竖线：每条轨道各画一段，上下伸进行间距里首尾相接；第一段顶上挂现价标签
@@ -3249,24 +3466,29 @@ function renderValuationPanel(item, panel, idBlock) {
         tr.appendChild(seg);
       });
     }
-    // 击球线 / 泡沫线：淡色参考竖线（取区间色），标签挂在最后一行下方；五个区间本身交给侧栏钟摆，这里不再重画
+    // 两端区域向图外延伸；渐变贴着阈值虚线最深、向外渐淡，虚线精确标出阈值。各行首尾相接。
     if (valued) {
       const tracks = [...grid.querySelectorAll(".vmap-track")];
-      [[a[1], ZONES[0].hex, zh ? "击球线" : "Strike"], [a[4], ZONES[ZONES.length - 1].hex, zh ? "泡沫线" : "Bubble"]].forEach(([v, col, lab]) => {
-        if (!(v > lo && v < hi)) return;
-        tracks.forEach((tr, i) => {
-          const seg = document.createElement("div"); seg.className = "vmap-ref"; seg.style.left = X(v) + "%"; seg.style.borderColor = col;
-          if (i === tracks.length - 1) { const tag = document.createElement("span"); tag.className = "vmap-ref-tag"; tag.style.color = col; tag.textContent = `${lab} ${fmtPx(v)}`; seg.appendChild(tag); }
-          tr.appendChild(seg);
+      const labels = document.createElement("div"); labels.className = "vmap-zone-labels";
+      [[a[1], ZONES[0].hex, "strike", zh ? "← 击球区" : "← Strike zone"], [a[4], ZONES[ZONES.length - 1].hex, "bubble", zh ? "泡沫区 →" : "Bubble zone →"]].forEach(([v, col, side, lab]) => {
+        tracks.forEach((tr) => {
+          const zone = document.createElement("div"); zone.className = "vmap-zone " + side;
+          zone.style.setProperty("--zone-color", col); zone.style.width = (side === "strike" ? X(v) : 100 - X(v)) + "%";
+          zone.setAttribute("aria-hidden", "true"); tr.prepend(zone);
         });
+        const label = document.createElement("div"); label.className = "vmap-zone-label"; label.style.color = col;
+        const name = document.createElement("strong"); name.textContent = lab;
+        const rule = document.createElement("span"); rule.textContent = (zh ? "价格 " : "Price ") + (side === "strike" ? "≤ " : "> ") + fmtPx(v);
+        label.append(name, rule); labels.appendChild(label);
       });
+      grid.appendChild(labels);
     }
     // 价格轴刻度
     const axL = document.createElement("div"); axL.className = "vmap-lab axis";
     const ax = document.createElement("div"); ax.className = "vmap-axis";
-    const step = niceStep((hi - lo) / 5);
-    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
-      const s = document.createElement("span"); s.style.left = X(v) + "%"; s.textContent = fmtPx(v); ax.appendChild(s);
+    const step = niceStep((hi - lo) / 5), digits = step >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(step) - 1e-9));
+    for (let i = Math.ceil(lo / step); i * step <= hi + 1e-9; i++) {
+      const v = i * step, s = document.createElement("span"); s.style.left = X(v) + "%"; s.textContent = v.toFixed(digits); ax.appendChild(s);
     }
     grid.append(axL, ax);
     wrap.appendChild(grid);
@@ -3296,14 +3518,14 @@ function renderValuationPanel(item, panel, idBlock) {
     const head = document.createElement("div"); head.className = "vcard-head";
     const name = document.createElement("span"); name.className = "vcard-method"; name.textContent = model ? (model.label[LANG] || model.key) : card.method;
     head.appendChild(name);
-    if (c.selectedValuationId === card.id) { const b = document.createElement("span"); b.className = "vcard-badge"; b.textContent = LANG === "zh" ? "合理区间" : "Fair range"; head.appendChild(b); }
+    if (c.selectedValuationId === card.id) { const b = document.createElement("span"); b.className = "vcard-badge"; b.textContent = card.scenarioMode === "single" ? (LANG === "zh" ? "合理价值" : "Fair value") : LANG === "zh" ? "合理区间" : "Fair range"; head.appendChild(b); }
     const range = document.createElement("div"); range.className = "vcard-range";
     // 低、高两个数各自缩小小数部分，中间破折号保持原样
     const rLo = document.createElement("span"), rHi = document.createElement("span");
     setNum(rLo, fmtPx(Math.min(card.low, card.high))); setNum(rHi, fmtPx(Math.max(card.low, card.high)));
-    range.append(rLo, " – ", rHi);
-    const sum = document.createElement("div"); sum.className = "vcard-assume"; sum.textContent = model ? assumeSummary(model, card.inputs) : "";
-    const vinfo = verdictOf({ ...c, fairLow: card.low, fairHigh: card.high }, VMSGS);
+    if (card.scenarioMode === "single") range.append(rLo); else range.append(rLo, " – ", rHi);
+    const sum = document.createElement("div"); sum.className = "vcard-assume"; sum.textContent = (card.scenarioMode === "single" ? (LANG === "zh" ? "单场景 · " : "Single case · ") : "") + (model ? assumeSummary(model, card.inputs) : "");
+    const vinfo = verdictOf({ ...c, fairLow: card.low, fairHigh: card.high, scenarioMode: card.scenarioMode }, VMSGS);
     const verd = document.createElement("div"); verd.className = "vcard-verdict " + vinfo.cls; verd.textContent = c.price > 0 ? vinfo.text : ""; if (!(c.price > 0)) verd.style.display = "none";
     const note = document.createElement("div"); note.className = "vcard-note"; note.textContent = card.note || ""; if (!card.note) note.style.display = "none";
     const thesis = cleanThesis(card.thesis);
@@ -3311,7 +3533,7 @@ function renderValuationPanel(item, panel, idBlock) {
     for (const scenario of [...THESIS_SCENARIOS, { key: "legacy", zh: "未分场景的旧记录", en: "Previous shared notes" }]) {
       const fields = thesis[scenario.key]; if (!fields) continue;
       const section = document.createElement("section"); section.className = "vcard-thesis-case";
-      const title = document.createElement("h4"); title.textContent = LANG === "zh" ? scenario.zh : scenario.en; section.append(title);
+      const title = document.createElement("h4"); title.textContent = card.scenarioMode === "single" && scenario.key === "c" ? (LANG === "zh" ? "主情景" : "Main case") : LANG === "zh" ? scenario.zh : scenario.en; section.append(title);
       for (const field of thesisEntries(fields, LANG)) {
         const row = document.createElement("div");
         const label = document.createElement("strong"); label.textContent = field.label;
@@ -3323,7 +3545,7 @@ function renderValuationPanel(item, panel, idBlock) {
     const actions = document.createElement("div"); actions.className = "vcard-actions";
     const picked = c.selectedValuationId === card.id;
     const sel = document.createElement("button"); sel.type = "button"; sel.className = "vcard-sel" + (picked ? " on" : "");
-    sel.textContent = picked ? (LANG === "zh" ? "取消选定" : "Unset") : (LANG === "zh" ? "设为合理区间" : "Set as fair range");
+    sel.textContent = picked ? (LANG === "zh" ? "取消选定" : "Unset") : card.scenarioMode === "single" ? (LANG === "zh" ? "设为合理价值" : "Set as fair value") : (LANG === "zh" ? "设为合理区间" : "Set as fair range");
     sel.title = picked ? (LANG === "zh" ? "点击取消选定" : "Click to unset") : "";
     sel.addEventListener("click", () => { (picked ? clearValuation : (i, b) => selectValuation(i, card, b))(item, idBlock); showList(); });
     const edit = document.createElement("button"); edit.type = "button"; edit.className = "vcard-edit"; edit.textContent = LANG === "zh" ? "编辑" : "Edit";
@@ -3351,14 +3573,19 @@ function renderValuationPanel(item, panel, idBlock) {
       const how = { edit: zh ? "编辑" : "edited", ai: zh ? "AI 复核" : "AI review", mark: zh ? "手动标记" : "marked" }[lc.how];
       chk.append(ri(due ? "error-warning-line" : "checkbox-circle-line"), document.createTextNode((zh ? `上次复核 ${when} · ${how}` : `Last reviewed ${when} · ${how}`) + (due ? (zh ? " · " : " · ") + due.join(zh ? "，" : ", ") : "")));
     }
-    if (due) {
+    if (due && !reviewNeedsUpdate(card)) {
       const mark = document.createElement("button"); mark.type = "button"; mark.className = "vcard-mark";
       mark.textContent = zh ? "标记已复核" : "Mark reviewed";
       mark.title = zh ? "看过了，假设仍成立，不需要改这张卡" : "Checked — the assumptions still hold, no edit needed";
       mark.addEventListener("click", () => { card.reviewedAt = new Date().toISOString(); saveItem(item); renderOverview(); showList(); });
       chk.appendChild(mark);
     }
-    wrap.append(head, range, verd, sum, story, note);
+    const details = document.createElement("details"); details.className = "vcard-details";
+    const detailLabel = document.createElement("summary");
+    detailLabel.textContent = zh ? (story.childElementCount ? "叙事与参数" : "参数与备注") : (story.childElementCount ? "Narrative & assumptions" : "Assumptions & notes");
+    details.append(detailLabel, sum, story, note);
+    wrap.append(head, range, verd);
+    if (sum.textContent || story.childElementCount || card.note) wrap.appendChild(details);
     if (lc) wrap.appendChild(chk);
     if (card.review) wrap.appendChild(reviewEl(card, model));
     wrap.append(revErr, actions);
@@ -3372,10 +3599,6 @@ function renderValuationPanel(item, panel, idBlock) {
     return { k: f.k, label: (f.label && f.label[LANG]) || f.k, col: f.col, unit: f.unit || "", meta: f.meta || "", money: REV_MONEY.has(f.meta),
       value: f.col === "dual" ? { c: n(v && v.c), o: n(v && v.o) } : n(v) };
   });
-  const revVal = (f) => {
-    const one = (x) => (x === null || x === undefined ? "—" : f.money ? (x < 0 ? "−" : "") + fmtBig(Math.abs(x), "") : String(Math.round(x * 100) / 100)) + (x !== null && x !== undefined && f.unit === "%" ? "%" : "");
-    return f.col === "dual" ? `${one(f.value.c)} / ${one(f.value.o)}` : one(f.value);
-  };
   async function runReview(card, btn, errEl) {
     const model = MODELS.find((m) => m.key === card.method); if (!model) return;
     btn.disabled = true; btn.classList.add("busy");
@@ -3385,13 +3608,15 @@ function renderValuationPanel(item, panel, idBlock) {
       const [annual, quarter, research] = await Promise.all([loadFinancials(item, "annual"), loadFinancials(item, "quarter"),
         fetch("/api/research?symbol=" + encodeURIComponent(item.cfg.symbol || "")).then((r) => r.json()).then((j) => j.research).catch(() => null)]);
       const c = item.cfg, st = item.statics || {};
-      const fields = revFields(model, card.inputs);
+      const scenarioMode = reviewMode(card);
+      const fields = scopeReviewFields(revFields(model, card.inputs), scenarioMode);
+      const evidence = buildReviewEvidence({ fields, scenarioMode, financials: annual?.financials, valuationRefs: annual?.valuationRefs, dividends: annual?.dividends, financialsSource: annual?.financialsSource, lang: LANG });
       const body = {
-        lang: LANG,
+        lang: LANG, scenarioMode, evidence,
         stock: { name: displayName(item), code: (c.ticker || "").toUpperCase(), currency: st.currency || "", price: c.price > 0 ? c.price : null },
         method: { key: model.key, label: model.label[LANG] || model.key },
         valuedAt: card.updatedAt || "",
-        thesis: cleanThesis(card.thesis),
+        thesis: scenarioMode === "single" ? cleanThesis({ c: card.thesis?.c, legacy: card.thesis?.legacy }) : cleanThesis(card.thesis),
         fields,
         result: { low: Math.min(card.low, card.high), high: Math.max(card.low, card.high), price: c.price || null },
         verified: verifiedFacts({ financials: annual && annual.financials, dividends: annual && annual.dividends, dps: parseFloat(st.dividendYield), financial: isFinancialCompany(research), lang: LANG }),
@@ -3399,8 +3624,7 @@ function renderValuationPanel(item, panel, idBlock) {
         market: marketViews({ research, financials: annual && annual.financials, price: item.cfg.price, market: (item.cfg.symbol || "").slice(0, 2), lang: LANG }),
         lenses: masterLenses({ financials: annual && annual.financials, research, price: item.cfg.price, eps: parseFloat(st.epsTtm), bps: parseFloat(st.bps), lang: LANG }),
         business: businessFacts({ research, lang: LANG }),
-        // 假设 vs 最新实际的位置由前端算好（开源模型比数字常出错），AI 只负责解释
-        comparisons: assumptionChecks({ fields, financials: annual && annual.financials, financialsQ: quarter && quarter.financials, valuationRefs: annual && annual.valuationRefs, dividends: annual && annual.dividends, lang: LANG }),
+        // Comparable values, periods and source names are captured with the review.
       };
       const r = await fetch("/api/my/ai/review", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({}));
@@ -3418,48 +3642,15 @@ function renderValuationPanel(item, panel, idBlock) {
   }
   // 复核结果：总体结论徽章 + 一句总结 + 逐项假设（状态点 · 名称 · 当初的值 · 依据），可去调整假设
   function reviewEl(card, model) {
-    const r = card.review, zh = LANG === "zh";
-    const OV = { hold: [zh ? "假设成立" : "Holds", "checkbox-circle-fill"], watch: [zh ? "需关注" : "Watch", "error-warning-fill"], broken: [zh ? "已不成立" : "Broken", "close-circle-fill"] };
-    const ST = { ok: zh ? "成立" : "OK", watch: zh ? "需关注" : "Watch", broken: zh ? "不成立" : "Broken" };
-    const box = document.createElement("div"); box.className = "vrev " + r.overall;
-    const top = document.createElement("div"); top.className = "vrev-top";
-    const badge = document.createElement("span"); badge.className = "vrev-badge " + r.overall; badge.append(ri(OV[r.overall][1]), document.createTextNode(OV[r.overall][0]));
-    const when = document.createElement("span"); when.className = "vrev-when"; when.textContent = (zh ? "AI 复核 · " : "AI review · ") + (r.at ? r.at.slice(0, 10) : "");
-    top.append(badge, when);
-    box.appendChild(top);
-    if (card.updatedAt && r.at && card.updatedAt > r.at) {
-      const stale = document.createElement("div"); stale.className = "vrev-stale"; stale.textContent = zh ? "复核之后改过假设，结论可能已过期，可以重新复核。" : "Assumptions changed after this review; re-run it.";
-      box.appendChild(stale);
-    }
-    if (r.summary) { const p = document.createElement("div"); p.className = "vrev-sum"; p.textContent = r.summary; box.appendChild(p); }
-    const fields = model ? new Map(revFields(model, card.inputs).map((f) => [f.k, f])) : new Map();
-    if (r.checks && r.checks.length) {
-      const list = document.createElement("div"); list.className = "vrev-checks";
-      for (const ck of r.checks) {
-        const f = fields.get(ck.k);
-        const row = document.createElement("div"); row.className = "vrev-row";
-        const dot = document.createElement("span"); dot.className = "vrev-dot " + ck.status; dot.title = ST[ck.status];
-        const main = document.createElement("div"); main.className = "vrev-main";
-        const k = document.createElement("div"); k.className = "vrev-k";
-        k.append(document.createTextNode(f ? f.label : ck.k));
-        if (f) { const v = document.createElement("span"); v.className = "vrev-v"; v.textContent = (zh ? "当初 " : "was ") + revVal(f); k.appendChild(v); }
-        const why = document.createElement("div"); why.className = "vrev-why"; why.textContent = ck.reason || ST[ck.status];
-        main.append(k, why);
-        row.append(dot, main);
-        if (metricKey(ck.metric)) loadFinancials(item, "annual").then((a) => {
-          const sp = aiSparkEl(ck.metric, a && a.financials, a && a.dividends, (item.statics && item.statics.currency) || ""); if (sp) row.appendChild(sp);
-        });
-        list.appendChild(row);
-      }
-      box.appendChild(list);
-    }
-    if (r.overall !== "hold") {
-      const go = document.createElement("button"); go.type = "button"; go.className = "vrev-go";
-      go.append(document.createTextNode(zh ? "去调整假设" : "Adjust assumptions"), ri("arrow-right-line"));
-      go.addEventListener("click", () => showEditor(card));
-      box.appendChild(go);
-    }
-    return box;
+    return reviewElement(card, { fields: model ? revFields(model, card.inputs) : [], lang: LANG,
+      onEdit: () => showEditor(card), onFinancials: () => detailGoFinancials?.(),
+      loadTrend: async (metric) => {
+        const a = await loadFinancials(item, "annual"), series = metricSeries(metric, a?.financials, a?.dividends);
+        const element = aiSparkEl(metric, a?.financials, a?.dividends, item.statics?.currency || "");
+        const m = METRICS[metric];
+        return { element, label: `${m ? (LANG === "zh" ? m.zh : m.en) : metric} · FY${series[0]?.year || "—"}–FY${series.at(-1)?.year || "—"} · ${LANG === "zh" ? "年度趋势" : "Annual trend"}` };
+      },
+    });
   }
 
   // 打开全屏双栏编辑器视图（添加/编辑卡片）
@@ -3490,6 +3681,8 @@ function renderValuationPanel(item, panel, idBlock) {
       initialSegments: card ? card.segments : undefined,
       initialNote: card ? card.note : undefined,
       initialThesis: card ? card.thesis : undefined,
+      initialScenarioMode: card?.scenarioMode,
+      initialManagementResearch: card?.managementResearch,
       draftKey: `${greetName}:${boardSlug}:${item.cfg.symbol}:${card?.id || "new"}`,
       initialUpdatedAt: card?.updatedAt || "",
       loadGuideData: async () => { const annual = await loadFinancials(item, "annual"); return { financials: annual?.financials || null, dividends: annual?.dividends || null }; },
@@ -3500,7 +3693,7 @@ function renderValuationPanel(item, panel, idBlock) {
         dividends: (item._financials && item._financials.annual && item._financials.annual.dividends) || null,
         sources: valuationSources(item, LANG),
       },
-      verdict: (low, high) => { const vv = verdictOf({ ...item.cfg, fairLow: low, fairHigh: high }, VMSGS); return { text: vv.text, cls: vv.cls }; },
+      verdict: (low, high) => { const vv = verdictOf({ ...item.cfg, fairLow: low, fairHigh: high, ...(low === high ? { scenarioMode: "single" } : {}) }, VMSGS); return { text: vv.text, cls: vv.cls }; },
       stock: editorStock(item),
       onCancel: () => finishValEdit(),
       onDone: async (value) => {
@@ -3529,10 +3722,10 @@ function editorStock(item) {
     mountLogo: (el) => mountLogo(el, item),
     rows: [
       [t("d_market_cap"), c.price > 0 && shares ? money(c.price * shares) : "—"],
-      [t("d_shares"), shares ? fmtBig(shares, cur) : "—"],
-      [t("d_eps_ttm"), Number.isFinite(eps) ? eps.toFixed(2) : "—"],
-      [zh ? "每股净资产" : "Book value / share", Number.isFinite(bps) ? bps.toFixed(2) : "—"],
-      [zh ? "净负债" : "Net debt", money(latest.netDebt)],
+      [t("d_shares"), shares ? fmtBig(shares, cur) + (zh ? " 股" : " shares") : (zh ? "暂无数据" : "Unavailable")],
+      [t("d_eps_ttm"), Number.isFinite(eps) ? eps.toFixed(2) + (cur ? " " + cur : "") + (zh ? "/股" : "/share") : (zh ? "暂无数据" : "Unavailable")],
+      [zh ? "每股净资产" : "Book value / share", Number.isFinite(bps) ? bps.toFixed(2) + (cur ? " " + cur : "") + (zh ? "/股" : "/share") : (zh ? "暂无数据" : "Unavailable")],
+      [zh ? "净负债" : "Net debt", Number.isFinite(latest.netDebt) ? money(latest.netDebt) + (Number.isFinite(latest.year) ? ` (${latest.year})` : (zh ? "（报告期待补）" : " (period unavailable)")) : (zh ? "暂无数据" : "Unavailable")],
     ],
   };
 }
@@ -3891,6 +4084,7 @@ async function initAiSettings() {
 
 function initOwner(settings) {
   initAiSettings();
+  mountJevSettings(document.getElementById("jevCfgBody"), LANG);
   const zh = LANG === "zh";
   document.getElementById("defCfgName").textContent = zh ? "估值默认值" : "Valuation defaults";
   document.getElementById("defMosLab").textContent = zh ? "安全边际 %" : "Margin of safety %";

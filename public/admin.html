@@ -33,6 +33,7 @@
 </head>
 <body>
 <div class="page">
+  <div class="page-corner" id="corner"></div>
   <!-- 登录门 -->
   <div class="login-gate" id="gate">
     <h2>配置后台登录</h2>
@@ -99,6 +100,8 @@
 import { Gauge } from "/shared/gauge.js";
 import { verdictOf, structValid, applyZoneColors, ZONES, DEFAULT_ZONE_COLORS } from "/shared/core.js";
 import { MKT_LABEL } from "/shared/market.js";
+import { mountGlobalAi } from "/shared/global-ai.js";
+mountGlobalAi(document.getElementById("corner"), { getPage: () => ({ kind: "other", path: location.pathname, title: document.title }) }); // 全站 AI 助手（只对已登录用户显示）
 
 const REDUCE = window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 const chartsEl = document.getElementById("charts");

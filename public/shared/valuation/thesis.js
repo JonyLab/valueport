@@ -6,9 +6,9 @@ export const THESIS_SCENARIOS = [
 ];
 export const THESIS_FIELDS = [
   { key: "story", step: 1, zh: "核心判断", en: "Business thesis", placeholderZh: "先描述生意：产品、客户、管理层与竞争会如何变化？本场景成立需要什么前提？", placeholderEn: "Start with the business: products, customers, management and competition. What makes this case possible?" },
-  { key: "assessment", step: 2, zh: "故事检验", en: "Test the story", placeholderZh: "常识、历史与竞争格局支持这个故事吗？哪些证据相反，哪些仍待核实？", placeholderEn: "Do history, competition and common sense support this case? What contradicts it or remains unverified?" },
-  { key: "drivers", step: 3, zh: "关键假设", en: "Key assumptions", placeholderZh: "把故事翻译成增长、利润率、再投资和风险的方向；量化后补充取值依据。", placeholderEn: "Translate the story into growth, margins, reinvestment and risk. Add numerical assumptions once justified." },
-  { key: "signals", step: 5, zh: "验证条件", en: "What to watch", placeholderZh: "跟踪哪些经营指标？什么变化会让你先修正故事，再更新数字？", placeholderEn: "What will you track? What changes would make you revise the story and then update the numbers?" },
+  { key: "assessment", step: 2, zh: "叙事检验", en: "Test the story", placeholderZh: "常识、历史与竞争格局支持这个叙事吗？哪些证据相反，哪些仍待核实？", placeholderEn: "Do history, competition and common sense support this case? What contradicts it or remains unverified?" },
+  { key: "drivers", step: 3, zh: "关键假设", en: "Key assumptions", placeholderZh: "把叙事翻译成增长、利润率、再投资和风险的方向；量化后补充取值依据。", placeholderEn: "Translate the story into growth, margins, reinvestment and risk. Add numerical assumptions once justified." },
+  { key: "signals", step: 5, zh: "验证条件", en: "What to watch", placeholderZh: "跟踪哪些经营指标？什么变化会让你先修正叙事，再更新数字？", placeholderEn: "What will you track? What changes would make you revise the story and then update the numbers?" },
 ];
 
 export const THESIS_RESEARCH_FIELDS = [
@@ -50,7 +50,7 @@ export function impactParameterHint(key, fields, modelKey, lang = "zh") {
   return zh ? "当前方法没有直接对应的参数；保留这条判断，检查方法是否能表达它，不必硬塞进某个数字。" : "This method has no direct input for this topic. Keep the judgment and consider whether another method represents it better.";
 }
 
-// 参数旁的提示：这个参数对应故事里的哪项影响，两个场景各自判断的方向和原因。只复述用户的判断，不推算数值。
+// 参数旁的提示：这个参数对应叙事里的哪项影响，两个场景各自判断的方向和原因。只复述用户的判断，不推算数值。
 export function fieldStoryHint(meta, thesis, lang = "zh") {
   const impact = THESIS_IMPACTS.find((item) => item.metas.includes(meta));
   if (!impact) return null;
@@ -62,7 +62,7 @@ export function fieldStoryHint(meta, thesis, lang = "zh") {
     parts.push(`${zh ? scenario.zh : scenario.en} ${impactDirection(impact.key, item.direction, lang).toLowerCase()}${reason}`);
   }
   if (!parts.length) return null;
-  return (zh ? `你的故事：${impact.zh} — ` : `Your story: ${impact.en} — `) + parts.join(zh ? "；" : "; ");
+  return (zh ? `你的叙事：${impact.zh} — ` : `Your story: ${impact.en} — `) + parts.join(zh ? "；" : "; ");
 }
 
 function cleanFields(raw) {

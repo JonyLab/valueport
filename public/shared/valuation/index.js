@@ -64,6 +64,19 @@ export function modeFields(model, mode) {
  * @param {Object} ctx    { price, epsTtm, bps, shares, dividendYield }
  * @returns {{low:Number|null, high:Number|null}}
  */
+export function runScenario(model, form, ctx, scenario) {
+  if (!["c", "o"].includes(scenario)) return null;
+  if (typeof model.run === "function") {
+    const result = model.run(form, ctx);
+    return safe(scenario === "c" ? result?.low : result?.high);
+  }
+  const values = {};
+  const fields = model.modes ? modeFields(model, form._mode || model.defaultMode) : model.fields;
+  for (const field of fields) values[field.k] = field.col === "dual" ? form[field.k]?.[scenario] : form[field.k];
+  if (model.modes) values._mode = form._mode || model.defaultMode;
+  try { return safe(model.compute(values, ctx)); } catch { return null; }
+}
+
 export function runModel(model, form, ctx) {
   // 自跑型模型（如 NAV/SOTP：每资产各自增速、求和后取区间）自带 run()，跳过通用 cons/opt 拆分。
   if (typeof model.run === "function") return model.run(form, ctx) || { low: null, high: null };

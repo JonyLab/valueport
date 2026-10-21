@@ -29,6 +29,7 @@ export function computeAnchors(cfg) {
 export function priceToPhi(anchors, p) {
   const [, t1, t2, t3, t4] = anchors;
   if (!(p > 0)) return 0;
+  if (t2 === t3 && p === t2) return SEG * 2.5;
   if (p <= t1) return SEG * (p / t1);
   if (p <= t2) return SEG + SEG * (p - t1) / (t2 - t1);
   if (p <= t3) return SEG * 2 + SEG * (p - t2) / (t3 - t2);
@@ -38,7 +39,8 @@ export function priceToPhi(anchors, p) {
 
 // 是否已设定内在价值区间（低<高）。未设定时钟摆改为占位态。
 export function hasFairRange(c) {
-  return c.fairLow > 0 && c.fairHigh > c.fairLow;
+  const point = c.scenarioMode === "single" || c.valuations?.some((v) => v.id === c.selectedValuationId && v.scenarioMode === "single" && Math.abs(v.low - c.fairLow) <= 0.0051 && Math.abs(v.high - c.fairHigh) <= 0.0051);
+  return c.fairLow > 0 && (c.fairHigh > c.fairLow || (!!point && c.fairHigh === c.fairLow));
 }
 
 export function structValid(c) {
@@ -59,7 +61,7 @@ export const VERDICT_MSGS_ZH = {
 export function verdictOf(cfg, msgs = VERDICT_MSGS_ZH) {
   if (!cfg.symbol) return { cls: "v-fair", text: msgs.noSymbol, px: msgs.pxNone };
   if (!(cfg.price > 0)) return { cls: "v-fair", text: msgs.waiting, px: msgs.pxNone };
-  if (!(cfg.fairLow > 0) || !(cfg.fairHigh > cfg.fairLow))
+  if (!hasFairRange(cfg))
     return { cls: "v-fair", text: "—", px: msgs.px(cfg.price) };
   if (cfg.price < cfg.fairLow) {
     const pct = (cfg.fairLow - cfg.price) / cfg.fairLow * 100;
