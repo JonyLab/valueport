@@ -25,7 +25,7 @@ const TX = {
     quick: ["帮我给出一套完整的保守 / 乐观假设", "看看我现在的假设是否合理", "折现率 / WACC 该取多少？"],
     more: ["保守和乐观之间差多大比较合适？", "这家公司最大的风险是什么？", "和同行比，现在的估值贵不贵？", "哪个假设对结论影响最大？", "这个估值方法适合这家公司吗？", "当前价格隐含了多少增长？"],
     fieldQ: (f) => `「${f}」该取多少？`, sugHint: "↑↓ 选择 · Enter 发送 · Tab 填入", sugBtn: "常用问题",
-    thinking: "思考中…", copy: "复制", copied: "已复制", copyFail: "复制失败，可以手动选中文字复制", retry: "重试", suggest: "建议参数", field: "字段", now: "当前", next: "建议", apply: "应用到表单", applied: "已应用", undo: "撤销",
+    stop: "停止生成", stopped: "已停止生成", thinking: "思考中…", copy: "复制", copied: "已复制", copyFail: "复制失败，可以手动选中文字复制", retry: "重试", suggest: "建议参数", field: "字段", now: "当前", next: "建议", apply: "应用到表单", applied: "已应用", undo: "撤销",
     cons: "保守", opt: "乐观", scenC: "保守情景", scenO: "乐观情景", scenDrivers: "关键假设", scenBreaks: "可能错在哪", scenSignals: "跟踪信号", err: "AI 暂时不可用", limit: "今天的 AI 对话次数已用完，明天再来", clear: "新对话", hist: "历史对话", histEmpty: "这只股票还没有保存的对话", histDel: "删除这条对话", histDelQ: "删除这条对话？", untitled: "（无标题）", cur: "当前",
     disclaimer: "AI 建议仅供参考，不构成投资建议",
     risk: "AI 的回答可能出错。它不是持牌投资顾问，以上内容仅供参考，不构成投资建议；数字和结论请自己核实，不要盲目照做。",
@@ -37,7 +37,7 @@ const TX = {
     quick: ["Suggest a full set of conservative / optimistic assumptions", "Are my current assumptions reasonable?", "What discount rate / WACC should I use?"],
     more: ["How far apart should the conservative and optimistic cases be?", "What's the biggest risk for this company?", "Is it expensive compared with peers?", "Which assumption moves the result most?", "Does this method suit this company?", "How much growth does today's price imply?"],
     fieldQ: (f) => `What should "${f}" be?`, sugHint: "↑↓ choose · Enter send · Tab fill in", sugBtn: "Suggested questions",
-    thinking: "Thinking…", copy: "Copy", copied: "Copied", copyFail: "Couldn't copy — select the text to copy it", retry: "Retry", suggest: "Suggested inputs", field: "Field", now: "Now", next: "Suggested", apply: "Apply to form", applied: "Applied", undo: "Undo",
+    stop: "Stop generating", stopped: "Generation stopped", thinking: "Thinking…", copy: "Copy", copied: "Copied", copyFail: "Couldn't copy — select the text to copy it", retry: "Retry", suggest: "Suggested inputs", field: "Field", now: "Now", next: "Suggested", apply: "Apply to form", applied: "Applied", undo: "Undo",
     cons: "Cons.", opt: "Opt.", scenC: "Conservative case", scenO: "Optimistic case", scenDrivers: "Key assumptions", scenBreaks: "Where it could be wrong", scenSignals: "Signals to watch", err: "AI is unavailable right now", limit: "Daily AI limit reached — try again tomorrow", clear: "New chat", hist: "Chat history", histEmpty: "No saved chats for this stock yet", histDel: "Delete this chat", histDelQ: "Delete this chat?", untitled: "(untitled)", cur: "Current",
     disclaimer: "AI suggestions are for reference only, not investment advice",
     risk: "AI can be wrong. It is not a licensed financial adviser — treat this as reference only, not investment advice. Check the numbers and conclusions yourself; don't follow it blindly.",
@@ -49,6 +49,9 @@ const TX = {
 // 和「个人每天次数用完」，两种都提示可以配置自己的模型（不受限制）
 export function aiErrorText(status, j, lang) {
   const zh = lang !== "en", e = j && j.error;
+  if (e === "search_not_configured") return zh ? "联网搜索暂未配置" : "Web search is not configured";
+  if (e === "search_company_required") return zh ? "缺少公司名称或代码，无法搜索" : "A company name or ticker is required for search";
+  if (e === "search_timeout" || e === "search_failed") return zh ? "联网搜索失败，请重试或关闭搜索后发送" : "Search failed. Retry or turn off web search.";
   if (e === "site_quota") return zh ? "站点的免费 AI 额度今天已用完（全站共用），北京时间早上 8 点恢复；也可以在「设置 → AI 模型」里配置自己的模型，不受这个限制"
     : "The site's free AI allowance is used up for today (shared by everyone); it resets at 00:00 UTC. Add your own model under Settings → AI models to skip this limit";
   if (e === "daily_limit" || status === 429) return zh ? "你今天的 AI 次数已用完，明天再来；在「设置 → AI 模型」里配置自己的模型可不受限制"
@@ -64,10 +67,25 @@ export function aiErrorText(status, j, lang) {
   return zh ? "AI 暂时没有响应，可能是服务繁忙，请稍后再试" : "The AI didn't respond. It may be busy; please try again shortly";
 }
 
+// History is user-editable data too: validate links on both new replies and restoration.
+export function normalizeResearch(value) {
+  if (!value || !["ok", "empty"].includes(value.status) || !Array.isArray(value.sources)) return null;
+  const sources = [];
+  for (const s of value.sources.slice(0, 5)) {
+    try {
+      const u = new URL(s.url);
+      if (u.protocol !== "https:" || u.username || u.password || u.href.length > 1200 || !Number.isInteger(s.id) || s.id < 1 || s.id > 5) continue;
+      sources.push({ id: s.id, url: u.href, title: typeof s.title === "string" ? s.title.slice(0, 200) : u.hostname,
+        publishedAt: typeof s.publishedAt === "string" ? s.publishedAt.slice(0, 80) : null });
+    } catch { /* Ignore unsafe links in old or edited history. */ }
+  }
+  return { status: sources.length ? "ok" : "empty", searchedAt: typeof value.searchedAt === "string" ? value.searchedAt.slice(0, 80) : "", sources };
+}
+
 export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField, widgets: wx, checkParams, chatKey }) {
   const T = TX[lang] || TX.zh;
   const history = []; // { role, content } —— 发给后端的对话（不含建议卡）
-  let busy = false;
+  let busy = false, activeRequest = null;
 
   const panel = el("aside", "vc-ai");
   panel.hidden = true;
@@ -115,7 +133,16 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     manage.href = slug ? `/b/${slug}#ai` : "#"; manage.target = "_blank"; manage.rel = "noopener"; // 新标签打开设置，不打断正在编辑的估值
     modelMenu.appendChild(manage);
   }
-  const loadModels = () => fetch("/api/my/ai/models").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) { models = j; drawModels(); } }).catch(() => {});
+  const loadModels = () => fetch("/api/my/ai/models").then((r) => (r.ok ? r.json() : null)).then((j) => {
+    if (j) {
+      models = j; drawModels();
+      searchBtn.disabled = !j.webSearchAvailable;
+      searchBtn.title = j.webSearchAvailable
+        ? (lang === "zh" ? "仅搜索公司公开资料" : "Search public company information only")
+        : (lang === "zh" ? "联网搜索暂未配置" : "Web search is not configured");
+      if (!j.webSearchAvailable) { useSearch = false; searchBtn.setAttribute("aria-pressed", "false"); }
+    }
+  }).catch(() => {});
   loadModels();
   modelBtn.addEventListener("click", (e) => { e.stopPropagation(); if (!models) return; if (modelMenu.hidden) loadModels(); modelMenu.hidden = !modelMenu.hidden; });
   document.addEventListener("click", (e) => { if (!modelWrap.contains(e.target)) modelMenu.hidden = true; });
@@ -132,6 +159,11 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   log.setAttribute("aria-live", "polite");
 
   const foot = el("form", "vc-ai-foot");
+  let useSearch = false;
+  const searchBtn = el("button", "vc-ai-search"); searchBtn.type = "button"; searchBtn.disabled = true;
+  searchBtn.setAttribute("aria-pressed", "false");
+  searchBtn.append(ri("global-line"), document.createTextNode(lang === "zh" ? "联网搜索" : "Web search"));
+  searchBtn.addEventListener("click", () => { if (busy) return; useSearch = !useSearch; searchBtn.setAttribute("aria-pressed", String(useSearch)); });
   const input = el("textarea", "vc-ai-input"); input.rows = 1; input.placeholder = T.ph; input.maxLength = 2000;
   const sendBtn = el("button", "vc-ai-send"); sendBtn.type = "submit"; sendBtn.setAttribute("aria-label", T.send); sendBtn.appendChild(ri("arrow-up-line"));
   // 常用问题：默认收起，点输入框左边的灯泡才展开；展开时输入会按关键字过滤
@@ -140,7 +172,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   const box = el("div", "vc-ai-box"); box.append(sugToggle, input, sendBtn);
   // 预设问题建议：输入框聚焦时在上方弹出；空着时列常用问题，输入后按关键字过滤；问题里也带上当前方法的字段
   const sug = el("div", "vc-ai-sug"); sug.hidden = true; sug.setAttribute("role", "listbox");
-  foot.append(sug, box, el("div", "vc-ai-disclaimer", T.disclaimer));
+  foot.append(sug, searchBtn, box, el("div", "vc-ai-disclaimer", T.disclaimer));
 
   panel.append(head, log, foot);
   host.appendChild(panel);
@@ -216,6 +248,8 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       }
       parts.push(lines.join("\n"));
     }
+    const research = normalizeResearch(j.research);
+    if (research?.sources.length) parts.push((lang === "zh" ? "搜索来源（摘要待核实）：" : "Search sources (excerpts need verification):") + "\n" + research.sources.map((s) => `[${s.id}] ${s.title}${s.publishedAt ? " · " + s.publishedAt : ""}\n${s.url}`).join("\n"));
     parts.push("—— " + T.risk); // 复制出去也带上风险提示
     return parts.join("\n\n");
   }
@@ -374,6 +408,24 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     const reply = view.reply || (view.params || extra.length ? "" : "…");
     const m = bubble("ai", reply);
     if (!reply) m.querySelector(".vc-ai-bubble").remove();
+    const research = normalizeResearch(view.research);
+    if (research) {
+      const sources = el("div", "vc-ai-sources");
+      sources.appendChild(el("div", "vc-ai-source-title", research.status === "empty"
+        ? (lang === "zh" ? "未找到相关公开资料" : "No relevant public sources found")
+        : (lang === "zh" ? "搜索来源 · 摘要待核实" : "Search sources · verify excerpts")));
+      if (research.searchedAt) {
+        const date = new Date(research.searchedAt);
+        if (!isNaN(date)) sources.appendChild(el("div", "vc-ai-source-date", (lang === "zh" ? "检索于 " : "Searched ") + date.toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US")));
+      }
+      for (const s of research.sources) {
+        const row = el("div", "vc-ai-source"), link = el("a", "", `[${s.id}] ${s.title}`);
+        link.href = s.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+        row.append(link, el("span", "vc-ai-source-date", `${new URL(s.url).hostname} · ${s.publishedAt || (lang === "zh" ? "发布日期未提供" : "Publication date unavailable")}`));
+        sources.appendChild(row);
+      }
+      m.appendChild(sources);
+    }
     if (view.params) m.appendChild(suggestionCard(view.params, view.reasons, fields, view.scenarios));
     for (const node of extra) m.appendChild(node);
     // 每条 AI 回复底部一条醒目的风险提示：可能出错、不是持牌顾问、只能参考
@@ -388,7 +440,10 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     const tail = {};
     if (view.params) tail.params = view.params;
     if (view.widgets && view.widgets.length) tail.widgets = view.widgets;
-    return reply + (Object.keys(tail).length ? "\n" + JSON.stringify(tail) : "");
+    const research = normalizeResearch(view.research);
+    if (research) tail.previousSearch = { searchedAt: research.searchedAt,
+      sources: research.sources.map(({ id, title, publishedAt }) => ({ id, title, publishedAt })) };
+    return (reply + (Object.keys(tail).length ? "\n" + JSON.stringify(tail) : "")).slice(0, 4000);
   }
 
   // ── 对话记录：每次问答成功后存到服务端（按标的），面板第一次打开时恢复最近一次 ──
@@ -458,35 +513,79 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   histBtn.addEventListener("click", (e) => { e.stopPropagation(); const show = histMenu.hidden; histMenu.hidden = !show; if (show) drawHistory(); });
   document.addEventListener("click", (e) => { if (!histWrap.contains(e.target)) histMenu.hidden = true; });
 
+  function setBusy(value) {
+    busy = value;
+    sendBtn.setAttribute("aria-label", value ? T.stop : T.send);
+    sendBtn.title = value ? T.stop : T.send;
+    sendBtn.replaceChildren(ri(value ? "stop-fill" : "arrow-up-line"));
+    log.setAttribute("aria-busy", String(value));
+  }
+  function stop() { activeRequest?.stop(); }
+
   async function send(text) {
     text = (text || "").trim();
     if (!text || busy) return;
     let context;
     try { context = getContext(); } catch { context = null; }
     if (!context || !context.fields || !context.fields.length) return;
-    busy = true; sendBtn.disabled = true;
+    const controller = new AbortController();
+    const request = { stop: null };
+    activeRequest = request;
+    setBusy(true);
     input.value = ""; autosize();
     const um = userMsg(text);
     history.push({ role: "user", content: text });
-    const pending = bubble("ai", T.thinking); pending.classList.add("pending");
+    const pending = bubble("ai", ""); pending.classList.add("pending");
+    const pendingBody = pending.querySelector(".vc-ai-bubble");
+    // DotMatrix Core Spiral adapted to the native DOM (no React runtime).
+    // https://dotmatrix.zzzzshawn.cloud/r/dotm-square-3.json
+    const loader = el("span", "vc-ai-dotmatrix"); loader.setAttribute("aria-hidden", "true");
+    const spiral = [0, 1, 2, 3, 4, 9, 14, 19, 24, 23, 22, 21, 20, 15, 10, 5, 6, 7, 8, 13, 18, 17, 16, 11, 12];
+    for (let i = 0; i < 25; i++) {
+      const dot = el("span");
+      dot.style.animationDelay = `${(spiral.indexOf(i) * 0.04 - 1) * 2.025}s`;
+      loader.appendChild(dot);
+    }
+    pendingBody.append(loader, el("span", "", useSearch ? (lang === "zh" ? "检索公开资料并分析中…" : "Searching public sources and analyzing…") : T.thinking));
     // 失败时：错误消息带「重试」——去掉这一问一答，用同样的问题重新发
     const failed = (msg) => {
       const m = bubble("ai", msg); m.classList.add("error");
       msgActions(m, { copy: msg, retry: () => { if (busy) return; m.remove(); um.remove(); send(text); } });
     };
+    const finish = () => {
+      if (activeRequest !== request) return;
+      activeRequest = null;
+      setBusy(false);
+      if (!panel.hidden) input.focus();
+    };
+    request.stop = () => {
+      controller.abort();
+      history.pop(); // 取消的问题不混入后续模型上下文，也不保存为完整问答。
+      pending.classList.remove("pending");
+      pending.querySelector(".vc-ai-bubble").textContent = T.stopped;
+      msgActions(pending, { retry: () => {
+        if (busy) return;
+        pending.remove(); um.remove(); send(text);
+      } });
+      finish();
+    };
     try {
       const r = await fetch("/api/my/ai/valuation", {
+        signal: controller.signal,
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lang, messages: history.slice(-20), context }),
+        body: JSON.stringify({ lang, messages: history.slice(-20), context, webSearch: useSearch }),
       });
+      if (controller.signal.aborted) return;
       const j = await r.json().catch(() => ({}));
+      if (controller.signal.aborted) return;
       pending.remove();
       if (!r.ok) {
         history.pop();
-        failed(r.status === 429 ? aiErrorText(r.status, j, lang) : `${T.err}${j && j.detail ? "：" + j.detail : ""}`);
+        failed(r.status === 429 || j.error?.startsWith("search_") ? aiErrorText(r.status, j, lang) : `${T.err}${j && j.detail ? "：" + j.detail : ""}`);
         return;
       }
       const view = { reply: j.reply || "", params: j.params || null, reasons: j.reasons || null, scenarios: j.scenarios || null, widgets: Array.isArray(j.widgets) ? j.widgets : [] };
+      const research = normalizeResearch(j.research); if (research) view.research = research;
       const usedFields = new Set([...Object.keys(view.params || {}), ...view.widgets.map((w) => w.field)]);
       const resourceFields = context.fields.filter((f) => f.k.startsWith("resource.") && usedFields.has(f.k));
       if (resourceFields.length) view.resourceFields = resourceFields;
@@ -495,10 +594,11 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       saved.push({ role: "user", content: text }, { role: "assistant", content: reply, view });
       saveChat();
     } catch {
+      if (controller.signal.aborted) return;
       pending.remove(); history.pop();
       failed(T.err);
     } finally {
-      busy = false; sendBtn.disabled = false; input.focus();
+      finish();
     }
   }
 
@@ -560,7 +660,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       hideSug(); send(pick || input.value);
     }
   });
-  foot.addEventListener("submit", (e) => { e.preventDefault(); send(input.value); });
+  foot.addEventListener("submit", (e) => { e.preventDefault(); if (busy) stop(); else send(input.value); });
   clearBtn.addEventListener("click", () => { if (busy) return; resetChat(); input.focus(); });
   closeBtn.addEventListener("click", () => close());
   // Esc 只关面板：捕获阶段接住，避免宿主页的全局 Esc 顺带退出整个编辑器

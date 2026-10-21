@@ -1,4 +1,4 @@
-// 券商凭证加密：AES-256-GCM，密钥来自 Worker secret CREDENTIALS_KEY（base64 编码的 32 字节）。
+// 凭证与资产加密：AES-256-GCM，密钥来自 Worker secret CREDENTIALS_KEY（base64 编码的 32 字节）。
 // 存库格式：base64(12 字节 IV ‖ 密文+认证标签)。解不开（密钥换了 / 数据被改）就抛错，调用方当作「凭证失效」处理。
 
 function b64ToBytes(b64) {
@@ -20,20 +20,22 @@ async function importKey(secret) {
   return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
 
-// 加密任意可 JSON 序列化的对象
-export async function encryptJson(secret, obj) {
+export async function assertEncryptionKey(secret) { await importKey(secret); }
+
+// 资产调用方传入 context 作为认证附加数据；旧凭证使用空 context，兼容既有密文。
+export async function encryptJson(secret, obj, context = "") {
   const key = await importKey(secret);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify(obj))));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode(context) }, key, new TextEncoder().encode(JSON.stringify(obj))));
   const out = new Uint8Array(iv.length + ct.length);
   out.set(iv); out.set(ct, iv.length);
   return bytesToB64(out);
 }
 
-export async function decryptJson(secret, blob) {
+export async function decryptJson(secret, blob, context = "") {
   const key = await importKey(secret);
   const bytes = b64ToBytes(blob);
   const iv = bytes.slice(0, 12), ct = bytes.slice(12);
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode(context) }, key, ct);
   return JSON.parse(new TextDecoder().decode(pt));
 }

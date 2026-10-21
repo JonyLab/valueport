@@ -51,9 +51,9 @@ export function mountValuationFlow(host, { lang, company, initial, hooks, onChan
   const zh = lang !== "en", t = (a, b) => (zh ? a : b);
   const empty = () => ({ stage: "story", turns: [], history: [], question: null, drafts: null, selected: [], freeText: "", otherText: "",
     references: [], picks: null, method: "", rows: null, paramsFor: "" });
-  let state = cleanFlowState(initial) || empty(), busy = "", error = "", stopped = false, active = null, destroyed = false;
+  let state = cleanFlowState(initial) || empty(), busy = "", locked = false, error = "", stopped = false, active = null, destroyed = false;
   const replies = new Map(); // 本次打开期间：同样的已答内容 → 上次 AI 的回复（返回再前进、答案没改时不重复调用）
-  host.classList.add("vc-guide", "vc-guide-card");
+  host.classList.add("vc-thesis-guide", "vc-guide-card");
   // 窄屏下吸底按钮会盖住正在输入的框：聚焦时把它滚到可视区中间
   host.addEventListener("focusin", (e) => {
     if (!e.target.matches?.("input[type=text], input[type=number], textarea") || innerWidth > 760) return;
@@ -63,12 +63,12 @@ export function mountValuationFlow(host, { lang, company, initial, hooks, onChan
   const notify = () => onChange?.();
   function button(text, action, primary = false) {
     const element = node("button", primary ? "vc-guide-primary" : "vc-guide-secondary", text); element.type = "button";
-    element.addEventListener("click", action); return element;
+    element.addEventListener("click", () => { if (!locked) action(); }); return element;
   }
 
   // ── 异步任务：同一时间只有一个；可暂停；超时 / 失败保留已答内容 ──
   async function run(label, task) {
-    if (busy || destroyed) return;
+    if (busy || locked || destroyed) return;
     busy = label; error = ""; stopped = false;
     const controller = new AbortController(); active = controller;
     const timeout = setTimeout(() => controller.abort("timeout"), 60000);
@@ -117,7 +117,7 @@ export function mountValuationFlow(host, { lang, company, initial, hooks, onChan
   }
   function answerText() { return state.question ? guideAnswer(state.question, state.selected, state.freeText, lang, state.otherText) : ""; }
   function submitAnswer() {
-    const value = answerText(); if (busy || !value || value.length > 800) return;
+    const value = answerText(); if (busy || locked || !value || value.length > 800) return;
     state.history.push({ question: state.question, selected: [...state.selected], freeText: state.freeText, otherText: state.otherText });
     state.turns.push({ question: state.question.question, answer: value });
     state.question = null; state.selected = []; state.freeText = ""; state.otherText = ""; notify(); askNext();
@@ -458,6 +458,7 @@ export function mountValuationFlow(host, { lang, company, initial, hooks, onChan
       const references = node("details", "vc-guide-history"); references.append(node("summary", "", t("参考的公司资料", "Company information used")));
       for (const line of state.references) references.append(node("p", "", line)); host.append(references);
     }
+    if (locked) for (const control of host.querySelectorAll("button,input,textarea,select")) control.disabled = true;
     if (focus) {
       heading.focus({ preventScroll: true });
       if (host.getBoundingClientRect().top < 0) host.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
@@ -467,6 +468,7 @@ export function mountValuationFlow(host, { lang, company, initial, hooks, onChan
   return {
     snapshot: () => JSON.parse(JSON.stringify(state)),
     refresh: () => { if (busy) return; if (stopped) { error = ""; stopped = false; } render(); },
+    setLocked(value) { locked = !!value; if (locked) active?.abort(); render(); },
     pause() { active?.abort(); },
     destroy() { destroyed = true; active?.abort(); },
     isBusy: () => !!busy,

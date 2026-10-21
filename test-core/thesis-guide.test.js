@@ -18,6 +18,8 @@ describe("bounded generative research UI", () => {
     expect(guideDraft({ ...draft, conflict: "" })).not.toHaveProperty("conflict");
     expect(guideDraft({ ...draft, conflict: "x".repeat(401) })).toBeNull();
     expect(guideDraft({ ...draft, conflict: { html: "<b>" } })).toBeNull();
+    expect(guideDraft({ ...draft, signals: ["建议跟踪复购", "建议核实费用"] }).signals).toBe("建议跟踪复购\n建议核实费用");
+    expect(guideDraft({ ...draft, signals: [{ code: "bad" }] })).toBeNull();
   });
   it("keeps selection and free text together, without asserting certainty on unknown answers", () => {
     expect(guideAnswer(question, ["a", "b"], "我还想看海外复购")).toBe(question.options.map((option) => option.label).join("\n") + "\n我还想看海外复购");
@@ -37,6 +39,8 @@ describe("bounded generative research UI", () => {
     expect(clean.selected).toEqual(["b"]); expect(clean.freeText).toBe("待研究");
     expect(cleanGuideState({ ...state, question: { type: "html" } })).toBeNull();
     expect(cleanGuideState(clean)).toEqual(clean);
+    expect(cleanGuideState({ ...state, history: [] })).toBeNull();
+    expect(cleanGuideState({ ...state, draft })).toBeNull();
   });
 });
 

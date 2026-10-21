@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>详情页核心信息栏 · 克制版</title>
+<style>
+  :root{
+    --paper:#F4EFE6; --card:#FBF8F2; --ink:#262420; --ink-soft:#4f4a42; --ink-mute:#938b7d;
+    --border:#E6DFD2; --line:#ECE6DA; --shadow:0 1px 0 rgba(0,0,0,.02);
+    --good:#3F7A4F; --warn:#B5852F; --bad:#B0503F; --accent:#5b6b8a;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;line-height:1.5;padding:28px 18px 60px}
+  .wrap{max-width:880px;margin:0 auto}
+  .note{color:var(--ink-mute);font-size:12.5px;margin:0 2px 18px;letter-spacing:.01em}
+  .note b{color:var(--ink-soft);font-weight:600}
+
+  .bar{background:var(--card);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);overflow:hidden}
+
+  /* identity row */
+  .id{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    padding:18px 22px 0;flex-wrap:wrap}
+  .id-l{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0}
+  .nm{font-size:21px;font-weight:600;letter-spacing:-.01em}
+  .tick{font-family:var(--mono);font-size:13px;color:var(--ink-mute);letter-spacing:.02em}
+  .meta{font-size:12px;color:var(--ink-mute)}
+  .id-r{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--ink-mute);white-space:nowrap}
+  .id-r .edit{border:1px solid var(--border);background:transparent;border-radius:6px;
+    padding:4px 11px;color:var(--ink-soft);font-size:12px;cursor:pointer}
+
+  /* HERO — 顶部唯一的主角 */
+  .hero{display:grid;grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr);
+    gap:30px;padding:20px 22px 24px;align-items:center}
+  @media(max-width:620px){.hero{grid-template-columns:1fr;gap:20px}}
+  .price{font-family:var(--mono);font-size:36px;font-weight:600;letter-spacing:-.02em;line-height:1}
+  .chg{font-family:var(--mono);font-size:13px;margin-top:8px}
+  .chg.up{color:var(--good)} .chg.down{color:var(--bad)}
+  .verdict{margin-top:16px;display:inline-flex;align-items:center;gap:8px;
+    border:1px solid var(--border);border-radius:8px;padding:8px 13px;background:#fff}
+  .vdot{width:9px;height:9px;border-radius:50%;background:var(--warn)}
+  .vlab{font-size:13.5px;font-weight:600;color:var(--ink)}
+  .vmos{font-family:var(--mono);font-size:12.5px;color:var(--ink-mute)}
+  .frange{margin-top:11px;font-size:12px;color:var(--ink-mute)}
+  .frange b{font-family:var(--mono);color:var(--ink-soft);font-weight:600}
+
+  /* pendulum */
+  .track{position:relative;height:44px;border-radius:8px;overflow:hidden;
+    background:linear-gradient(90deg,
+      rgba(63,122,79,.16) 0%, rgba(63,122,79,.10) 30%,
+      rgba(181,133,47,.12) 50%,
+      rgba(176,80,63,.10) 70%, rgba(176,80,63,.18) 100%);
+    border:1px solid var(--line)}
+  .band{position:absolute;top:0;bottom:0;background:rgba(255,255,255,.55);
+    border-left:1px dashed #c9c0b0;border-right:1px dashed #c9c0b0}
+  .mark{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--ink)}
+  .mark::after{content:"";position:absolute;top:-4px;left:-4px;width:10px;height:10px;
+    border-radius:50%;background:var(--ink)}
+  .scale{display:flex;justify-content:space-between;margin-top:8px;
+    font-family:var(--mono);font-size:11px;color:var(--ink-mute)}
+  .pcap{margin-top:11px;font-size:12px;color:var(--ink-mute);line-height:1.5}
+  .pcap .pc{font-family:var(--mono);font-weight:600;color:var(--ink-soft)}
+
+  /* 收起的「生意质地」入口 —— 安静、不抢戏 */
+  .more{border-top:1px solid var(--line)}
+  .more-h{display:flex;align-items:center;gap:9px;padding:12px 22px;cursor:pointer;
+    user-select:none;color:var(--ink-soft)}
+  .more-h:hover{background:rgba(0,0,0,.012)}
+  .more-h .t{font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--ink-mute)}
+  .more-h .hint{font-size:11.5px;color:var(--ink-mute)}
+  .more-h .chev{margin-left:auto;color:var(--ink-mute);font-size:12px;transition:transform .18s}
+  .more.open .chev{transform:rotate(180deg)}
+  /* 触发式红旗：平时就一个小点提示，不展开也能看到“有料” */
+  .flagdot{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;
+    color:var(--warn);font-weight:600}
+  .flagdot::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--warn)}
+
+  .more-b{display:none;padding:2px 8px 8px}
+  .more.open .more-b{display:block}
+
+  /* quality strip (展开后) */
+  .qstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:0;padding:6px 8px 6px}
+  @media(max-width:620px){.qstrip{grid-template-columns:repeat(2,1fr);row-gap:14px}}
+  .qcell{padding:8px 14px;border-left:1px solid var(--line)}
+  .qcell:nth-child(1){border-left:none}
+  @media(max-width:620px){.qcell:nth-child(3){border-left:none}}
+  .qlab{font-size:12px;color:var(--ink-soft);font-weight:600}
+  .qspark{margin:7px 0 6px}
+  .qval{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .qval .u{font-size:11px;color:var(--ink-mute);font-weight:400;margin-left:1px}
+  .qtrend{font-size:11px;margin-top:2px}
+  .qtrend.amber{color:var(--warn)} .qtrend.mute{color:var(--ink-mute)} .qtrend.good{color:var(--good)}
+  .qfoot{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 22px 12px;
+    border-top:1px solid var(--line);margin-top:6px}
+  .stat{font-size:12.5px;color:var(--ink-mute)}
+  .stat b{font-family:var(--mono);color:var(--ink-soft);font-weight:600}
+  .links{margin-left:auto;display:flex;gap:16px;flex-wrap:wrap}
+  .lk{font-size:12.5px;color:var(--accent);text-decoration:none;cursor:pointer;white-space:nowrap}
+  .lk:hover{text-decoration:underline}
+  .lk .ar{color:var(--ink-mute);font-size:10px}
+
+  .legend{margin:22px 4px 0;font-size:11.5px;color:var(--ink-mute);line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="note">克制版 · 顶部<b>只答"贵不贵"</b>，「生意质地」默认收起（点标题展开）。数据取自 <b>美光科技 MU</b> 真实年报，价格/分位为示意。</p>
+
+  <div class="bar">
+    <!-- identity -->
+    <div class="id">
+      <div class="id-l">
+        <span class="nm">美光科技</span>
+        <span class="tick">MU</span>
+        <span class="meta">· NASDAQ · USD · 半导体 / 存储</span>
+      </div>
+      <div class="id-r">
+        <span>行情更新于 16:00 ET</span>
+        <button class="edit">编辑</button>
+      </div>
+    </div>
+
+    <!-- HERO -->
+    <div class="hero">
+      <div>
+        <div class="price">$130.40</div>
+        <div class="chg up">+2.18  ·  +1.70%</div>
+        <div class="verdict">
+          <span class="vdot"></span>
+          <span class="vlab">接近合理</span>
+          <span class="vmos">安全边际 −4%</span>
+        </div>
+        <div class="frange">合理区间 <b>$108 – $145</b> · 正常化盈利口径</div>
+      </div>
+      <div>
+        <div class="track">
+          <div class="band" style="left:30%;right:25%"></div>
+          <div class="mark" style="left:53%"></div>
+        </div>
+        <div class="scale"><span>$80</span><span>合理区间</span><span>$175</span></div>
+        <div class="pcap">
+          自身估值 <span class="pc">62 分位</span> · 现价隐含未来增速 <span class="pc">≈ 12%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 安静的展开入口：标题 + 一句话 + 触发式红旗点 -->
+    <div class="more" id="more">
+      <div class="more-h" onclick="document.getElementById('more').classList.toggle('open')">
+        <span class="t">生意质地</span>
+        <span class="hint">近 10 年 ROIC · 现金流 · 利润率 · 股本</span>
+        <span class="flagdot">强周期</span>
+        <span class="chev">▾</span>
+      </div>
+      <div class="more-b">
+        <div class="qstrip">
+          <div class="qcell">
+            <div class="qlab">资本回报 ROIC</div>
+            <div class="qspark"><svg width="100%" height="30" viewBox="0 0 120 30" preserveAspectRatio="none">
+              <polyline fill="none" stroke="#5b6b8a" stroke-width="1.6" points="0,18 13,8 26,22 40,27 53,12 66,4 80,26 93,28 106,9 120,14"/>
+              <line x1="0" y1="29" x2="120" y2="29" stroke="#ECE6DA" stroke-width="1"/></svg></div>
+            <div class="qval">18.6<span class="u">%</span></div>
+            <div class="qtrend amber">−5% → 33% 剧烈</div>
+          </div>
+          <div class="qcell">
+            <div class="qlab">自由现金流</div>
+            <div class="qspark"><svg width="100%" height="30" viewBox="0 0 120 30" preserveAspectRatio="none">
+              <polyline fill="none" stroke="#3F7A4F" stroke-width="1.6" points="0,20 13,10 26,24 40,28 53,14 66,6 80,27 93,29 106,12 120,17"/>
+              <line x1="0" y1="29" x2="120" y2="29" stroke="#ECE6DA" stroke-width="1"/></svg></div>
+            <div class="qval">$3.1<span class="u">B</span></div>
+            <div class="qtrend amber">FCF ≈ 净利 0.4×</div>
+          </div>
+          <div class="qcell">
+            <div class="qlab">净利率</div>
+            <div class="qspark"><svg width="100%" height="30" viewBox="0 0 120 30" preserveAspectRatio="none">
+              <polyline fill="none" stroke="#B5852F" stroke-width="1.6" points="0,16 13,7 26,21 40,26 53,11 66,3 80,25 93,27 106,8 120,13"/>
+              <line x1="0" y1="29" x2="120" y2="29" stroke="#ECE6DA" stroke-width="1"/></svg></div>
+            <div class="qval">22.8<span class="u">%</span></div>
+            <div class="qtrend amber">3% ↔ 33%</div>
+          </div>
+          <div class="qcell">
+            <div class="qlab">流通股数</div>
+            <div class="qspark"><svg width="100%" height="30" viewBox="0 0 120 30" preserveAspectRatio="none">
+              <polyline fill="none" stroke="#938b7d" stroke-width="1.6" points="0,24 13,23 26,21 40,20 53,18 66,17 80,16 93,15 106,14 120,13"/>
+              <line x1="0" y1="29" x2="120" y2="29" stroke="#ECE6DA" stroke-width="1"/></svg></div>
+            <div class="qval">1.12<span class="u">B</span></div>
+            <div class="qtrend good">十年净回购</div>
+          </div>
+        </div>
+        <div class="qfoot">
+          <span class="stat">净负债/EBITDA <b>0.3×</b></span>
+          <span class="stat">股息率 <b>0.5%</b></span>
+          <span class="links">
+            <a class="lk">一手披露 10-K <span class="ar">↗</span></a>
+            <a class="lk">内部人交易 <span class="ar">↗</span></a>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="legend">
+    顶部到「生意质地」标题为止 = 常驻的核心栏，答<b style="color:var(--ink-soft)">贵不贵</b>；展开才进<b style="color:var(--ink-soft)">是不是好生意</b>。红旗平时只缩成标题旁一个「强周期」小点——有料但不占地方。
+  </p>
+</div>
+</body>
+</html>

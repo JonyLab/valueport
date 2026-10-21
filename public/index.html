@@ -176,7 +176,7 @@
   .modal-err{font-size:12.5px;color:var(--red);margin-top:10px;display:none}
   .ve-confirm{padding:24px}
   .ve-confirm-msg{margin:10px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink-soft)}
-  .ve-confirm-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
+  .ve-confirm-acts{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:22px}
   .ve-confirm-acts .btn:disabled{opacity:.4;cursor:default}
   .modal-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:22px -24px 0;padding:16px 24px 20px;
     border-top:1px dashed var(--border)}
@@ -191,7 +191,7 @@
   .vc{max-width:none}
   @media (max-width:860px){ .vc-singles-grid{grid-template-columns:1fr} }
 
-  /* ===== 设置视图 / 标的详情视图（身份区 + 主栏[关键数据/tabs] + 侧栏[钟摆/同看板]） ===== */
+  /* ===== 设置视图 / 标的详情视图（身份区 + 主栏[tabs] + 侧栏[关键数据/钟摆/同看板]） ===== */
   .view-detail{padding:0}
   .view-detail.view-valedit{padding:0}
   .vd-backrow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
@@ -252,15 +252,19 @@
   .vd-hold-acc{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
   .vd-cardsub{font-size:13px;line-height:1.55;color:var(--ink-mute);margin:6px 0 14px}
   /* 关键数据 */
-  .ks-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+  .ks-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
   .ks-cell{display:flex;flex-direction:column;gap:8px;padding:14px 16px 14px 0;border-top:1px dashed var(--border)}
-  .ks-cell:nth-child(-n+4){border-top:0;padding-top:0}
+  .ks-cell:nth-child(-n+2){border-top:0;padding-top:0}
   .ks-k{font-size:13px;color:var(--ink-mute)}
-  .ks-v{display:flex;align-items:center;gap:7px;font-size:22px;font-weight:400;letter-spacing:-.01em;color:var(--ink);font-variant-numeric:tabular-nums}
+  .ks-v{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 7px;font-size:19px;font-weight:400;letter-spacing:-.01em;color:var(--ink);font-variant-numeric:tabular-nums}
   .ks-v small{font-size:12px;color:var(--ink-mute);font-weight:400;letter-spacing:0}
   /* tabs 卡 */
-  .vd-main{min-width:0;margin-top:6px}
-  /* 侧栏：钟摆 + 同看板 */
+  .vd-main{min-width:0;background:var(--card);border:1px solid var(--card-edge);border-radius:var(--r-xl);box-shadow:var(--shadow);padding:22px 24px 24px;
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .vd-main .p-val,.vd-main .p-fin,.vd-main .fd-sec,.vd-main .p-fund > .fd-empty{background:none;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .vd-main .p-val,.vd-main .p-fin,.vd-main .fd-sec{padding:0;border-radius:0}
+  .vd-main .fd-sec + .fd-sec{padding-top:22px;border-top:1px dashed var(--border)}
+  /* 侧栏：关键数据 + 钟摆 + 同看板 */
   .vd-gauge{width:100%}
   .vd-gauge svg{display:block;width:100%;height:auto;overflow:visible}
   .peer-list{display:flex;flex-direction:column}
@@ -282,12 +286,10 @@
     .vd-side{position:static;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
   }
   @media (max-width:760px){
+    .vd-main{padding:18px 16px}
     .vd-hero{grid-template-columns:auto minmax(0,1fr);gap:14px}
     .vd-avatar{width:54px;height:54px;font-size:22px}
     .vd-quote{grid-column:1 / -1;justify-items:start;justify-content:start}
-    .ks-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .ks-cell:nth-child(-n+4){border-top:1px dashed var(--border);padding-top:14px}
-    .ks-cell:nth-child(-n+2){border-top:0;padding-top:0}
     .vd-card{padding:18px 16px}
   }
   .vge{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:180px;padding:20px 0;text-align:center}
@@ -310,12 +312,15 @@
   .vd-tabs{display:flex;gap:4px;width:fit-content;margin:0 0 16px;padding:5px;position:sticky;top:12px;z-index:3;
     background:rgba(255,255,255,.6);border:1px solid var(--card-edge);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-radius:var(--r-pill)}
   /* tab 内各分节即卡片：与「关键数据」等同一套卡片样式 */
-  .fd-sec,.vdist-tile,.p-fin,.p-val,.p-fund > .fd-empty{background:var(--card);border:1px solid var(--card-edge);box-shadow:var(--shadow);
+  .fd-sec,.p-fin,.p-val,.p-fund > .fd-empty{background:var(--card);border:1px solid var(--card-edge);box-shadow:var(--shadow);
     -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
   .p-fin{border-radius:var(--r-xl);padding:22px 24px}
   .p-fund > .fd-empty{border-radius:var(--r-xl);padding:40px 24px;text-align:center}
   /* 估值研究 tab：对照图 + 估值卡片放在同一张大卡里，上下用虚线分段；估值卡片是卡内的浅灰格子 */
   .p-val{border-radius:var(--r-xl);padding:22px 24px 24px}
+  @media (min-width:1101px){
+    .vd-main{min-height:max(320px,calc(100vh - 198px));min-height:max(320px,calc(100dvh - 198px))}
+  }
   .p-val > .vsec-head{margin-top:24px;padding-top:22px;border-top:1px dashed var(--border)}
   .p-val > .vsec-head:first-child{margin-top:0;padding-top:0;border-top:0}
   .vd-tab{height:38px;padding:0 18px;border:0;background:none;cursor:pointer;font-family:var(--font);font-size:14px;font-weight:400;color:var(--ink-soft);border-radius:var(--r-pill);transition:background .15s,color .15s}
@@ -650,14 +655,14 @@
   .vc-thesis-modes button{padding:8px 14px;border:1px solid var(--border);border-radius:var(--r-pill);font:inherit;font-size:12px;color:var(--ink-soft);background:transparent;cursor:pointer}
   .vc-thesis-modes button[aria-pressed="true"]{background:var(--dark);border-color:var(--dark);color:#fff}
   .vc-thesis-manual{display:grid;gap:20px}
-  .vc-thesis-manual[hidden],.vc-guide[hidden],.vc-note-ai[hidden],.vc-guide-error[hidden]{display:none}
-  .vc-guide{display:grid;gap:16px;min-width:0}
+  .vc-thesis-manual[hidden],.vc-thesis-guide[hidden],.vc-note-ai[hidden],.vc-guide-error[hidden]{display:none}
+  .vc-thesis-guide{display:grid;gap:16px;min-width:0}
   /* 引导卡片：和字段说明的 .vc-guide 同名，这里单独定样式（实色背景，吸底按钮的渐变才能和它对齐） */
   .vc-guide-card .vc-guide-context,.vc-guide-card .vc-question-help,.vc-guide-card .vc-guide-option small,.vc-guide-card .vc-guide-progress,.vc-guide-card .vc-guide-tag,
   .vc-flow-case dt,.vc-flow-param-check,.vc-flow-intro small,.vc-flow-intro-note,.vc-flow-result-label,.vc-flow-param-values label{color:var(--ink-soft) !important}
   .vc-guide-card .vc-guide-tag{background:#fff;box-shadow:inset 0 0 0 1px var(--border)}
-  .vc-guide.vc-guide-card{--guide-bg:#fdf6dd;grid-column:auto;margin:0;padding:22px 24px 6px;gap:18px;background:var(--guide-bg);border-radius:var(--r-lg);font-size:13px;color:var(--ink)}
-  @media(max-width:600px){.vc-guide.vc-guide-card{padding:18px 16px 4px}}
+  .vc-thesis-guide.vc-guide-card{--guide-bg:#fdf6dd;grid-column:auto;margin:0;padding:22px 24px 6px;gap:18px;background:var(--guide-bg);border-radius:var(--r-lg);font-size:13px;color:var(--ink)}
+  @media(max-width:600px){.vc-thesis-guide.vc-guide-card{padding:18px 16px 4px}}
   .vc-guide-title{margin:0;font-size:17px;font-weight:500;line-height:1.5;overflow-wrap:anywhere;outline-offset:4px}
   .vc-guide-progress{display:flex;gap:6px;list-style:none;margin:0;padding:0;font-size:12px;color:var(--ink-mute)}
   .vc-guide-progress li{flex:1;padding:8px 4px;border-bottom:2px solid var(--border);text-align:center}
@@ -692,7 +697,7 @@
   .vc-flow-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
   .vc-guiding-mount > .vc-workflow{display:none}
   /* 开始页：窄一点、居中，像一张邀请卡；四步预览 + 一个主按钮 */
-  .vc-guide.vc-guide-card.intro{max-width:560px;width:100%;margin:clamp(12px,6vh,64px) auto 0;padding:32px 32px 28px;gap:20px;box-shadow:0 18px 48px -28px rgba(120,90,20,.35)}
+  .vc-thesis-guide.vc-guide-card.intro{max-width:560px;width:100%;margin:clamp(12px,6vh,64px) auto 0;padding:32px 32px 28px;gap:20px;box-shadow:0 18px 48px -28px rgba(120,90,20,.35)}
   .vc-guide-card.intro .vc-guide-title{font-size:22px;line-height:1.4;letter-spacing:-.01em}
   .vc-flow-intro-lead{margin:-8px 0 0;font-size:14px;line-height:1.75;color:var(--ink-soft)}
   .vc-flow-intro{display:grid;gap:4px;margin:0;padding:0;list-style:none;counter-reset:intro}
@@ -706,7 +711,7 @@
   .vc-flow-intro-go{display:grid;justify-items:center;gap:12px}
   .vc-flow-intro-go .vc-guide-link{justify-self:center}
   .vc-guide-primary.vc-flow-start{justify-self:stretch;padding:14px 18px;font-size:15px}
-  @media(max-width:600px){.vc-guide.vc-guide-card.intro{padding:24px 20px 20px;margin-top:8px}}
+  @media(max-width:600px){.vc-thesis-guide.vc-guide-card.intro{padding:24px 20px 20px;margin-top:8px}}
   .vc-flow-top .vc-guide-secondary{padding:6px 14px;font-size:12px}
   .vc-flow-cases{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   @media(max-width:600px){.vc-flow-cases{grid-template-columns:minmax(0,1fr)}}
@@ -788,7 +793,7 @@
   .vc-guide-review p{margin:6px 0 0;font-size:13px;line-height:1.8;white-space:pre-wrap}
   .vc-savebar{gap:12px;flex-wrap:wrap}
   .vc-savebar>.vc-guide-error{flex:1 1 200px}
-  @media(max-width:600px){.vc-guide-progress{font-size:10px}.vc-guide-primary{width:100%}.vc-guide .vc-note-input{font-size:16px}}
+  @media(max-width:600px){.vc-guide-progress{font-size:10px}.vc-guide-primary{width:100%}.vc-thesis-guide .vc-note-input{font-size:16px}}
   .vc-question:last-of-type{border-bottom:0;padding-bottom:0}
   .vc-question-label{margin:0;font-size:14px;font-weight:500;line-height:1.6;color:var(--ink)}
   .vc-question-help{margin:0;font-size:12px;font-weight:400;line-height:1.7;color:var(--ink-mute)}
@@ -892,7 +897,11 @@
   .vc-ai-bubble{max-width:88%;padding:10px 14px;border-radius:18px;font-size:13.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
   .vc-ai-msg.me .vc-ai-bubble{background:var(--dark);color:#fff;border-bottom-right-radius:6px}
   .vc-ai-msg.ai .vc-ai-bubble{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 1px var(--divider);border-bottom-left-radius:6px}
-  .vc-ai-msg.pending .vc-ai-bubble{color:var(--ink-mute);animation:vcAiPulse 1.2s ease-in-out infinite}
+  .vc-ai-msg.pending .vc-ai-bubble{display:flex;align-items:center;gap:10px;color:var(--ink-soft)}
+  .vc-ai-dotmatrix{flex:none;display:grid;grid-template-columns:repeat(5,4px);gap:2px;width:28px;height:28px;color:var(--ink)}
+  .vc-ai-dotmatrix > span{width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.08;animation:vcAiSpiral 2.025s linear infinite}
+  @keyframes vcAiSpiral{0%,100%{opacity:.08}8%{opacity:1}16%{opacity:.68}24%{opacity:.48}32%{opacity:.26}40%{opacity:.12}}
+  @media (prefers-reduced-motion:reduce){.vc-ai-dotmatrix > span{animation:none;opacity:.3}.vc-ai-dotmatrix > span:nth-child(3n){opacity:.8}}
   .vc-ai-msg.error .vc-ai-bubble{color:var(--red);background:rgba(198,65,65,.07);box-shadow:none}
   /* 消息操作行：复制 / 重试，平时淡，悬停这条消息时变清楚；失败消息的操作一直清楚 */
   .vc-ai-risk{display:flex;align-items:flex-start;gap:7px;margin:8px 0 6px;padding:8px 10px;border-radius:var(--r-sm);background:rgba(240,140,46,.10);color:#8a4a17;font-size:11.5px;line-height:1.55}
@@ -968,6 +977,14 @@
   .vc-ai-send{flex:none;width:34px;height:34px;border:0;border-radius:50%;background:var(--dark);color:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
   .vc-ai-send:disabled{opacity:.35;cursor:default}
   .vc-ai-disclaimer{margin-top:7px;text-align:center;font-size:11px;color:var(--ink-mute)}
+  .vc-ai-search{display:inline-flex;align-items:center;gap:5px;margin:0 0 8px;padding:5px 9px;border:1px solid var(--border);border-radius:var(--r-pill);background:transparent;color:var(--ink-soft);font:inherit;font-size:12px;cursor:pointer}
+  .vc-ai-search[aria-pressed="true"]{background:var(--sun-soft);border-color:var(--sun-ink);color:var(--sun-ink)}
+  .vc-ai-search:disabled{opacity:.45;cursor:default}
+  .vc-ai-sources{margin:10px 0;padding:10px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;line-height:1.6}
+  .vc-ai-source-title{color:var(--ink-soft);font-weight:500}
+  .vc-ai-source{display:flex;flex-direction:column;margin-top:7px;overflow-wrap:anywhere}
+  .vc-ai-source a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+  .vc-ai-source-date{color:var(--ink-mute);font-size:11px}
 
   /* 窄屏：单栏，结论排在输入下方，整块一起滚动 */
   @media (max-width:1100px){
@@ -997,27 +1014,10 @@
     .vc-results{padding:18px 18px 22px}
   }
   /* 估值卡片列表 */
-  /* ===== 估值研究 tab：距离指标 / 估值区间对照图 / 估值卡片网格 ===== */
+  /* ===== 估值研究 tab：估值区间对照图 / 估值卡片网格 ===== */
   .vsec-head{display:flex;align-items:baseline;gap:12px;margin:0 0 14px}
   .vsec-title{font-size:20px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
   .vsec-sub{font-size:13px;color:var(--ink-mute)}
-  /* 三个距离指标 */
-  .vdist{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-  .vdist-tile{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;padding:18px 20px 16px;border-radius:var(--r-lg)}
-  .vdist-dot{width:10px;height:10px;border-radius:50%;background:var(--dark)}
-  .vdist-lab{font-size:13.5px;color:var(--ink-soft)}
-  .vdist-val{grid-column:1 / -1;margin-top:10px;font-size:40px;font-weight:400;line-height:1;letter-spacing:-.035em;color:var(--ink);font-variant-numeric:tabular-nums}
-  .vdist-sub{grid-column:1 / -1;margin-top:8px;font-size:12.5px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
-  .vdist-none{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px 22px;border-radius:var(--r-xl);
-    background:var(--card);border:1px solid var(--card-edge);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-  .vdist-none-msg{display:flex;align-items:center;gap:12px;font-size:14px;line-height:1.6;color:var(--ink-soft);min-width:0;flex:1 1 320px}
-  .vdist-none-msg i{font-size:22px;color:var(--ink-mute)}
-  .vdist-none-acts{display:none;gap:8px} /* 宽屏侧栏钟摆卡里已有「添加估值」，这里不重复；窄屏侧栏排到下方时才显示 */
-  @media (max-width:1100px){ .vdist-none-acts{display:flex} }
-  .vdist-params{grid-column:1 / -1;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink-mute)}
-  .vdist-edit{appearance:none;border:0;background:none;padding:0;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);
-    text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-  .vdist-edit:hover{color:var(--ink)}
   /* 估值区间对照图（football field） */
   .vmap{padding:0}
   .vmap-grid{display:grid;grid-template-columns:minmax(110px,170px) minmax(0,1fr);column-gap:16px;row-gap:14px;align-items:center}
@@ -1025,7 +1025,7 @@
   .vmap-lab.picked{color:var(--ink);font-weight:500}
   .vmap-pick{font-size:10.5px;font-weight:500;color:var(--sun-ink);background:var(--sun);border-radius:var(--r-pill);padding:2px 8px}
   .vmap-track{position:relative;height:30px;grid-column:2}
-  .vmap-bar{position:absolute;top:7px;bottom:7px;border-radius:var(--r-pill);background:var(--dark)}
+  .vmap-bar{position:absolute;top:7px;bottom:7px;border-radius:var(--r-pill);background:rgba(29,29,27,.22)}
   .vmap-track.picked .vmap-bar{background:var(--sun)}
   .vmap-end{position:absolute;top:50%;transform:translateY(-50%);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;font-variant-numeric:tabular-nums}
   .vmap-end.lo{right:100%;margin-right:6px}
@@ -1041,11 +1041,6 @@
   .vmap-lab.axis{min-height:0}
   .vmap .vsec-head{margin-bottom:26px}
   @media (max-width:760px){
-    .vdist{gap:8px}
-    .vdist-tile{grid-template-columns:auto 1fr;padding:14px 12px 12px;column-gap:6px}
-    .vdist-lab{font-size:11.5px}
-    .vdist-val{font-size:24px;margin-top:8px}
-    .vdist-sub{font-size:11px}
     .vmap{padding:18px 14px 14px}
     .vmap-grid{grid-template-columns:84px minmax(0,1fr);column-gap:10px}
     .vmap-lab{font-size:12px}
@@ -1410,9 +1405,9 @@
       vd.innerHTML = '<div class="vd-backrow">' + L("84px", 34, "border-radius:999px") + '<span class="sk sk-round" style="width:40px;height:40px"></span></div>'
         + '<div class="vd-hero"><span class="sk sk-round" style="width:72px;height:72px"></span><div>' + L("200px", 24) + L("120px", 11, "margin-top:10px") + "</div>" + L("180px", 52, "border-radius:14px") + "</div>"
         + '<div class="vd-cols"><div class="vd-maincol">' + card(L("70%", 14), "margin-bottom:16px")
-        + card(L("90px", 16) + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px">' + new Array(9).join(L("60%", 10) + L("80%", 22)) + "</div>", "margin-bottom:16px")
         + L("260px", 46, "border-radius:999px;margin-bottom:16px") + card(L("140px", 16) + L("100%", 160, "border-radius:16px") + L("60%", 12))
-        + '</div><div class="vd-side">' + card(L("100px", 18) + L("70%", 11) + '<span class="sk" style="height:130px;border-radius:130px 130px 0 0;margin:10px auto 0;width:260px"></span>', "margin-bottom:16px")
+        + '</div><div class="vd-side">' + card(L("90px", 16) + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:18px">' + new Array(9).join(L("60%", 10) + L("80%", 19)) + "</div>", "margin-bottom:16px")
+        + card(L("100px", 18) + L("70%", 11) + '<span class="sk" style="height:130px;border-radius:130px 130px 0 0;margin:10px auto 0;width:260px"></span>', "margin-bottom:16px")
         + card(L("90px", 18) + new Array(6).join('<div class="sk-row"><span class="sk sk-round" style="width:28px;height:28px"></span><span class="sk-grow">' + L("60%", 11) + "</span>" + L("40px", 14) + "</div>")) + "</div></div>";
       vd.classList.remove("hidden");
     }
@@ -2335,7 +2330,7 @@ const viewDetail = document.getElementById("viewDetail");
 const viewValEdit = document.getElementById("viewValEdit");
 const pageHeadEl = document.querySelector(".page-head");
 const btnSettings = document.getElementById("btnSettings");
-let detailGauge = null, detailItem = null, detailGwrap = null, detailIdBlock = null, detailValRefresh = null, detailAddValuation = null, detailDistEl = null;
+let detailGauge = null, detailItem = null, detailGwrap = null, detailIdBlock = null, detailValRefresh = null, detailAddValuation = null;
 let detailGoFund = null; // 切到基本面 tab 并滚到某一分节（AI 结论旁的迷你图点击用）
 
 // ---------- 详情页「我的持仓」：资产页持仓表里这只股票的信息（数量、成本、盈亏、占比、目标偏离与建议、各账户） ----------
@@ -2469,7 +2464,6 @@ function refreshDetailIfOpen(item) {
     const vEl = detailIdBlock.querySelector(".vd-verdict");
     if (vEl) { vEl.textContent = vv.text; vEl.className = "vd-verdict " + vv.cls; }
   }
-  if (detailDistEl) renderDistance(item, detailDistEl); // 顶部距离指标同步
   if (detailValRefresh) detailValRefresh(); // 估值研究摘要（区间/阈值/判定）同步
 }
 
@@ -2540,11 +2534,9 @@ function renderDetail(item, initialTab = "val") {
   idBlock.querySelector(".vd-verdict").textContent = v.text === "—" ? t("ov_none") : v.text;
   detailIdBlock = idBlock;
 
-  // 主栏：距离指标 → 关键数据 → tabs（价值投资工具，不展示价格走势）
+  // 关键数据放在右侧钟摆上方；主栏直接展示估值研究 tabs。
   const statsCard = document.createElement("section"); statsCard.className = "vd-card vd-stats";
   renderKeyStats(item, statsCard);
-  const distBox = document.createElement("section"); detailDistEl = distBox;
-  renderDistance(item, distBox);
 
   const tabsNav = document.createElement("div"); tabsNav.className = "vd-tabs";
   const panels = document.createElement("div");
@@ -2578,11 +2570,11 @@ function renderDetail(item, initialTab = "val") {
   renderFinancialsPanel(item, panelOf("fin"));
   loadFinancials(item, "annual"); // 预取年报，供计算器预填
   loadFinancials(item, "quarter"); // 预取季报，供「最新季 / 近4季 TTM」参考
-  // tabs 直接放在背景上，不再包一层大卡；各 tab 里的分节自己就是卡片（避免卡片套卡片）
+  // tabs 与内容共用左侧大卡，内部各分节不再重复套卡。
   const main = document.createElement("section"); main.className = "vd-main"; main.append(tabsNav, panels);
-  const mainCol = document.createElement("div"); mainCol.className = "vd-maincol"; mainCol.append(distBox, statsCard, main);
+  const mainCol = document.createElement("div"); mainCol.className = "vd-maincol"; mainCol.append(main);
 
-  // 侧栏：估值钟摆 + 同看板标的
+  // 侧栏：关键数据 + 估值钟摆 + 同看板标的
   const gwrap = document.createElement("div"); gwrap.className = "vd-gauge";
   detailGwrap = gwrap;
   const pendCard = document.createElement("section"); pendCard.className = "vd-card vd-pendcard";
@@ -2602,7 +2594,7 @@ function renderDetail(item, initialTab = "val") {
   pendCard.append(pendHead, pendSub, gwrap);
   const peers = document.createElement("section"); peers.className = "vd-card vd-peers";
   renderPeers(item, peers);
-  const side = document.createElement("aside"); side.className = "vd-side"; side.append(pendCard, peers);
+  const side = document.createElement("aside"); side.className = "vd-side"; side.append(statsCard, pendCard, peers);
   if (owner) { const hold = document.createElement("section"); hold.className = "vd-card vd-hold"; hold.hidden = true; side.insertBefore(hold, peers); renderHolding(item, hold); }
 
   const cols = document.createElement("div"); cols.className = "vd-cols"; cols.append(mainCol, side);
@@ -2617,63 +2609,6 @@ function renderDayChange(item, el) {
   const d = p - pc, pct = d / pc * 100, sign = d > 0 ? "+" : d < 0 ? "−" : "";
   el.textContent = `${sign}${Math.abs(d).toFixed(Math.abs(d) >= 100 ? 0 : 2)} (${sign}${Math.abs(pct).toFixed(2)}%)`;
   el.className = "vd-chg " + (d > 0 ? "up" : d < 0 ? "down" : "");
-}
-
-/* ---------- 距离指标（详情页顶部）：到击球区 / 到合理区间 / 到泡沫区，现价还要涨跌多少 ---------- */
-function renderDistance(item, box) {
-  const c = item.cfg, zh = LANG === "zh";
-  box.innerHTML = "";
-  // 未设区间：三个「—」是噪音，改成一条提示 + 行动（访客只看提示）
-  if (!structValid(c)) {
-    box.className = "vdist vdist-none";
-    const msg = document.createElement("div"); msg.className = "vdist-none-msg";
-    msg.innerHTML = `<i class="ri-scales-3-line" aria-hidden="true"></i><span></span>`;
-    msg.querySelector("span").textContent = zh ? "还没设定合理区间：设定后这里会显示现价离击球区、合理区间和泡沫区还有多远。" : "No fair range yet — once set, this shows how far the price is from the strike zone, fair range and bubble.";
-    box.appendChild(msg);
-    if (owner) {
-      const acts = document.createElement("div"); acts.className = "vdist-none-acts";
-      const direct = document.createElement("button"); direct.type = "button"; direct.className = "btn sm"; direct.textContent = zh ? "直接设定" : "Set directly";
-      direct.addEventListener("click", () => openItemModal(item, false));
-      const addv = document.createElement("button"); addv.type = "button"; addv.className = "btn sm primary"; addv.textContent = zh ? "添加估值" : "Add valuation";
-      addv.addEventListener("click", () => { if (detailAddValuation) detailAddValuation(); });
-      acts.append(direct, addv);
-      box.appendChild(acts);
-    }
-    return;
-  }
-  box.className = "vdist";
-  const a = computeAnchors(c), p = c.price;
-  const ready = p > 0;
-  const pct = (to) => { const v = (to / p - 1) * 100; return (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(Math.abs(v) < 10 ? 1 : 0) + "%"; };
-  const tiles = [
-    { k: "strike", lab: zh ? "到击球区" : "To strike zone",
-      val: !ready ? "—" : p < a[1] ? (zh ? "已进入" : "Inside") : pct(a[1]),
-      sub: zh ? `跌破 ${fmtPx(a[1])}` : `Below ${fmtPx(a[1])}` },
-    { k: "fair", lab: zh ? "到合理区间" : "To fair range",
-      val: !ready ? "—" : p < a[2] ? pct(a[2]) : p > a[3] ? pct(a[3]) : (zh ? "区间内" : "Inside"),
-      sub: `${fmtPx(a[2])} – ${fmtPx(a[3])}` },
-    { k: "bubble", lab: zh ? "到泡沫区" : "To bubble",
-      val: !ready ? "—" : p >= a[4] ? (zh ? "已进入" : "Inside") : pct(a[4]),
-      sub: zh ? `涨过 ${fmtPx(a[4])}` : `Above ${fmtPx(a[4])}` },
-  ];
-  tiles.forEach((tl) => {
-    const d = document.createElement("div"); d.className = "vdist-tile " + tl.k;
-    d.innerHTML = `<span class="vdist-dot" aria-hidden="true"></span><span class="vdist-lab"></span><span class="vdist-val"></span><span class="vdist-sub"></span>`;
-    d.querySelector(".vdist-lab").textContent = tl.lab;
-    setNum(d.querySelector(".vdist-val"), tl.val);
-    d.querySelector(".vdist-sub").textContent = tl.sub;
-    if (tl.k === "strike") d.querySelector(".vdist-dot").style.background = ZONES[0].hex;
-    if (tl.k === "bubble") d.querySelector(".vdist-dot").style.background = ZONES[ZONES.length - 1].hex;
-    box.appendChild(d);
-  });
-  const params = document.createElement("div"); params.className = "vdist-params";
-  params.textContent = zh ? `安全边际 ${c.mos || 0}% · 泡沫阈值 ${c.ext || 0}%` : `Margin of safety ${c.mos || 0}% · Bubble threshold ${c.ext || 0}%`;
-  if (owner) {
-    const e = document.createElement("button"); e.type = "button"; e.className = "vdist-edit"; e.textContent = zh ? "调整" : "Adjust";
-    e.addEventListener("click", () => openItemModal(item, false));
-    params.appendChild(e);
-  }
-  box.appendChild(params);
 }
 
 /* ---------- 关键数据 ---------- */
@@ -3128,7 +3063,6 @@ function clearValuation(item, idBlock) {
 function syncFairUI(item, idBlock, persist = true) {
   const c = item.cfg;
   mountDetailPendulum(item);
-  if (detailDistEl && detailItem === item) renderDistance(item, detailDistEl);
   if (idBlock) { const vv = verdictOf(c, VMSGS); const vEl = idBlock.querySelector(".vd-verdict"); vEl.textContent = vv.text; vEl.className = "vd-verdict " + vv.cls; }
   if (item.gauge) item.gauge.set(c, true);
   renderVerdict(item); renderItemHead(item);
@@ -3257,7 +3191,7 @@ function renderValuationPanel(item, panel, idBlock) {
     const cards = item.cfg.valuations || [];
     // 真正空态（无卡片且未直接设定区间）：用图标 + 标题 + 说明 + 主行动,而不是一排"—"摘要
     if (!cards.length && !hasFairRange(item.cfg)) { panel.appendChild(emptyValuations()); return; }
-    // 距离指标已移到详情页顶部（renderDistance）；这里只放对照图 + 估值卡片
+    // 估值区间对照图 + 估值卡片
     if (cards.length) panel.appendChild(valuationMap(cards)); // 只有手动区间、没有估值卡时，对照图没有可比的内容
 
     const head = document.createElement("div"); head.className = "vsec-head";
@@ -3617,14 +3551,15 @@ function askSaveValEdit() {
   const box = document.createElement("div"); box.className = "modal ve-confirm"; box.setAttribute("role", "alertdialog"); box.setAttribute("aria-modal", "true");
   const title = document.createElement("div"); title.className = "modal-title"; title.textContent = zh ? "保存这次修改吗？" : "Save your changes?";
   const msg = document.createElement("p"); msg.className = "ve-confirm-msg";
-  msg.textContent = canSave ? (zh ? "你改过的假设和备注还没保存，离开后会丢失。" : "Your assumptions and note haven't been saved and will be lost if you leave.")
+  msg.textContent = canSave ? (zh ? "可以保存为正式估值，也可以只保留此浏览器中的研究草稿，下次继续。" : "Save the valuation, or keep a research draft in this browser to continue later.")
     : (zh ? "研究还没完成，可以先保留在此浏览器，下次回来继续；草稿不会参与估值钟摆。" : "Keep the unfinished research in this browser and resume later. Drafts do not affect the valuation gauge.");
   const acts = document.createElement("div"); acts.className = "ve-confirm-acts";
   const mk = (cls, text) => { const b = document.createElement("button"); b.type = "button"; b.className = "btn " + cls; b.textContent = text; return b; };
   const keep = mk("ghost", zh ? "继续编辑" : "Keep editing");
   const discard = mk("", zh ? "不保存" : "Don't save");
-  const save = mk("primary", canSave ? (zh ? "保存" : "Save") : (zh ? "保留草稿并离开" : "Keep draft and leave")); save.disabled = !canSave && !canDraft;
-  acts.append(keep, discard, save);
+  const draft = mk(canSave ? "" : "primary", zh ? "保留草稿并离开" : "Keep draft and leave"); draft.disabled = !canDraft;
+  const save = mk("primary", zh ? "保存估值并离开" : "Save valuation and leave"); save.hidden = !canSave; save.disabled = !canSave;
+  acts.append(keep, discard, draft); if (canSave) acts.append(save);
   box.append(title, msg, acts); ov.appendChild(box); document.body.appendChild(ov);
   const close = () => { ov.remove(); document.removeEventListener("keydown", onKey, true); };
   const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); close(); } };
@@ -3632,11 +3567,11 @@ function askSaveValEdit() {
   keep.addEventListener("click", close);
   ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
   discard.addEventListener("click", () => { valEditApi?.discardDraft(); close(); finishValEdit(); });
-  save.addEventListener("click", () => {
-    if (canSave) { close(); valEditApi.save(); }
-    else if (valEditApi.keepDraft()) { close(); finishValEdit(); }
+  draft.addEventListener("click", () => {
+    if (valEditApi.keepDraft()) { close(); finishValEdit(); }
     else msg.textContent = zh ? "此浏览器未能保留草稿，请继续编辑或复制研究内容。" : "The draft could not be stored. Keep editing or copy your research.";
   });
+  save.addEventListener("click", () => { if (canSave) { close(); valEditApi.save(); } });
   (canSave ? save : keep).focus();
 }
 // 关标签页 / 刷新：浏览器自带的离开提醒
@@ -3655,6 +3590,7 @@ function route() {
 }
 window.addEventListener("popstate", () => {
   if (valEditReturn) {
+    if (!valEditLeaving && valEditApi?.isSaving()) { history.pushState({ valedit: 1 }, "", location.href); return; }
     // 浏览器后退但有未保存改动：把历史条压回去，先问
     if (!valEditLeaving && valEditApi && valEditApi.isDirty()) { history.pushState({ valedit: 1 }, "", location.href); askSaveValEdit(); return; }
     const it = valEditReturn; valEditReturn = null; valEditLeaving = false;
@@ -3791,7 +3727,7 @@ boardNameEl.addEventListener("input", () => {
 document.getElementById("btnLogout").addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" });
   try { sessionStorage.clear(); } catch {} // 清掉身份提示与资产页缓存
-  location.reload();
+  location.replace("/login");
 });
 
 /* ---------- 主人模式初始化 ---------- */

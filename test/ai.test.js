@@ -143,6 +143,44 @@ describe("POST /api/my/ai/valuation", () => {
   });
 });
 
+describe("valuation web search", () => {
+  const searchBody = { messages: [{ role: "user", content: "给出假设；我持有 SECRET_HOLDING" }], context: CONTEXT, webSearch: true };
+  it("adds public search excerpts to the model and returns separate bounded source metadata", async () => {
+    const ck = await userCookie("search_success");
+    fetchMock.get("https://api.tavily.com").intercept({ path: "/search", method: "POST" }).reply(200, (opts) => {
+      expect(opts.headers.authorization).toBe("Bearer test-tavily-key");
+      expect(opts.body).toContain("小米集团"); expect(opts.body).not.toContain("SECRET_HOLDING");
+      return { results: [{ title: "Issuer report", url: "https://issuer.example/report", content: "REPORT_EXCERPT", published_date: "2026-03-20" }] };
+    });
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, (opts) => {
+      const system = JSON.parse(opts.body).messages[0].content;
+      expect(system).toContain("REPORT_EXCERPT"); expect(system).toContain("不可信数据");
+      return { choices: [{ message: { content: "参考报告 [1]，仍需核对口径。" } }] };
+    });
+    const res = await post(ck, searchBody), j = await res.json();
+    expect(res.status).toBe(200); expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(j.research).toMatchObject({ status: "ok", sources: [{ id: 1, url: "https://issuer.example/report", publishedAt: "2026-03-20" }] });
+    expect(j.research.sources[0]).not.toHaveProperty("excerpt");
+  });
+  it("reports search failure without pretending to have searched or calling the model", async () => {
+    const ck = await userCookie("search_failure");
+    fetchMock.get("https://api.tavily.com").intercept({ path: "/search", method: "POST" }).reply(429, { error: "do not echo upstream details" });
+    const res = await post(ck, searchBody);
+    expect(res.status).toBe(502); expect(await res.json()).toEqual({ error: "search_failed" });
+  });
+  it("records empty searches honestly and does not search before login/quota checks", async () => {
+    expect((await post(null, searchBody)).status).toBe(401);
+    const ck = await userCookie("search_empty");
+    fetchMock.get("https://api.tavily.com").intercept({ path: "/search", method: "POST" }).reply(200, { results: [] });
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, { choices: [{ message: { content: "未检索到相关资料。" } }] });
+    expect((await (await post(ck, searchBody)).json()).research).toMatchObject({ status: "empty", sources: [] });
+    const { id: uid } = await env.DB.prepare("SELECT id FROM users WHERE username='search_empty'").first();
+    await env.DB.prepare("UPDATE settings SET value=? WHERE user_id=? AND key='_ai_usage'").bind(new Date().toISOString().slice(0, 10) + ":100", uid).run();
+    expect((await post(ck, searchBody)).status).toBe(429);
+    expect(validateChat({ ...searchBody, webSearch: "true" })).toBe("bad webSearch");
+  });
+});
+
 const METHODS = [{ key: "pb", title: "P/B" }, { key: "ddm", title: "DDM" }, { key: "fcf", title: "DCF" }, { key: "pe", title: "P/E" }];
 describe("method recommendation", () => {
   it("keeps known keys only, first pick is primary, at most three", () => {
@@ -405,13 +443,29 @@ describe("AI note draft", () => {
 });
 
 describe("optional company-specific thesis guide", () => {
+  it("requests bounded JSON on Zhipu guides without changing other provider requests", async () => {
+    for (const [baseUrl, structuredGuide] of [["https://open.bigmodel.cn/api/paas/v4", true], ["https://open.bigmodel.cn/api/paas/v4", false], ["https://other.test/v1", true]]) {
+      const fakeFetch = async (_url, init) => {
+        const body = JSON.parse(init.body);
+        if (baseUrl.includes("bigmodel.cn") && structuredGuide) {
+          expect(body.response_format).toEqual({ type: "json_object" });
+          expect(body.temperature).toBe(0.2);
+        } else {
+          expect(body.response_format).toBeUndefined();
+          expect(body.temperature).toBeUndefined();
+        }
+        return Response.json({ choices: [{ message: { content: "{}" } }] });
+      };
+      expect(await chatComplete({}, "Return JSON", [{ role: "user", content: "Test" }], fakeFetch, { provider: "openai", baseUrl, model: "test", apiKey: "fixture", structuredGuide })).toBe("{}");
+    }
+  });
   const context = { stock: { name: "示例芯片公司", code: "DEMO" }, fields: [], business: ["业务描述：设计工业芯片，海外渠道仍在建设中。"], verified: ["2025 年海外收入占比 20%，来自测试财报。"] };
   const question = { type: "question", context: "公司正在建设海外芯片渠道，收入持续性仍需验证。", question: "你怎么看工业芯片海外渠道的发展？", selection: "single", options: [{ id: "a", label: "如果客户认可产品，海外收入会增长", detail: "场景假设，待验证" }, { id: "b", label: "渠道建设慢，增长有限" }] };
   const draft = { story: "海外工业芯片收入增长", evidence: "测试财报显示 2025 年海外收入占比 20%", uncertainties: "客户复购与投入效率待验证", impacts: [{ key: "growth", direction: "up", reason: "海外渠道可能增加销售" }, { key: "reinvestment", direction: "unknown", reason: "渠道投入效率未确定" }], signals: "建议跟踪复购和渠道费用，不设未确认的阈值" };
   const request = (cookie, body) => SELF.fetch("https://x/api/my/ai/thesis-guide", { method: "POST", headers: { ...J, ...(cookie ? { cookie } : {}) }, body: JSON.stringify(body) });
   const body = { lang: "zh", scenario: "o", context, turns: [], thesis: { c: { story: "另一个场景的私有判断" } } };
   it("validates bounded turns, isolates the case and includes available company evidence", async () => {
-    const { validateThesisGuide, buildThesisGuidePrompt } = await import("../src/ai.js");
+    const { validateThesisGuide, buildThesisGuidePrompt, parseThesisGuide } = await import("../src/ai.js");
     expect(validateThesisGuide(body)).toBeNull();
     expect(validateThesisGuide({ ...body, scenario: "all" })).toBe("scenario required");
     expect(validateThesisGuide({ ...body, scenario: "both" })).toBeNull(); // 整条流程：两个场景一起问
@@ -421,8 +475,9 @@ describe("optional company-specific thesis guide", () => {
     const prompt = buildThesisGuidePrompt(body, "zh");
     expect(prompt).toContain("工业芯片"); expect(prompt).toContain("2025 年海外收入占比"); expect(prompt).toContain("乐观场景");
     expect(prompt).not.toContain("另一个场景的私有判断"); expect(prompt).toContain("不是你声称已经发生的事实");
-    expect(buildThesisGuidePrompt({ ...body, context: { stock: context.stock } }, "en")).toContain("资料不足");
+    expect(buildThesisGuidePrompt({ ...body, context: { stock: context.stock } }, "en")).toContain("Insufficient company information");
     expect(buildThesisGuidePrompt(body, "en")).toContain("in English");
+    expect(parseThesisGuide(JSON.stringify(question), 2).selection).toBe("multiple");
     expect(prompt).toContain("所有选项都必须是有利的方向");
     const conservative = buildThesisGuidePrompt({ ...body, scenario: "c" }, "zh");
     expect(conservative).toContain("所有选项都必须是不利或不及预期的方向"); expect(conservative).not.toContain("所有选项都必须是有利的方向");
@@ -437,6 +492,8 @@ describe("optional company-specific thesis guide", () => {
     expect(validateThesisGuide({ ...flow, turns: Array(5).fill({ question: "q", answer: "a" }) })).toBeNull();
     expect(validateThesisGuide({ ...flow, turns: Array(6).fill({ question: "q", answer: "a" }) })).toBe("bad turns");
     const first = buildThesisGuidePrompt(flow, "zh");
+    expect(first).toContain("没有提供数据，不等于数据为零或不存在");
+    expect(buildThesisGuidePrompt(flow, "en")).toContain("FINAL OUTPUT REQUIREMENT");
     expect(first).toContain("两个场景共用的出发点"); expect(first).toContain("第 1/5 轮"); expect(first).toContain("另一个场景的私有判断"); // 两个场景的已有研究都要看到
     expect(buildThesisGuidePrompt({ ...flow, turns: [{ question: "q", answer: "a" }] }, "zh")).toContain("所有选项都必须是不利或不及预期的方向");
     expect(buildThesisGuidePrompt({ ...flow, turns: Array(2).fill({ question: "q", answer: "a" }) }, "zh")).toContain("所有选项都必须是有利的方向");

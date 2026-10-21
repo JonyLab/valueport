@@ -12,6 +12,7 @@ import { hashPassword, verifyPassword } from "./password.js";
 import { generateCode } from "./codes.js";
 import { validateUsername, validateSlug, rowToUser } from "./users.js";
 import { registerPortfolio } from "./portfolio.js";
+import { PortfolioStorageError, migratePortfolioBatch } from "./portfolio-storage.js";
 import { registerAi } from "./ai.js";
 import { registerAiChats } from "./ai-chats.js";
 import { registerResearch } from "./research.js";
@@ -27,6 +28,14 @@ import { parseHoldingsCsv } from "./brokers/csv.js";
 import { touchSeen, ownerStats } from "./usage.js";
 
 const app = new Hono();
+app.onError((error, c) => {
+  if (error instanceof PortfolioStorageError) {
+    c.header("Cache-Control", "no-store");
+    return c.json({ ok: false, error: "portfolio_storage_unavailable" }, 503);
+  }
+  console.error(error);
+  return c.text("Internal Server Error", 500);
+});
 const USER_COOKIE = "pendulum_user", OWNER_COOKIE = "pendulum_owner";
 const TTL = 7 * 24 * 3600;
 // 用户设置：只剩「新标的的默认安全边际 / 泡沫阈值」（页面文案与区间配色已取消，库里旧值不再返回、不再生效）
@@ -380,6 +389,12 @@ app.get("/api/owner/users", async (c) => {
 });
 // 使用统计（站长后台顶部的仪表盘）：只读聚合，见 src/usage.js
 app.get("/api/owner/stats", async (c) => { c.header("Cache-Control", "no-store"); return c.json(await ownerStats(c.env)); });
+// Restartable backfill; only counts are returned, never financial values or ciphertext.
+app.post("/api/owner/portfolio/encrypt", async (c) => {
+  c.header("Cache-Control", "no-store");
+  const body = await c.req.json().catch(() => ({}));
+  return c.json(await migratePortfolioBatch(c.env, body.limit));
+});
 app.post("/api/owner/users/:id/reset", async (c) => {
   const tmp = generateCode();
   const { hash, salt } = await hashPassword(tmp);

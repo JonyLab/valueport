@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Memory Supply-Demand Monitor Demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172026;
+      --muted: #66727c;
+      --line: #d8dee4;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --green: #087f5b;
+      --amber: #9a6700;
+      --blue: #1c5d99;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header {
+      padding: 28px 32px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: 0; }
+    .meta { color: var(--muted); font-size: 14px; }
+    main { padding: 24px 32px 36px; display: grid; gap: 22px; }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+    .view {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr);
+      gap: 16px;
+      align-items: stretch;
+    }
+    .thesis {
+      background: #102033;
+      color: #f7fbff;
+      border-radius: 8px;
+      padding: 22px;
+      min-height: 168px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #d3f9d8;
+      color: #075f43;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .thesis h2 {
+      margin: 16px 0 10px;
+      padding: 0;
+      border: 0;
+      color: #ffffff;
+      font-size: 26px;
+    }
+    .thesis p { margin: 0; color: #d8e2eb; line-height: 1.65; }
+    .signals {
+      display: grid;
+      gap: 10px;
+    }
+    .signal {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--amber);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .signal.positive {
+      border-left-color: var(--green);
+      background: #e9f8ef;
+      color: #075f43;
+    }
+    .signal.neutral {
+      border-left-color: #adb5bd;
+      background: #f1f3f5;
+      color: #495057;
+    }
+    .signal.watch {
+      background: #fff9db;
+      color: #7c5a00;
+    }
+    .signal .name { color: var(--muted); font-size: 13px; }
+    .signal .status { margin-top: 5px; font-weight: 700; }
+    .checks {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+      padding: 16px;
+    }
+    .check {
+      border: 1px solid var(--line);
+      border-left: 5px solid #c92a2a;
+      border-radius: 8px;
+      padding: 13px 14px;
+      background: #fffafa;
+    }
+    .check.ok {
+      border-left-color: var(--green);
+      background: #fbfffc;
+    }
+    .check-title { font-weight: 800; }
+    .check-body { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .kpi {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .kpi .label { color: var(--muted); font-size: 13px; }
+    .kpi .value { margin-top: 8px; font-size: 30px; font-weight: 700; }
+    .positive .value { color: var(--green); }
+    .watch .value { color: var(--amber); }
+    .neutral .value { color: var(--blue); }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .charts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .chart {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .chart-body { padding: 14px 16px 18px; }
+    svg { width: 100%; height: auto; display: block; }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px 16px; padding-bottom: 8px; color: var(--muted); font-size: 13px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .trend-note { color: var(--muted); font-size: 13px; padding-top: 4px; }
+    .axis-label { font-size: 13px; fill: #4d5963; }
+    .bar-label { font-size: 13px; fill: #172026; font-weight: 700; }
+    .threshold-label { font-size: 12px; fill: #6a737d; font-weight: 700; }
+    .empty { padding: 20px; color: var(--muted); }
+    h2 { margin: 0; padding: 16px 18px; font-size: 17px; border-bottom: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 11px 14px; border-bottom: 1px solid #edf0f2; text-align: left; }
+    th { color: var(--muted); font-weight: 600; background: #fafbfc; }
+    tr:last-child td { border-bottom: 0; }
+    @media (max-width: 680px) {
+      header, main { padding-left: 16px; padding-right: 16px; }
+      .view { grid-template-columns: 1fr; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Memory Supply-Demand Monitor</h1>
+    <div class="meta">本地 demo · Generated at 2026-06-26 19:00:06</div>
+  </header>
+  <main>
+    <div class="view">
+      <div class="thesis">
+        <span class="badge">需求修复</span>
+        <h2>Market View</h2>
+        <p><strong>模组厂营收动能较强</strong>。威剛月营收 MoM 超过 15%，但 DDR5 现货溢价尚未越过关键阈值。需求改善需要价格确认。</p>
+      </div>
+      <div class="signals">
+        <div class="signal neutral">
+          <div class="name">价格确认</div>
+          <div class="status">DDR5 溢价阈值 10% · 当前 -</div>
+        </div>
+        <div class="signal positive">
+          <div class="name">需求确认</div>
+          <div class="status">威剛 MoM 阈值 15% · 当前 22.61%</div>
+        </div>
+        <div class="signal neutral">
+          <div class="name">供给确认</div>
+          <div class="status">HBM 分流率未接入 · 暂不触发完整做多预警</div>
+        </div>
+      </div>
+    </div>
+    <div class="kpis">
+      <div class="kpi neutral">
+        <div class="label">DDR5 Spot Premium</div>
+        <div class="value">-</div>
+      </div>
+      <div class="kpi positive">
+        <div class="label">威剛 Revenue MoM</div>
+        <div class="value">22.61%</div>
+      </div>
+      <div class="kpi neutral">
+        <div class="label">Spot Rows</div>
+        <div class="value">3</div>
+      </div>
+      <div class="kpi neutral">
+        <div class="label">Revenue Rows</div>
+        <div class="value">4</div>
+      </div>
+    </div>
+    <section>
+      <h2>Data Sufficiency</h2>
+      <div class="checks"><div class="check bad"><div class="check-title">现货趋势样本不足</div><div class="check-body">当前每个产品最多 1 个交易日采样；至少需要 3 天看斜率，5-7 天看加速/阴跌信号。</div></div>
+<div class="check bad"><div class="check-title">营收趋势样本不足</div><div class="check-body">当前每家公司最多 1 个月度点；至少需要 2 个月判断连续转正，3 个月看趋势质量。</div></div>
+<div class="check bad"><div class="check-title">合约价口径未校准</div><div class="check-body">当前可用同单位价差产品 0 个；占位合约价会造成千百分比溢价，已禁止驱动观点。</div></div>
+<div class="check bad"><div class="check-title">HBM 供给参数缺失</div><div class="check-body">当前 HBM 投片占比/晶圆惩罚样本 0 条；没有它就不能触发完整结构性做多信号。</div></div></div>
+    </section>
+    <div class="charts">
+      <div class="chart">
+        <h2>Spot Price Trend</h2>
+        <div class="chart-body"><div class="legend"><span><i style="background:#087f5b"></i>DDR5_16Gb_5600</span><span><i style="background:#1c7ed6"></i>DDR5_16Gb_4800</span><span><i style="background:#9a6700"></i>DDR4_8Gb</span></div><svg viewBox="0 0 560 240" role="img" aria-label="Spot price trend"><line x1="58" y1="204" x2="530" y2="204" stroke="#d8dee4"></line><line x1="58" y1="20" x2="58" y2="204" stroke="#d8dee4"></line><circle cx="58" cy="24" r="5" fill="#087f5b"></circle><circle cx="58" cy="24" r="5" fill="#1c7ed6"></circle><circle cx="58" cy="24" r="5" fill="#9a6700"></circle></svg><div class="trend-note">当前只有一个采样点；调度运行几天后，这里会显示上扬/下行斜率。</div></div>
+      </div>
+      <div class="chart">
+        <h2>Revenue MoM Trend</h2>
+        <div class="chart-body"><div class="legend"><span><i style="background:#1c7ed6"></i>6239 力成</span><span><i style="background:#087f5b"></i>3260 威剛</span><span><i style="background:#9a6700"></i>2408 南亞科</span><span><i style="background:#7048e8"></i>2330 台積電</span></div><svg viewBox="0 0 560 240" role="img" aria-label="Revenue MoM trend"><line x1="58" y1="204" x2="530" y2="204" stroke="#d8dee4"></line><line x1="58" y1="20" x2="58" y2="204" stroke="#d8dee4"></line><line x1="58" y1="88" x2="530" y2="88" stroke="#8c959f" stroke-dasharray="6 6"></line><text x="432" y="81" class="threshold-label">MoM 15% threshold</text><circle cx="58" cy="178" r="5" fill="#1c7ed6"></circle><circle cx="58" cy="24" r="5" fill="#087f5b"></circle><circle cx="58" cy="144" r="5" fill="#9a6700"></circle><circle cx="58" cy="204" r="5" fill="#7048e8"></circle></svg><div class="trend-note">当前只有一个月度点；连续月份入库后，这里会显示需求动能拐点。</div></div>
+      </div>
+      <div class="chart">
+        <h2>Spot-Contract Spread</h2>
+        <div class="chart-body"><div class="empty">Contract baseline needs same-unit calibration before spread can drive a signal.</div></div>
+      </div>
+      <div class="chart">
+        <h2>Revenue MoM Pulse</h2>
+        <div class="chart-body"><svg viewBox="0 0 560 202" role="img" aria-label="Revenue MoM chart"><line x1="150" y1="10" x2="150" y2="192" stroke="#9aa4ad" stroke-dasharray="3 4"></line><text x="0" y="38" class="axis-label">3260 威剛</text><rect x="150" y="22" width="360" height="20" rx="3" fill="#1c7ed6"></rect><text x="518" y="37" class="bar-label">22.61%</text><text x="0" y="78" class="axis-label">2408 南亞科</text><rect x="150" y="62" width="136" height="20" rx="3" fill="#1c7ed6"></rect><text x="294" y="77" class="bar-label">8.55%</text><text x="0" y="118" class="axis-label">6239 力成</text><rect x="150" y="102" width="71" height="20" rx="3" fill="#1c7ed6"></rect><text x="229" y="117" class="bar-label">4.52%</text><text x="0" y="158" class="axis-label">2330 台積電</text><rect x="150" y="142" width="24" height="20" rx="3" fill="#1c7ed6"></rect><text x="182" y="157" class="bar-label">1.52%</text></svg></div>
+      </div>
+    </div>
+    <section>
+      <h2>Spot Prices</h2>
+      <table>
+        <thead><tr><th>Product</th><th>Spot Avg</th><th>Contract</th><th>Spread</th><th>Crawled</th></tr></thead>
+        <tbody><tr><td>DDR4_8Gb</td><td>36.0000</td><td>1.6000</td><td>34.4000</td><td>2026-06-26 17:26:18.677590+08:00</td></tr>
+<tr><td>DDR5_16Gb_4800</td><td>46.7330</td><td>3.7000</td><td>43.0330</td><td>2026-06-26 17:26:18.677590+08:00</td></tr>
+<tr><td>DDR5_16Gb_5600</td><td>46.7330</td><td>3.9000</td><td>42.8330</td><td>2026-06-26 17:26:18.677590+08:00</td></tr></tbody>
+      </table>
+    </section>
+    <section>
+      <h2>Taiwan Supply Chain Revenue</h2>
+      <table>
+        <thead><tr><th>Month</th><th>Code</th><th>Name</th><th>Revenue</th><th>MoM</th><th>YoY</th></tr></thead>
+        <tbody><tr><td>2026-05</td><td>2330</td><td>台積電</td><td>416,975,163</td><td>1.52%</td><td>30.09%</td></tr>
+<tr><td>2026-05</td><td>2408</td><td>南亞科</td><td>27,669,563</td><td>8.55%</td><td>730.14%</td></tr>
+<tr><td>2026-05</td><td>3260</td><td>威剛</td><td>12,942,597</td><td>22.61%</td><td>210.44%</td></tr>
+<tr><td>2026-05</td><td>6239</td><td>力成</td><td>7,917,615</td><td>4.52%</td><td>30.23%</td></tr></tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

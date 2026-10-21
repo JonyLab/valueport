@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memory-monitor"
+version = "0.1.0"
+description = "High-frequency memory supply-demand monitor collectors"
+requires-python = ">=3.10"
+dependencies = [
+  "apscheduler>=3.10",
+  "playwright>=1.44",
+  "psycopg[binary]>=3.1",
+  "requests>=2.31",
+]
+
+[project.scripts]
+memory-monitor-init-db = "memory_monitor.db:main"
+memory-monitor-demo = "memory_monitor.demo:main"
+memory-monitor-scheduler = "memory_monitor.scheduler:main"
+memory-monitor-spot-prices = "memory_monitor.supply.spot_prices:main"
+memory-monitor-twse-revenue = "memory_monitor.demand.twse_revenue:main"
+
+[tool.setuptools.packages.find]
+where = ["."]

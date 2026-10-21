@@ -8,7 +8,19 @@ const ri = (name) => `<i class="ri-${name}" aria-hidden="true"></i>`;
 // 示例标的：合理区间 100–130、安全边际 20%（击球线 80）、泡沫阈值 30%；现价 71.6 落在击球区
 const DEMO = { fairLow: 100, fairHigh: 130, mos: 20, ext: 30, price: 71.6, ticker: "DEMO" };
 
-export function mountIntro(host) {
+export function mountIntro(host, { strikeZone = false } = {}) {
+  if (strikeZone) {
+    host.classList.add("ap-intro-strike");
+    host.innerHTML = `
+      <figure class="ap-strike">
+        <img class="ap-strike-image" src="/images/strike-zone-sketch.webp" width="814" height="1042" alt="${t("a_strike_alt")}" fetchpriority="high">
+      </figure>
+      <div class="ap-strike-copy">
+        <h2 class="ap-title"><span>${t("a_strike_heading")}</span><span>${t("a_strike_heading2")}</span></h2>
+        <p class="ap-lead">${t("a_strike_lead")}</p>
+      </div>`;
+    return;
+  }
   const feats = [["dashboard-3-line", "a_f_pend"], ["focus-3-line", "a_f_strike"], ["earth-line", "a_f_macro"], ["pie-chart-2-line", "a_f_pf"]];
   host.innerHTML = `
     <p class="ap-eyebrow">${ri("seedling-line")}${t("a_intro_eyebrow")}</p>

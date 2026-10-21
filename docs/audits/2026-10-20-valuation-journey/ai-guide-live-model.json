@@ -1,0 +1,329 @@
+{
+  "at": "2026-10-20T12:02:55.362Z",
+  "provider": "openai",
+  "model": "glm-4.7-flash",
+  "cases": [
+    {
+      "id": "industrial-conservative",
+      "context": {
+        "stock": {
+          "name": "虚构工芯公司",
+          "code": "TEST_CHIP"
+        },
+        "business": [
+          "本测试为虚构公司：设计工业芯片，正在建立海外销售渠道，工业客户需要产品认证。"
+        ],
+        "verified": [
+          "测试给定事实：尚未提供海外复购和渠道费用数据。"
+        ]
+      },
+      "turns": [
+        {
+          "question": "在建立海外销售渠道的初期，您认为公司的业务重心和收入来源会有什么变化？",
+          "answer": "我担心认证时间长，海外收入增长会慢。"
+        },
+        {
+          "question": "您认为公司目前最缺乏哪类具体信息来支撑您的担忧？",
+          "answer": "只有业务简介，尚无认证进度或复购数据，不要当成已证实。"
+        },
+        {
+          "question": "如果海外销售渠道建立缓慢，您认为这首先会主要影响公司的哪一项？",
+          "answer": "可能先增加渠道投入，收入方向还不确定。"
+        }
+      ],
+      "steps": [
+        {
+          "round": 1,
+          "ms": 13689,
+          "valid": true,
+          "output": {
+            "type": "question",
+            "context": "资料[1]提到公司正在建立海外销售渠道，但未提供具体进展。我们需要了解您对这一阶段业务变化的判断。",
+            "question": "在建立海外销售渠道的初期，您认为公司的业务重心和收入来源会有什么变化？",
+            "selection": "multiple",
+            "options": [
+              {
+                "id": "a",
+                "label": "收入来源增加，但可能伴随较高的初期费用",
+                "detail": "如果海外渠道开始产生订单，收入会增加，但资料未提供渠道费用数据，初期费用可能较高。"
+              },
+              {
+                "id": "b",
+                "label": "收入来源不变，主要依赖现有渠道",
+                "detail": "如果海外渠道尚未产生实际订单，收入可能仍主要依赖现有渠道。"
+              },
+              {
+                "id": "c",
+                "label": "收入来源增加，且费用相对可控",
+                "detail": "如果海外渠道开始产生订单，收入会增加，且资料未提供渠道费用数据，费用可能相对可控。"
+              }
+            ]
+          }
+        },
+        {
+          "round": 2,
+          "ms": 8640,
+          "valid": true,
+          "output": {
+            "type": "question",
+            "context": "用户担心海外收入增长慢，这通常源于对业务落地难度的担忧。我们需要验证这种担忧是否有具体依据，还是仅基于对工业芯片认证流程的普遍印象。",
+            "question": "您认为公司目前最缺乏哪类具体信息来支撑您的担忧？",
+            "selection": "multiple",
+            "options": [
+              {
+                "id": "a",
+                "label": "海外客户的认证进度",
+                "detail": "例如：是否已有客户在测试中，还是完全处于空白。"
+              },
+              {
+                "id": "b",
+                "label": "渠道建设的具体计划",
+                "detail": "例如：是否有具体的销售团队组建或合作伙伴名单。"
+              },
+              {
+                "id": "c",
+                "label": "认证失败的具体原因",
+                "detail": "例如：是技术参数不达标，还是流程不熟悉。"
+              },
+              {
+                "id": "d",
+                "label": "公司对认证周期的预估",
+                "detail": "例如：是否有内部的时间表或历史数据参考。"
+              }
+            ]
+          }
+        },
+        {
+          "round": 3,
+          "ms": 3162,
+          "valid": true,
+          "output": {
+            "type": "question",
+            "context": "依据您之前的担忧，如果海外渠道建立缓慢，这会如何影响公司的现金流和资金使用？",
+            "question": "如果海外销售渠道建立缓慢，您认为这首先会主要影响公司的哪一项？",
+            "selection": "single",
+            "options": [
+              {
+                "id": "a",
+                "label": "收入增长",
+                "detail": "海外收入增长会变慢，导致营收增速下降。"
+              },
+              {
+                "id": "b",
+                "label": "利润率",
+                "detail": "初期投入的渠道费用可能增加，导致利润率承压。"
+              },
+              {
+                "id": "c",
+                "label": "再投资",
+                "detail": "需要更多资金投入渠道建设，减少其他方面的再投资。"
+              },
+              {
+                "id": "d",
+                "label": "资本回报",
+                "detail": "资金回笼变慢，导致资本回报率下降。"
+              }
+            ]
+          }
+        },
+        {
+          "round": 4,
+          "ms": 20478,
+          "valid": true,
+          "output": {
+            "type": "summary",
+            "draft": {
+              "story": "公司目前处于海外渠道建设初期，主要依赖工业芯片设计业务。由于工业客户认证周期长，海外收入增长可能较慢。公司可能需要增加渠道投入，但收入方向尚不确定。复购和渠道费用数据尚未获得。",
+              "signals": "建议：跟踪海外客户认证进度。\n建议：关注渠道建设投入与收入增长的匹配情况。\n建议：等待海外复购数据以验证客户粘性。\n建议：收集渠道费用数据以评估扩张成本。",
+              "evidence": "1. 公司为虚构工芯公司，设计工业芯片，正在建立海外销售渠道。[1] 2. 工业客户需要产品认证。[1] 3. 尚未提供海外复购和渠道费用数据。[2] 4. 用户担忧认证时间长，海外收入增长会慢。用户认为目前只有业务简介，尚无认证进度或复购数据。用户认为可能先增加渠道投入，收入方向还不确定。",
+              "uncertainties": "1. 海外复购数据尚未提供，无法判断客户粘性。[2] 2. 渠道费用数据尚未提供，无法评估扩张成本。[2] 3. 认证进度和具体时间表未知，收入增长速度存在不确定性。 4. 用户对收入方向不确定，可能存在多种情景。",
+              "impacts": [
+                {
+                  "key": "growth",
+                  "direction": "unknown",
+                  "reason": "认证时间长可能导致海外收入增长缓慢，但渠道建立后可能带来收入增长，方向不确定。"
+                },
+                {
+                  "key": "reinvestment",
+                  "direction": "up",
+                  "reason": "用户推测可能先增加渠道投入，以建立海外销售渠道。"
+                },
+                {
+                  "key": "risk",
+                  "direction": "unknown",
+                  "reason": "认证周期长和渠道建设缓慢可能带来经营风险，但具体风险程度未知。"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "retailer-optimistic-english",
+      "context": {
+        "stock": {
+          "name": "Fictional Neighborhood Retail",
+          "code": "TEST_SHOP"
+        },
+        "business": [
+          "Fictional test company: operates neighborhood grocery stores. It is piloting local delivery; no delivery profit data supplied."
+        ],
+        "verified": [
+          "Provided fictional fact: the company operates 40 stores; no plan to open more stores has been supplied."
+        ]
+      },
+      "turns": [
+        {
+          "question": "How will the pilot program impact the company's future?",
+          "answer": "I think better delivery service could increase purchases from existing customers."
+        },
+        {
+          "question": "What evidence do you have for this claim?",
+          "answer": "This is my hypothesis. I have no repeat-purchase evidence or delivery profit data."
+        },
+        {
+          "question": "Which financial effects follow from your story?",
+          "answer": "Sales may rise, but delivery costs could increase too. I am unsure about margins."
+        }
+      ],
+      "steps": [
+        {
+          "round": 1,
+          "ms": 25892,
+          "valid": true,
+          "output": {
+            "type": "question",
+            "context": "The company is currently piloting local delivery. No delivery profit data has been supplied.",
+            "question": "How will the pilot program impact the company's future?",
+            "selection": "single",
+            "options": [
+              {
+                "id": "a",
+                "label": "It will become a major profit driver.",
+                "detail": "Delivery will significantly increase revenue and profit margins."
+              },
+              {
+                "id": "b",
+                "label": "It will remain a small, break-even service.",
+                "detail": "Delivery will not be a significant profit center."
+              }
+            ]
+          }
+        },
+        {
+          "round": 2,
+          "ms": 4633,
+          "valid": true,
+          "output": {
+            "type": "question",
+            "context": "You mentioned that better delivery service could increase purchases from existing customers. To validate this, we need to know if you have data to support this claim.",
+            "question": "What evidence do you have for this claim?",
+            "selection": "single",
+            "options": [
+              {
+                "id": "a",
+                "label": "I have repeat-purchase records and can add the source",
+                "detail": "I have data showing customers who use delivery also buy more frequently."
+              },
+              {
+                "id": "b",
+                "label": "I only have the business description",
+                "detail": "I do not have specific data, just the general idea that delivery helps retention."
+              }
+            ]
+          }
+        },
+        {
+          "round": 3,
+          "ms": 30925,
+          "valid": true,
+          "output": {
+            "type": "question",
+            "context": "The company is piloting local delivery. No delivery profit data is available, and no repeat-purchase evidence has been collected yet.",
+            "question": "Which financial effects follow from your story?",
+            "selection": "multiple",
+            "options": [
+              {
+                "id": "a",
+                "label": "Delivery will increase sales revenue.",
+                "detail": "If delivery attracts more customers or increases purchase frequency, revenue will rise."
+              },
+              {
+                "id": "b",
+                "label": "Delivery will increase operating costs.",
+                "detail": "If delivery requires new staff or vehicles, costs will rise."
+              },
+              {
+                "id": "c",
+                "label": "Delivery will increase profit margin.",
+                "detail": "If delivery attracts higher-value customers, margins could improve."
+              }
+            ]
+          }
+        },
+        {
+          "round": 4,
+          "ms": 5222,
+          "valid": true,
+          "output": {
+            "type": "summary",
+            "draft": {
+              "story": "The company is piloting local delivery. The user hypothesizes that better delivery service could increase purchases from existing customers. The user is unsure about delivery profit data and repeat-purchase evidence. The user believes sales may rise, but delivery costs could increase too, leaving margins uncertain.",
+              "signals": "Suggested observations: 1) Monitor repeat purchase rates for delivery customers. 2) Analyze delivery cost per order versus average basket size. 3) Compare delivery customer retention to in-store retention.",
+              "evidence": "Fictional test company operates neighborhood grocery stores and is piloting local delivery [1]. The company operates 40 stores [2].",
+              "uncertainties": "The user has no repeat-purchase evidence or delivery profit data. The user is unsure about margins.",
+              "impacts": [
+                {
+                  "key": "growth",
+                  "direction": "unknown",
+                  "reason": "The user hypothesizes that better delivery service could increase purchases from existing customers."
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "missing-information",
+      "context": {
+        "stock": {
+          "name": "未知测试公司",
+          "code": "UNKNOWN"
+        }
+      },
+      "turns": [],
+      "steps": [
+        {
+          "round": 1,
+          "ms": 33898,
+          "valid": true,
+          "output": {
+            "type": "question",
+            "context": "缺少业务资料，无法判断公司核心业务模式。需要先了解公司具体在做什么，才能讨论未来的变化。",
+            "question": "这家公司目前主要在做什么业务？请描述它的核心产品或服务。",
+            "selection": "single",
+            "options": [
+              {
+                "id": "a",
+                "label": "提供产品或服务",
+                "detail": "例如：销售商品、提供咨询、软件服务等"
+              },
+              {
+                "id": "b",
+                "label": "平台或中介模式",
+                "detail": "例如：连接买卖双方、提供撮合服务"
+              },
+              {
+                "id": "c",
+                "label": "其他模式",
+                "detail": "请描述具体业务内容"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

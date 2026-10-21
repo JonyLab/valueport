@@ -233,7 +233,8 @@ async function login() {
 }
 document.getElementById("btnLogout").addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST" });
-  location.reload();
+  try { sessionStorage.clear(); } catch {}
+  location.replace("/login");
 });
 
 /* ---------- 保存（防抖） ---------- */

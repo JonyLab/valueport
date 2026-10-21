@@ -2,3 +2,12 @@ node_modules/
 .wrangler/
 .dev.vars
 dist/
+
+# Local Python environments and runtime files
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.env
+.env.*
+!.env.example

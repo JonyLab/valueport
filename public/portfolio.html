@@ -484,7 +484,7 @@ let base = localStorage.getItem("pf_base") || (zh ? "CNY" : "USD");
 if (!BASES.includes(base)) base = "USD";
 
 // ---------- 身份 / 配色 ----------
-// 先用本次会话记下的身份把缓存画出来（有缓存就不出骨架），/api/me 在后台校正（见文件末尾）
+// 身份信息不含持仓；等待 /api/me 确认身份后再加载资产。
 const meP = api("/api/me");
 let me = { ok: true, data: { username: sessionStorage.getItem("pf_user") || "", board: { slug: sessionStorage.getItem("owner_slug") || "" } } };
 let slug = "";
@@ -575,22 +575,25 @@ function summarize(d) {
 
 // ---------- 渲染 ----------
 let data = null, history = [];
-// 先用本次会话里上一次的数据立即画出页面（避免切页时先空白再「蹦出」内容），后台拉最新数据再刷新
-const CACHE_KEY = () => "pf_cache_" + me.data.username + "_" + base; // 按用户区分，换号不会看到别人的缓存
-function fromCache() {
-  try { const c = JSON.parse(sessionStorage.getItem(CACHE_KEY()) || "null"); if (c && c.data && Array.isArray(c.data.accounts)) { data = c.data; history = c.history || []; render(); return true; } } catch {}
-  return false;
-}
+// Remove legacy plaintext financial caches. Portfolio data now lives only in page memory.
+try {
+  for (const key of Object.keys(sessionStorage)) if (key.startsWith("pf_cache_")) sessionStorage.removeItem(key);
+} catch {}
 async function load() {
   const [r, h] = await Promise.all([api("/api/my/portfolio?base=" + base), api("/api/my/portfolio/history?days=3660")]);
-  data = r.data; history = (h.data && h.data.points) || [];
-  try { sessionStorage.setItem(CACHE_KEY(), JSON.stringify({ data, history })); } catch { /* 存不下就算了 */ }
+  if (!r.ok || !h.ok) {
+    data = null; history = [];
+    $("pfAccounts").replaceChildren(); $("pfAlert").replaceChildren();
+    $("pfRoot").textContent = T("资产数据暂时无法读取，请稍后重试；如持续失败，请联系管理员。", "Portfolio data is unavailable. Retry later; if it persists, contact the administrator.");
+    return;
+  }
+  data = r.data; history = h.data.points || [];
   render();
 }
 
 function render() {
   const root = $("pfRoot");
-  const fromSkel = !!$("pfSkel"); // 只在替换骨架时淡入；缓存先画、新数据再画时不重复淡入（否则会闪）
+  const fromSkel = !!$("pfSkel"); // 只在替换骨架时淡入
   root.innerHTML = "";
   if (!data.accounts.length) { $("pfAlert").replaceChildren(); $("pfAccounts").replaceChildren(); root.appendChild(emptyState()); return; }
   const s = summarize(data);
@@ -611,8 +614,8 @@ function emptyState() {
   const b = el("button", "btn primary"); b.type = "button"; b.append(ri("add-line"), document.createTextNode(T("添加账户", "Add an account")));
   b.addEventListener("click", () => openAccount());
   c.append(ico, el("div", "pf-empty-title", T("把你的券商账户连进来", "Connect your brokerage accounts")),
-    el("div", "pf-empty-sub", T("支持长桥、老虎、嘉信、E*TRADE、Webull（实时）和 IBKR（Flex 日终数据），以及手动录入或导入 CSV（适合 A 股等没有接口的券商）。连上后，这里会汇总总资产，并把每只持仓和你看板上的估值区间对上：多少仓位在击球区，多少在泡沫区。",
-      "Longbridge, Tiger, Schwab, E*TRADE and Webull (live), IBKR (Flex, end of day), or manual entry / CSV import for brokers without an API. Once connected, this page totals your assets and maps every holding onto your board's valuation zones.")), b);
+    el("div", "pf-empty-sub", T("连接券商或导入持仓，查看资产总览与估值分布。",
+      "Connect a broker or import holdings to see your assets and valuation zones.")), b);
   return c;
 }
 
@@ -643,7 +646,7 @@ function totalCard(s) {
   const curMenu = el("div", "pf-cur-menu"); curMenu.setAttribute("role", "menu"); curMenu.hidden = true;
   for (const b of BASES) {
     const o = el("button", b === base ? "on" : "", b); o.type = "button"; o.setAttribute("role", "menuitemradio"); o.setAttribute("aria-checked", b === base ? "true" : "false");
-    o.addEventListener("click", () => { curMenu.hidden = true; if (b === base) return; base = b; localStorage.setItem("pf_base", b); fromCache(); load(); }); // 有这个币种的缓存就先画缓存
+    o.addEventListener("click", () => { curMenu.hidden = true; if (b === base) return; base = b; localStorage.setItem("pf_base", b); load(); });
     curMenu.appendChild(o);
   }
   const setOpen = (open) => { curMenu.hidden = !open; curBtn.setAttribute("aria-expanded", open ? "true" : "false"); };
@@ -1485,7 +1488,7 @@ function openAccount(acc) {
   $("accTitle").textContent = acc ? T("账户设置", "Account settings") : T("添加账户", "Add account");
   $("accCancel").textContent = T("取消", "Cancel");
   $("accSave").textContent = acc ? T("保存", "Save") : T("连接并同步", "Connect & sync");
-  $("accPriv").textContent = T("凭证加密保存，只用来读取持仓和余额，不会下单；接口也永远不会返回明文。", "Credentials are stored encrypted, used only to read positions and balances (never to trade), and never returned in plain text.");
+  $("accPriv").textContent = T("券商凭证、持仓和余额均加密保存，仅用于读取资产，不会下单。", "Broker credentials, holdings and balances are stored encrypted. Connections only read asset data and never place trades.");
   $("accErr").textContent = "";
   renderAccForm();
   $("accOverlay").classList.remove("hidden");
@@ -1728,10 +1731,8 @@ async function doImport() {
   $("holdSave").onclick = () => { closeOverlays(); $("holdSave").onclick = null; };
 }
 
-const hadCache = me.data.username ? fromCache() : false;
 const meR = await meP;
 if (!meR.ok) { location.replace("/login"); throw new Error("unauthorized"); }
-if (meR.data.username !== me.data.username && hadCache) $("pfRoot").innerHTML = ""; // 身份和缓存对不上：别留着别人的画面
 me = meR; applyIdentity();
 await load();
 </script>

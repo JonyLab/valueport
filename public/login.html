@@ -9,7 +9,7 @@
   <link rel="modulepreload" href="/shared/core.js">
 </head><body><div class="page ap-page">
 <header class="ap-top"><a class="brand" href="/"><b>Value</b>Port<span class="brand-beta">Beta</span></a><div id="corner"></div></header>
-<main class="ap-shell">
+<main class="ap-shell ap-shell-strike">
   <section class="ap-card" aria-labelledby="ap-h">
     <h1 id="ap-h" data-i18n="a_login_title">登录</h1>
     <p class="ap-sub" data-i18n="a_login_sub">欢迎回来。</p>
@@ -36,7 +36,7 @@ import { mountLangMenu } from "/shared/langmenu.js";
 import { mountIntro, wirePasswordToggle, mapServerError, formState, firstEmpty } from "/shared/auth.js";
 applyI18n();
 mountLangMenu(document.getElementById("corner"));
-mountIntro(document.getElementById("intro"));
+mountIntro(document.getElementById("intro"), { strikeZone: true });
 const form=document.getElementById("f"), go=document.getElementById("go");
 const st=formState(form, document.getElementById("err"), go);
 wirePasswordToggle(document.getElementById("p"), document.getElementById("eye"));
@@ -46,7 +46,7 @@ async function gotoMyBoard(replace){
     if(!r.ok) return false;
     const me=await r.json();
     if(!me.board||!me.board.slug) return false;
-    const url="/portfolio"; // 登录后先到资产（Portfolio）首页
+    const url="/b/"+encodeURIComponent(me.board.slug);
     if(replace) location.replace(url); else location.href=url;
     return true;
   }catch{ return false; }

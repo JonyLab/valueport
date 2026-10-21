@@ -31,6 +31,8 @@ export function guideQuestion(raw) {
 }
 
 export function guideDraft(raw) {
+  // Models sometimes emit watch items as a list. Accept only bounded plain text.
+  if (object(raw) && Array.isArray(raw.signals) && raw.signals.length > 0 && raw.signals.length <= 6 && raw.signals.every((line) => text(line, 800))) raw = { ...raw, signals: raw.signals.join("\n") };
   if (!object(raw) || !["story", "evidence", "uncertainties", "signals"].every((key) => text(raw[key], 800))
     || !Array.isArray(raw.impacts) || raw.impacts.length > THESIS_IMPACTS.length
     || (raw.conflict !== undefined && raw.conflict !== null && (typeof raw.conflict !== "string" || raw.conflict.length > 400))) return null;
@@ -76,10 +78,10 @@ export function cleanGuideState(raw) {
   if (!object(raw) || !validGuideTurns(raw.turns)) return null;
   const question = raw.question ? guideQuestion(raw.question) : null;
   const draft = raw.draft ? guideDraft(raw.draft) : null;
-  if ((raw.question && !question) || (raw.draft && !draft)) return null;
+  if ((raw.question && !question) || (raw.draft && !draft) || (draft && raw.turns.length !== 3) || (question && raw.turns.length === 3) || (draft && question)) return null;
   const selected = Array.isArray(raw.selected) && question ? [...new Set(raw.selected.filter((id) => id === "unknown" || id === "other" || question.options.some((option) => option.id === id)))] : [];
   const history = Array.isArray(raw.history) ? raw.history.slice(0, 3).map((page) => cleanGuideState({ ...page, turns: [], history: [] })) : [];
-  if (history.some((page) => !page?.question)) return null;
+  if (history.length !== raw.turns.length || history.some((page) => !page?.question)) return null;
   return { turns: raw.turns.map(({ question, answer }) => ({ question, answer })), question, draft, history,
     selected: selected.includes("unknown") ? ["unknown"] : question?.selection === "single" ? selected.slice(0, 1) : selected,
     freeText: typeof raw.freeText === "string" ? raw.freeText.slice(0, 800) : "",

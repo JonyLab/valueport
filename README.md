@@ -1,4 +1,6 @@
-# 估值钟摆 · 看板 (Valuation Pendulum Watchlist)
+# ValuePort · 估值钟摆与资产看板
+
+Repository: `JonyLab/valueport`. The Cloudflare Worker and D1 database retain their existing names, `valuation-pendulum` and `pendulum-db`.
 
 ## Overview
 
@@ -18,12 +20,15 @@ Sessions are stateless HMAC-signed cookies (`SESSION_SECRET`). The owner backend
 
 | URL | Description |
 |-----|-------------|
-| `/login` | User login page — after signing in (or registering) you land on `/portfolio` |
-| `/register` | New-user registration (requires an activation code) |
+| `/login` | User login page — successful sign-in, or opening this page with an existing session, takes you to your Watchlist at `/b/<slug>` |
+| `/register` | New-user registration (requires an activation code); currently opens `/portfolio` after registration |
 | `/b/<slug>` | The board page — read-only for visitors; the signed-in owner edits items via dialogs and opens Settings (top-right) for text/colors/board config |
 | `/app` | Legacy entry — 302 redirect to your `/b/<slug>` (or `/login`) |
 | `/owner` | Station-master backend with a side menu — Overview (usage dashboard), Users (activity table + password reset), Activation codes (issue, filter by used / unused, see who redeemed) |
 | `/portfolio` | Signed-in user's Portfolio — linked broker accounts (Longbridge / IBKR Flex / Tiger / Schwab / E*TRADE / Webull / manual + CSV), total assets and holdings mapped onto the board's valuation zones |
+| `/macro` | Macro valuation dashboard |
+
+Signing out clears the browser session cache and replaces the current page with `/login`; it does not leave you on the board in read-only mode. Public board links remain available to visitors.
 
 ## Architecture
 
@@ -37,6 +42,11 @@ Cloudflare Worker (src/index.js)  — Hono router
 ├── src/users.js       Username/slug validation and DB-row ↔ camelCase mapping
 ├── src/items.js       Watchlist item validation and DB-row ↔ camelCase mapping
 ├── src/quotes.js      Tencent Finance GBK response parsers (quotes + hints)
+├── src/portfolio.js   Account, holdings, cash, history and allocation APIs
+├── src/portfolio-storage.js  Encrypted asset storage and legacy-data backfill
+├── src/crypto.js      AES-256-GCM helpers for assets, broker credentials and AI keys
+├── src/ai.js          Valuation assistant and model configuration
+├── src/web-search.js  Optional Tavily company search and source metadata
 │
 ├── public/login.html  Login page
 ├── public/register.html  Registration page (activation code required)
@@ -54,7 +64,12 @@ D1 database (binding: DB)
 │                       sort_order, updated_at
 ├── settings          — (user_id, key) composite PK; public keys: default_mos, default_ext
 │                       (new-stock defaults); internal: _ai_usage, _ai_active
-└── activation_codes  — code (PK), used_by (user id), created_at, used_at
+├── activation_codes  — code (PK), used_by (user id), created_at, used_at
+├── broker_accounts   — account owner, broker, name, encrypted credentials, sync status
+├── holdings / cash_balances / portfolio_snapshots / portfolio_plans
+│                     — encrypted asset payloads in data_enc; legacy value columns cleared
+├── ai_models / ai_chats  — encrypted custom-model keys / saved assistant conversations
+└── usage_daily / macro_series  — usage aggregates / macro indicator history
 ```
 
 ### Cookie names
@@ -70,15 +85,15 @@ Both are `HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800`.
 
 | Project | Runner | Covers |
 |---------|--------|--------|
-| `core` | Node (vitest default) | `test-core/core.test.js` — pure pendulum logic |
-| `worker` | `@cloudflare/vitest-pool-workers` | `test/*.test.js` — auth, password, codes, users, items, quotes, routes |
+| `core` | Node (vitest default) | `test-core/*.test.js` — valuation logic, module dependencies, search validation and other pure helpers |
+| `worker` | `@cloudflare/vitest-pool-workers` | `test/*.test.js` — APIs, authentication, encryption, migrations, brokers and AI integrations |
 
 ## Local Development
 
 ### Prerequisites
 
-- Node.js 18+ and npm
-- No Cloudflare account needed for local dev
+- Node.js 22+ and npm (required by the installed Wrangler version; CI also uses Node 22)
+- Local D1 runs on your machine. The configured Workers AI binding calls Cloudflare remotely and requires account access; external model, search and broker integrations need their own credentials.
 
 ### Setup
 
@@ -91,13 +106,18 @@ Create `.dev.vars` in the project root (gitignored):
 ```ini
 ADMIN_PASSWORD = "dev-pass"
 SESSION_SECRET = "dev-secret-please-change"
+CREDENTIALS_KEY = "<base64-encoded 32 random bytes>"
 ```
+
+Generate `CREDENTIALS_KEY` once with `openssl rand -base64 32`, paste it into the ignored `.dev.vars`, and restrict the file to your user (`chmod 600 .dev.vars`). Keep the key stable: replacing it makes existing encrypted data unreadable. Optional local secrets include `ZHIPU_API_KEY` (shared GLM model) and `TAVILY_API_KEY` (valuation web search). Local values are not automatically uploaded to production.
 
 Initialise the local D1 database (creates `.wrangler/state/v3/d1/`):
 
 ```bash
 npm run db:init
 ```
+
+For an existing local database, `db:init` does not add missing columns to existing tables. Apply the relevant migration files with `--local`; asset encryption also needs the backfill described in [Asset storage security](#asset-storage-security).
 
 ### Run locally
 
@@ -136,6 +156,10 @@ npx wrangler d1 execute pendulum-db --remote --file=./schema.sql
 # 4. Set secrets (you will be prompted to enter values)
 npx wrangler secret put ADMIN_PASSWORD
 npx wrangler secret put SESSION_SECRET
+# New environment only: generate and safely back up a random 32-byte base64 key.
+openssl rand -base64 32 | npx wrangler secret put CREDENTIALS_KEY
+npx wrangler secret put ZHIPU_API_KEY  # optional: shared GLM model
+npx wrangler secret put TAVILY_API_KEY # optional: valuation web search
 npx wrangler secret put GITHUB_TOKEN   # optional: file feedback as GitHub issues (see "Feedback")
 
 # 5. Deploy
@@ -147,8 +171,7 @@ After deploying:
 2. Generate activation codes and share them with new users.
 3. New users visit `/register`, enter their username, password, and activation code.
 
-> **Note:** `wrangler.toml` ships with `database_id = "PLACEHOLDER_RUN_d1_create_TO_FILL"`.
-> Replace this with the real ID returned by `d1 create` before deploying.
+`wrangler.toml` currently points to the project's existing D1 database. For a separate deployment, replace the database IDs (including `[env.test]`) with your own. For an existing deployment, preserve the original `CREDENTIALS_KEY` and follow the migration instructions instead of generating a replacement.
 
 ## Continuous deployment (GitHub Actions)
 
@@ -157,7 +180,7 @@ After deploying:
 1. **test** — `npm ci`, then `vitest run` (core + worker projects; the worker project uses wrangler's `[env.test]`, which has no AI binding).
 2. **deploy** — only on push to `main`, and only after `test` passes: `wrangler deploy --env=""` (the top-level production config). Deploys run one at a time in push order.
 
-So production is always the tested tip of `main`. Don't `npm run deploy` by hand from a local checkout any more — a manual deploy from a stale or uncommitted copy puts code that is not on `main` into production until the next CI deploy replaces it.
+The normal release path is a tested push to `main`. An explicit manual release can deploy a reviewed local checkout with `npx wrangler deploy --env="" --keep-vars`; it may temporarily differ from `main`, and the next CI release will replace it. Commit and merge the corresponding code before the next CI deployment. Runtime secrets are preserved; `--keep-vars` also preserves dashboard variables for a manual deployment, while CI currently takes variables from the repository configuration.
 
 ### Repository secrets (Settings → Secrets and variables → Actions → New repository secret)
 
@@ -239,6 +262,23 @@ Each user can link their own brokerage accounts on `/portfolio`. Holdings and ca
 
 **Credentials** are validated, encrypted with AES-256-GCM (`src/crypto.js`) using the `CREDENTIALS_KEY` Worker secret, and never returned by any endpoint — the API only reports whether credentials exist plus the last four characters of the key / query ID. They are used only to read positions and balances.
 
+### Asset storage security
+
+Holdings (symbol, name, quantity, cost, currency and market), cash balances, historical asset amounts and target allocation plans are also encrypted with AES-256-GCM. Each write uses a random 12-byte IV; authenticated context binds asset payloads to their type, user, account and history date where applicable. The existing `CREDENTIALS_KEY` stays on the server. Encrypted writes clear the old value columns; invalid ciphertext or a missing/wrong key fails closed with HTTP 503. Portfolio APIs use `Cache-Control: no-store`, and the Portfolio page no longer stores financial snapshots in `sessionStorage`.
+
+Passwords are salted PBKDF2-SHA256 hashes (currently 100,000 iterations), not reversible ciphertext. Account names, ownership metadata, watchlist items and saved AI chats are outside the asset encryption scope. The server can decrypt assets for authenticated requests; this is not end-to-end encryption. Old backups and database restore points may still contain earlier plaintext.
+
+For an existing database, add the encryption columns **once**, deploy the new Worker while retaining its original key, then run the authenticated backfill until `remaining=0`:
+
+```bash
+npx wrangler d1 execute pendulum-db --remote --env="" --file=./migrations/2026-10-20-portfolio-encryption.sql
+# Deploy the updated Worker before running the backfill.
+# Supply ADMIN_PASSWORD securely through the environment, not command arguments.
+node scripts/encrypt-portfolio.mjs --url=https://your-site
+```
+
+For local migration use `--local`, then `node scripts/encrypt-portfolio.mjs` (reads the local admin password from `.dev.vars`). Fresh databases using the current `schema.sql` already have the columns. See [the encryption rollout guide](docs/portfolio-encryption.md) for verification, key backup and recovery constraints.
+
 Setup for an existing deployment:
 
 ```bash
@@ -247,17 +287,22 @@ npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-port
 npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-portfolio-history.sql
 npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-portfolio-plan.sql
 npx wrangler d1 execute pendulum-db --remote --file=./migrations/2026-10-17-ai-models.sql
-# 2. Encryption key for broker credentials (32 random bytes, base64). Keep it stable: rotating it makes stored credentials unreadable.
+# 2. Only if this environment has no key or existing encrypted data:
+# generate and back up a key. Never overwrite an existing CREDENTIALS_KEY.
 openssl rand -base64 32 | npx wrangler secret put CREDENTIALS_KEY
 ```
 
-For local dev, add `CREDENTIALS_KEY = "<base64 32 bytes>"` to `.dev.vars` and run the migration with `--local`.
+These older table migrations are only for deployments missing those tables. Follow the asset-encryption migration and backfill above after the tables exist. For local dev, add `CREDENTIALS_KEY = "<base64 32 bytes>"` to `.dev.vars` and use `--local`.
 
 ## AI valuation assistant
 
 Both AI features are grounded: `public/shared/valuation/facts.js` turns the annual reports into verified statements (revenue trend, loss years, negative free-cash-flow years, earnings / cash-flow stability verdicts, capex jumps, net cash, buyback / dilution trend, dividend record with yield and payout ratio plus a verdict on whether dividends are the main form of shareholder return — "no dividend record found" when neither the dividend history nor the quote has one; DDM is only recommended as the primary method for high-payout, long-running payers), and the prompts require every claim about stability, dividends, growth or debt to match them. **Business first.** Method recommendation starts from the business itself, the way Buffett, Munger and Lynch would: `/api/research` also returns the Longbridge company profile (business scope) and revenue mix by business and region, which `businessFacts()` states for the model. The model must first describe how the company makes money, what drives revenue and profit, and how cyclical and capital-heavy it is, then classify it into one of `BUSINESS_TYPES` in `src/ai.js` (cyclical / commodity, financial, utility, stalwart, fast grower, unprofitable / turnaround, asset play, asset-light platform — Lynch's categories plus financials and utilities), each with a valuation playbook (e.g. cyclicals: resource NAV or mid-cycle EV/EBITDA, never PEG on peak earnings). Methods a type should never use are removed server-side even if the model picks them. The picker shows the result as a "business profile" (type, how it makes money, drivers, what it means for valuation). Beyond fundamentals, both the method picker and the AI review also weigh **market research** and **master lenses**: `GET /api/research?symbol=` (`src/research.js`, cached 6 h per symbol because Longbridge throttles repeated calls) returns Longbridge analyst ratings (buy / overweight / hold / underweight / sell), the target-price range and the consensus EPS forecast (US and HK; none for A-shares). `marketViews()` turns that into statements (bullish share, target midpoint vs price, consensus EPS growth vs the latest annual EPS, forward P/E for US stocks only because HK reports are often in RMB), and `masterLenses()` applies published yardsticks — Graham (P/E ≤ 15, P/B ≤ 1.5, P/E × P/B ≤ 22.5, Graham number), Lynch (PEG) and Buffett-style (owner-earnings yield, five-year ROE consistency, net cash) — labelled "by X's method", never as the investor's own view. The prompts ask the model to weigh fundamentals, market views and lenses and to say which side it favours when they disagree. Replies are stripped of Markdown before display. The method picker has **Ask AI to recommend**: the model reads the company's business and financials and marks one primary method plus one or two cross-checks on the method cards (cached per stock for the session). Each saved valuation card has **AI review**: it sends the card's assumptions with the verified facts, the latest actuals (`latestMetrics`) and code-computed comparisons of each assumption against the latest value (`assumptionChecks`: below both cases / between / above both — the model only explains, it doesn't compare numbers) and stores the verdict on the card as `review` (validated in `src/items.js`). The valuation workbench has an **Ask AI** drawer: chat about the stock, and the model returns suggested inputs for the current method (conservative / optimistic, with reasons) that you preview and apply to the form with one click (undoable). The server sends the model the stock, the known financials and the current method's fields; the model replies with prose plus a ```json block, which `src/ai.js` validates against the field list. No native tool calling is needed, so any provider works.
 
 **Per-user models.** Settings only configure; the AI panel switches. Under board settings → **AI models** a user adds their own OpenAI-compatible or Anthropic models (name, model, base URL, key; several allowed, stored in `ai_models` with the key encrypted by `CREDENTIALS_KEY`, never returned — only the last four characters). The model switcher at the top of the AI panel picks among the site default, a few Workers AI models (no setup) and those custom models; the choice applies to chat, method recommendations and reviews. Requests on the user's own key skip the site's daily limit. Base URLs must be https; "Test connection" sends one tiny request with the unsaved form values.
+
+**Method-specific assumptions.** The assistant receives the company name/code and the selected method's current fields. Resource NAV / SOTP includes the resource asset and commodity-price fields supported by the form; suggested changes are validated and need the user's confirmation before application.
+
+**Optional web search.** Set `TAVILY_API_KEY` to enable the **Web search / 联网搜索** toggle in the valuation chat drawer (off by default). Search sends only the company name/code and public keywords selected for the valuation method, not the user's question, holdings or form values. Tavily results are supplied to the model as untrusted reference material. Replies show numbered sources, available publication dates and the search date; saved chats retain source metadata rather than search excerpts. Search is limited to five sources and a 15-second timeout. Failures are reported explicitly; empty results are labelled honestly. This option currently applies to `/api/my/ai/valuation`, not every AI endpoint. The model itself still receives the normal chat and valuation context.
 
 The site default provider is configured with:
 
@@ -291,7 +336,7 @@ Signed-in users see a feedback icon next to the language menu (board / stock det
   `POST /api/my/feedback` then creates the issue through the GitHub REST API with the ValuePort username in the body and returns the issue URL; the dialog shows a link to it. Each user can file 10 issues per day (`_feedback_usage` in `settings`). If GitHub rejects the labels (422) it retries once without them. The token is only sent to `api.github.com` — never logged or returned.
 - **Without a token** the endpoint returns 501 and the dialog instead opens `https://github.com/<repo>/issues/new` with title, body and label prefilled (URL kept under 8,000 chars by trimming the description); the user files it with their own GitHub account.
 
-The target repo defaults to `JonyLab/watchlist`; override it with `FEEDBACK_REPO = "owner/repo"` under `[vars]` in `wrangler.toml`.
+The code's target repo still defaults to the legacy `JonyLab/watchlist`; set `FEEDBACK_REPO = "JonyLab/valueport"` under `[vars]` in `wrangler.toml` to target the renamed repository explicitly.
 
 ## API Reference
 
@@ -344,7 +389,7 @@ The target repo defaults to `JonyLab/watchlist`; override it with `FEEDBACK_REPO
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/my/ai/models` | `{active, site, workers: [...], custom: [{id: "m:<n>", kind, name, model, baseUrl, keyHint}]}` — never keys |
+| GET | `/api/my/ai/models` | `{active, dailyLimit, webSearchAvailable, site, workers: [...], siteKey: [...], custom: [{id: "m:<n>", kind, name, model, baseUrl, keyHint}]}` — never keys |
 | PUT | `/api/my/ai/active` | `{id: "default" \| "wa:<model>" \| "m:<n>"}` — switch the model in use |
 | POST | `/api/my/ai/models` | `{provider: "openai"\|"anthropic", name, model, baseUrl, apiKey}` → 201 `{id}` (max 10) |
 | PUT | `/api/my/ai/models/:n` | Same body; omit `apiKey` to keep the saved one |
@@ -356,7 +401,7 @@ The target repo defaults to `JonyLab/watchlist`; override it with `FEEDBACK_REPO
 | POST | `/api/my/ai/brief` | `{lang, stock, verified, metrics, market, lenses}` → `{brief:{points:[≤3], risks:[≤2], at}}`: fundamentals summary shown at the top of the detail page's Fundamentals tab (owner only, on click, cached per session); 502 `bad_ai_output`; shares the daily limit |
 | GET / PUT / DELETE | `/api/my/ai/chats?symbol=`, `/api/my/ai/chats`, `/api/my/ai/chats/:id` | AI assistant chat history per user and stock (`ai_chats`): list (newest first, ≤30 per stock, oldest pruned), read one `{chat:{messages:[{role, content, view?}]}}`, save `{id?, symbol, method, messages}` → `{id}` (with `id` overwrites your own chat), delete |
 | POST | `/api/my/ai/method` | `{lang, stock, facts, methods:[{key,title,subtitle}]}` → `{reply, picks:[{key, role: "primary"\|"check", reason}]}`; shares the daily limit |
-| POST | `/api/my/ai/valuation` | `{lang, messages:[{role,content}], context:{stock, method, mode, fields, facts}}` → `{reply, params, reasons}`; 429 after 100/day, 502 if the provider fails |
+| POST | `/api/my/ai/valuation` | `{lang, messages:[{role,content}], context:{stock, method, mode, fields, facts}, webSearch?:boolean}` → `{reply, params, reasons, widgets?, research?}`; optional research contains status, search date and source metadata; search errors are explicit, with 503 if search is unconfigured and 504 on timeout; shares the site daily limit |
 
 ### Feedback (requires `pendulum_user` cookie)
 
@@ -381,6 +426,7 @@ The target repo defaults to `JonyLab/watchlist`; override it with `FEEDBACK_REPO
 | POST | `/api/owner/codes` | `{count}` → mint 1-50 codes; returns `{ok, created:[...]}` |
 | GET | `/api/owner/users` | List all registered users |
 | POST | `/api/owner/users/:id/reset` | Reset a user's password → `{ok, password:"<temp>"}` |
+| POST | `/api/owner/portfolio/encrypt` | `{limit?:number}` → `{migrated, remaining, done}`; authenticated, restartable legacy asset-encryption backfill, at most 100 rows per call |
 
 Any unmatched `/api/*` path returns a JSON 404. All other paths are served from the `public/`
 static-asset directory via the `ASSETS` binding.

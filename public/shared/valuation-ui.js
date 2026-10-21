@@ -421,7 +421,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const thesisTabs = el("div", "vc-thesis-tabs");
   thesisTabs.setAttribute("role", "tablist");
   thesisTabs.setAttribute("aria-label", lang === "zh" ? "投资逻辑场景" : "Thesis scenarios");
-  let activeThesisScenario = "c";
+  let activeThesisScenario = restored?.state?.activeScenario === "o" ? "o" : "c";
   const thesisPanels = {}, thesisTabButtons = {}, followupPanels = {};
   for (const scenario of THESIS_SCENARIOS) {
     const scenarioTitle = lang === "zh" ? scenario.zh : scenario.en;
@@ -471,7 +471,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       thesisTabButtons[scenario.key].tabIndex = selected ? 0 : -1;
     }
   }
-  selectThesisScenario("c"); refreshThesisTabs();
+  selectThesisScenario(activeThesisScenario); refreshThesisTabs();
   const readThesis = () => cleanThesis({ ...Object.fromEntries(THESIS_SCENARIOS.map(({ key }) => [key, thesisEditors[key].read()])), legacy: thesisSeed.legacy });
   const writeScenario = (key, value) => thesisEditors[key].write(cleanThesis(value)[key]);
   const noteDetails = el("details", "vc-thesis-notes"); noteDetails.open = !!initialNote;
@@ -499,6 +499,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const r = await fetch("/api/my/ai/note", { method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ lang, format: "thesis", scenario, thesis: readThesis(), context: { ...context, ...views }, messages: ai.history(), note: noteInput.value.slice(0, 2000) }) });
       const j = await r.json().catch(() => ({}));
+      if (saving || destroyed) return;
       if (!r.ok || !cleanThesis(j.thesis)[scenario]) throw new Error(aiErrorText(r.status, j, lang));
       // Do not replace text typed while the request was in flight.
       if (draftAtRequest !== draftSnapshot(storyContext())) throw new Error(lang === "zh" ? "假设或投资逻辑已修改，请重新起草。" : "The assumptions or thesis changed. Please draft again.");
@@ -507,7 +508,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const next = { ...j.thesis[scenario] };
       for (const key of ["assessment", "drivers"]) if (next[key] === undefined && noteBefore.thesis[scenario]?.[key]) next[key] = noteBefore.thesis[scenario][key];
       writeScenario(scenario, { [scenario]: next }); noteUndo.hidden = false;
-      selectThesisScenario(scenario); thesisEditors[scenario].focus();
+      selectThesisScenario(scenario); thesisEditors[scenario].focus(); scheduleDraft();
     } catch (e) {
       noteErr.textContent = (lang === "zh" ? "起草失败：" : "Draft failed: ") + (e && e.message || e); noteErr.hidden = false;
     } finally { setDraftBtn(false); }
@@ -580,6 +581,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     if (!(lastLow > 0 && lastHigh > 0) || Math.round(lastHigh * 100) === Math.round(lastLow * 100)) return;
     const segOut = currentMode === "segment" ? { enabled: true, rows: segments.rows } : { enabled: false, rows: segments.rows || [] };
     saving = true; submitBtn.disabled = true; submitBtn.textContent = lang === "zh" ? "保存中…" : "Saving…"; saveError.hidden = true;
+    flow?.setLocked(true);
     const controls = [...root.querySelectorAll("button,input,textarea,select")].map((control) => [control, control.disabled]);
     for (const [control] of controls) control.disabled = true;
     flow?.pause();
@@ -588,8 +590,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const result = await onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), segments: segOut, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim(), thesis: readThesis() });
       if (result === false) throw new Error(lang === "zh" ? "保存失败，请重试。" : "Save failed. Please retry.");
       didSave = true; clearTimeout(draftTimer); draftTimer = null; draftStore.clear();
-    } catch (error) { saveError.textContent = (lang === "zh" ? "未能保存，输入已保留。" : "Not saved; your input is kept. ") + String(error.message || error); saveError.hidden = false; }
-    finally { saving = false; for (const [control, disabled] of controls) control.disabled = disabled; submitBtn.disabled = false; submitBtn.textContent = tx("submit"); }
+    } catch { saveError.textContent = lang === "zh" ? "未能保存，输入已保留。请稍后重试。" : "Not saved; your input is kept. Please retry shortly."; saveError.hidden = false; }
+    finally { saving = false; for (const [control, disabled] of controls) control.disabled = disabled; submitBtn.disabled = false; submitBtn.textContent = tx("submit"); flow?.setLocked(false); }
   });
   // ── 标的（logo · 名称 · 代码 · 现价，放结论栏顶）· 估值用到的数据（放输入栏）· 估值明细 · 备注与保存 ──
   const prof = el("div", "vc-prof");
@@ -1695,7 +1697,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   let baseline; // undefined = 还没记
   function draftState() {
     return { method: MODELS[activeIdx]?.key || null, inputs: cleanForm(lastForm), derivations: currentDerivations(), segments: { enabled: !!segments?.enabled, rows: segments?.rows || [] }, note: noteInput.value.trim(), thesis: readThesis(),
-      mode: flowMode ? "guide" : "manual", flow: flow ? flow.snapshot() : null };
+      activeScenario: activeThesisScenario, mode: flowMode ? "guide" : "manual", flow: flow ? flow.snapshot() : null };
   }
   function persistDraft() {
     if (destroyed || didSave || didDiscard || !draftKey) return false;

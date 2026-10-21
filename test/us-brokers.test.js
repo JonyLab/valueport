@@ -1,3 +1,4 @@
+import { readHoldings } from "../src/portfolio-storage.js";
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { env, SELF, fetchMock } from "cloudflare:test";
 import { schwabAuthorizeUrl, schwabExchangeCode, parseSchwabAccounts, fetchSchwabAssets } from "../src/brokers/schwab.js";
@@ -211,8 +212,8 @@ describe("oauth routes", () => {
       `CREATE TABLE IF NOT EXISTS settings (user_id INTEGER NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (user_id, key))`,
       `CREATE TABLE IF NOT EXISTS activation_codes (code TEXT PRIMARY KEY, used_by INTEGER, created_at TEXT NOT NULL, used_at TEXT)`,
       `CREATE TABLE IF NOT EXISTS broker_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, broker TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', cred_enc TEXT, last_sync_at TEXT, last_error TEXT, created_at TEXT NOT NULL)`,
-      `CREATE TABLE IF NOT EXISTS holdings (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, symbol TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', quantity REAL NOT NULL, cost_price REAL, currency TEXT NOT NULL, market TEXT NOT NULL DEFAULT '')`,
-      `CREATE TABLE IF NOT EXISTS cash_balances (account_id INTEGER NOT NULL, currency TEXT NOT NULL, amount REAL NOT NULL, PRIMARY KEY (account_id, currency))`,
+      `CREATE TABLE IF NOT EXISTS holdings (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, symbol TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', quantity REAL NOT NULL, cost_price REAL, currency TEXT NOT NULL, market TEXT NOT NULL DEFAULT '', data_enc TEXT)`,
+      `CREATE TABLE IF NOT EXISTS cash_balances (account_id INTEGER NOT NULL, currency TEXT NOT NULL, amount REAL NOT NULL, data_enc TEXT, PRIMARY KEY (account_id, currency))`,
     ];
     for (const q of ddl) await env.DB.prepare(q).run();
     const J = { "content-type": "application/json" };
@@ -245,7 +246,8 @@ describe("oauth routes", () => {
     const cb = await call(`/api/my/portfolio/oauth/callback?code=${encodeURIComponent("C0.x@y")}&state=${state}`);
     expect(cb.status).toBe(302);
     expect(cb.headers.get("location")).toBe(`/portfolio?connected=${id}`);
-    const { results } = await env.DB.prepare("SELECT symbol FROM holdings WHERE account_id=? ORDER BY symbol").bind(id).all();
+    const uid = (await env.DB.prepare("SELECT user_id FROM broker_accounts WHERE id=?").bind(id).first()).user_id;
+    const results = (await readHoldings(env, uid, id)).sort((a, b) => a.symbol.localeCompare(b.symbol));
     expect(results.map((x) => x.symbol)).toEqual(["usAAPL", "usBRK.B", "usSPY"]);
     const row = await env.DB.prepare("SELECT cred_enc, last_error FROM broker_accounts WHERE id=?").bind(id).first();
     expect(row.last_error).toBeNull();

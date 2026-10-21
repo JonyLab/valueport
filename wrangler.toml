@@ -19,6 +19,8 @@ database_id = "0be2e6bd-01f6-4b58-8112-516b9a1034db"
 # secrets（不写明文，用 `wrangler secret put` 设置）:
 #   ADMIN_PASSWORD            站长后台登录密码
 #   SESSION_SECRET            cookie HMAC 签名密钥
+#   CREDENTIALS_KEY           base64 编码的随机 32 字节 AES 密钥，保护券商凭据、用户 AI Key 及资产数据；必须备份，不能直接替换
+#   TAVILY_API_KEY             估值助手联网搜索（可选），未配置时搜索开关禁用
 #   LONGBRIDGE_APP_KEY        长桥 OpenAPI App Key（实时行情，可选）
 #   LONGBRIDGE_APP_SECRET     长桥 OpenAPI App Secret
 #   LONGBRIDGE_ACCESS_TOKEN   长桥 OpenAPI Access Token（有有效期，过期需更新）

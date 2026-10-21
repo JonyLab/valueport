@@ -2,6 +2,7 @@
 // 路由都挂在 /api/my/portfolio 下，复用 /api/my/* 的登录中间件（c.get("uid")），数据严格按 user_id 隔离。
 // 凭证只写不读：加密存库（src/crypto.js），接口永远不返回明文，只返回是否已配置 + 末四位提示。
 import { encryptJson, decryptJson } from "./crypto.js";
+import { readHoldings, readCash, replaceSnapshot, readHistory, historyStatement, readStoredPlan, writePlan } from "./portfolio-storage.js";
 
 export const BROKERS = ["longbridge", "ibkr", "tiger", "schwab", "etrade", "webull", "manual"];
 const SYMBOL_RE = /^(us|hk|sh|sz)[A-Za-z0-9.]{1,12}$/;
@@ -101,11 +102,8 @@ export function validatePlan(body) {
   if (!Number.isFinite(rel) || rel < 5 || rel > 100) return { error: "rel must be 5-100" };
   return { plan: { targets, cash, band, rel } };
 }
-async function readPlan(db, uid) {
-  try {
-    const row = await db.prepare("SELECT plan FROM portfolio_plans WHERE user_id=?").bind(uid).first();
-    return row ? { ...PLAN_DEFAULTS, ...JSON.parse(row.plan) } : { ...PLAN_DEFAULTS };
-  } catch { return { ...PLAN_DEFAULTS }; } // 线上还没跑迁移时不影响资产页
+async function readPlan(env, uid) {
+  return { ...PLAN_DEFAULTS, ...await readStoredPlan(env, uid) };
 }
 
 function credHint(broker, creds) {
@@ -118,27 +116,11 @@ function rowToAccount(r, hint) {
   return { id: r.id, broker: r.broker, name: r.name, hasCreds: !!r.cred_enc, credHint: hint || "", lastSyncAt: r.last_sync_at, lastError: r.last_error, createdAt: r.created_at };
 }
 
-// 用快照整体替换某账户的持仓与现金（一次 batch，要么全成要么全不成）
-async function replaceSnapshot(db, accountId, { positions, cash }) {
-  const stmts = [
-    db.prepare("DELETE FROM holdings WHERE account_id=?").bind(accountId),
-    db.prepare("DELETE FROM cash_balances WHERE account_id=?").bind(accountId),
-  ];
-  for (const p of positions) {
-    stmts.push(db.prepare("INSERT INTO holdings (account_id,symbol,name,quantity,cost_price,currency,market) VALUES (?,?,?,?,?,?,?)")
-      .bind(accountId, p.symbol, p.name || "", p.quantity, Number.isFinite(p.costPrice) ? p.costPrice : null, p.currency, p.market || ""));
-  }
-  // 同币种合并（CSV / 多子账户可能重复）
-  const merged = new Map();
-  for (const r of cash) merged.set(r.currency, (merged.get(r.currency) || 0) + r.amount);
-  for (const [currency, amount] of merged) stmts.push(db.prepare("INSERT INTO cash_balances (account_id,currency,amount) VALUES (?,?,?)").bind(accountId, currency, amount));
-  await db.batch(stmts);
-}
-
 // 持仓股票默认就在自选里：把还没在用户自选（items）里的持仓标的补进去（未估值，安全边际 / 泡沫阈值取用户设置的默认值），排在最后。返回补了几只
-export async function ensureOnBoard(db, uid) {
-  const [{ results: hs }, { results: its }, { results: st }] = await Promise.all([
-    db.prepare("SELECT h.symbol, h.name FROM holdings h JOIN broker_accounts a ON a.id=h.account_id WHERE a.user_id=?").bind(uid).all(),
+export async function ensureOnBoard(env, uid) {
+  const db = env.DB;
+  const [hs, { results: its }, { results: st }] = await Promise.all([
+    readHoldings(env, uid),
     db.prepare("SELECT symbol, sort_order FROM items WHERE user_id=?").bind(uid).all(),
     db.prepare("SELECT key, value FROM settings WHERE user_id=? AND key IN ('default_mos','default_ext')").bind(uid).all(),
   ]);
@@ -179,6 +161,8 @@ async function fxRates(base, currencies) {
  * @param getQuotes async (env, symbols) → { quotes: {sym: price}, prevClose: {sym: price}, source }
  */
 export function registerPortfolio(app, { adapters, getQuotes }) {
+  app.use("/api/my/portfolio", async (c, next) => { c.header("Cache-Control", "no-store"); await next(); });
+  app.use("/api/my/portfolio/*", async (c, next) => { c.header("Cache-Control", "no-store"); await next(); });
   const own = async (c, id) => c.env.DB.prepare("SELECT * FROM broker_accounts WHERE id=? AND user_id=?").bind(id, c.get("uid")).first();
   const key = (c) => c.env.CREDENTIALS_KEY;
 
@@ -251,8 +235,8 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
       const creds = await decryptJson(env.CREDENTIALS_KEY, acc.cred_enc);
       const snap = await fn(creds);
       if (snap.creds) await env.DB.prepare("UPDATE broker_accounts SET cred_enc=? WHERE id=?").bind(await encryptJson(env.CREDENTIALS_KEY, snap.creds), acc.id).run(); // 刷新过的令牌
-      await replaceSnapshot(env.DB, acc.id, snap);
-      await ensureOnBoard(env.DB, uid);
+      await replaceSnapshot(env, uid, acc.id, snap);
+      await ensureOnBoard(env, uid);
       await env.DB.prepare("UPDATE broker_accounts SET last_sync_at=?, last_error=NULL WHERE id=?").bind(now, acc.id).run();
       return { ok: true, positions: snap.positions.length, cash: snap.cash.length, unsupported: (snap.unsupported || []).length };
     } catch (e) {
@@ -335,8 +319,8 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     if (acc.broker !== "manual") return c.json({ ok: false, error: "only manual accounts can be edited" }, 400);
     const v = validateSnapshot(await c.req.json().catch(() => ({})));
     if (v.errors.length) return c.json({ ok: false, errors: v.errors }, 400);
-    await replaceSnapshot(c.env.DB, acc.id, v);
-    await ensureOnBoard(c.env.DB, c.get("uid"));
+    await replaceSnapshot(c.env, c.get("uid"), acc.id, v);
+    await ensureOnBoard(c.env, c.get("uid"));
     await c.env.DB.prepare("UPDATE broker_accounts SET last_sync_at=? WHERE id=?").bind(new Date().toISOString(), acc.id).run();
     return c.json({ ok: true });
   });
@@ -349,10 +333,10 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     const { text } = await c.req.json().catch(() => ({}));
     if (typeof text !== "string" || !text.trim() || text.length > 1_000_000) return c.json({ ok: false, error: "empty or too large" }, 400);
     const parsed = adapters.csv(text);
-    const { results } = await c.env.DB.prepare("SELECT currency, amount FROM cash_balances WHERE account_id=?").bind(acc.id).all();
+    const results = await readCash(c.env, c.get("uid"), acc.id);
     const v = validateSnapshot({ positions: parsed.positions, cash: results || [] });
-    await replaceSnapshot(c.env.DB, acc.id, v);
-    await ensureOnBoard(c.env.DB, c.get("uid"));
+    await replaceSnapshot(c.env, c.get("uid"), acc.id, v);
+    await ensureOnBoard(c.env, c.get("uid"));
     await c.env.DB.prepare("UPDATE broker_accounts SET last_sync_at=? WHERE id=?").bind(new Date().toISOString(), acc.id).run();
     return c.json({ ok: true, imported: v.positions.length, unsupported: parsed.unsupported || [], errors: [...(parsed.errors || []), ...v.errors] });
   });
@@ -363,16 +347,16 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     const uid = c.get("uid");
     const base = CUR_RE.test(c.req.query("base") || "") ? c.req.query("base") : "USD";
     const db = c.env.DB;
-    await ensureOnBoard(db, uid); // 兜底：之前的持仓也补进自选
-    const [{ results: accs }, { results: hs }, { results: cs }, { results: its }] = await Promise.all([
+    await ensureOnBoard(c.env, uid); // 兜底：之前的持仓也补进自选
+    const [{ results: accs }, hs, cs, { results: its }] = await Promise.all([
       db.prepare("SELECT * FROM broker_accounts WHERE user_id=? ORDER BY id ASC").bind(uid).all(),
-      db.prepare("SELECT h.* FROM holdings h JOIN broker_accounts a ON a.id=h.account_id WHERE a.user_id=?").bind(uid).all(),
-      db.prepare("SELECT b.* FROM cash_balances b JOIN broker_accounts a ON a.id=b.account_id WHERE a.user_id=?").bind(uid).all(),
+      readHoldings(c.env, uid),
+      readCash(c.env, uid),
       db.prepare("SELECT ticker,name,symbol,fair_low,fair_high,mos,ext FROM items WHERE user_id=?").bind(uid).all(),
     ]);
     const holdings = (hs || []).map((h) => ({ accountId: h.account_id, symbol: h.symbol, name: h.name, quantity: h.quantity, costPrice: h.cost_price, currency: h.currency, market: h.market }));
     const cash = (cs || []).map((r) => ({ accountId: r.account_id, currency: r.currency, amount: r.amount }));
-    const plan = await readPlan(db, uid);
+    const plan = await readPlan(c.env, uid);
     // 计划建仓的标的（有目标、还没持有）也要报价，用来算「约需买入多少股」
     const symbols = [...new Set([...holdings.map((h) => h.symbol), ...Object.keys(plan.targets)])];
     const q = symbols.length ? await getQuotes(c.env, symbols) : { quotes: {}, prevClose: {} };
@@ -393,13 +377,12 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
   });
 
   // ---------- 目标仓位 ----------
-  app.get("/api/my/portfolio/plan", async (c) => c.json({ plan: await readPlan(c.env.DB, c.get("uid")) }));
+  app.get("/api/my/portfolio/plan", async (c) => c.json({ plan: await readPlan(c.env, c.get("uid")) }));
   app.put("/api/my/portfolio/plan", async (c) => {
     const body = await c.req.json().catch(() => null);
     const { error, plan } = validatePlan(body);
     if (error) return c.json({ error }, 400);
-    await c.env.DB.prepare("INSERT INTO portfolio_plans (user_id, plan, updated_at) VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET plan=excluded.plan, updated_at=excluded.updated_at")
-      .bind(c.get("uid"), JSON.stringify(plan), new Date().toISOString()).run();
+    await writePlan(c.env, c.get("uid"), plan);
     return c.json({ ok: true, plan });
   });
 
@@ -407,10 +390,10 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
   // 按当前持仓 × 现价 + 现金算出每个账户与合计的价值，按当天汇率折成 USD / HKD / CNY 各存一份
   async function recordSnapshot(env, uid) {
     const db = env.DB;
-    const [{ results: accs }, { results: hs }, { results: cs }] = await Promise.all([
+    const [{ results: accs }, hs, cs] = await Promise.all([
       db.prepare("SELECT id FROM broker_accounts WHERE user_id=?").bind(uid).all(),
-      db.prepare("SELECT h.* FROM holdings h JOIN broker_accounts a ON a.id=h.account_id WHERE a.user_id=?").bind(uid).all(),
-      db.prepare("SELECT b.* FROM cash_balances b JOIN broker_accounts a ON a.id=b.account_id WHERE a.user_id=?").bind(uid).all(),
+      readHoldings(env, uid),
+      readCash(env, uid),
     ]);
     if (!(accs || []).length) return null;
     const symbols = [...new Set((hs || []).map((h) => h.symbol))];
@@ -422,9 +405,8 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     for (const c of cs || []) { const r = fx[c.currency]; if (r > 0) per.set(c.account_id, per.get(c.account_id) + c.amount * r); }
     const day = new Date().toISOString().slice(0, 10);
     const rows = [...per.entries(), [0, [...per.values()].reduce((a, v) => a + v, 0)]];
-    await db.batch(rows.map(([aid, usd]) => db.prepare(
-      "INSERT INTO portfolio_snapshots (user_id,day,account_id,v_usd,v_hkd,v_cny) VALUES (?,?,?,?,?,?) ON CONFLICT(user_id,day,account_id) DO UPDATE SET v_usd=excluded.v_usd, v_hkd=excluded.v_hkd, v_cny=excluded.v_cny"
-    ).bind(uid, day, aid, usd, usd / fx.HKD, usd / fx.CNY)));
+    await db.batch(await Promise.all(rows.map(([aid, usd]) => historyStatement(env, uid, day, aid,
+      { USD: usd, HKD: usd / fx.HKD, CNY: usd / fx.CNY }))));
     // 删除了的账户：去掉它当天的旧快照行，避免曲线里残留
     await db.prepare(`DELETE FROM portfolio_snapshots WHERE user_id=? AND day=? AND account_id<>0 AND account_id NOT IN (${[...per.keys()].map(() => "?").join(",") || "NULL"})`).bind(uid, day, ...per.keys()).run();
     return { day, total: rows[rows.length - 1][1] };
@@ -434,10 +416,9 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
   app.get("/api/my/portfolio/history", async (c) => {
     const days = Math.max(7, Math.min(3660, parseInt(c.req.query("days"), 10) || 365));
     const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-    const { results } = await c.env.DB.prepare("SELECT day, account_id, v_usd, v_hkd, v_cny FROM portfolio_snapshots WHERE user_id=? AND day>=? ORDER BY day ASC")
-      .bind(c.get("uid"), since).all();
+    const points = await readHistory(c.env, c.get("uid"), since);
     c.header("Cache-Control", "no-store");
-    return c.json({ points: (results || []).map((r) => ({ day: r.day, accountId: r.account_id, USD: r.v_usd, HKD: r.v_hkd, CNY: r.v_cny })) });
+    return c.json({ points });
   });
 
   // 每日定时任务：同步所有用户的券商账户，再给每个有账户的用户记一笔快照

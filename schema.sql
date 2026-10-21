@@ -54,13 +54,15 @@ CREATE TABLE IF NOT EXISTS holdings (
   quantity    REAL    NOT NULL,
   cost_price  REAL,
   currency    TEXT    NOT NULL,
-  market      TEXT    NOT NULL DEFAULT ''
+  market      TEXT    NOT NULL DEFAULT '',
+  data_enc    TEXT                            -- v1 AES-GCM payload; legacy fields cleared after migration
 );
 CREATE INDEX IF NOT EXISTS idx_holdings_account ON holdings(account_id);
 CREATE TABLE IF NOT EXISTS cash_balances (
   account_id  INTEGER NOT NULL,
   currency    TEXT    NOT NULL,
   amount      REAL    NOT NULL,
+  data_enc    TEXT,
   PRIMARY KEY (account_id, currency)
 );
 CREATE TABLE IF NOT EXISTS portfolio_snapshots (
@@ -70,10 +72,12 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
   v_usd       REAL    NOT NULL,
   v_hkd       REAL    NOT NULL,
   v_cny       REAL    NOT NULL,
+  data_enc    TEXT,
   PRIMARY KEY (user_id, day, account_id)
 );
 CREATE TABLE IF NOT EXISTS portfolio_plans (
   user_id     INTEGER PRIMARY KEY,
+  data_enc    TEXT,
   plan        TEXT    NOT NULL,                -- {targets:{symbol:pct}, cash:pct|null, band:pp, rel:%}
   updated_at  TEXT    NOT NULL
 );
