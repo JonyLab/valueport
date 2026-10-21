@@ -32,7 +32,7 @@ export function suggestedImpacts(story) {
 }
 
 export function impactDirection(key, direction, lang = "zh") {
-  if (lang === "en") return ({ up: "Increase", flat: "Stable", down: "Decrease", unknown: "To assess" })[direction] || "To assess";
+  if (lang === "en") return ({ up: "Increase", flat: "Stable", down: "Decrease", unknown: "Not sure yet" })[direction] || "Not sure yet";
   const labels = key === "growth" ? { up: "加快", flat: "稳定", down: "放缓" }
     : key === "risk" ? { up: "上升", flat: "不变", down: "下降" }
     : key === "reinvestment" ? { up: "增加", flat: "不变", down: "减少" }
@@ -48,6 +48,21 @@ export function impactParameterHint(key, fields, modelKey, lang = "zh") {
   if (!modelKey) return zh ? "选择估值方法后，再找到对应参数；现在不用填数字。" : "Choose a method later to find matching inputs. No numbers needed yet.";
   if (modelKey === "pb") return zh ? "P/B 不直接预测这项变化。先说明它如何影响 ROE 或风险，再判断目标 PB；需要单独量化时可换用其他方法。" : "P/B does not forecast this directly. Explain its effect on ROE or risk before choosing a multiple, or use another method.";
   return zh ? "当前方法没有直接对应的参数；保留这条判断，检查方法是否能表达它，不必硬塞进某个数字。" : "This method has no direct input for this topic. Keep the judgment and consider whether another method represents it better.";
+}
+
+// 参数旁的提示：这个参数对应故事里的哪项影响，两个场景各自判断的方向和原因。只复述用户的判断，不推算数值。
+export function fieldStoryHint(meta, thesis, lang = "zh") {
+  const impact = THESIS_IMPACTS.find((item) => item.metas.includes(meta));
+  if (!impact) return null;
+  const zh = lang !== "en", parts = [];
+  for (const scenario of THESIS_SCENARIOS) {
+    const item = (thesis?.[scenario.key]?.impacts || []).find((x) => x.key === impact.key);
+    if (!item || (item.direction === "unknown" && !item.reason)) continue;
+    const reason = item.reason ? (zh ? `（${item.reason}）` : ` (${item.reason})`) : "";
+    parts.push(`${zh ? scenario.zh : scenario.en} ${impactDirection(impact.key, item.direction, lang).toLowerCase()}${reason}`);
+  }
+  if (!parts.length) return null;
+  return (zh ? `你的故事：${impact.zh} — ` : `Your story: ${impact.en} — `) + parts.join(zh ? "；" : "; ");
 }
 
 function cleanFields(raw) {

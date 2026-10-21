@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cleanThesis, thesisLines, suggestedImpacts, impactParameterHint } from "../public/shared/valuation/thesis.js";
+import { cleanThesis, thesisLines, suggestedImpacts, impactParameterHint, fieldStoryHint } from "../public/shared/valuation/thesis.js";
 import { MODELS, modeFields } from "../public/shared/valuation/index.js";
 
 describe("scenario stories", () => {
@@ -35,5 +35,15 @@ describe("scenario stories", () => {
     expect(impactParameterHint("reinvestment", modeFields(fcff), "fcff")).toContain("销售/资本比");
     expect(impactParameterHint("growth", modeFields(pb), "pb")).toContain("P/B 不直接预测");
     expect(impactParameterHint("returns", modeFields(pb), "pb")).toContain("目标 PB");
+  });
+});
+
+describe("fieldStoryHint", () => {
+  it("restates each case's direction and reason next to the matching input, and stays silent otherwise", () => {
+    const thesis = { c: { story: "s", impacts: [{ key: "margin", direction: "flat", reason: "直销放缓" }] }, o: { story: "s", impacts: [{ key: "margin", direction: "up", reason: "直销占比提升" }, { key: "growth", direction: "unknown", reason: "" }] } };
+    expect(fieldStoryHint("netMargin", thesis)).toBe("你的故事：利润率 — 保守场景 稳定（直销放缓）；乐观场景 改善（直销占比提升）");
+    expect(fieldStoryHint("revGrowth", thesis)).toBeNull(); // 只有「还不确定」且没写原因
+    expect(fieldStoryHint("targetPE", thesis)).toBeNull(); // 没有对应的影响项
+    expect(fieldStoryHint("netMargin", {})).toBeNull();
   });
 });

@@ -25,6 +25,10 @@ describe("verifiedFacts", () => {
     expect(f).toContain("净现金 73.3B");
     expect(f).toContain("没有查到现金分红记录");
   });
+  it("does not judge free cash flow for financial companies", () => {
+    const f = verifiedFacts({ financials: XIAOMI, dividends: null, dps: NaN, financial: true, lang: "zh" }).join("\n");
+    expect(f).toContain("金融企业"); expect(f).not.toContain("现金流不稳定"); expect(f).toContain("盈利波动较大");
+  });
   it("recognises steady cash flow and a dividend history", () => {
     const steady = {
       IS: [acct("NetProfit", [[2021, 10], [2022, 11], [2023, 12], [2024, 12.5]])],
@@ -37,6 +41,31 @@ describe("verifiedFacts", () => {
     expect(f).toContain("连续派息 3 年");
     const en = verifiedFacts({ financials: steady, dividends: null, dps: 0.3, lang: "en" }).join("\n");
     expect(en).toContain("~0.3 per share (no full history)");
+  });
+  it("judges a steadily growing company (Microsoft-like) as stable growth, not volatile", () => {
+    const years = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+    const msft = {
+      IS: [acct("NetProfit", [17, 21, 16, 39, 44, 61, 73, 72, 88, 102].map((v, i) => [years[i], v]))],
+      CF: [acct("NetFreeCashFlow", [25, 31, 32, 38, 45, 56, 65, 59, 74, 72].map((v, i) => [years[i], v]))],
+    };
+    const f = verifiedFacts({ financials: msft, dividends: null, lang: "zh" }).join("\n");
+    expect(f).toContain("判断：盈利稳定增长");
+    expect(f).toContain("判断：现金流稳定增长、可预测");
+    expect(f).not.toContain("波动较大");
+    expect(f).not.toContain("现金流不稳定");
+    const en = verifiedFacts({ financials: msft, dividends: null, lang: "en" }).join("\n");
+    expect(en).toContain("Verdict: earnings growing steadily");
+    expect(en).toContain("Verdict: cash flow growing steadily and predictable");
+  });
+  it("still judges flat noisy series by the old rule", () => {
+    const years = [2019, 2020, 2021, 2022, 2023, 2024];
+    const mk = (ni, fcf) => ({ IS: [acct("NetProfit", ni.map((v, i) => [years[i], v]))], CF: [acct("NetFreeCashFlow", fcf.map((v, i) => [years[i], v]))] });
+    // 没有趋势、来回波动但没腰斩、没负值：变异系数不高，仍是「较稳定」，不说「增长」
+    const flat = verifiedFacts({ financials: mk([10, 18, 9.5, 17, 9.2, 16.5], [10, 17, 9.5, 16, 9.5, 15]), dividends: null, lang: "zh" }).join("\n");
+    expect(flat).toContain("盈利较稳定"); expect(flat).toContain("现金流较稳定"); expect(flat).not.toContain("稳定增长");
+    // 有腰斩 / 负值仍然不稳定
+    const bad = verifiedFacts({ financials: mk([10, 18, 8, 15, 9, 16], [10, 17, -2, 16, 9, 15]), dividends: null, lang: "zh" }).join("\n");
+    expect(bad).toContain("盈利波动较大"); expect(bad).toContain("现金流不稳定");
   });
   it("says DDM doesn't fit a low-payout buyback company like Apple, but fits a high-payout steady payer", () => {
     // 苹果：EPS 6.1→7.5、净利 ~1000 亿，股数逐年下降；每股股息 ~1 美元，分红率 ~14%、股息率 ~0.4%

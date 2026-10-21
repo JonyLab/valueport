@@ -23,9 +23,9 @@ export function mountThesisQuestions(panel, followup, { lang, scenario, initial 
     inputs[key] = input; label.append(input); parent.append(label); return input;
   }
   const storySection = node("section", "vc-question");
-  const story = textField(storySection, "story", zh ? "1. 在这个场景下，你认为公司未来会怎样？" : "1. What happens to the business in this case?",
+  const story = textField(storySection, "story", zh ? "这个场景下，公司未来会怎样？" : "What happens to the business in this case?",
     zh ? "例如：竞争加剧，老客户还在，但新客户增长会变慢。" : "For example: competition increases; existing customers stay, but new customer growth slows.",
-    zh ? "先写一句话就可以。想想产品、客户和竞争会发生什么变化，不用先懂估值术语。" : "One sentence is enough. Think about products, customers and competition; no valuation jargon needed.");
+    zh ? "一句话就行：产品、客户和竞争会怎么变。" : "One sentence is enough: products, customers, competition.");
   const example = node("details", "vc-question-example");
   example.append(node("summary", "", zh ? "不知道怎么写？看个例子" : "Need an example?"), help(zh
     ? (scenario.key === "c" ? "假设性例子：新产品推广比预期慢，公司主要靠老客户维持收入。你可以接着想：客户为什么愿意留下？竞争对手会不会降价？" : "假设性例子：新产品得到客户认可，海外渠道逐渐成熟。你可以接着想：谁会购买？为什么选它？公司能否持续交付？")
@@ -33,7 +33,7 @@ export function mountThesisQuestions(panel, followup, { lang, scenario, initial 
   storySection.append(example); panel.append(storySection);
 
   const evidenceSection = node("section", "vc-question");
-  evidenceSection.append(node("h3", "vc-question-label", zh ? "2. 什么支持这个判断？还有什么没证实？" : "2. What supports your view, and what is unverified?"), help(zh ? "把事实和预期分开。也可以记下反面证据；暂时没有资料，可以先留待验证。" : "Separate facts from expectations. Include contrary evidence; missing information can remain unverified."));
+  evidenceSection.append(node("h3", "vc-question-label", zh ? "有什么依据？还有什么没证实？" : "What supports it, and what is unverified?"), help(zh ? "把事实和预期分开；没有资料的先留待验证。" : "Separate facts from expectations; leave gaps unverified."));
   const evidence = textField(evidenceSection, "evidence", zh ? "已有依据" : "Supporting evidence", zh ? "例如：年报显示海外收入连续增长。写下来源或链接，方便以后核实。" : "For example: annual reports show overseas revenue growth. Note a source or link to check later.");
   const noEvidence = node("button", "vc-question-action", zh ? "暂时没有依据" : "No evidence yet"); noEvidence.type = "button";
   noEvidence.addEventListener("click", () => {
@@ -47,34 +47,29 @@ export function mountThesisQuestions(panel, followup, { lang, scenario, initial 
   panel.append(evidenceSection);
 
   const impactSection = node("section", "vc-question");
-  impactSection.append(node("h3", "vc-question-label", zh ? "3. 这些变化，会怎样影响公司的赚钱能力？" : "3. How do these changes affect the business financially?"), help(zh ? "选出受影响的项目，再判断方向和原因。这里不用填数字，量化时再确认参数。" : "Choose affected topics, then a direction and reason. Confirm numerical inputs later."));
-  const suggestions = node("div", "vc-impact-suggestions");
-  const all = node("details", "vc-question-example");
-  all.append(node("summary", "", zh ? "自己选择影响项" : "Choose topics yourself"));
-  const choices = node("div", "vc-impact-choices"); all.append(choices);
+  impactSection.append(node("h3", "vc-question-label", zh ? "会怎样影响赚钱能力？" : "How does it affect the financials?"), help(zh ? "选出受影响的项目和方向，数字在下一步填。" : "Pick what is affected and which way; numbers come next."));
+  const choices = node("div", "vc-impact-choices");
   const list = node("div", "vc-impact-list");
-  const next = help(zh ? "确认影响后，再往下选择估值方法，把判断变成数字。" : "After reviewing these effects, choose a valuation method below to quantify them.");
-  impactSection.append(suggestions, all, list, next); panel.append(impactSection);
+  impactSection.append(list, choices); panel.append(impactSection);
   const choiceButtons = new Map();
   function addImpact(key, value = {}) {
     if (rows.has(key)) return;
     const item = THESIS_IMPACTS.find((entry) => entry.key === key); if (!item) return;
     const title = zh ? item.zh : item.en;
+    // 紧凑一行：影响项 + 方向 + 移除；下面一行写原因
     const row = node("section", "vc-impact-row"), head = node("div", "vc-impact-head");
-    const remove = node("button", "vc-question-action", zh ? "移除" : "Remove"); remove.type = "button"; remove.setAttribute("aria-label", `${caseName} · ${zh ? "移除" : "Remove"} ${title}`);
-    head.append(node("strong", "", title), remove); row.append(head);
-    const label = node("label", "vc-impact-direction"); label.append(node("span", "", zh ? "你预计的方向" : "Expected direction"));
+    const remove = node("button", "vc-impact-remove", "×"); remove.type = "button"; remove.setAttribute("aria-label", `${caseName} · ${zh ? "移除" : "Remove"} ${title}`);
     const direction = node("select", ""); direction.setAttribute("aria-label", `${caseName} · ${title} · ${zh ? "方向" : "Direction"}`);
     for (const dir of ["unknown", ...IMPACT_DIRECTIONS.filter((entry) => entry !== "unknown")]) {
       const option = node("option", "", impactDirection(key, dir, lang)); option.value = dir; direction.append(option);
     }
-    direction.value = value.direction || "unknown"; label.append(direction); row.append(label);
-    const reasonLabel = node("label", "vc-thesis-field"); reasonLabel.append(node("span", "", zh ? "故事里的哪件事，会带来这个变化？" : "What in your story causes this change?"));
-    const reason = node("textarea", "vc-note-input"); reason.rows = 2; reason.maxLength = THESIS_LIMIT; reason.value = value.reason || "";
-    reason.placeholder = zh ? "例如：要覆盖更多地区，就需要增加渠道和库存投入。还不确定也可以先留空。" : "For example: reaching more regions requires more channel and inventory investment. Leave blank if uncertain.";
-    reason.setAttribute("aria-label", `${caseName} · ${title} · ${zh ? "原因" : "Reason"}`); reasonLabel.append(reason);
-    const hint = help(impactParameterHint(key, currentFields, currentMethod, lang));
-    row.append(reasonLabel, hint); list.append(row); rows.set(key, { row, direction, reason, hint });
+    direction.value = value.direction || "unknown";
+    head.append(node("strong", "", title), direction, remove); row.append(head);
+    const reason = node("textarea", "vc-note-input vc-impact-reason"); reason.rows = 1; reason.maxLength = THESIS_LIMIT; reason.value = value.reason || "";
+    reason.placeholder = zh ? "原因：故事里的哪件事带来这个变化？（可留空）" : "Why: what in your story causes this? (optional)";
+    reason.setAttribute("aria-label", `${caseName} · ${title} · ${zh ? "原因" : "Reason"}`);
+    const hint = node("p", "vc-impact-hint", impactParameterHint(key, currentFields, currentMethod, lang));
+    row.append(reason, hint); list.append(row); rows.set(key, { row, direction, reason, hint });
     remove.addEventListener("click", () => { row.remove(); rows.delete(key); refreshSuggestions(); changed(); choiceButtons.get(key)?.focus(); });
     direction.addEventListener("change", changed);
   }
@@ -83,21 +78,14 @@ export function mountThesisQuestions(panel, followup, { lang, scenario, initial 
     const button = node("button", "vc-impact-chip", (zh ? "+ " : "+ ") + (zh ? item.zh : item.en)); button.type = "button";
     button.addEventListener("click", () => addFromChoice(item.key)); choices.append(button); choiceButtons.set(item.key, button);
   }
+  // 故事里的用词只用来提示「可能相关」：高亮对应选项，不替用户选
   function refreshSuggestions() {
-    const keys = suggestedImpacts(story.value).filter((key) => !rows.has(key));
-    suggestions.replaceChildren();
-    suggestions.append(help(zh ? (keys.length ? "根据你的用词，可以先检查这些影响（需你确认）：" : "不确定影响什么？展开下面的选项，也可以稍后再判断。") : (keys.length ? "Your wording suggests these topics to review; you decide whether they apply:" : "Not sure yet? Browse the topics below, or come back later.")));
-    if (keys.length) {
-      const chips = node("div", "vc-impact-choices");
-      for (const key of keys) {
-        const item = THESIS_IMPACTS.find((entry) => entry.key === key);
-        const button = node("button", "vc-impact-chip", "+ " + (zh ? item.zh : item.en)); button.type = "button";
-        button.addEventListener("click", () => addFromChoice(key)); chips.append(button);
-      }
-      suggestions.append(chips);
+    const keys = new Set(suggestedImpacts(story.value));
+    for (const [key, button] of choiceButtons) {
+      button.hidden = rows.has(key);
+      button.classList.toggle("suggested", keys.has(key));
+      button.title = keys.has(key) ? (zh ? "故事里提到了相关内容" : "Your story mentions this") : "";
     }
-    for (const [key, button] of choiceButtons) { button.disabled = rows.has(key); }
-    next.hidden = !rows.size;
   }
   story.addEventListener("input", refreshSuggestions);
 
@@ -105,7 +93,7 @@ export function mountThesisQuestions(panel, followup, { lang, scenario, initial 
   const previous = node("details", "vc-question-example"); previous.append(node("summary", "", zh ? "之前写过的检验与假设" : "Previous research notes"));
   textField(previous, "assessment", zh ? "原有故事检验" : "Previous story assessment", "");
   textField(previous, "drivers", zh ? "原有关键假设" : "Previous assumptions", ""); panel.append(previous);
-  textField(followup, "signals", zh ? "5. 什么变化会让你重新考虑这个故事？" : "5. What would make you reconsider this story?", zh ? "例如：新品迟迟没有复购、客户流失增加。先写观察事项，有依据后再定阈值。" : "For example: no repeat orders, or more customers leaving. Set thresholds once supported by evidence.");
+  textField(followup, "signals", zh ? "什么变化会让你重新考虑这个故事？" : "What would make you reconsider this story?", zh ? "例如：新品迟迟没有复购、客户流失增加。先写观察事项，有依据后再定阈值。" : "For example: no repeat orders, or more customers leaving. Set thresholds once supported by evidence.");
 
   function write(value) {
     const clean = cleanThesis({ [scenario.key]: value })[scenario.key] || {};

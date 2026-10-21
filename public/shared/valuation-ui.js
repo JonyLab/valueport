@@ -16,15 +16,15 @@ import { aggregateSegments } from "/shared/valuation/segments.js";
 import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
 import { resourceAiFields, resourceAiFacts, applyResourceAiParams } from "/shared/valuation/resource-ai.js";
 import { mountAiPanel, aiErrorText } from "/shared/ai-panel.js";
-import { verifiedFacts, marketViews, masterLenses, businessFacts, latestMetrics, assumptionChecks } from "/shared/valuation/facts.js";
-import { cleanThesis, THESIS_SCENARIOS, thesisLines } from "/shared/valuation/thesis.js";
+import { verifiedFacts, marketViews, masterLenses, businessFacts, latestMetrics, assumptionChecks, isFinancialCompany } from "/shared/valuation/facts.js";
+import { cleanThesis, THESIS_SCENARIOS, thesisLines, fieldStoryHint } from "/shared/valuation/thesis.js";
 import { mountThesisQuestions } from "/shared/valuation/thesis-questions.js";
-import { mountThesisGuide } from "/shared/valuation/thesis-guide-ui.js";
+import { mountValuationFlow } from "/shared/valuation/thesis-guide-ui.js";
 import { valuationDraftStore } from "/shared/valuation/editor-draft.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
-        submit: "保存估值", dash: "—", note: "备注", notePh: "为什么给出这个估值？关键逻辑、假设依据、风险…", useRange: "套用区间" },
+        submit: "保存估值", dash: "—", note: "备注", notePh: "为什么给出这个估值？关键逻辑、假设依据、风险…", useRange: "填入历史区间" },
   en: { method: "Method", facts: "Inputs", assume: "Assumptions", conservative: "Conservative", optimistic: "Optimistic",
         submit: "Save valuation", dash: "—", note: "Note", notePh: "Why this valuation? Key logic, assumptions, risks…", useRange: "Use range" },
 };
@@ -107,7 +107,15 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   let draftTimer = null, saving = false, destroyed = false, didSave = false, didDiscard = false;
   const draftStatus = el("p", "vc-draft-status"); draftStatus.setAttribute("role", "status");
   draftStatus.textContent = restored ? (lang === "zh" ? "已恢复此浏览器中的研究草稿；尚未保存为正式估值。" : "Restored this browser's research draft; it is not a saved valuation.") : (lang === "zh" ? "研究草稿会保存在此浏览器，完成估值后再正式保存。" : "Research drafts stay in this browser until you save the valuation.");
-  const scheduleDraft = () => { clearTimeout(draftTimer); draftTimer = setTimeout(persistDraft, 250); };
+  // 参数旁「你的故事」提示：随故事修改即时更新；表单重建后旧节点自动丢弃
+  let storyHints = [];
+  function refreshStoryHints() {
+    storyHints = storyHints.filter(({ node }) => node.isConnected);
+    if (!storyHints.length) return;
+    const thesis = readThesis();
+    for (const { node, meta } of storyHints) { const text = fieldStoryHint(meta, thesis, lang); node.textContent = text || ""; node.hidden = !text; }
+  }
+  const scheduleDraft = () => { clearTimeout(draftTimer); draftTimer = setTimeout(persistDraft, 250); refreshStoryHints(); refreshThesisTabs(); };
   // 新增从故事开始；选择模型是把故事转成数字时的下一步。
   let activeIdx = initialMethod ? MODELS.findIndex((m) => m.key === initialMethod) : -1;
   // 预填用的已存假设：只对原方法有效；换了方法就从头开始（同名字段在不同方法里含义不同，不能带过去）
@@ -257,17 +265,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     pickAiBtn.disabled = true;
     pickAiBtn.replaceChildren(ri("loader-4-line"), document.createTextNode(lang === "zh" ? "AI 正在分析这家公司…" : "Analysing the company…"));
     pickAiBtn.classList.add("busy");
-    const views = await aiViews();
-    const methods = METHOD_MENU_GROUPS.flatMap((g) => g.methods).filter((m) => MODELS.some((x) => x.key === m.key))
-      .map((m) => ({ key: m.key, title: textFor(m.title, lang, m.key), subtitle: textFor(m.subtitle, lang, "") }));
     try {
-      const res = await fetch("/api/my/ai/method", { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), verified: aiVerified(), ...views, methods }) });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(aiErrorText(res.status, j, lang));
-      Object.assign(j, { market: views.market, lenses: views.lenses, businessFacts: views.business });
-      showAiResult(j);
-      try { sessionStorage.setItem(aiPickKey(), JSON.stringify(j)); } catch { /* 存不下就算了 */ }
+      await requestMethodPicks();
     } catch (e) {
       pickAiOut.textContent = (lang === "zh" ? "AI 暂时不可用：" : "AI unavailable: ") + (e && e.message || e);
       pickAiOut.className = "vc-picker-aiout on error";
@@ -275,6 +274,20 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       pickAiBtn.replaceChildren(ri("sparkling-2-fill"), document.createTextNode(lang === "zh" ? "重试" : "Retry"));
     }
   });
+  const methodChoices = () => METHOD_MENU_GROUPS.flatMap((g) => g.methods).filter((m) => MODELS.some((x) => x.key === m.key))
+    .map((m) => ({ key: m.key, title: textFor(m.title, lang, m.key), subtitle: textFor(m.subtitle, lang, "") }));
+  // 按公司资料和用户的故事推荐方法；弹窗里的「让 AI 推荐」和 AI 引导流程共用，结果同步显示在弹窗里
+  async function requestMethodPicks() {
+    const views = await aiViews();
+    const res = await fetch("/api/my/ai/method", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), verified: aiVerified(), ...views, methods: methodChoices(), thesis: readThesis() }) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(aiErrorText(res.status, j, lang));
+    Object.assign(j, { market: views.market, lenses: views.lenses, businessFacts: views.business });
+    showAiResult(j);
+    try { sessionStorage.setItem(aiPickKey(), JSON.stringify(j)); } catch { /* 存不下就算了 */ }
+    return j;
+  }
   pickerModal.append(pickHead, methodBar);
   // 关闭：还没选过方法（新增）→ 退出工作台回详情；已有方法（更换）→ 保持原方法
   function closePicker() { showPicker(false); }
@@ -377,7 +390,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // AI 只起草选中场景；已填参数用于检验一致性，不能倒推故事。
   const noteDraftBtn = el("button", "vc-note-ai", { type: "button" });
   const noteUndo = el("button", "vc-note-undo", { type: "button" }); noteUndo.hidden = true;
-  noteUndo.textContent = lang === "zh" ? "撤销" : "Undo";
+  noteUndo.textContent = lang === "zh" ? "撤销 AI 填入" : "Undo AI fill";
   const noteErr = el("div", "vc-note-err"); noteErr.hidden = true;
   const setDraftBtn = (busy) => {
     noteDraftBtn.disabled = busy;
@@ -389,7 +402,17 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   noteInput.maxLength = 2000;
   noteInput.setAttribute("aria-label", lang === "zh" ? "补充备注" : "Additional notes");
   if (initialNote) noteInput.value = initialNote;
-  const thesisEditors = {}, thesisGuides = {}, thesisModes = {};
+  const thesisEditors = {};
+  // 整条 AI 流程（故事 → 方法 → 参数 → 结果）：一张卡片，挂载放在表单建好之后（见文件末尾 mountFlow）
+  let flow = null, flowMode = false;
+  const flowHost = el("div", "vc-flow-host");
+  const modeBar = el("div", "vc-thesis-modes");
+  const guideModeBtn = el("button", "", { type: "button", textContent: lang === "zh" ? "AI 引导" : "AI guide" });
+  const manualModeBtn = el("button", "", { type: "button", textContent: lang === "zh" ? "自己填写" : "Fill in myself" });
+  modeBar.setAttribute("role", "group"); modeBar.setAttribute("aria-label", lang === "zh" ? "填写方式" : "How to fill in");
+  const modeTools = el("span", "vc-thesis-tools");
+  modeBar.append(guideModeBtn, manualModeBtn, modeTools);
+  const flowDone = el("div", "vc-next-step"); flowDone.hidden = true; flowDone.setAttribute("role", "status");
   const thesisSeed = cleanThesis(initialThesis);
   const thesisForm = el("div", "vc-thesis-fields");
   const followup = el("section", "vc-thesis-followup");
@@ -411,33 +434,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const followupPanel = el("div", "vc-thesis-panel");
     const caseLabel = el("p", "vc-thesis-hint"); caseLabel.textContent = scenarioTitle;
     followupPanel.append(caseLabel); followupPanels[scenario.key] = followupPanel;
-    const modeBar = el("div", "vc-thesis-modes"), manual = el("div", "vc-thesis-manual"), guide = el("div");
-    const guideButton = el("button", "", { type: "button", textContent: lang === "zh" ? "AI 引导" : "AI guide" });
-    const manualButton = el("button", "", { type: "button", textContent: lang === "zh" ? "自己填写" : "Write myself" });
-    modeBar.setAttribute("aria-label", lang === "zh" ? `${scenarioTitle}填写方式` : `${scenarioTitle} writing mode`);
-    modeBar.append(guideButton, manualButton); panel.append(modeBar, guide, manual);
+    const manual = el("div", "vc-thesis-manual");
+    panel.append(manual);
     thesisEditors[scenario.key] = mountThesisQuestions(manual, followupPanel, { lang, scenario, initial: thesisSeed[scenario.key] });
-    const showMode = (mode) => {
-      thesisModes[scenario.key] = mode; manual.hidden = mode !== "manual"; guide.hidden = mode !== "guide";
-      manualButton.setAttribute("aria-pressed", String(mode === "manual")); guideButton.setAttribute("aria-pressed", String(mode === "guide"));
-      if (activeThesisScenario === scenario.key) noteDraftBtn.hidden = mode !== "manual";
-    };
-    thesisGuides[scenario.key] = mountThesisGuide(guide, { lang, scenario, company: stock?.name || stock?.code || (lang === "zh" ? "这家公司" : "this company"),
-      initial: restored?.state?.guides?.[scenario.key],
-      getThesis: () => cleanThesis({ [scenario.key]: thesisEditors[scenario.key].read() })[scenario.key] || {},
-      getContext: async () => { if (loadGuideData) Object.assign(refData, await loadGuideData()); const views = await aiViews(); return { stock: aiStock(), verified: aiVerified(), business: views.business }; },
-      onChange: scheduleDraft,
-      onApply: (draft) => {
-        noteBefore = { scenario: scenario.key, thesis: readThesis() };
-        const old = noteBefore.thesis[scenario.key] || {};
-        writeScenario(scenario.key, { [scenario.key]: { ...old, ...draft } });
-        noteUndo.hidden = false; showMode("manual"); thesisEditors[scenario.key].focus(); scheduleDraft();
-      },
-    });
-    guideButton.addEventListener("click", () => { showMode("guide"); scheduleDraft(); });
-    manualButton.addEventListener("click", () => { thesisGuides[scenario.key].pause(); showMode("manual"); scheduleDraft(); });
-    const mode = restored?.state?.modes?.[scenario.key];
-    showMode(mode === "manual" || mode === "guide" ? mode : (thesisSeed[scenario.key] ? "manual" : "guide"));
     thesisPanels[scenario.key] = panel; thesisTabButtons[scenario.key] = tab;
     tab.addEventListener("click", () => selectThesisScenario(scenario.key));
     tab.addEventListener("keydown", (e) => {
@@ -448,9 +447,22 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     });
     thesisTabs.append(tab); thesisForm.append(panel); followup.append(followupPanel);
   }
+  // AI 引导整条流程时只显示引导卡片；完成或切到「自己填写」后才出现可修改的完整面板
+  function syncGuideLayout() {
+    root.classList.toggle("vc-guiding", flowMode); sideR.hidden = flowMode;
+    mount.classList.toggle("vc-guiding-mount", flowMode); // 引导卡片自带进度，顶部五步条先收起，避免两套步骤并排
+    flowHost.hidden = !flowMode; thesisTabs.hidden = flowMode; thesisForm.hidden = flowMode;
+    guideModeBtn.setAttribute("aria-pressed", String(flowMode)); manualModeBtn.setAttribute("aria-pressed", String(!flowMode));
+    noteDraftBtn.hidden = true; // 整条 AI 引导已覆盖「AI 起草」，编辑页只保留一个 AI 入口（引导）+ 参数对话（AI 助手）
+  }
+  function hasStory(key) { return !!thesisEditors[key] && !!cleanThesis({ [key]: thesisEditors[key].read() })[key]?.story; }
+  // 场景标签上标出已有故事的场景，一眼看出还差哪个
+  function refreshThesisTabs() {
+    for (const scenario of THESIS_SCENARIOS) thesisTabButtons[scenario.key]?.classList.toggle("done", hasStory(scenario.key));
+  }
   function selectThesisScenario(key) {
     activeThesisScenario = key;
-    noteDraftBtn.hidden = thesisModes[key] !== "manual";
+    if (flow) syncGuideLayout();
     for (const scenario of THESIS_SCENARIOS) {
       const selected = key === scenario.key;
       thesisPanels[scenario.key].hidden = !selected;
@@ -459,14 +471,15 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       thesisTabButtons[scenario.key].tabIndex = selected ? 0 : -1;
     }
   }
-  selectThesisScenario("c");
+  selectThesisScenario("c"); refreshThesisTabs();
   const readThesis = () => cleanThesis({ ...Object.fromEntries(THESIS_SCENARIOS.map(({ key }) => [key, thesisEditors[key].read()])), legacy: thesisSeed.legacy });
   const writeScenario = (key, value) => thesisEditors[key].write(cleanThesis(value)[key]);
   const noteDetails = el("details", "vc-thesis-notes"); noteDetails.open = !!initialNote;
   const noteSummary = el("summary"); noteSummary.textContent = lang === "zh" ? "补充备注" : "Additional notes";
   noteDetails.append(noteSummary, noteInput);
   const thesisHint = el("p", "vc-thesis-hint"); thesisHint.textContent = lang === "zh" ? "每个场景单独梳理。可以让 AI 通过问答引导，也可以自己填写；不确定的地方留待验证。" : "Work on each case separately. Choose guided questions or write yourself; uncertainties can remain unverified.";
-  noteWrap.append(noteLabel, thesisHint, thesisTabs, thesisForm);
+  modeTools.append(noteUndo, noteDraftBtn); // 起草 / 撤销作用于当前选中的场景
+  noteWrap.append(modeBar, flowDone, flowHost, thesisTabs, thesisForm);
   if (thesisSeed.legacy) {
     const legacy = el("details", "vc-thesis-notes");
     const title = el("summary"); title.textContent = lang === "zh" ? "未分场景的旧记录" : "Previous shared notes";
@@ -499,7 +512,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       noteErr.textContent = (lang === "zh" ? "起草失败：" : "Draft failed: ") + (e && e.message || e); noteErr.hidden = false;
     } finally { setDraftBtn(false); }
   });
-  noteUndo.addEventListener("click", () => { if (noteBefore === null) return; writeScenario(noteBefore.scenario, noteBefore.thesis); selectThesisScenario(noteBefore.scenario); noteBefore = null; noteUndo.hidden = true; scheduleDraft(); });
+  noteUndo.addEventListener("click", () => {
+    if (noteBefore === null) return;
+    if (noteBefore.scenario === "both") { for (const { key } of THESIS_SCENARIOS) writeScenario(key, noteBefore.thesis); }
+    else { writeScenario(noteBefore.scenario, noteBefore.thesis); selectThesisScenario(noteBefore.scenario); }
+    noteBefore = null; noteUndo.hidden = true; refreshThesisTabs(); scheduleDraft();
+  });
   for (const parent of [thesisForm, followup]) parent.addEventListener("input", () => { noteBefore = null; noteUndo.hidden = true; });
 
   // ── 中栏顶部：大号估值结果（区间 / 现价）+ 判定 + 区间 vs 现价条 ──
@@ -522,9 +540,11 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   heroTop.append(heroNums, verdictEl);
   // 保守 = 乐观时结果只是一个值：只显示一个数，并提示拉开两档
   const pointHint = el("div", "vc-point-hint");
-  pointHint.textContent = lang === "zh" ? "两档目前得到同一价值。研究可以保留为草稿；确认各自的依据后，再保存有区间的正式估值。" : "Both cases currently give the same value. Keep the research as a draft and review each case before saving a valuation range.";
+  pointHint.textContent = lang === "zh" ? "保守和乐观算出的价值一样。可以先存草稿；把两个场景的参数拉开后，再保存估值区间。" : "Both cases give the same value. Keep it as a draft, then spread the two cases' inputs apart before saving a range.";
   pointHint.style.display = "none";
-  summaryCard.append(summaryLabel, heroTop, pointHint, emptyHint, rangeViz);
+  // 两个场景的参数都还停在方法自带的示例默认值：结果只是示例，不能读成对这家公司的判断
+  const sampleHint = el("div", "vc-point-hint vc-sample-hint"); sampleHint.style.display = "none";
+  summaryCard.append(summaryLabel, heroTop, sampleHint, pointHint, emptyHint, rangeViz);
   // 区间 vs 现价：一条轴上画出低~高区间和现价位置
   function renderRangeViz(lo, hi, valid) {
     rangeViz.innerHTML = "";
@@ -562,7 +582,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     saving = true; submitBtn.disabled = true; submitBtn.textContent = lang === "zh" ? "保存中…" : "Saving…"; saveError.hidden = true;
     const controls = [...root.querySelectorAll("button,input,textarea,select")].map((control) => [control, control.disabled]);
     for (const [control] of controls) control.disabled = true;
-    for (const guide of Object.values(thesisGuides)) guide.pause();
+    flow?.pause();
     persistDraft();
     try {
       const result = await onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), segments: segOut, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim(), thesis: readThesis() });
@@ -596,8 +616,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   saveBar.append(saveError, submitBtn);
   // 栏头一行：左「关键假设」，右「AI 助手」
   const inHead = el("div", "vc-colhead-row");
-  inHead.append(colHead("从故事到数字", "From story to numbers", "先研究与检验，再量化两个场景", "Research and test each case, then quantify it"), aiBtn);
+  inHead.append(colHead("1–2. 讲故事 · 评估故事", "1–2. Story & evidence", "保守、乐观各写一个；不确定的先留待验证", "One story per case; leave uncertainties unverified"), aiBtn);
   const translateHead = colHead("3. 把故事翻译成数字", "3. Translate to numbers", "选择方法，给故事里的驱动力赋值", "Choose a method and quantify the business drivers");
+  // 沉浸式引导：回答问题时只留场景切换和当前这一步，方法、数据和参数等引导结束再出现
+  for (const node of [inHead, modeBar, thesisTabs, thesisForm, translateHead, methodHead, infoSec, formWrap]) node.classList.add("vc-guide-hide");
   center.append(inHead, noteWrap, translateHead, methodHead, infoSec, formWrap);
   sideR.append(colHead("4. 计算估值", "4. Calculate value", "检验数字是否支持故事", "Check whether the numbers support the story"),
     prof, summaryCard, bdSec, schedMount, vizGrid, followup, noteDetails, saveBar);
@@ -771,7 +793,17 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     heroTop.style.display = valid ? "" : "none";
     const point = valid && Math.abs(lastHigh - lastLow) < 1e-9;
     outDash.style.display = outHigh.style.display = point ? "none" : "";
-    pointHint.style.display = point ? "" : "none";
+    const defaults = modeFields(model, currentMode).filter((f) => f.col === "dual" && f.default !== undefined);
+    const sample = valid && defaults.length > 0 && defaults.every((f) => formData[f.k] && formData[f.k].c === f.default && formData[f.k].o === f.default);
+    if (sample) {
+      const list = defaults.slice(0, 3).map((f) => `${textFor(f.label, lang, f.k)} ${f.default}${f.unit === "%" ? "%" : ""}`).join(lang === "zh" ? "、" : ", ");
+      sampleHint.textContent = lang === "zh" ? `这是用方法自带的示例参数（${list}）算出的数字，还不是你对这家公司的判断。在左侧按两个场景填入参数后，这里才是你的估值。`
+        : `This uses the method's sample inputs (${list}), not your view of the company. Fill in both cases on the left to get your valuation.`;
+    }
+    summaryCard.classList.toggle("vc-hero-sample", sample);
+    if (sample) verdictEl.style.display = "none"; // 示例数字不给「低估 / 合理」判定
+    sampleHint.style.display = sample ? "" : "none";
+    pointHint.style.display = point && !sample ? "" : "none";
     emptyHint.style.display = valid ? "none" : "";
     renderRangeViz(lastLow, lastHigh, valid);
     renderBreakdown(model, formData, valid);
@@ -1360,6 +1392,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         };
         inC.addEventListener("input", onEdit); inO.addEventListener("input", onEdit);
         arow.append(lab, inC, inO);
+        if (field.meta) {
+          const hint = el("p", "vc-story-hint"); hint.style.gridColumn = "1 / -1"; arow.appendChild(hint);
+          storyHints.push({ node: hint, meta: field.meta });
+        }
         fieldEls[field.k] = { c: inC, o: inO, arow };
         // 锚点型:参考筹码进推导面板;其余:筹码照旧在字段下
         const anchorType = deriv && deriv.shape === "anchor";
@@ -1408,6 +1444,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       if (section._refresh) macroInputs.forEach((i) => i.addEventListener("input", section._refresh));
     }
 
+    refreshStoryHints();
     recompute();
   }
 
@@ -1462,7 +1499,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     : Promise.resolve(null);
   // 已核实的事实：由财报算出（现金流 / 盈利是否稳定、负值年份、是否分红等），提示词要求 AI 以此为准、不得凭印象编
   function aiVerified() {
-    try { return verifiedFacts({ financials: refData && refData.financials, dividends: refData && refData.dividends, dps: ctx.dividendYield, price: ctx.price, eps: ctx.epsTtm, lang }); } catch { return []; }
+    try { return verifiedFacts({ financials: refData && refData.financials, dividends: refData && refData.dividends, dps: ctx.dividendYield, price: ctx.price, eps: ctx.epsTtm, financial: isFinancialCompany(researchData), lang }); } catch { return []; }
   }
   function storyContext() {
     return aiContext() || { stock: aiStock(), verified: aiVerified(), method: { key: "", label: lang === "zh" ? "尚未选择，先形成故事" : "Not chosen; start with the story" }, fields: [], facts: stockFacts(), thesis: readThesis() };
@@ -1509,6 +1546,27 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     } catch { /* 缺数据就不显示 */ }
     return out;
   }
+  // AI 建议的参数写入表单（AI 助手的「应用」和 AI 引导的参数确认共用）；返回撤销用的快照，失败返回 null
+  function applyParamsToForm(params, fields = []) {
+    const snap = { inputs: structuredClone(cleanForm(lastForm)), derivations: JSON.parse(JSON.stringify(derivations)) };
+    let merged;
+    try {
+      if (Object.keys(params).some((k) => k.startsWith("resource."))) {
+        if (!MODELS[activeIdx]?.assetModel) throw new Error("resource_inputs_changed");
+        merged = applyResourceAiParams(cleanForm(lastForm), params, fields);
+      } else merged = { ...cleanForm(lastForm), ...params };
+    } catch {
+      alert(lang === "zh" ? "资产明细或估值方法已变化，请重新获取 AI 建议。" : "Assets or method changed. Please request fresh AI suggestions.");
+      return null;
+    }
+    for (const k of Object.keys(params)) delete derivations[k]; // 改了的字段解除推导
+    if (MODELS[activeIdx]?.assetModel) {
+      assetState.rows = structuredClone(merged.assets || []);
+      priceState = structuredClone(merged.prices || {});
+    }
+    seedInputs = merged; renderForm();
+    return snap;
+  }
   const ai = mountAiPanel(mount, {
     lang,
     getContext: aiContext,
@@ -1516,26 +1574,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     chatKey: () => ({ symbol: (stock && stock.symbol) || "", method: (MODELS[activeIdx] && MODELS[activeIdx].key) || "" }),
     checkParams,
     fmtField: (f, v) => !Number.isFinite(v) ? "—" : f.money ? fmtMoney(v) : String(Math.round(v * 1000) / 1000),
-    onApply: (params, fields = []) => {
-      const snap = { inputs: structuredClone(cleanForm(lastForm)), derivations: JSON.parse(JSON.stringify(derivations)) };
-      let merged;
-      try {
-        if (Object.keys(params).some((k) => k.startsWith("resource."))) {
-          if (!MODELS[activeIdx]?.assetModel) throw new Error("resource_inputs_changed");
-          merged = applyResourceAiParams(cleanForm(lastForm), params, fields);
-        } else merged = { ...cleanForm(lastForm), ...params };
-      } catch {
-        alert(lang === "zh" ? "资产明细或估值方法已变化，请重新获取 AI 建议。" : "Assets or method changed. Please request fresh AI suggestions.");
-        return null;
-      }
-      for (const k of Object.keys(params)) delete derivations[k]; // 改了的字段解除推导
-      if (MODELS[activeIdx]?.assetModel) {
-        assetState.rows = structuredClone(merged.assets || []);
-        priceState = structuredClone(merged.prices || {});
-      }
-      seedInputs = merged; renderForm();
-      return snap;
-    },
+    onApply: (params, fields = []) => applyParamsToForm(params, fields),
     onUndo: (snap) => {
       for (const k of Object.keys(derivations)) delete derivations[k];
       Object.assign(derivations, snap.derivations);
@@ -1565,12 +1604,98 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   aiBtn.addEventListener("click", () => ai.toggle());
 
   renderForm();
+  mountFlow();
+
+  // ── AI 引导整条流程：表单与结果都建好后再挂载，恢复到「方法 / 参数 / 结果」步骤时才能读到它们 ──
+  function mountFlow() {
+    const zh = lang === "zh";
+    flow = mountValuationFlow(flowHost, {
+      lang, company: stock?.name || stock?.code || (zh ? "这家公司" : "this company"),
+      initial: restored?.state?.flow, onChange: scheduleDraft, visible: () => flowMode,
+      hooks: {
+        getContext: async () => { if (loadGuideData) Object.assign(refData, await loadGuideData()); const views = await aiViews(); return { stock: aiStock(), verified: aiVerified(), business: views.business }; },
+        getThesis: () => readThesis(),
+        applyThesis: (drafts) => {
+          noteBefore = { scenario: "both", thesis: readThesis() };
+          for (const { key } of THESIS_SCENARIOS) writeScenario(key, { [key]: { ...(noteBefore.thesis[key] || {}), ...drafts[key] } });
+          noteUndo.hidden = false; refreshThesisTabs(); refreshStoryHints(); scheduleDraft();
+        },
+        recommendMethods: () => requestMethodPicks(),
+        methods: methodChoices,
+        currentMethod: () => MODELS[activeIdx]?.key || "",
+        selectMethod: (key) => {
+          const idx = MODELS.findIndex((model) => model.key === key);
+          if (idx < 0 || idx === activeIdx) return;
+          seedInputs = initialMethod && key === initialMethod ? (initialInputs || null) : null; // 换方法：上一个方法填的数不带过来
+          selectMethod(idx);
+        },
+        fields: () => {
+          const model = MODELS[activeIdx]; if (!model) return [];
+          return modeFields(model, currentMode).map((f) => {
+            // 和编辑器里一样的历史参考（年报口径），供引导里一键填入、以及取消采用时说明会用什么数
+            let refs = null;
+            try {
+              const meta = f.meta && FIELD_META[f.meta], ref = meta && meta.ref && refData ? fieldReference(meta.ref, refData, ctx, lang) : null;
+              const chips = ref ? ref.chips.filter((c) => !c.q && Number.isFinite(c.value)) : [];
+              if (chips.length) refs = { unit: ref.unit, chips: chips.map((c) => ({ label: c.label, value: Math.round(c.value * 100) / 100 })) };
+            } catch { refs = null; }
+            return { k: f.k, label: textFor(f.label, lang, f.k), unit: f.unit || "", col: f.col, meta: f.meta, value: lastForm[f.k], isDefault: f.default !== undefined && (f.col === "dual" ? lastForm[f.k]?.c === f.default && lastForm[f.k]?.o === f.default : lastForm[f.k] === f.default), refs };
+          });
+        },
+        suggestParams: async () => {
+          if (loadGuideData) Object.assign(refData, await loadGuideData());
+          const context = aiContext(); if (!context) throw new Error(zh ? "请先选择估值方法。" : "Choose a method first.");
+          const r = await fetch("/api/my/ai/valuation", { method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ lang, context, messages: [{ role: "user", content: zh
+              ? "按我写好的保守、乐观两个场景故事，给每个两档参数一对建议值（保守 c、乐观 o）。每项一句理由，理由里写出参考的财报数据或历史区间，以及它对应故事里的哪个判断。"
+              : "Using my conservative and optimistic stories, suggest a conservative (c) and optimistic (o) value for every two-case input. Give one reason per input, citing the financial data or historical range used and which part of the story it reflects." }] }) });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(aiErrorText(r.status, j, lang));
+          return { params: j.params || {}, reasons: j.reasons || {} };
+        },
+        applyParams: (params) => { applyParamsToForm(params); scheduleDraft(); },
+        checkParams,
+        result: () => {
+          const lo = lastLow, hi = lastHigh, ok = Number.isFinite(lo) && Number.isFinite(hi);
+          let v = null; if (ok && typeof verdict === "function") { try { v = verdict(Math.min(lo, hi), Math.max(lo, hi)); } catch { v = null; } }
+          const model = MODELS[activeIdx];
+          const missing = model ? modeFields(model, currentMode).filter((f) => { const x = lastForm[f.k]; return f.col === "dual" ? !(x && Number.isFinite(x.c) && Number.isFinite(x.o)) : !Number.isFinite(x); }).map((f) => textFor(f.label, lang, f.k)) : [];
+          const sample = summaryCard.classList.contains("vc-hero-sample");
+          const shown = model ? modeFields(model, currentMode).filter((f) => f.col === "dual" && lastForm[f.k] && Number.isFinite(lastForm[f.k].c)).slice(0, 3)
+            .map((f) => `${textFor(f.label, lang, f.k)} ${lastForm[f.k].c}${f.unit === "%" ? "%" : ""}–${lastForm[f.k].o}${f.unit === "%" ? "%" : ""}`) : [];
+          const samples = model ? modeFields(model, currentMode).filter((f) => f.col === "dual" && f.default !== undefined && lastForm[f.k]?.c === f.default && lastForm[f.k]?.o === f.default).map((f) => `${textFor(f.label, lang, f.k)} ${f.default}${f.unit === "%" ? "%" : ""}`) : [];
+          return { low: lo, high: hi, price: ctx && ctx.price, currency: (stock && stock.currency) || "", method: model ? textFor(methodMenuMeta(model)?.title, lang, modelTitle(model, lang)) : "", inputs: shown, samples,
+            inverted: ok && lo > hi, // 保守场景算出的价值反而更高：多半是两组参数填反了
+            verdict: !sample && v && v.text && v.text !== "—" ? v.text : "", sample, missing, canSave: !submitBtn.disabled, fmt: (x) => fmt(x, "—") }; // 示例参数不给判定
+        },
+        finish: () => {
+          setFlowMode(false);
+          flowDone.replaceChildren(ri("checkbox-circle-fill"), el("span", "vc-next-step-text", { textContent: zh ? "AI 引导完成。故事、依据和参数都可以在下面继续修改，确认后保存估值。" : "Guide complete. Keep editing the story, evidence and inputs below, then save." }));
+          flowDone.hidden = false; flowDone.tabIndex = -1;
+          root.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+          flowDone.focus({ preventScroll: true }); // 读屏和键盘用户从完成提示继续
+        },
+        exit: () => setFlowMode(false),
+        save: () => { setFlowMode(false); submitBtn.click(); }, // 结果页直接保存：和编辑页的「保存估值」走同一条路径
+      },
+    });
+    const restoredMode = restored?.state?.mode;
+    setFlowMode(restoredMode === "guide" || restoredMode === "manual" ? restoredMode === "guide" : !hasStory("c") && !hasStory("o") && activeIdx < 0, false);
+  }
+  function setFlowMode(on, save = true) {
+    if (!on) flow?.pause();
+    flowMode = on; if (on) flowDone.hidden = true;
+    syncGuideLayout(); if (on) flow?.refresh();
+    if (save) scheduleDraft();
+  }
+  guideModeBtn.addEventListener("click", () => setFlowMode(true));
+  manualModeBtn.addEventListener("click", () => setFlowMode(false));
 
   // ── 未保存改动：用户第一次点击 / 按键时记一份基线（页面自动预填、异步补的数据不算改动），离开时和当前状态比 ──
   let baseline; // undefined = 还没记
   function draftState() {
     return { method: MODELS[activeIdx]?.key || null, inputs: cleanForm(lastForm), derivations: currentDerivations(), segments: { enabled: !!segments?.enabled, rows: segments?.rows || [] }, note: noteInput.value.trim(), thesis: readThesis(),
-      modes: thesisModes, guides: Object.fromEntries(Object.entries(thesisGuides).map(([key, guide]) => [key, guide.snapshot()])) };
+      mode: flowMode ? "guide" : "manual", flow: flow ? flow.snapshot() : null };
   }
   function persistDraft() {
     if (destroyed || didSave || didDiscard || !draftKey) return false;
@@ -1594,6 +1719,6 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     hasLocalDraft: () => !!draftKey,
     discardDraft: () => { didDiscard = true; clearTimeout(draftTimer); draftStore.clear(); },
     isSaving: () => saving,
-    destroy: () => { if (draftTimer) { clearTimeout(draftTimer); persistDraft(); } destroyed = true; window.removeEventListener("pagehide", persistDraft); window.removeEventListener("beforeunload", persistDraft); for (const guide of Object.values(thesisGuides)) guide.destroy(); for (const event of ["input", "change", "click"]) mount.removeEventListener(event, scheduleDraft); for (const t of ["pointerdown", "keydown"]) document.removeEventListener(t, markBase, true); },
+    destroy: () => { if (draftTimer) { clearTimeout(draftTimer); persistDraft(); } destroyed = true; window.removeEventListener("pagehide", persistDraft); window.removeEventListener("beforeunload", persistDraft); flow?.destroy(); for (const event of ["input", "change", "click"]) mount.removeEventListener(event, scheduleDraft); for (const t of ["pointerdown", "keydown"]) document.removeEventListener(t, markBase, true); },
   };
 }

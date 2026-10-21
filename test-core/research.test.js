@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseRating, parseForecastEps, parseProfile, parseSegments, fetchResearch } from "../src/research.js";
-import { businessFacts } from "../public/shared/valuation/facts.js";
+import { businessFacts, isFinancialCompany } from "../public/shared/valuation/facts.js";
 
 describe("research parsing", () => {
   it("parses the institution rating snapshot", () => {
@@ -23,6 +23,28 @@ describe("research parsing", () => {
     expect(r.rating.total).toBe(1);
     expect(r.forecastEps).toBeNull();
     expect(await fetchResearch({}, "usAAPL", get)).toBeNull(); // 没配长桥凭据
+  });
+  it("borrows company profile and segments from the H-share when an A+H stock has none", async () => {
+    const env = { LONGBRIDGE_APP_KEY: "k", LONGBRIDGE_APP_SECRET: "s", LONGBRIDGE_ACCESS_TOKEN: "t" };
+    const calls = [];
+    const get = async (e, path, q) => {
+      calls.push(q);
+      if (!q.includes("2318.HK")) return { data: null };
+      return path.includes("segments") ? { data: { report_txt: "2026.H1", business: [{ name: "人寿和健康保险", percent: "32.16" }, { name: "银行业", percent: "20.67" }] } } : { data: { name: "中国平安", profile: "投资保险企业" } };
+    };
+    const r = await fetchResearch(env, "sh601318", get);
+    expect(calls.slice(-2)).toEqual(["symbol=2318.HK", "symbol=2318.HK"]);
+    expect(r.rating).toBeNull(); // 评级和一致预期不借：币种与股价不同
+    expect(r.companySource).toBe("2318.HK");
+    const facts = businessFacts({ research: r, lang: "zh" }).join("\n");
+    expect(facts).toContain("人寿和健康保险 32.2%"); expect(facts).toContain("H 股（2318.HK）");
+    expect(isFinancialCompany(r)).toBe(true);
+    expect(isFinancialCompany({ segments: { business: [{ name: "手机" }] } })).toBe(false);
+    expect(isFinancialCompany({ segments: { business: [{ name: "工程机械", percent: 88 }, { name: "期货与证券投资", percent: 12 }] } })).toBe(false); // 只是一小块金融业务
+    expect(isFinancialCompany({ rating: { industry: { name: "银行" } } })).toBe(true);
+    expect(isFinancialCompany(null)).toBe(false);
+    const none = await fetchResearch(env, "sh600519", async () => ({ data: null }));
+    expect(none).toBeNull(); // 不在两地上市名单：照旧没有资料
   });
 });
 

@@ -174,6 +174,9 @@ describe("verified facts in prompts", () => {
     expect(mp).toContain("已核实的事实");
     expect(mp).toContain("2021、2022 年为负");
     expect(mp).toContain("不要编造");
+    const withStory = buildMethodPrompt({ stock: { name: "小米集团" }, methods: METHODS, verified: V, thesis: { o: { story: "汽车业务带动利润率改善" } } }, "zh");
+    expect(withStory).toContain("用户已写的场景故事"); expect(withStory).toContain("汽车业务带动利润率改善");
+    expect(mp).not.toContain("用户已写的场景故事");
     const sp = buildSystemPrompt({ ...CONTEXT, verified: V }, "zh");
     expect(sp).toContain("没有查到现金分红记录");
   });
@@ -410,7 +413,8 @@ describe("optional company-specific thesis guide", () => {
   it("validates bounded turns, isolates the case and includes available company evidence", async () => {
     const { validateThesisGuide, buildThesisGuidePrompt } = await import("../src/ai.js");
     expect(validateThesisGuide(body)).toBeNull();
-    expect(validateThesisGuide({ ...body, scenario: "both" })).toBe("scenario required");
+    expect(validateThesisGuide({ ...body, scenario: "all" })).toBe("scenario required");
+    expect(validateThesisGuide({ ...body, scenario: "both" })).toBeNull(); // 整条流程：两个场景一起问
     expect(validateThesisGuide({ ...body, turns: Array(4).fill({ question: "q", answer: "a" }) })).toBe("bad turns");
     expect(validateThesisGuide({ ...body, turns: [{ question: "q", answer: "" }] })).toBe("bad turns");
     expect(validateThesisGuide({ ...body, context: { fields: [] } })).toBe("stock required");
@@ -419,6 +423,30 @@ describe("optional company-specific thesis guide", () => {
     expect(prompt).not.toContain("另一个场景的私有判断"); expect(prompt).toContain("不是你声称已经发生的事实");
     expect(buildThesisGuidePrompt({ ...body, context: { stock: context.stock } }, "en")).toContain("资料不足");
     expect(buildThesisGuidePrompt(body, "en")).toContain("in English");
+    expect(prompt).toContain("所有选项都必须是有利的方向");
+    const conservative = buildThesisGuidePrompt({ ...body, scenario: "c" }, "zh");
+    expect(conservative).toContain("所有选项都必须是不利或不及预期的方向"); expect(conservative).not.toContain("所有选项都必须是有利的方向");
+    const summary = buildThesisGuidePrompt({ ...body, scenario: "c", turns: Array(3).fill({ question: "q", answer: "a" }) }, "zh");
+    expect(summary).toContain("conflict"); expect(summary).toContain("与保守场景相反");
+    const evidence = buildThesisGuidePrompt({ ...body, turns: [{ question: "q", answer: "a" }] }, "zh");
+    expect(evidence).toContain("引用公司资料编号"); expect(evidence).toContain("反面证据");
+  });
+  it("runs the shared five-round flow and returns drafts for both cases", async () => {
+    const { validateThesisGuide, buildThesisGuidePrompt, parseThesisGuide } = await import("../src/ai.js");
+    const flow = { ...body, scenario: "both" };
+    expect(validateThesisGuide({ ...flow, turns: Array(5).fill({ question: "q", answer: "a" }) })).toBeNull();
+    expect(validateThesisGuide({ ...flow, turns: Array(6).fill({ question: "q", answer: "a" }) })).toBe("bad turns");
+    const first = buildThesisGuidePrompt(flow, "zh");
+    expect(first).toContain("两个场景共用的出发点"); expect(first).toContain("第 1/5 轮"); expect(first).toContain("另一个场景的私有判断"); // 两个场景的已有研究都要看到
+    expect(buildThesisGuidePrompt({ ...flow, turns: [{ question: "q", answer: "a" }] }, "zh")).toContain("所有选项都必须是不利或不及预期的方向");
+    expect(buildThesisGuidePrompt({ ...flow, turns: Array(2).fill({ question: "q", answer: "a" }) }, "zh")).toContain("所有选项都必须是有利的方向");
+    const summary = buildThesisGuidePrompt({ ...flow, turns: Array(5).fill({ question: "q", answer: "a" }) }, "zh");
+    expect(summary).toContain('"drafts"'); expect(summary).toContain("conflict");
+    expect(parseThesisGuide(JSON.stringify(question), 2, true)).toMatchObject({ type: "question", question: question.question, selection: "single" });
+    const both = parseThesisGuide(JSON.stringify({ type: "summary", drafts: { c: draft, o: draft, conflict: "保守那一轮偏乐观" } }), 5, true);
+    expect(both.drafts.c.story).toBe(draft.story); expect(both.drafts.conflict).toBe("保守那一轮偏乐观");
+    expect(parseThesisGuide(JSON.stringify({ type: "summary", drafts: { c: draft } }), 5, true)).toBeNull(); // 两份都要有
+    expect(parseThesisGuide(JSON.stringify({ type: "summary", draft }), 5, true)).toBeNull();
   });
   it("completes three contextual question rounds, accepts typed uncertainty and previews a bounded summary", async () => {
     const cookie = await userCookie("guided_three_rounds"); const turns = [];

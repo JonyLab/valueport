@@ -26,9 +26,35 @@ function cv(vals) {
   const sd = Math.sqrt(vals.reduce((a, b) => a + (b - m) ** 2, 0) / vals.length);
   return sd / Math.abs(m);
 }
+// 围绕趋势判断稳定性（调用方已排除亏损 / 腰斩 / 负值这些硬伤）：
+// 整段变异系数会把逐年增长的公司（如微软）误判成「波动大」，所以先看同比：七成以上年份同比不差于 -10% 视为稳步向上；
+// 否则退回看去趋势后的波动（对数线性拟合的残差，约等于偏离趋势的百分比）。
+// growing：至少 5 年数据、年复合增速 ≥5% 且稳步向上，才说「稳定增长」。
+function trendStability(vals, threshold) {
+  if (cv(vals) < threshold) return { stable: true, growing: trendGrowing(vals) };
+  if (trendGrowing(vals)) return { stable: true, growing: true };
+  return { stable: detrendedCv(vals) < threshold, growing: false };
+}
+function mostlyUp(vals) {
+  const yoy = vals.slice(1).map((v, i) => (vals[i] > 0 ? v / vals[i] - 1 : NaN)).filter(Number.isFinite);
+  return yoy.length > 0 && yoy.filter((g) => g >= -0.1).length / yoy.length >= 0.7;
+}
+function trendGrowing(vals) {
+  const n = vals.length - 1, first = vals[0], last = vals[n];
+  if (vals.length < 5 || !(first > 0) || !(last > 0)) return false;
+  return Math.pow(last / first, 1 / n) - 1 >= 0.05 && mostlyUp(vals);
+}
+function detrendedCv(vals) {
+  if (!vals.every((v) => v > 0)) return Infinity;
+  const y = vals.map(Math.log), n = y.length, mx = (n - 1) / 2, my = y.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0, sxx = 0;
+  y.forEach((v, i) => { sxy += (i - mx) * (v - my); sxx += (i - mx) ** 2; });
+  const b = sxx ? sxy / sxx : 0;
+  return Math.sqrt(y.reduce((a, v, i) => a + (v - (my + b * (i - mx))) ** 2, 0) / n);
+}
 const span = (s) => `${s[0].year}–${s[s.length - 1].year}`;
 
-export function verifiedFacts({ financials, dividends, dps, price, eps, lang = "zh" } = {}) {
+export function verifiedFacts({ financials, dividends, dps, price, eps, financial = false, lang = "zh" } = {}) {
   const zh = lang !== "en";
   const out = [];
   const REV = series(financials, "IS", "OperatingRevenue");
@@ -49,26 +75,28 @@ export function verifiedFacts({ financials, dividends, dps, price, eps, lang = "
   if (NI.length >= 3) {
     const vals = NI.map((x) => x.value), losses = NI.filter((x) => x.value < 0).map((x) => x.year);
     const drops = NI.slice(1).filter((x, i) => NI[i].value > 0 && x.value < NI[i].value * 0.5).map((x) => x.year);
-    const v = cv(vals);
-    const stable = !losses.length && !drops.length && v < 0.35;
+    const t = !losses.length && !drops.length ? trendStability(vals, 0.35) : { stable: false, growing: false };
+    const stable = t.stable;
     const recent = NI.slice(-3), recentProfit = recent.length === 3 && recent.every((x) => x.value > 0);
     if (recentProfit) out.push(zh ? `最近三年（${recent[0].year}–${recent[2].year}）均盈利` : `Profitable in each of the last three years (${recent[0].year}–${recent[2].year})`);
     out.push(zh
-      ? `净利润 ${span(NI)}：最低 ${money(Math.min(...vals))}、最高 ${money(Math.max(...vals))}` + (losses.length ? `；${losses.join("、")} 年亏损` : "") + (drops.length ? `；${drops.join("、")} 年较上年腰斩以上` : "") + `。判断：盈利${stable ? "较稳定" : "波动较大，不能说稳定"}`
-      : `Net income ${span(NI)}: min ${money(Math.min(...vals))}, max ${money(Math.max(...vals))}` + (losses.length ? `; losses in ${losses.join(", ")}` : "") + (drops.length ? `; fell by over half in ${drops.join(", ")}` : "") + `. Verdict: earnings ${stable ? "fairly stable" : "volatile — not stable"}`);
+      ? `净利润 ${span(NI)}：最低 ${money(Math.min(...vals))}、最高 ${money(Math.max(...vals))}` + (losses.length ? `；${losses.join("、")} 年亏损` : "") + (drops.length ? `；${drops.join("、")} 年较上年腰斩以上` : "") + `。判断：盈利${t.growing ? "稳定增长" : stable ? "较稳定" : "波动较大，不能说稳定"}`
+      : `Net income ${span(NI)}: min ${money(Math.min(...vals))}, max ${money(Math.max(...vals))}` + (losses.length ? `; losses in ${losses.join(", ")}` : "") + (drops.length ? `; fell by over half in ${drops.join(", ")}` : "") + `. Verdict: earnings ${t.growing ? "growing steadily" : stable ? "fairly stable" : "volatile — not stable"}`);
   }
 
-  if (FCF.length >= 3) {
+  // 银行、保险、券商的经营现金流里混着存款、保费和投资往来，自由现金流不能说明经营质量，只提示不作判断
+  if (financial && FCF.length >= 3) out.push(zh ? "这是金融企业：自由现金流受存款、保费与投资往来影响，不能用来判断经营质量或现金流稳定性" : "Financial company: free cash flow is driven by deposits, premiums and investment flows, so it says little about operating quality or cash-flow stability");
+  else if (FCF.length >= 3) {
     const vals = FCF.map((x) => x.value), neg = FCF.filter((x) => x.value < 0).map((x) => x.year);
-    const v = cv(vals);
-    const stable = !neg.length && v < 0.4;
+    const t = !neg.length ? trendStability(vals, 0.4) : { stable: false, growing: false };
+    const stable = t.stable;
     let ratio = "";
     const pairs = FCF.filter((f) => NI.some((x) => x.year === f.year));
     const sumF = pairs.reduce((a, f) => a + f.value, 0), sumN = pairs.reduce((a, f) => a + NI.find((x) => x.year === f.year).value, 0);
     if (pairs.length >= 3 && sumN > 0) ratio = zh ? `；累计自由现金流 / 净利润 = ${(sumF / sumN).toFixed(2)}` : `; cumulative FCF / net income = ${(sumF / sumN).toFixed(2)}`;
     out.push(zh
-      ? `自由现金流 ${span(FCF)}：最低 ${money(Math.min(...vals))}、最高 ${money(Math.max(...vals))}` + (neg.length ? `；${neg.join("、")} 年为负` : "；各年均为正") + ratio + `。判断：现金流${stable ? "较稳定、可预测" : "不稳定，不能说「现金流稳定」"}`
-      : `Free cash flow ${span(FCF)}: min ${money(Math.min(...vals))}, max ${money(Math.max(...vals))}` + (neg.length ? `; negative in ${neg.join(", ")}` : "; positive every year") + ratio + `. Verdict: cash flow ${stable ? "fairly stable and predictable" : "unstable — do not call it stable"}`);
+      ? `自由现金流 ${span(FCF)}：最低 ${money(Math.min(...vals))}、最高 ${money(Math.max(...vals))}` + (neg.length ? `；${neg.join("、")} 年为负` : "；各年均为正") + ratio + `。判断：现金流${t.growing ? "稳定增长、可预测" : stable ? "较稳定、可预测" : "不稳定，不能说「现金流稳定」"}`
+      : `Free cash flow ${span(FCF)}: min ${money(Math.min(...vals))}, max ${money(Math.max(...vals))}` + (neg.length ? `; negative in ${neg.join(", ")}` : "; positive every year") + ratio + `. Verdict: cash flow ${t.growing ? "growing steadily and predictable" : stable ? "fairly stable and predictable" : "unstable — do not call it stable"}`);
   }
 
   if (CAP.length >= 4) {
@@ -343,5 +371,16 @@ export function businessFacts({ research, lang = "zh" } = {}) {
   const mix = (arr) => arr.slice(0, 6).map((x) => `${x.name} ${x.percent.toFixed(1)}%` + (Number.isFinite(x.yoy) && x.yoy !== 0 ? (zh ? `（同比 ${x.yoy >= 0 ? "+" : ""}${x.yoy.toFixed(1)}%）` : ` (${x.yoy >= 0 ? "+" : ""}${x.yoy.toFixed(1)}% YoY)`) : "")).join(zh ? "、" : ", ");
   if (sg && sg.business && sg.business.length) out.push((zh ? `收入构成（${sg.period}，按业务）：` : `Revenue mix (${sg.period}, by business): `) + mix(sg.business));
   if (sg && sg.regions && sg.regions.length) out.push((zh ? `收入构成（${sg.period}，按地区）：` : `Revenue mix (${sg.period}, by region): `) + mix(sg.regions));
+  if (out.length && research.companySource) out.push(zh ? `以上公司资料来自同一公司的 H 股（${research.companySource}）` : `Company information above comes from the same company's H-share listing (${research.companySource})`);
   return out;
+}
+
+const FINANCIAL_RE = /银行|保险|证券|券商|信托|期货|bank|insur|brokerage|securities/i;
+// 是否金融企业：看行业名与业务构成名称。拿不到资料时按非金融处理（保持原有判断）。
+export function isFinancialCompany(research) {
+  if (!research) return false;
+  // 行业名直接判断；业务构成里金融类合计过半才算（只有一小块「证券投资」「期货」业务的制造企业不算）
+  if (FINANCIAL_RE.test(research.rating?.industry?.name || "")) return true;
+  const share = (research.segments?.business || []).filter((x) => FINANCIAL_RE.test(x.name || "")).reduce((sum, x) => sum + (Number(x.percent) || 0), 0);
+  return share >= 50;
 }

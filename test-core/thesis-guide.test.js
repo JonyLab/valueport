@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { guideQuestion, guideDraft, guideAnswer, cleanGuideState, validGuideTurns } from "../public/shared/valuation/thesis-guide.js";
+import { guideQuestion, guideDraft, guideDrafts, guideAnswer, cleanGuideState, validGuideTurns, FLOW_STEPS } from "../public/shared/valuation/thesis-guide.js";
 import { valuationDraftStore } from "../public/shared/valuation/editor-draft.js";
 import { valuationChange, persistValuation } from "../public/shared/valuation/save.js";
 
@@ -14,11 +14,19 @@ describe("bounded generative research UI", () => {
     expect(guideDraft({ ...draft, impacts: [{ key: "code", direction: "up", reason: "execute" }] })).toBeNull();
     expect(guideDraft({ ...draft, impacts: [] })).toEqual({ ...draft, impacts: [] });
     expect(guideDraft(guideDraft({ ...draft, impacts: [] }))).not.toBeNull();
+    expect(guideDraft({ ...draft, conflict: "  保守场景却判断增长加快  " }).conflict).toBe("保守场景却判断增长加快");
+    expect(guideDraft({ ...draft, conflict: "" })).not.toHaveProperty("conflict");
+    expect(guideDraft({ ...draft, conflict: "x".repeat(401) })).toBeNull();
+    expect(guideDraft({ ...draft, conflict: { html: "<b>" } })).toBeNull();
   });
   it("keeps selection and free text together, without asserting certainty on unknown answers", () => {
     expect(guideAnswer(question, ["a", "b"], "我还想看海外复购")).toBe(question.options.map((option) => option.label).join("\n") + "\n我还想看海外复购");
     expect(guideAnswer(question, ["unknown", "a"], "")).toBe("还不确定，先留待验证。");
     expect(guideAnswer(question, [], "我的独立判断")).toBe("我的独立判断");
+    expect(guideAnswer(question, ["a", "other"], "", "zh", "  回购加速  ")).toBe(question.options[0].label + "\n回购加速");
+    expect(guideAnswer(question, ["other"], "", "zh", "  ")).toBe("");
+    expect(guideAnswer(question, ["unknown", "other"], "", "zh", "回购加速")).toBe("还不确定，先留待验证。");
+    expect(guideQuestion({ ...question, options: [{ id: "other", label: "override" }, question.options[0]] })).toBeNull();
     expect(validGuideTurns([{ question: "q", answer: "a" }])).toBe(true);
     expect(validGuideTurns(Array(4).fill({ question: "q", answer: "a" }))).toBe(false);
     expect(validGuideTurns([{ question: "q", answer: "" }])).toBe(false);
@@ -71,5 +79,18 @@ describe("valuation save transaction", () => {
     const base = { ...cfg, valuations: [{ ...value, id: "a", review: { summary: "old" }, reviewedAt: "old" }, { ...value, id: "b" }], selectedValuationId: "b", fairLow: 10, fairHigh: 20 };
     const updated = valuationChange(base, "a", value); expect(updated.fairLow).toBe(10); expect(updated.selectedValuationId).toBe("b"); expect(updated.valuations[0].review).toBeUndefined(); expect(base.valuations[0].review).toBeDefined();
     expect(() => valuationChange(cfg, null, { ...value, high: 40 })).toThrow();
+  });
+});
+
+describe("two-case flow drafts", () => {
+  it("needs both cases, keeps conflict as a separate warning and bounds the flow turns", () => {
+    const d = guideDrafts({ c: draft, o: { ...draft, story: "乐观故事" }, conflict: " 保守偏乐观 " });
+    expect(d.c.story).toBe(draft.story); expect(d.o.story).toBe("乐观故事"); expect(d.conflict).toBe("保守偏乐观");
+    expect(d.c).not.toHaveProperty("conflict");
+    expect(guideDrafts({ c: draft })).toBeNull();
+    expect(guideDrafts({ c: draft, o: draft, conflict: "x".repeat(401) })).toBeNull();
+    expect(FLOW_STEPS).toHaveLength(5);
+    expect(validGuideTurns(Array(5).fill({ question: "q", answer: "a" }), FLOW_STEPS.length)).toBe(true);
+    expect(validGuideTurns(Array(5).fill({ question: "q", answer: "a" }))).toBe(false); // 单场景仍是 3 轮
   });
 });

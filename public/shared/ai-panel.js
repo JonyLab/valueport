@@ -55,7 +55,13 @@ export function aiErrorText(status, j, lang) {
     : "You've used today's AI requests; try again tomorrow, or add your own model under Settings → AI models";
   if (e === "bad_ai_output") return zh ? "AI 返回的格式不对，请重试" : "Unexpected AI output, try again";
   if (/访问量过大|稍后再试/.test((j && j.detail) || "")) return zh ? "智谱免费模型现在太忙（并发有限制），稍等一会儿再试，或在 AI 面板顶部的模型菜单换一个模型" : "The free Zhipu model is busy right now (concurrency is limited); try again shortly or switch models from the menu at the top of the AI panel";
-  return String((j && j.detail) || e || status);
+  // 用户不该看到 503、upstream_error 这类代号或英文报错：一律换成人话，原始信息只记到控制台便于排查
+  const raw = String((j && j.detail) || e || "");
+  if (raw || status) console.warn("[ai]", status, raw);
+  if (status === 401 || status === 403) return zh ? "登录已过期，请刷新页面后重新登录" : "Your session has expired. Refresh the page and sign in again";
+  if (status === 400 || status === 413) return zh ? "这次提交的内容太多或格式不对，可以精简一下回答后再试" : "This request was too long or malformed. Shorten your answers and try again";
+  if (/[\u4e00-\u9fff]/.test(raw) && raw.length < 200 && !/\d{3}/.test(raw)) return raw; // 已经是给人看的中文说明
+  return zh ? "AI 暂时没有响应，可能是服务繁忙，请稍后再试" : "The AI didn't respond. It may be busy; please try again shortly";
 }
 
 export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField, widgets: wx, checkParams, chatKey }) {
