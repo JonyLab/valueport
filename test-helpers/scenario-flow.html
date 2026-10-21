@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><title>Scenario flow local fixture</title>
+<style>body{font:16px system-ui;max-width:900px;margin:24px auto;background:#f5f5ef}button,input,textarea{font:inherit;padding:8px;margin:4px}fieldset,section{padding:12px;margin:12px 0;background:white}label{display:flex;margin:8px}small{display:block}pre{font-size:11px;white-space:pre-wrap}.vc-guide-progress{display:flex;gap:12px}.vc-flow-cases{display:flex;gap:24px}.vc-flow-case{flex:1}textarea{width:90%}</style>
+<h1>本地模拟验证 · 不调用真实 AI</h1>
+<button id="resume">模拟恢复草稿</button><button id="failure">下次模拟失败</button><button id="change">模拟修改共用基础数据</button>
+<div id="flow"></div><details><summary>测试状态</summary><pre id="state"></pre></details>
+<script type="module">
+import { mountValuationFlow } from '/shared/valuation/thesis-guide-ui.js';
+import { mergeScenarioParams } from '/shared/valuation/thesis-guide.js';
+let ui, lastSnapshot, method='', mode='range', saved=false, fail=false, form={years:5,growth:{c:10,o:10},multiple:{c:15,o:15}}, requests=[];
+const plan={version:1,status:'uncertain',keys:['demand','margin','reinvestment']};
+window.fetch=async(url,init)=>{
+ if(url!='/api/my/ai/thesis-guide') throw Error('Unexpected network call blocked by fixture');
+ const body=JSON.parse(init.body);requests.push(body);if(fail){fail=false;throw new TypeError('fixture failure');}
+ const key=body.scenario, label=body.singleCase?'主情景':key==='c'?'保守':'乐观';
+ if(body.turns.length===3)return Response.json({type:'summary',draft:{story:label+'用户明确判断',evidence:'仅本地测试资料',uncertainties:'订单仍待验证',signals:'建议跟踪订单',impacts:[]},driverPlan:plan,references:['本地公开虚构资料']});
+ return Response.json({type:'question',context:'本地虚构资料，仅测试界面',question:label+'第'+(body.turns.length+1)+'项经营判断？',selection:'single',options:[{id:'a',label:label+'维持合理预期'},{id:'b',label:label+'需要更多依据'}],driverPlan:plan,references:['本地公开虚构资料']});
+};
+const fields=()=>[{k:'years',label:'预测年数',col:'single',value:form.years},{k:'growth',label:'收入增长',unit:'%',col:'dual',value:form.growth},{k:'multiple',label:'估值倍数',col:'dual',value:form.multiple}];
+const hooks={setScenarioMode:value=>{mode=value;},getContext:async()=>({stock:{name:'虚构测试公司',code:'TEST'},fields:[],business:['虚构公开收入资料']}),getThesis:()=>thesis,applyThesis:d=>Object.assign(thesis,d),
+ recommendMethods:async()=>({summary:'使用共用方法',picks:[{key:'pe',reason:'测试方法'}]}),methods:()=>[{key:'pe',title:'P/E'},{key:'fcf',title:'DCF'}],currentMethod:()=>method,selectMethod:k=>{method=k;},fields,
+ suggestParams:async(key)=>({params:{growth:{[key]:key==='c'?3:12},multiple:{[key]:key==='c'?12:20},years:6},reasons:{growth:'测试依据'}}),
+ applyParams:(params,key)=>{Object.assign(form,mergeScenarioParams(params,fields(),key));},checkParams:()=>({}),
+ result:()=>({low:form.growth.c*form.multiple.c,high:mode==='single'?form.growth.c*form.multiple.c:form.growth.o*form.multiple.o,currency:'TEST',fmt:n=>String(n),canSave:true,missing:[],samples:[]}),
+ save:()=>{saved=true;show();},finish:()=>{},exit:()=>{},sharedKey:()=>''};
+let thesis={};
+function show(){if(!ui)return;lastSnapshot=ui.snapshot();document.querySelector('#state').textContent=JSON.stringify({mode,saved,form,method,snapshot:lastSnapshot,requests},null,2);}
+function mount(initial){ui=mountValuationFlow(document.querySelector('#flow'),{lang:'zh',company:'虚构测试公司',initial,hooks,onChange:()=>queueMicrotask(show)});show();}
+mount();
+document.querySelector('#resume').onclick=()=>{const snapshot=ui.snapshot();ui.destroy();mount(snapshot);};
+document.querySelector('#failure').onclick=()=>{fail=true;};
+document.querySelector('#change').onclick=()=>{form.years+=1;ui.refresh();show();};
+</script>

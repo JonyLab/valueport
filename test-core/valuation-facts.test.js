@@ -102,18 +102,18 @@ describe("latestMetrics", () => {
          acct("OperatingIncome", [[2021, 15], [2022, 16.5], [2023, 18.15], [2024, 26.62]])],
     CF: [acct("NetFreeCashFlow", [[2023, 10], [2024, 8]])],
   };
-  const finQ = { IS: [{ field: "OperatingRevenue", values: [{ year: 2025, period: "Q2 2025", value: 40 * B, yoy: "12.5" }] }, { field: "NetProfit", values: [{ year: 2025, period: "Q2 2025", value: 4 * B, yoy: "-3.2" }] }] };
+  const finQ = { IS: [{ field: "OperatingRevenue", values: [{ year: 2025, period: "Q2 2025", value: 40 * B, yoy: "12.50" }] }, { field: "NetProfit", values: [{ year: 2025, period: "Q2 2025", value: 4 * B, yoy: "-3.20" }] }] };
   const refs = { pe: { current: 20, own5y: 25, industryMedian: 18 }, pb: { current: 3.2, own5y: null } };
   it("summarises growth, margins, the latest quarter and multiples", () => {
     const m = latestMetrics({ financials: fin, financialsQ: finQ, valuationRefs: refs, valuedAt: "2024-06-01T00:00:00Z", lang: "zh" }).join("\n");
     expect(m).toContain("最新年报：FY2024（估值做于 2024-06-01，之后可能已有新年报）");
-    expect(m).toContain("营收增速：最新年同比 +10.0%，近三年复合 +10.0%");
-    expect(m).toContain("净利润增速：最新年同比 +0.0%");
-    expect(m).toContain("自由现金流增速：最新年同比 -20.0%");
-    expect(m).toContain("营业利润率：最新 20.0%，前三年均值 15.0%");
-    expect(m).toContain("最新季度 Q2 2025：营收同比 +12.5%，净利润同比 -3.2%");
-    expect(m).toContain("当前 P/E 20.0，自身五年中位 25.0，行业中位 18.0");
-    expect(m).toContain("当前 P/B 3.2");
+    expect(m).toContain("营收增速：最新年同比 +10.00%，近三年复合 +10.00%");
+    expect(m).toContain("净利润增速：最新年同比 +0.00%");
+    expect(m).toContain("自由现金流增速：最新年同比 -20.00%");
+    expect(m).toContain("营业利润率：最新 20.00%，前三年均值 15.00%");
+    expect(m).toContain("最新季度 Q2 2025：营收同比 +12.50%，净利润同比 -3.20%");
+    expect(m).toContain("当前 P/E 20.00，自身五年中位 25.00，行业中位 18.00");
+    expect(m).toContain("当前 P/B 3.20");
   });
   it("returns nothing without data", () => {
     expect(latestMetrics({})).toEqual([]);

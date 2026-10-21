@@ -1,13 +1,13 @@
 import { cleanThesis, THESIS_IMPACTS, IMPACT_DIRECTIONS } from "./thesis.js";
 
 export const GUIDE_STEPS = [
-  { key: "story", zh: "形成故事", en: "Build the story" },
+  { key: "story", zh: "形成叙事", en: "Build the story" },
   { key: "evidence", zh: "检查依据", en: "Check the evidence" },
   { key: "impacts", zh: "连接数字", en: "Connect to numbers" },
 ];
-// 整条 AI 流程：先问两个场景共用的故事，再分开问保守 / 乐观，最后一起检查依据与影响
+// 整条 AI 流程：先问两个场景共用的叙事，再分开问保守 / 乐观，最后一起检查依据与影响
 export const FLOW_STEPS = [
-  { key: "core", zh: "核心故事", en: "Core story" },
+  { key: "core", zh: "核心叙事", en: "Core story" },
   { key: "downside", zh: "保守情况", en: "Downside" },
   { key: "upside", zh: "乐观情况", en: "Upside" },
   { key: "evidence", zh: "检查依据", en: "Evidence" },
@@ -88,4 +88,32 @@ export function cleanGuideState(raw) {
     otherText: typeof raw.otherText === "string" ? raw.otherText.slice(0, 400) : "",
     references: Array.isArray(raw.references) ? raw.references.filter((line) => typeof line === "string").slice(0, 24).map((line) => line.slice(0, 1600)) : [],
     base: typeof raw.base === "string" && raw.base.length < 16000 ? raw.base : "", applied: raw.applied === true };
+}
+
+// Keep the source numbers assigned in the server prompt; never renumber a subset.
+export function citedGuideReferences(text, references) {
+  const numbers = [...new Set([...text.matchAll(/[\[［](\d{1,3})[\]］]/g)].map((match) => Number(match[1])))].filter((n) => n > 0);
+  return numbers.sort((a, b) => a - b).map((number) => ({ number, text: references[number - 1] || null }));
+}
+
+// Single-case interviews must not expose the other case's assumptions or target value.
+export function scenarioContext(context, scenario) {
+  if (!["c", "o"].includes(scenario)) return context;
+  const { currentConclusion, resourceValuation, ...facts } = context.facts || {};
+  return { ...context, scenario, facts, thesis: { [scenario]: cleanThesis(context.thesis)[scenario] },
+    fields: (context.fields || []).map((f) => ({ ...f,
+      ...(scenario === "o" && f.col === "single" ? { readOnly: true } : {}),
+      ...(f.col === "dual" ? { value: { [scenario]: f.value?.[scenario] ?? null } } : {}) })) };
+}
+
+// Apply only explicitly confirmed values for this case, preserving its counterpart.
+export function mergeScenarioParams(params, fields, scenario) {
+  const result = {};
+  for (const field of fields) {
+    const value = params[field.k];
+    if (field.col === "dual") {
+      if (typeof value?.[scenario] === "number" && Number.isFinite(value[scenario])) result[field.k] = { ...field.value, [scenario]: value[scenario] };
+    } else if (scenario === "c" && typeof value === "number" && Number.isFinite(value)) result[field.k] = value;
+  }
+  return result;
 }

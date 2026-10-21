@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>复核排版 · 模拟数据</title>
+<link rel="stylesheet" href="/shared/styles.css">
+<!-- Local-only preview. Inject the page's styles when serving this fixture. -->
+<style>body{padding:24px}.preview{max-width:520px;margin:auto}h1{font-size:18px}button{font:inherit}.vrev{margin-top:14px}</style>
+<main class="preview"><h1>复核排版 · 模拟数据</h1><div id="new"></div><div id="old"></div></main>
+<script type="module">
+import {reviewElement} from '/shared/valuation/review-ui.js';
+import {buildReviewEvidence} from '/shared/valuation/review.js';
+window.fetch=()=>{throw Error('No network calls in this preview');};
+const fields=[{k:'margin',label:'净利率',meta:'netMargin',col:'dual',unit:'%',value:{c:6.88,o:6.88}},{k:'pe',label:'目标 PE',meta:'targetPE',col:'dual',value:{c:20,o:20}}];
+const evidence=buildReviewEvidence({fields,scenarioMode:'single',financialsSource:'longbridge',financials:{IS:[{field:'OperatingRevenue',values:[{year:2025,value:100}]},{field:'NetProfit',values:[{year:2025,value:6.878}]}]},valuationRefs:{pe:{current:30.1,own5y:170.6,industryMedian:17.4}}});
+const card={scenarioMode:'single',updatedAt:'2026-10-21T00:00:00Z',review:{version:2,scenarioMode:'single',valuedAt:'2026-10-21T00:00:00Z',at:'2026-10-21T01:00:00Z',overall:'watch',summary:'主情景的利润率与最新年度数据基本一致，持续性和目标倍数仍需验证。',evidence,checks:[{k:'margin',status:'watch',reason:'全年利润率与原假设基本一致，但历史水平不能保证未来维持。',condition:'跟踪后续完整报告期的利润率、投入和竞争变化。'},{k:'pe',status:'watch',reason:'目标倍数低于当前市场倍数，但还缺少盈利质量和可比公司的充分依据。',condition:'结合增长持续性及可比公司的盈利口径重新核对。'}]}};
+const next=reviewElement(card,{fields});document.querySelector('#new').append(next);next.querySelector('details').open=true;
+document.querySelector('#old').append(reviewElement({...card,review:{...card.review,version:undefined}},{fields}));
+</script>

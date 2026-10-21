@@ -1,5 +1,7 @@
+import { REVIEW_VERSION, cleanReviewEvidence } from "../public/shared/valuation/review.js";
 import { metricKey } from "../public/shared/metric-spark.js";
 import { cleanThesis } from "../public/shared/valuation/thesis.js";
+import { cleanManagementResearch } from "../public/shared/valuation/management-research.js";
 
 // 估值方法白名单（与 public/shared/valuation/* 的 model.key 一致）
 const METHODS = new Set(["fcff", "fcf", "fcfe", "ddm", "pe", "peg", "pb", "ps", "evebitda"]);
@@ -11,8 +13,8 @@ function cleanReview(r) {
   if (!r || typeof r !== "object" || !REVIEW_OVERALL.has(r.overall)) return undefined;
   const checks = (Array.isArray(r.checks) ? r.checks : []).slice(0, 40)
     .filter((c) => c && typeof c.k === "string" && REVIEW_STATUS.has(c.status))
-    .map((c) => ({ k: c.k.slice(0, 40), status: c.status, reason: typeof c.reason === "string" ? c.reason.slice(0, 240) : "", ...(metricKey(c.metric) ? { metric: c.metric } : {}) }));
-  return { overall: r.overall, summary: typeof r.summary === "string" ? r.summary.slice(0, 400) : "", checks, at: typeof r.at === "string" ? r.at.slice(0, 40) : "" };
+    .map((c) => ({ k: c.k.slice(0, 40), status: c.status, reason: typeof c.reason === "string" ? c.reason.slice(0, 240) : "", ...(metricKey(c.metric) ? { metric: c.metric } : {}), ...(typeof c.condition === "string" && c.condition ? { condition: c.condition.slice(0, 240) } : {}) }));
+  return { ...(r.version === REVIEW_VERSION && ["single", "range"].includes(r.scenarioMode) ? { version: REVIEW_VERSION, scenarioMode: r.scenarioMode, valuedAt: typeof r.valuedAt === "string" ? r.valuedAt.slice(0, 40) : "", evidence: cleanReviewEvidence(r.evidence) } : {}), overall: r.overall, summary: typeof r.summary === "string" ? r.summary.slice(0, 400) : "", checks, at: typeof r.at === "string" ? r.at.slice(0, 40) : "" };
 }
 function validateValuations(raw) {
   if (raw === undefined || raw === null) return { ok: true, value: [] };
@@ -24,10 +26,13 @@ function validateValuations(raw) {
     if (!METHODS.has(card.method)) return { ok: false };
     if (!card.inputs || typeof card.inputs !== "object") return { ok: false };
     const low = Number(card.low), high = Number(card.high);
-    if (!(low > 0) || !(high > low)) return { ok: false };
+    if (!Number.isFinite(low) || !Number.isFinite(high) || !(low > 0) || (card.scenarioMode === "single" ? high !== low : !(high > low))) return { ok: false };
+    if (card.scenarioMode !== undefined && !["single", "range"].includes(card.scenarioMode)) return { ok: false };
     out.push({ id: card.id, method: card.method, inputs: card.inputs, low, high,
+      ...(card.scenarioMode ? { scenarioMode: card.scenarioMode } : {}),
       note: typeof card.note === "string" ? card.note.slice(0, 2000) : "",
       thesis: cleanThesis(card.thesis),
+      ...(cleanManagementResearch(card.managementResearch) ? { managementResearch: cleanManagementResearch(card.managementResearch) } : {}),
       derivations: (card.derivations && typeof card.derivations === "object" && !Array.isArray(card.derivations)) ? card.derivations : {},
       segments: (card.segments && typeof card.segments === "object" && !Array.isArray(card.segments)) ? card.segments : {},
       updatedAt: typeof card.updatedAt === "string" ? card.updatedAt : "",
@@ -50,14 +55,15 @@ export function validateItem(b) {
   const hasFair = lowSet || highSet;
   if (!b.symbol || typeof b.symbol !== "string") errors.push("symbol required");
   if (!b.ticker || typeof b.ticker !== "string") errors.push("ticker required");
+  const vals = validateValuations(b.valuations);
+  const selectedSingle = vals.ok && vals.value.find((v) => v.id === b.selectedValuationId && v.scenarioMode === "single" && Math.abs(v.low - fairLow) <= 0.0051 && Math.abs(v.high - fairHigh) <= 0.0051);
   if (hasFair) {
     if (!(fairLow > 0)) errors.push("fairLow must be > 0");
-    else if (!(fairHigh > fairLow)) errors.push("fairHigh must be > fairLow");
+    else if (!(fairHigh > fairLow) && !(selectedSingle && fairHigh === fairLow)) errors.push("fairHigh must be > fairLow");
   }
   if (!(mos > 0 && mos < 100)) errors.push("mos must be in (0,100)");
   if (!(ext > 0)) errors.push("ext must be > 0");
 
-  const vals = validateValuations(b.valuations);
   if (!vals.ok) errors.push("valuations invalid");
   // 未设定区间 ⇒ 不可能有选中的估值卡片
   let selectedValuationId = (hasFair && typeof b.selectedValuationId === "string" && b.selectedValuationId) ? b.selectedValuationId : null;

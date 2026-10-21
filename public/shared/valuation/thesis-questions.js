@@ -66,7 +66,7 @@ export function mountThesisQuestions(panel, followup, { lang, scenario, initial 
     direction.value = value.direction || "unknown";
     head.append(node("strong", "", title), direction, remove); row.append(head);
     const reason = node("textarea", "vc-note-input vc-impact-reason"); reason.rows = 1; reason.maxLength = THESIS_LIMIT; reason.value = value.reason || "";
-    reason.placeholder = zh ? "原因：故事里的哪件事带来这个变化？（可留空）" : "Why: what in your story causes this? (optional)";
+    reason.placeholder = zh ? "原因：叙事里的哪件事带来这个变化？（可留空）" : "Why: what in your story causes this? (optional)";
     reason.setAttribute("aria-label", `${caseName} · ${title} · ${zh ? "原因" : "Reason"}`);
     const hint = node("p", "vc-impact-hint", impactParameterHint(key, currentFields, currentMethod, lang));
     row.append(reason, hint); list.append(row); rows.set(key, { row, direction, reason, hint });
@@ -78,22 +78,22 @@ export function mountThesisQuestions(panel, followup, { lang, scenario, initial 
     const button = node("button", "vc-impact-chip", (zh ? "+ " : "+ ") + (zh ? item.zh : item.en)); button.type = "button";
     button.addEventListener("click", () => addFromChoice(item.key)); choices.append(button); choiceButtons.set(item.key, button);
   }
-  // 故事里的用词只用来提示「可能相关」：高亮对应选项，不替用户选
+  // 叙事里的用词只用来提示「可能相关」：高亮对应选项，不替用户选
   function refreshSuggestions() {
     const keys = new Set(suggestedImpacts(story.value));
     for (const [key, button] of choiceButtons) {
       button.hidden = rows.has(key);
       button.classList.toggle("suggested", keys.has(key));
-      button.title = keys.has(key) ? (zh ? "故事里提到了相关内容" : "Your story mentions this") : "";
+      button.title = keys.has(key) ? (zh ? "叙事里提到了相关内容" : "Your story mentions this") : "";
     }
   }
   story.addEventListener("input", refreshSuggestions);
 
   // Existing prose stays editable and survives round trips, without demanding it again.
   const previous = node("details", "vc-question-example"); previous.append(node("summary", "", zh ? "之前写过的检验与假设" : "Previous research notes"));
-  textField(previous, "assessment", zh ? "原有故事检验" : "Previous story assessment", "");
+  textField(previous, "assessment", zh ? "原有叙事检验" : "Previous story assessment", "");
   textField(previous, "drivers", zh ? "原有关键假设" : "Previous assumptions", ""); panel.append(previous);
-  textField(followup, "signals", zh ? "什么变化会让你重新考虑这个故事？" : "What would make you reconsider this story?", zh ? "例如：新品迟迟没有复购、客户流失增加。先写观察事项，有依据后再定阈值。" : "For example: no repeat orders, or more customers leaving. Set thresholds once supported by evidence.");
+  textField(followup, "signals", zh ? "什么变化会让你重新考虑这个叙事？" : "What would make you reconsider this story?", zh ? "例如：新品迟迟没有复购、客户流失增加。先写观察事项，有依据后再定阈值。" : "For example: no repeat orders, or more customers leaving. Set thresholds once supported by evidence.");
 
   function write(value) {
     const clean = cleanThesis({ [scenario.key]: value })[scenario.key] || {};

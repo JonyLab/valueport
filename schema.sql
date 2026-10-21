@@ -122,3 +122,32 @@ CREATE TABLE IF NOT EXISTS usage_daily (
   ai_own   INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (day, user_id)
 );
+
+-- Public company research only; no user assumptions or broker credentials.
+CREATE TABLE IF NOT EXISTS management_research_snapshots (
+  symbol TEXT PRIMARY KEY,
+  snapshot_json TEXT NOT NULL,
+  saved_at TEXT NOT NULL,
+  checked_at TEXT NOT NULL,
+  refresh_after INTEGER NOT NULL,
+  lease_until INTEGER NOT NULL DEFAULT 0,
+  refresh_failed INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS management_research_documents (
+  symbol TEXT NOT NULL,
+  url TEXT NOT NULL,
+  source_url TEXT NOT NULL,
+  format TEXT NOT NULL,
+  pages_json TEXT NOT NULL,
+  fetched_at TEXT NOT NULL,
+  published_at TEXT NOT NULL DEFAULT '',
+  expires_at INTEGER NOT NULL,
+  PRIMARY KEY (symbol, url)
+);
+-- On-demand public annual/interim revenue tables and original PDF provenance.
+CREATE TABLE IF NOT EXISTS business_report_snapshots (
+  symbol TEXT PRIMARY KEY,
+  snapshot_json TEXT NOT NULL,
+  saved_at TEXT NOT NULL,
+  refresh_after INTEGER NOT NULL
+);

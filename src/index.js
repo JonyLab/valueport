@@ -14,8 +14,11 @@ import { validateUsername, validateSlug, rowToUser } from "./users.js";
 import { registerPortfolio } from "./portfolio.js";
 import { PortfolioStorageError, migratePortfolioBatch } from "./portfolio-storage.js";
 import { registerAi } from "./ai.js";
+import { registerJev } from "./jev.js";
 import { registerAiChats } from "./ai-chats.js";
 import { registerResearch } from "./research.js";
+import { registerManagementResearch } from "./management-research.js";
+import { registerBusinessReports } from "./business-report.js";
 import { registerMacro, refreshIfStale } from "./macro.js";
 import { registerFeedback } from "./feedback.js";
 import { fetchLongbridgeAssets } from "./brokers/longbridge-assets.js";
@@ -272,8 +275,11 @@ app.use("/api/my/*", async (c, next) => {
 
 /* ---------- Portfolio（券商账户 / 持仓汇总，按 uid 隔离，见 src/portfolio.js） ---------- */
 registerAi(app);
+registerJev(app);
 registerAiChats(app);
 registerResearch(app); // 分析师评级 / 目标价 / 一致预期（公开，按标的缓存 6 小时）
+registerManagementResearch(app);
+registerBusinessReports(app);
 registerMacro(app);
 registerFeedback(app);
 const portfolio = registerPortfolio(app, {

@@ -1,5 +1,5 @@
 export function valuationChange(cfg, cardId, value, id = crypto.randomUUID(), at = new Date().toISOString()) {
-  if (!Number.isFinite(value.low) || !Number.isFinite(value.high) || value.low <= 0 || value.high <= value.low) throw new Error("Invalid valuation range");
+  if (!Number.isFinite(value.low) || !Number.isFinite(value.high) || value.low <= 0 || (value.scenarioMode === "single" ? value.high !== value.low : value.high <= value.low)) throw new Error("Invalid valuation range");
   const cards = Array.isArray(cfg.valuations) ? cfg.valuations : [];
   if (cardId && !cards.some((card) => card.id === cardId)) throw new Error("Valuation no longer exists");
   const nextCard = { ...(cardId ? cards.find((card) => card.id === cardId) : {}), ...value, id: cardId || id, updatedAt: at };

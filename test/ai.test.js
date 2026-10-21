@@ -213,8 +213,8 @@ describe("verified facts in prompts", () => {
     expect(mp).toContain("2021、2022 年为负");
     expect(mp).toContain("不要编造");
     const withStory = buildMethodPrompt({ stock: { name: "小米集团" }, methods: METHODS, verified: V, thesis: { o: { story: "汽车业务带动利润率改善" } } }, "zh");
-    expect(withStory).toContain("用户已写的场景故事"); expect(withStory).toContain("汽车业务带动利润率改善");
-    expect(mp).not.toContain("用户已写的场景故事");
+    expect(withStory).toContain("用户已写的场景叙事"); expect(withStory).toContain("汽车业务带动利润率改善");
+    expect(mp).not.toContain("用户已写的场景叙事");
     const sp = buildSystemPrompt({ ...CONTEXT, verified: V }, "zh");
     expect(sp).toContain("没有查到现金分红记录");
   });
@@ -253,6 +253,29 @@ describe("AI review", () => {
     expect(validateReviewReq({ ...BODY, metrics: "x" })).toBeTruthy();
     expect(validateReviewReq(BODY)).toBeNull();
   });
+  it("scopes single-case reviews on the server and retains comparable evidence", async () => {
+    const { buildReviewEvidence } = await import("../public/shared/valuation/review.js");
+    const { buildReviewPrompt, validateReviewReq } = await import("../src/ai.js");
+    const fields = [{ k: "margin", label: "净利率", meta: "netMargin", col: "dual", unit: "%", value: { c: 6.88, o: 999 } }];
+    const evidence = buildReviewEvidence({ fields, scenarioMode: "single", financialsSource: "longbridge", financials: { IS: [{ field: "OperatingRevenue", values: [{ year: 2025, value: 100 }] }, { field: "NetProfit", values: [{ year: 2025, value: 6.878 }] }] } });
+    const body = { ...BODY, fields, scenarioMode: "single", evidence, thesis: { c: { story: "当前主情景观点" }, o: { story: "OTHER_SCENARIO_SECRET" } }, result: { low: 130.72, high: 130.72 } };
+    expect(validateReviewReq(body)).toBeNull();
+    expect(validateReviewReq({ ...body, result: { low: 1, high: 2 } })).toBe("single value required");
+    expect(validateReviewReq({ ...body, evidence: [{ ...evidence[0], k: "unknown" }] })).toBe("bad review evidence");
+    const prompt = buildReviewPrompt(body, "zh");
+    expect(prompt).not.toContain("OTHER_SCENARIO_SECRET");expect(prompt).not.toContain("999");
+    expect(prompt).toContain("主情景 ·"); expect(prompt).toContain("按相同显示精度基本一致");
+    expect(prompt).not.toContain("130.72 ~ 130.72");
+    const ck = await userCookie("single_review_v2");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, (opts) => {
+      expect(JSON.parse(opts.body).messages[0].content).not.toContain("OTHER_SCENARIO_SECRET");
+      return { choices: [{ message: { content: JSON.stringify({ overall: "broken", summary: "利润率失效", checks: [{ k: "margin", status: "broken", reason: "尾数低于假设", condition: "跟踪后续完整年度利润率" }] }) } }] };
+    });
+    const r = await SELF.fetch("https://x/api/my/ai/review", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(body) });
+    expect(r.status).toBe(200);
+    const result = (await r.json()).review;
+    expect(result).toMatchObject({ version: 2, scenarioMode: "single", valuedAt: body.valuedAt, overall: "watch", evidence, checks: [{ k: "margin", status: "watch", condition: "跟踪后续完整年度利润率" }] });
+  });
   it("returns the review from the provider with a timestamp", async () => {
     const ck = await userCookie("aiuser5");
     fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" })
@@ -260,7 +283,7 @@ describe("AI review", () => {
     const r = await SELF.fetch("https://x/api/my/ai/review", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) });
     expect(r.status).toBe(200);
     const j = await r.json();
-    expect(j.review).toMatchObject({ overall: "hold", summary: "假设仍成立", checks: [{ k: "growth", status: "ok", reason: "增速落在区间内" }] });
+    expect(j.review).toMatchObject({ version: 2, scenarioMode: "range", overall: "watch", checks: [{ k: "growth", status: "watch" }] });
     expect(typeof j.review.at).toBe("string");
     fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, { choices: [{ message: { content: "随便聊聊" } }] });
     expect((await SELF.fetch("https://x/api/my/ai/review", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(BODY) })).status).toBe(502);
@@ -402,14 +425,14 @@ describe("AI note draft", () => {
     const first = { ...BODY, format: "thesis", scenario: "o", context: { ...CONTEXT, method: {}, fields: [] } };
     expect(validateNoteReq(first)).toBeNull();
     const prompt = buildNotePrompt(first, "zh");
-    expect(prompt).toContain("先研究生意并形成定性故事");
-    expect(prompt).toContain("不能先看估值结果或现价再倒编故事");
+    expect(prompt).toContain("先研究生意并形成定性叙事");
+    expect(prompt).toContain("不能先看估值结果或现价再倒编叙事");
     const cases = { c: { story: "竞争激烈" }, o: { story: "新品放量" } };
     const translated = buildNotePrompt({ ...first, thesis: cases, context: { ...CONTEXT, fields: [{ k: "growth", col: "dual", value: { c: 7, o: 19 } }] } }, "zh");
     expect(translated).toContain("growth｜数字｜19");
     expect(translated).not.toContain("竞争激烈");
     expect(translated).toContain("新品放量");
-    expect(buildSystemPrompt({ ...CONTEXT, thesis: cases }, "zh")).toContain("把每个故事分别翻译成该场景");
+    expect(buildSystemPrompt({ ...CONTEXT, thesis: cases }, "zh")).toContain("把每个叙事分别翻译成该场景");
     const complete = { story: "a", assessment: "b", drivers: "c", signals: "d" };
     expect(parseThesis(JSON.stringify({ c: complete, o: complete }), "c")).toEqual({ c: complete });
     expect(validateNoteReq({ ...first, thesis: { o: { story: 123 } } })).toBe("bad thesis");
@@ -426,7 +449,7 @@ describe("AI note draft", () => {
     const body = { ...BODY, format: "thesis", scenario: "o", thesis };
     expect(validateNoteReq(body)).toBeNull();
     expect(parseThesis(JSON.stringify(thesis), "o")).toEqual(thesis);
-    expect(buildNotePrompt(body, "zh")).toContain("不能把故事里的预期当成已验证的证据");
+    expect(buildNotePrompt(body, "zh")).toContain("不能把叙事里的预期当成已验证的证据");
     expect(buildSystemPrompt({ ...CONTEXT, thesis }, "zh")).toContain("复购情况待验证");
     for (const impacts of ["not array", [{ key: "fake", direction: "up", reason: "x" }], [{ key: "growth", direction: "sure", reason: "x" }]]) {
       const bad = { o: { ...thesis.o, impacts } };
@@ -533,6 +556,98 @@ describe("optional company-specific thesis guide", () => {
     const { id } = await env.DB.prepare("SELECT id FROM users WHERE username='guided_recovery'").first();
     await env.DB.prepare("INSERT OR REPLACE INTO settings(user_id,key,value) VALUES(?,?,?)").bind(id, "_ai_usage", new Date().toISOString().slice(0, 10) + ":100").run();
     expect((await request(cookie, body)).status).toBe(429);
+  });
+});
+
+describe("Jev guide evidence checks", () => {
+  const context = { stock: { name: "Example", code: "EX" }, business: ["2025 net debt increased."], fields: [] };
+  const question = { type: "question", context: "[1] Net debt increased.", question: "What changes?", selection: "single", options: [
+    { id: "a", label: "If production grows, profits may rise." }, { id: "b", label: "[9] Cash flow is stable." },
+  ] };
+  const choice = (options, selected, p = 0.96) => ({ type: "choice", choice: selected, confidence: (p - 1 / options.length) / (1 - 1 / options.length), probabilities: Object.fromEntries(options.map((key) => [key, key === selected ? p : (1 - p) / (options.length - 1)])) });
+  const answers = () => ({ kind_0: choice(["fact", "assumption", "mixed", "other"], "fact"), support_0: choice(["supported", "partial", "unsupported", "contradicted", "uncertain"], "partial"),
+    kind_1: choice(["fact", "assumption", "mixed", "other"], "other"), kind_2: choice(["fact", "assumption", "mixed", "other"], "assumption"), kind_3: choice(["fact", "assumption", "mixed", "other"], "fact") });
+  const request = (ck, turns = [], scenario = "both") => SELF.fetch("https://x/api/my/ai/thesis-guide", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify({ lang: "en", scenario, turns, context }) });
+  async function configured(name) {
+    const ck = await userCookie(name);
+    await SELF.fetch("https://x/api/my/ai/jev", { method: "PUT", headers: { ...J, cookie: ck }, body: JSON.stringify({ apiKey: "fake-jev-guide-key" }) });
+    return ck;
+  }
+  const llm = () => fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, { choices: [{ message: { content: JSON.stringify(question) } }] });
+
+  it("checks numbered evidence separately from assumptions and never asks Jev to invent missing sources", async () => {
+    const ck = await configured("jev-guide-evidence"); llm();
+    fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).reply(200, (opts) => {
+      const body = JSON.parse(opts.body);
+      expect(Object.keys(body.questions)).toHaveLength(5);
+      expect(body.questions.support_3).toBeUndefined();
+      expect(body.questions.support_0.instructions).toContain("years, units, scope");
+      expect(body.state.supplied_sources).toEqual({ 1: context.business[0] });
+      expect(body.state.passages.passage_3.citations).toEqual([9]);
+      expect(opts.body).not.toContain("fake-jev-guide-key");
+      return { answers: answers() };
+    });
+    const res = await request(ck); expect(res.status).toBe(200);
+    const result = await res.json();
+    expect(result.context).toBe(question.context);
+    expect(result.audit).toMatchObject({ status: "used", items: [
+      { path: "context", kind: "fact", support: "partial" }, { path: "question", kind: "other", support: "not_applicable" },
+      { path: "options.0.label", kind: "assumption", support: "not_applicable" }, { path: "options.1.label", support: "missing_source" },
+    ] });
+  });
+  it("routes low confidence to uncertainty rather than claiming support", async () => {
+    const ck = await configured("jev-guide-uncertain"); llm();
+    const a = answers(); a.support_0 = choice(["supported", "partial", "unsupported", "contradicted", "uncertain"], "supported", 0.25);
+    a.kind_0 = choice(["fact", "assumption", "mixed", "other"], "fact", 0.3);
+    fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).reply(200, { answers: a });
+    expect((await (await request(ck)).json()).audit.items[0]).toMatchObject({ kind: "uncertain", support: "uncertain" });
+  });
+  it("preserves usable guide content on provider errors and malformed distributions", async () => {
+    const ck = await configured("jev-guide-failure");
+    for (const [status, response] of [[401, { error: "fake-jev-guide-key" }], [200, { answers: { ...answers(), support_0: { type: "choice", choice: "supported", confidence: 1, probabilities: { supported: 1 } } } }]]) {
+      llm();
+      fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).reply(status, response);
+      const res = await request(ck); expect(res.status).toBe(200);
+      const result = await res.json();
+      expect(result.options).toEqual(question.options.map((option) => ({ ...option, detail: "" })));
+      expect(result.audit.status).toBe("unavailable");
+      expect(result.audit.items[0].support).toBe("unchecked");
+      expect(result.audit.items[3].support).toBe("missing_source");
+      expect(JSON.stringify(result)).not.toContain("fake-jev-guide-key");
+    }
+  });
+  it("checks missing citation numbers without a key or external Jev call", async () => {
+    const ck = await userCookie("jev-guide-no-key"); llm();
+    const result = await (await request(ck)).json();
+    expect(result.audit.status).toBe("not_configured");
+    expect(result.audit.items[3].support).toBe("missing_source");
+  });
+  it("shares the audit request with coverage routing and identifies the exact prior answer", async () => {
+    const ck = await configured("jev-guide-reuse"); llm();
+    const turns = [{ question: "What if debt costs rise?", answer: "In the conservative case, higher interest costs could offset production growth. I accept this financing risk." }];
+    fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).reply(200, (opts) => {
+      const body = JSON.parse(opts.body);
+      expect(Object.keys(body.questions)).toHaveLength(7);
+      expect(body.state.guide_routing.current).toBe("downside");
+      expect(body.state.guide_routing.previous[0].answer).toBe(turns[0].answer);
+      expect(body.questions.answer_coverage.instructions).toContain("unselected options are NOT answers");
+      return { answers: { ...answers(), answer_coverage: choice(Object.keys(body.questions.answer_coverage.criteria), "covered_turn_0"), followup_need: choice(Object.keys(body.questions.followup_need.criteria), "accepted_risk") } };
+    });
+    const res = await request(ck, turns); expect(res.status).toBe(200);
+    const result = await res.json();
+    expect(result.audit.routing).toMatchObject({ status: "used", coverage: "covered", matchedTurn: 0, followup: "accepted_risk", snapshot: { turns, scenario: "both" } });
+    expect(result.audit.status).toBe("used");
+    expect(result.options.map((o) => o.id)).toEqual(["a", "b"]);
+  });
+  it("preserves citation checks if routing is malformed, and ordinary answering if no key exists", async () => {
+    const turns = [{ question: "What changes?", answer: "Production might grow; costs remain unknown." }];
+    const ck = await configured("jev-routing-bad"); llm();
+    fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).reply(200, { answers: { ...answers(), answer_coverage: { type: "choice", choice: "covered_turn_99", confidence: 1, probabilities: {} } } });
+    const result = await (await request(ck, turns)).json();
+    expect(result.audit).toMatchObject({ status: "used", routing: { status: "unavailable", matchedTurn: null } });
+    expect(result.audit.items[0].support).toBe("partial");
+    const unconfigured = await userCookie("jev-routing-no-key"); llm();
+    expect((await (await request(unconfigured, turns)).json()).audit.routing).toMatchObject({ status: "not_configured", matchedTurn: null });
   });
 });
 
@@ -665,5 +780,252 @@ describe("scenario analysis in the chat", () => {
     expect(r.scenarios).toEqual({ c: { story: "稳住", drivers: ["增速 8%"], breaks: "", signals: "" }, o: { story: "AI 驱动", drivers: ["增速 12%"], breaks: "宏观不好", signals: "广告增速" } });
     expect(parseSuggestion('```json\n{"params": {"growth": {"c": 8, "o": 12}}, "scenarios": {"c": {"story": "稳住", "drivers": ["增速 8%", "利润率 2', F).scenarios.c.drivers).toEqual(["增速 8%"]);
     expect(parseSuggestion("只是聊聊", F).params).toBeNull();
+  });
+});
+
+describe("Jev credentials", () => {
+  const request = (cookie, method = "GET", body) => SELF.fetch("https://x/api/my/ai/jev", {
+    method, headers: { ...J, ...(cookie ? { cookie } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  it("requires login and keeps encrypted keys private and isolated by user", async () => {
+    for (const method of ["GET", "PUT", "DELETE"]) expect((await request(null, method, method === "PUT" ? { apiKey: "fake-key" } : undefined)).status).toBe(401);
+    const ck = await userCookie("jev-owner"), other = await userCookie("jev-other");
+    expect(await (await request(ck)).json()).toEqual({ configured: false });
+    for (const apiKey of ["", "a b", "x".repeat(501), 123, "a\u0000b"]) expect((await request(ck, "PUT", { apiKey })).status).toBe(400);
+    const key = "fake-jev-key-12345";
+    const saved = await request(ck, "PUT", { apiKey: key });
+    expect(saved.status).toBe(200); expect(await saved.text()).not.toContain(key);
+    const uid = (await env.DB.prepare("SELECT id FROM users WHERE username=?").bind("jev-owner").first()).id;
+    const row = await env.DB.prepare("SELECT value FROM settings WHERE user_id=? AND key='_jev_key'").bind(uid).first();
+    expect(row.value).not.toContain(key);
+    const { readJevKey } = await import("../src/jev.js");
+    expect(await readJevKey(env, uid)).toBe(key);
+    const status = await request(ck);
+    expect(status.headers.get("cache-control")).toBe("no-store");
+    expect(await status.json()).toEqual({ configured: true });
+    for (const url of ["/api/my/settings", "/api/my/ai/models"]) {
+      const response = await SELF.fetch("https://x" + url, { headers: { cookie: ck } });
+      const text = await response.text(); expect(text).not.toContain(key); expect(text).not.toContain(row.value);
+    }
+    expect(await (await request(other)).json()).toEqual({ configured: false });
+    await request(other, "DELETE");
+    expect(await (await request(ck)).json()).toEqual({ configured: true });
+    await request(ck, "PUT", { apiKey: "replacement-key" });
+    expect(await readJevKey(env, uid)).toBe("replacement-key");
+    await request(ck, "DELETE");
+    expect(await readJevKey(env, uid)).toBeNull();
+  });
+});
+
+describe("Jev method decisions", () => {
+  const FIT = ["suitable", "uncertain", "unsuitable"];
+  const TYPES = ["cyclical", "financial", "utility", "stalwart", "fast_grower", "unprofitable", "asset_play", "platform", "unknown"];
+  const choice = (options, selected, p = 0.95) => ({ type: "choice", choice: selected, confidence: (p - 1 / options.length) / (1 - 1 / options.length), probabilities: Object.fromEntries(options.map((key) => [key, key === selected ? p : (1 - p) / (options.length - 1)])) });
+  const body = { lang: "zh", stock: { name: "Example", code: "EX" }, methods: [{ key: "fcff", title: "FCFF" }, { key: "pe", title: "P/E" }], facts: { sharesOutstanding: 100 }, thesis: { c: { story: "产量增长但商品价格下跌" }, o: { story: "产量增长带动营收和利润" } } };
+  const answers = () => ({ business_type: choice(TYPES, "cyclical"), fcff_business: choice(FIT, "suitable"), fcff_story: choice(FIT, "suitable"), pe_business: choice(FIT, "suitable", 0.8), pe_story: choice(FIT, "uncertain", 0.8) });
+  const request = (ck, value = body) => SELF.fetch("https://x/api/my/ai/method", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(value) });
+  async function configured(name) {
+    const ck = await userCookie(name);
+    await SELF.fetch("https://x/api/my/ai/jev", { method: "PUT", headers: { ...J, cookie: ck }, body: JSON.stringify({ apiKey: "fake-jev-decision-key" }) });
+    return ck;
+  }
+  const mockJev = (a, check = () => true) => fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST", body: check })
+    .reply(200, { model: "jev-1.14.0", answers: a });
+  const mockLlm = (picks = [{ key: "fcff", reason: "现金流驱动" }, { key: "pe", reason: "正常化盈利交叉验证" }]) => fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" })
+    .reply(200, { choices: [{ message: { content: '```json\n' + JSON.stringify({ summary: "按业务与叙事选方法。", picks }) + '\n```' } }] });
+
+  it("ranks on fit, keeps a first choice with missing data, and sends only named closed questions", async () => {
+    const ck = await configured("jev-ranking");
+    mockJev(answers(), (raw) => {
+      const j = JSON.parse(raw);
+      expect(j.model).toBe("jev-1.14.0");
+      expect(Object.keys(j.questions)).toHaveLength(5);
+      expect(j.questions.fcff_business.instructions).toContain("Missing numerical inputs do NOT");
+      expect(j.state.user_assumptions.c.story).toContain("商品价格");
+      expect(raw).not.toContain("fake-jev-decision-key");
+      return true;
+    });
+    mockLlm();
+    const r = await request(ck); expect(r.status).toBe(200);
+    const j = await r.json();
+    expect(j.decision).toMatchObject({ engine: "jev", status: "used", classification: { type: "cyclical", needsReview: false } });
+    expect(j.picks[0]).toMatchObject({ key: "fcff", role: "primary", readiness: { status: "needs_data" } });
+    expect(j.picks[0].readiness.missingInputs.map((x) => x.key)).toContain("revenue");
+    expect(j.picks[1].suitability).toBe("needs_review");
+    expect(r.headers.get("cache-control")).toBe("no-store");
+  });
+  it("does not let the explanation model reorder Jev's choices", async () => {
+    const ck = await configured("jev-explanation"); mockJev(answers()); mockLlm([{ key: "pe", reason: "改选PE" }]);
+    const j = await (await request(ck)).json();
+    expect(j.picks.map((p) => p.key)).toEqual(["fcff", "pe"]);
+    expect(j.picks[0].reason).not.toContain("改选");
+  });
+  it("uses structured explanations when the text model is unavailable", async () => {
+    const ck = await configured("jev-text-failure"); mockJev(answers());
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(503, { error: "busy" });
+    const r = await request(ck); expect(r.status).toBe(200);
+    expect((await r.json()).decision.engine).toBe("jev");
+  });
+  it("falls back honestly on invalid credentials or malformed answers without exposing upstream text", async () => {
+    const ck = await configured("jev-fallback");
+    fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).reply(401, { error: "fake-jev-decision-key" });
+    mockLlm();
+    const first = await (await request(ck)).json();
+    expect(first.decision).toEqual({ engine: "llm", status: "fallback", reason: "invalid_credentials" });
+    expect(JSON.stringify(first)).not.toContain("fake-jev-decision-key");
+    const a = answers(); a.fcff_business.probabilities.suitable = 7;
+    mockJev(a); mockLlm();
+    expect((await (await request(ck)).json()).decision.reason).toBe("invalid_response");
+  });
+  it("marks uncertain classification for review and excludes a confidently unsuitable method", async () => {
+    const ck = await configured("jev-uncertain");
+    const a = answers(); a.business_type = choice(TYPES, "unknown", 0.5); a.fcff_business = choice(FIT, "unsuitable");
+    mockJev(a); mockLlm([{ key: "pe", reason: "有条件使用" }]);
+    const j = await (await request(ck)).json();
+    expect(j.decision.classification).toMatchObject({ type: null, needsReview: true });
+    expect(j.picks.map((p) => p.key)).toEqual(["pe"]);
+  });
+  it("applies business constraints even if a method-fit answer ranks a conflicting method highly", async () => {
+    const ck = await configured("jev-bank-guard");
+    const a = answers(); a.business_type = choice(TYPES, "financial");
+    mockJev(a); mockLlm([{ key: "pe", reason: "盈利交叉验证" }]);
+    const j = await (await request(ck)).json();
+    expect(j.picks.map((p) => p.key)).toEqual(["pe"]); // FCFF is not an appropriate bank valuation method
+  });
+  it("keeps the original recommendation usable when Jev has a connection failure", async () => {
+    const ck = await configured("jev-network-fallback");
+    fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).replyWithError(new Error("connection unavailable"));
+    mockLlm();
+    const r = await request(ck); expect(r.status).toBe(200);
+    expect((await r.json()).decision).toEqual({ engine: "llm", status: "fallback", reason: "unavailable" });
+  });
+  it("tests the saved key using a fixed public example, without model chat or company data", async () => {
+    const ck = await configured("jev-connection");
+    mockJev({ sector: choice(["financial", "other"], "financial") }, (raw) => { expect(JSON.parse(raw).state.company).toBe("Example"); return true; });
+    const r = await SELF.fetch("https://x/api/my/ai/jev/test", { method: "POST", headers: { cookie: ck } });
+    expect(await r.json()).toEqual({ ok: true, model: "jev-1.14.0" });
+  });
+});
+
+describe("driver-based narrative guide", () => {
+  const context = { stock: { name: "Example Miner", code: "MIN" }, fields: [], business: ["Gold and copper mine sales; production expansion planned."], verified: [] };
+  const question = { type: "question", context: "[1] Gold sales are evidenced.", question: "How do you expect gold prices to change?", selection: "single", options: [{ id: "a", label: "Weaker" }, { id: "b", label: "Stronger" }] };
+  const base = { lang: "en", scenario: "both", guideMode: "drivers", context, turns: [] };
+  const request = (cookie, body = base) => SELF.fetch("https://x/api/my/ai/thesis-guide", { method: "POST", headers: { ...J, cookie }, body: JSON.stringify(body) });
+  const llm = (content, check = () => {}) => fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, (opts) => {
+    check(JSON.parse(opts.body)); return { choices: [{ message: { content: JSON.stringify(content) } }] };
+  });
+  it("returns an explicit generic fallback without a Jev key and preserves single judgments", async () => {
+    const cookie = await userCookie("driver_no_key");
+    llm({ ...question, selection: "multiple" }, (body) => {
+      const prompt = body.messages[0].content;
+      expect(prompt).toContain("demand"); expect(prompt).toContain("永续增速"); expect(prompt).toContain("一个选项只代表一个判断");
+    });
+    const res = await request(cookie); expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ type: "question", selection: "single", guideMode: "drivers", driverPlan: { version: 1, status: "not_configured", keys: ["demand", "margin", "reinvestment"] } });
+  });
+  it("uses Jev's closed rankings before writing the first question, then audits separately", async () => {
+    const cookie = await userCookie("driver_ranked");
+    await SELF.fetch("https://x/api/my/ai/jev", { method: "PUT", headers: { ...J, cookie }, body: JSON.stringify({ apiKey: "fake-driver-key" }) });
+    const options = ["core", "secondary", "negligible", "insufficient"];
+    const answer = (choice, p) => ({ type: "choice", choice, confidence: 0.8, probabilities: Object.fromEntries(options.map((key) => [key, key === choice ? p : (1 - p) / 3])) });
+    fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).reply(200, (opts) => {
+      const body = JSON.parse(opts.body);
+      expect(Object.keys(body.questions)).toContain("gold_price"); expect(body.state.supplied_business).toEqual(context.business);
+      const scores = { gold_price: 0.98, copper_price: 0.96, capacity: 0.94, reinvestment: 0.92 };
+      return { answers: Object.fromEntries(Object.keys(body.questions).map((key) => [key, answer(scores[key] ? "core" : "negligible", scores[key] || 0.9)])) };
+    });
+    llm(question, (body) => expect(body.messages[0].content).toContain("本轮只问变量 gold_price"));
+    // Failed evidence audit must not discard a successfully selected plan or fabricate support.
+    fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).reply(503, {});
+    const res = await request(cookie); expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ driverPlan: { status: "used", keys: ["gold_price", "copper_price", "capacity", "reinvestment"] }, audit: { status: "unavailable" } });
+  });
+  it("summarizes at the selected plan length and requires confirmation of new case conditions", async () => {
+    const cookie = await userCookie("driver_summary");
+    const driverPlan = { version: 1, status: "not_configured", keys: ["demand", "margin", "reinvestment"] };
+    const draft = { story: "Conditional case", evidence: "No evidence", uncertainties: "Proposed conditions need confirmation", impacts: [], signals: "Suggested observation" };
+    llm({ type: "summary", drafts: { c: draft, o: draft } }, (body) => {
+      expect(body.messages[0].content).toContain("建议情景，待你确认"); expect(body.messages[0].content).not.toContain("本轮只问变量");
+    });
+    const res = await request(cookie, { ...base, driverPlan, turns: Array(3).fill({ question: "A driver?", answer: "My assumption" }) });
+    expect(res.status).toBe(200); expect(await res.json()).toMatchObject({ type: "summary", drafts: { c: draft, o: draft }, driverPlan });
+    // No plan reselection or network call is permitted for malformed client plans.
+    for (const body of [{ ...base, turns: [{ question: "q", answer: "a" }] }, { ...base, driverPlan: { ...driverPlan, keys: ["unknown", "margin", "reinvestment"] } }, { ...base, driverPlan, turns: Array(4).fill({ question: "q", answer: "a" }) }]) expect((await request(cookie, body)).status).toBe(400);
+  });
+  it("keeps the persisted driver order for subsequent questions", async () => {
+    const cookie = await userCookie("driver_resume");
+    const driverPlan = { version: 1, status: "used", keys: ["gold_price", "copper_price", "capacity"] };
+    llm(question, (body) => expect(body.messages[0].content).toContain("本轮只问变量 copper_price"));
+    const res = await request(cookie, { ...base, driverPlan, turns: [{ question: "Gold prices?", answer: "Stronger" }] });
+    expect(res.status).toBe(200); expect((await res.json()).driverPlan).toEqual(driverPlan);
+  });
+  it("falls back explicitly when Jev returns a malformed driver distribution", async () => {
+    const cookie = await userCookie("driver_bad_output");
+    await SELF.fetch("https://x/api/my/ai/jev", { method: "PUT", headers: { ...J, cookie }, body: JSON.stringify({ apiKey: "fake-driver-key" }) });
+    fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).reply(200, { answers: {} });
+    llm(question);
+    fetchMock.get("https://api.typesafe.ai").intercept({ path: "/v1/systemone", method: "POST" }).reply(503, {});
+    const res = await request(cookie); expect(res.status).toBe(200);
+    expect((await res.json()).driverPlan).toEqual({ version: 1, status: "unavailable", keys: ["demand", "margin", "reinvestment"] });
+  });
+  it("rejects exhausted quota before any Jev routing request", async () => {
+    const cookie = await userCookie("driver_quota");
+    await SELF.fetch("https://x/api/my/ai/jev", { method: "PUT", headers: { ...J, cookie }, body: JSON.stringify({ apiKey: "fake-driver-key" }) });
+    const { id } = await env.DB.prepare("SELECT id FROM users WHERE username='driver_quota'").first();
+    await env.DB.prepare("INSERT OR REPLACE INTO settings(user_id,key,value) VALUES(?,?,?)").bind(id, "_ai_usage", new Date().toISOString().slice(0, 10) + ":100").run();
+    expect((await request(cookie)).status).toBe(429);
+  });
+});
+
+describe("sequential case API boundaries", () => {
+  const context = { stock: { name: "Scenario fixture", code: "TEST" }, fields: [], business: ["Public fixture revenue data"], verified: [] };
+  const plan = { version: 1, status: "uncertain", keys: ["demand", "margin", "reinvestment", "financing"] };
+  const draft = { story: "This case only", evidence: "No evidence", uncertainties: "Unverified", signals: "Suggested observation", impacts: [] };
+  it("keeps a single main case neutral in guide and parameter requests", async () => {
+    const { validateThesisGuide, buildDriverGuidePrompt } = await import("../src/ai.js");
+    const body = { lang: "zh", scenario: "c", singleCase: true, guideMode: "drivers", driverPlan: plan, turns: [], context };
+    expect(validateThesisGuide(body)).toBeNull();
+    expect(validateThesisGuide({ ...body, scenario: "o" })).toBe("bad single case");
+    expect(buildDriverGuidePrompt(body, "zh")).toContain("不强制向弱或强的方向引导");
+    const ck = await userCookie("main_case_params");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, (opts) => {
+      expect(JSON.parse(opts.body).messages[0].content).toContain("不把它改成保守预测");
+      return { choices: [{ message: { content: '```json\n{"params":{"growth":{"c":9,"o":99}}}\n```' } }] };
+    });
+    const res = await SELF.fetch("https://x/api/my/ai/valuation", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify({ lang: "zh", messages: [{ role: "user", content: "主情景参数" }], context: { ...CONTEXT, scenario: "c", singleCase: true } }) });
+    expect(res.status).toBe(200); expect((await res.json()).params).toEqual({ growth: { c: 9 } });
+  });
+  it("supports four driver answers for either case and summarizes only that case", async () => {
+    const { validateThesisGuide, buildDriverGuidePrompt } = await import("../src/ai.js");
+    for (const scenario of ["c", "o"]) {
+      const body = { lang: "en", scenario, guideMode: "drivers", driverPlan: plan, turns: Array(4).fill({ question: "Driver?", answer: "My case judgment" }), context,
+        thesis: { c: { ...draft, story: scenario === "c" ? "CURRENT" : "OTHER_CASE_SECRET" }, o: { ...draft, story: scenario === "o" ? "CURRENT" : "OTHER_CASE_SECRET" } } };
+      expect(validateThesisGuide(body)).toBeNull();
+      expect(buildDriverGuidePrompt(body, "en")).not.toContain("OTHER_CASE_SECRET");
+      const ck = await userCookie("single_guide_" + scenario);
+      fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, (opts) => {
+        expect(JSON.parse(opts.body).messages[0].content).toContain("单情景规则");
+        return { choices: [{ message: { content: JSON.stringify({ type: "summary", draft }) } }] };
+      });
+      const response = await SELF.fetch("https://x/api/my/ai/thesis-guide", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify(body) });
+      expect(response.status).toBe(200); expect(await response.json()).toMatchObject({ type: "summary", draft, driverPlan: plan });
+    }
+  });
+  it("strips the other case and target range before parameter suggestions and ignores attempts to change it", async () => {
+    const ck = await userCookie("single_params_o");
+    fetchMock.get("https://llm.test").intercept({ path: "/v1/chat/completions", method: "POST" }).reply(200, (opts) => {
+      const prompt = JSON.parse(opts.body).messages[0].content;
+      expect(prompt).not.toContain("OTHER_CASE_SECRET"); expect(prompt).not.toContain("TARGET_RANGE_SECRET");
+      expect(prompt).toContain("只建议 乐观");
+      return { choices: [{ message: { content: '```json\n{"params":{"growth":{"c":999,"o":18},"n":50},"reasons":{"growth":"Current case only"}}\n```' } }] };
+    });
+    const response = await SELF.fetch("https://x/api/my/ai/valuation", { method: "POST", headers: { ...J, cookie: ck }, body: JSON.stringify({ lang: "en", messages: [{ role: "user", content: "Suggest current inputs" }],
+      context: { ...CONTEXT, scenario: "o", thesis: { c: { ...draft, story: "OTHER_CASE_SECRET" }, o: draft }, facts: { revenue: 100, currentConclusion: "TARGET_RANGE_SECRET" } } }) });
+    expect(response.status).toBe(200); expect((await response.json()).params).toEqual({ growth: { o: 18 } });
+  });
+  it("parses partial suggestions without requiring or inventing a counterpart", () => {
+    expect(parseSuggestion('```json\n{"params":{"growth":{"c":5},"wacc":{"o":9},"n":7}}\n```', FIELDS, "c").params).toEqual({ growth: { c: 5 }, n: 7 });
+    expect(parseSuggestion('```json\n{"params":{"growth":{"c":5},"wacc":{"o":9},"n":7}}\n```', FIELDS, "o").params).toEqual({ wacc: { o: 9 } });
   });
 });

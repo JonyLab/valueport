@@ -1,3 +1,6 @@
+import { cleanManagementResearch } from "./valuation/management-research.js";
+import { managementResearchElement } from "./valuation/management-research-ui.js";
+
 /**
  * ai-panel.js — 估值工作台的 AI 助手抽屉（右侧滑出）。
  * 和 AI 聊估值假设；AI 回复若带建议参数，消息下方出现「建议参数」卡：逐项列出 当前 → 建议 + 理由，点「应用」才写入表单，可撤销。
@@ -12,7 +15,7 @@
  *     peers(multiple)        → { unit, items:[{ key, label, value, pct }] } | null     「倍数对比」，null = 数据缺失不显示
  *     fmtPrice(n) → 文本                                                              合理价显示
  *   「一键改值」组件走 onApply / onUndo，和建议参数卡一样可撤销。未知组件直接忽略。
- * 返回 { open(), close(), toggle() }
+ * 返回 { open(), close(), toggle(), openModelPicker() }
  */
 
 function ri(name) { const i = document.createElement("i"); i.className = "ri-" + name; i.setAttribute("aria-hidden", "true"); return i; }
@@ -57,7 +60,7 @@ export function aiErrorText(status, j, lang) {
   if (e === "daily_limit" || status === 429) return zh ? "你今天的 AI 次数已用完，明天再来；在「设置 → AI 模型」里配置自己的模型可不受限制"
     : "You've used today's AI requests; try again tomorrow, or add your own model under Settings → AI models";
   if (e === "bad_ai_output") return zh ? "AI 返回的格式不对，请重试" : "Unexpected AI output, try again";
-  if (/访问量过大|稍后再试/.test((j && j.detail) || "")) return zh ? "智谱免费模型现在太忙（并发有限制），稍等一会儿再试，或在 AI 面板顶部的模型菜单换一个模型" : "The free Zhipu model is busy right now (concurrency is limited); try again shortly or switch models from the menu at the top of the AI panel";
+  if (/访问量过大|稍后再试/.test((j && j.detail) || "")) return zh ? "智谱免费模型现在太忙（并发有限制），稍等一会儿再试，或切换模型" : "The free Zhipu model is busy right now (concurrency is limited); try again shortly or switch models";
   // 用户不该看到 503、upstream_error 这类代号或英文报错：一律换成人话，原始信息只记到控制台便于排查
   const raw = String((j && j.detail) || e || "");
   if (raw || status) console.warn("[ai]", status, raw);
@@ -82,7 +85,7 @@ export function normalizeResearch(value) {
   return { status: sources.length ? "ok" : "empty", searchedAt: typeof value.searchedAt === "string" ? value.searchedAt.slice(0, 80) : "", sources };
 }
 
-export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField, widgets: wx, checkParams, chatKey }) {
+export function mountAiPanel(host, { lang, getContext, prepareContext, onApply, onUndo, fmtField, widgets: wx, checkParams, chatKey }) {
   const T = TX[lang] || TX.zh;
   const history = []; // { role, content } —— 发给后端的对话（不含建议卡）
   let busy = false, activeRequest = null;
@@ -102,26 +105,33 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   const modelMenu = el("div", "vc-ai-mmenu"); modelMenu.setAttribute("role", "menu"); modelMenu.hidden = true;
   modelWrap.append(modelBtn, modelMenu);
   titles.append(el("div", "vc-ai-title", T.title), modelWrap);
-  let models = null;
+  let models = null, inlineModelMenu = null;
   const slug = (location.pathname.match(/^\/b\/([^/]+)/) || [])[1];
-  function drawModels() {
+  function drawModels(menu = modelMenu) {
     const all = [models.site, ...models.workers, ...(models.siteKey || []), ...models.custom];
     const cur = all.find((m) => m.id === models.active) || models.site;
     modelName.textContent = (lang === "zh" ? "模型：" : "Model: ") + cur.name;
-    modelMenu.innerHTML = "";
+    menu.innerHTML = "";
     const group = (label, items) => {
       if (!items.length) return;
-      modelMenu.appendChild(el("div", "vc-ai-mgroup", label));
+      menu.appendChild(el("div", "vc-ai-mgroup", label));
       for (const m of items) {
-        const b = el("button", m.id === models.active ? "on" : ""); b.type = "button"; b.setAttribute("role", "menuitemradio");
+        const b = el("button", m.id === models.active ? "on" : ""); b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(m.id === models.active));
         b.append(el("span", "vc-ai-mname", m.name), el("span", "vc-ai-mmodel", m.kind === "site" ? (lang === "zh" ? "站点默认" : "Site default") : m.model));
         b.addEventListener("click", async () => {
-          modelMenu.hidden = true;
-          if (m.id === models.active) return;
+          const dismiss = () => { if (menu.matches(":popover-open")) menu.hidePopover(); else menu.hidden = true; };
+          if (m.id === models.active) { dismiss(); return; }
+          for (const option of menu.querySelectorAll("button")) option.disabled = true;
           const r = await fetch("/api/my/ai/active", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: m.id }) }).catch(() => null);
-          if (r && r.ok) { models.active = m.id; drawModels(); }
+          if (r && r.ok) { models.active = m.id; dismiss(); drawModels(); }
+          else {
+            for (const option of menu.querySelectorAll("button")) option.disabled = false;
+            let error = menu.querySelector('[role="alert"]');
+            if (!error) { error = el("p", "vc-ai-mgroup"); error.setAttribute("role", "alert"); menu.append(error); }
+            error.textContent = lang === "zh" ? "切换失败，请重试。" : "Could not switch models. Try again.";
+          }
         });
-        modelMenu.appendChild(b);
+        menu.appendChild(b);
       }
     };
     group(lang === "zh" ? "站点默认" : "Site default", [models.site]);
@@ -131,7 +141,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     const manage = document.createElement("a"); manage.className = "vc-ai-manage";
     manage.textContent = models.custom.length ? (lang === "zh" ? "管理模型…" : "Manage models…") : (lang === "zh" ? "添加自己的模型（OpenAI 兼容 / Anthropic）…" : "Add your own model…");
     manage.href = slug ? `/b/${slug}#ai` : "#"; manage.target = "_blank"; manage.rel = "noopener"; // 新标签打开设置，不打断正在编辑的估值
-    modelMenu.appendChild(manage);
+    menu.appendChild(manage);
   }
   const loadModels = () => fetch("/api/my/ai/models").then((r) => (r.ok ? r.json() : null)).then((j) => {
     if (j) {
@@ -144,7 +154,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     }
   }).catch(() => {});
   loadModels();
-  modelBtn.addEventListener("click", (e) => { e.stopPropagation(); if (!models) return; if (modelMenu.hidden) loadModels(); modelMenu.hidden = !modelMenu.hidden; });
+  modelBtn.addEventListener("click", (e) => { e.stopPropagation(); if (!models) { openModelPicker(); return; } if (modelMenu.hidden) loadModels(); modelMenu.hidden = !modelMenu.hidden; });
   document.addEventListener("click", (e) => { if (!modelWrap.contains(e.target)) modelMenu.hidden = true; });
   // 「历史」：这只股票保存过的对话；「新对话」：开一段新的（旧的仍在历史里）
   const histWrap = el("div", "vc-ai-histwrap");
@@ -259,7 +269,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     return fmtField(f, v);
   };
 
-  // 保守 / 乐观两个情景的分析：故事 + 关键假设 + 可能错在哪 + 跟踪信号
+  // 保守 / 乐观两个情景的分析：叙事 + 关键假设 + 可能错在哪 + 跟踪信号
   function scenarioBlock(key, sc) {
     const box = el("div", "vc-ai-scen " + key);
     box.appendChild(el("div", "vc-ai-scen-head", key === "c" ? T.scenC : T.scenO));
@@ -408,6 +418,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
     const reply = view.reply || (view.params || extra.length ? "" : "…");
     const m = bubble("ai", reply);
     if (!reply) m.querySelector(".vc-ai-bubble").remove();
+    const management = managementResearchElement(view.managementResearch, lang); if (management) m.append(management);
     const research = normalizeResearch(view.research);
     if (research) {
       const sources = el("div", "vc-ai-sources");
@@ -570,6 +581,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       finish();
     };
     try {
+      if (prepareContext) { await prepareContext(); if (controller.signal.aborted) return; context = getContext(); }
       const r = await fetch("/api/my/ai/valuation", {
         signal: controller.signal,
         method: "POST", headers: { "content-type": "application/json" },
@@ -586,6 +598,7 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
       }
       const view = { reply: j.reply || "", params: j.params || null, reasons: j.reasons || null, scenarios: j.scenarios || null, widgets: Array.isArray(j.widgets) ? j.widgets : [] };
       const research = normalizeResearch(j.research); if (research) view.research = research;
+      const management = cleanManagementResearch(context.managementResearch); if (management) view.managementResearch = management;
       const usedFields = new Set([...Object.keys(view.params || {}), ...view.widgets.map((w) => w.field)]);
       const resourceFields = context.fields.filter((f) => f.k.startsWith("resource.") && usedFields.has(f.k));
       if (resourceFields.length) view.resourceFields = resourceFields;
@@ -665,14 +678,57 @@ export function mountAiPanel(host, { lang, getContext, onApply, onUndo, fmtField
   closeBtn.addEventListener("click", () => close());
   // Esc 只关面板：捕获阶段接住，避免宿主页的全局 Esc 顺带退出整个编辑器
   window.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape" || panel.hidden || !panel.isConnected) return;
+    if (e.key !== "Escape") return;
+    if (inlineModelMenu?.matches(":popover-open")) {
+      e.stopPropagation(); e.preventDefault(); inlineModelMenu.hidePopover(); return;
+    }
+    if (panel.hidden || !panel.isConnected) return;
     e.stopPropagation(); e.preventDefault();
+    if (!modelMenu.hidden) { modelMenu.hidden = true; modelBtn.focus(); return; }
     if (!sug.hidden) { hideSug(); return; } // 先收起建议，再按一次才关面板
     close();
   }, true);
 
-  function open() { restoreLatest(); panel.hidden = false; document.body.classList.add("vc-ai-open"); requestAnimationFrame(() => panel.classList.add("on")); setTimeout(() => input.focus(), 50); }
-  function close() { panel.classList.remove("on"); document.body.classList.remove("vc-ai-open"); setTimeout(() => { if (!panel.classList.contains("on")) panel.hidden = true; }, 220); }
+  function open(focusInput = true) { restoreLatest(); panel.hidden = false; document.body.classList.add("vc-ai-open"); requestAnimationFrame(() => panel.classList.add("on")); if (focusInput) setTimeout(() => { if (!panel.hidden) input.focus(); }, 50); }
+  async function openModelPicker(anchor = modelBtn) {
+    if (anchor !== modelBtn) {
+      const menu = el("div", "vc-ai-mmenu vc-ai-inline-models");
+      menu.setAttribute("popover", "auto"); menu.setAttribute("role", "menu");
+      inlineModelMenu = menu;
+      menu.setAttribute("aria-label", lang === "zh" ? "切换模型" : "Switch model");
+      menu.append(el("p", "vc-ai-mgroup", lang === "zh" ? "正在加载模型…" : "Loading models…"));
+      anchor.parentElement.append(menu);
+      const position = () => {
+        const rect = anchor.getBoundingClientRect(), width = Math.min(300, innerWidth - 24);
+        menu.style.width = `${width}px`;
+        menu.style.left = `${Math.max(12, Math.min(rect.right - width, innerWidth - width - 12))}px`;
+        const height = menu.getBoundingClientRect().height;
+        menu.style.top = `${Math.max(12, Math.min(rect.bottom + 6, innerHeight - height - 12))}px`;
+      };
+      menu.addEventListener("toggle", (event) => {
+        anchor.setAttribute("aria-expanded", String(event.newState === "open"));
+        if (event.newState === "closed") { if (inlineModelMenu === menu) inlineModelMenu = null; menu.remove(); if (anchor.isConnected) anchor.focus(); }
+      });
+      menu.showPopover(); position();
+      await loadModels();
+      if (!menu.isConnected || !menu.matches(":popover-open")) return;
+      if (models) drawModels(menu);
+      else menu.replaceChildren(el("p", "vc-ai-mgroup", lang === "zh" ? "模型列表加载失败，请关闭后重试。" : "Could not load models. Close and retry."));
+      position();
+      (menu.querySelector('[aria-checked="true"]') || menu).focus();
+      return;
+    }
+    open(false);
+    modelBtn.focus();
+    await Promise.all([loadModels(), new Promise(requestAnimationFrame)]); // 等待 click 冒泡和面板展开，再显示菜单
+    if (panel.hidden || !panel.classList.contains("on")) return;
+    if (!models) {
+      modelMenu.replaceChildren(el("p", "vc-ai-mgroup", lang === "zh" ? "模型列表加载失败，请再次点击模型菜单重试。" : "Could not load models. Click the model menu to retry."));
+    }
+    modelMenu.hidden = false;
+    (modelMenu.querySelector('[role="menuitemradio"].on') || modelBtn).focus();
+  }
+  function close() { modelMenu.hidden = true; panel.classList.remove("on"); document.body.classList.remove("vc-ai-open"); setTimeout(() => { if (!panel.classList.contains("on")) panel.hidden = true; }, 220); }
   // history()：给备注草稿用的对话摘录（只读副本）
-  return { open, close, toggle: () => (panel.hidden ? open() : close()), history: () => history.slice(-20) };
+  return { open, close, openModelPicker, toggle: () => (panel.hidden ? open() : close()), history: () => history.slice(-20) };
 }

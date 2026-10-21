@@ -1,14 +1,15 @@
+import { scenarioContext, mergeScenarioParams } from "./valuation/thesis-guide.js";
 /**
  * valuation-ui.js — 估值编辑器（Figma「Add Valuation」结构）。
- * 左栏：分场景故事、检验与驱动力，再选择方法并量化假设。
- * 右栏：估值结果、明细、分场景跟踪条件与保存。
+ * 左栏：分场景叙事、检验与驱动力，再选择方法并量化假设。
+ * 左栏用叙事／参数 tab 切换；右栏保留估值结果、明细与保存。
  * 依赖：MODELS/runModel（valuation/index.js）、FIELD_META/fieldReference（field-meta.js）。
  * 导出：mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, initialThesis, refData, verdict, onDone, onCancel })
  *   onDone({ method, inputs, low, high, note, thesis })  —— 点 Submit、且低~高有效时触发
  *   verdict(low, high) → { text, cls } | null     —— 由宿主提供（结果卡判定行）
  *   stock: { name, code, mountLogo(el), rows: [[标签, 值], …] } —— 右栏标的资料（可选）
  */
-import { METHOD_MENU_GROUPS, MODELS, methodMenuMeta, runModel, modeFields } from "/shared/valuation/index.js";
+import { METHOD_MENU_GROUPS, MODELS, methodMenuMeta, runModel, runScenario, modeFields } from "/shared/valuation/index.js";
 import { midpointForm, scheduleSeries, sensitivityMatrix, fieldSweep } from "/shared/valuation/workbench.js";
 import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef, multipleCompare } from "/shared/field-meta.js";
 import { derivationForMeta } from "/shared/valuation/derivations.js";
@@ -20,7 +21,13 @@ import { verifiedFacts, marketViews, masterLenses, businessFacts, latestMetrics,
 import { cleanThesis, THESIS_SCENARIOS, thesisLines, fieldStoryHint } from "/shared/valuation/thesis.js";
 import { mountThesisQuestions } from "/shared/valuation/thesis-questions.js";
 import { mountValuationFlow } from "/shared/valuation/thesis-guide-ui.js";
+import { readinessText, methodDecisionText } from "/shared/valuation/method-readiness.js";
 import { valuationDraftStore } from "/shared/valuation/editor-draft.js";
+import { cleanManagementResearch } from "/shared/valuation/management-research.js";
+import { managementResearchElement } from "/shared/valuation/management-research-ui.js";
+import { createManagementResearchLoader, recoverManagementResearch } from "/shared/valuation/management-research-loader.js";
+import { cleanBusinessReports, businessReportFacts } from "/shared/valuation/business-report.js";
+import { businessReportElement } from "/shared/valuation/business-report-ui.js";
 
 const TX = {
   zh: { method: "估值方法", facts: "前提", assume: "情景假设", conservative: "保守", optimistic: "乐观",
@@ -93,7 +100,7 @@ function modelTitle(model, lang) {
   return textFor(meta && meta.title, lang, (model && model.label && model.label[lang]) || (model && model.key) || "");
 }
 
-export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, initialThesis, initialDerivations, initialSegments, refData = {}, verdict, onDone, onCancel, stock, draftKey, initialUpdatedAt = "", loadGuideData }) {
+export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInputs, initialNote, initialThesis, initialScenarioMode, initialManagementResearch, initialDerivations, initialSegments, refData = {}, verdict, onDone, onCancel, stock, draftKey, initialUpdatedAt = "", loadGuideData }) {
   const L = TX[lang] || TX.zh;
   const tx = (k) => L[k];
   const draftStore = valuationDraftStore(draftKey, initialUpdatedAt), restored = draftStore.read();
@@ -107,7 +114,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   let draftTimer = null, saving = false, destroyed = false, didSave = false, didDiscard = false;
   const draftStatus = el("p", "vc-draft-status"); draftStatus.setAttribute("role", "status");
   draftStatus.textContent = restored ? (lang === "zh" ? "已恢复此浏览器中的研究草稿；尚未保存为正式估值。" : "Restored this browser's research draft; it is not a saved valuation.") : (lang === "zh" ? "研究草稿会保存在此浏览器，完成估值后再正式保存。" : "Research drafts stay in this browser until you save the valuation.");
-  // 参数旁「你的故事」提示：随故事修改即时更新；表单重建后旧节点自动丢弃
+  // 参数旁「你的叙事」提示：随叙事修改即时更新；表单重建后旧节点自动丢弃
   let storyHints = [];
   function refreshStoryHints() {
     storyHints = storyHints.filter(({ node }) => node.isConnected);
@@ -116,11 +123,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     for (const { node, meta } of storyHints) { const text = fieldStoryHint(meta, thesis, lang); node.textContent = text || ""; node.hidden = !text; }
   }
   const scheduleDraft = () => { clearTimeout(draftTimer); draftTimer = setTimeout(persistDraft, 250); refreshStoryHints(); refreshThesisTabs(); };
-  // 新增从故事开始；选择模型是把故事转成数字时的下一步。
+  // 新增从叙事开始；选择模型是把叙事转成数字时的下一步。
   let activeIdx = initialMethod ? MODELS.findIndex((m) => m.key === initialMethod) : -1;
   // 预填用的已存假设：只对原方法有效；换了方法就从头开始（同名字段在不同方法里含义不同，不能带过去）
   let seedInputs = initialInputs || null;
   let lastLow = null, lastHigh = null, lastForm = {};
+  let valuationMode = (restored?.state?.scenarioMode || initialScenarioMode) === "single" ? "single" : "range";
   let currentMode = null;
   const derivations = (initialDerivations && typeof initialDerivations === "object") ? JSON.parse(JSON.stringify(initialDerivations)) : {};
   const segments = (initialSegments && typeof initialSegments === "object" && Array.isArray(initialSegments.rows))
@@ -164,7 +172,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   root.append(center, sideR);
   const workflow = el("ol", "vc-workflow");
   workflow.setAttribute("aria-label", lang === "zh" ? "估值五步法" : "Five steps to valuation");
-  (lang === "zh" ? ["讲故事", "评估故事", "翻译成数字", "计算估值", "跟踪与修正"] : ["Tell the story", "Test it", "Translate to numbers", "Value it", "Track & revise"]).forEach((title, i) => {
+  (lang === "zh" ? ["构建叙事", "评估叙事", "翻译成数字", "计算估值", "跟踪与修正"] : ["Tell the story", "Test it", "Translate to numbers", "Value it", "Track & revise"]).forEach((title, i) => {
     const step = el("li"); const number = el("span"); number.textContent = String(i + 1); step.append(number, document.createTextNode(title)); workflow.append(step);
   });
   mount.append(workflow, draftStatus, pickerView, root);
@@ -194,7 +202,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // 生意类型标签（与 src/ai.js 的 BUSINESS_TYPES 对应）
   const BIZ_LABEL = { cyclical: ["资源与周期", "Cyclical / commodity"], financial: ["金融", "Financial"], utility: ["公用事业 / 类债券", "Utility / bond-like"], stalwart: ["成熟稳健", "Stalwart"],
     fast_grower: ["高速成长", "Fast grower"], unprofitable: ["未盈利成长 / 困境反转", "Unprofitable / turnaround"], asset_play: ["资产型 / 多元控股", "Asset play / holding"], platform: ["轻资产平台 / 品牌", "Asset-light platform / brand"] };
-  const aiPickKey = () => "ai_method_v5_" + ((stock && stock.code) || "") + "_" + lang;
+  const aiPickKey = () => "ai_method_v6_" + ((stock && stock.code) || "") + "_" + lang;
   function applyPicks() {
     methodBar.querySelectorAll(".vc-pcard").forEach((b) => {
       b.classList.remove("ai-pick", "ai-primary");
@@ -204,9 +212,10 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       b.classList.add("ai-pick"); if (p.role === "primary") b.classList.add("ai-primary");
       const tag = el("span", "vc-pcard-ai");
       const badge = el("span", "vc-pcard-aibadge");
-      badge.append(ri("sparkling-2-fill"), document.createTextNode(p.role === "primary" ? (lang === "zh" ? "AI 首选" : "AI pick") : (lang === "zh" ? "交叉验证" : "Cross-check")));
+      badge.append(ri("sparkling-2-fill"), document.createTextNode(p.suitability === "needs_review" ? (lang === "zh" ? "待确认" : "Needs review") : p.role === "primary" ? (lang === "zh" ? "AI 首选" : "AI pick") : (lang === "zh" ? "交叉验证" : "Cross-check")));
       tag.appendChild(badge);
       if (p.reason) tag.appendChild(el("span", "vc-pcard-reason")).textContent = p.reason;
+      const readiness = readinessText(p.readiness, lang); if (readiness) tag.appendChild(el("span", "vc-pcard-reason")).textContent = readiness;
       b.appendChild(tag);
     });
   }
@@ -218,6 +227,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const lab = el("div", "vc-picker-ailab"); lab.textContent = lang === "zh" ? "AI 建议" : "AI suggestion";
     const txt = el("div", "vc-picker-aitxt"); txt.textContent = r.reply || "";
     body.appendChild(lab);
+    const decision = methodDecisionText(r.decision, lang); if (decision) body.appendChild(el("p", "quote-note", { textContent: decision }));
     const bz = r.business && typeof r.business === "object" && !Array.isArray(r.business) ? r.business : null;
     if (bz && BIZ_LABEL[bz.type]) {
       const card = el("div", "vc-picker-biz");
@@ -276,11 +286,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   });
   const methodChoices = () => METHOD_MENU_GROUPS.flatMap((g) => g.methods).filter((m) => MODELS.some((x) => x.key === m.key))
     .map((m) => ({ key: m.key, title: textFor(m.title, lang, m.key), subtitle: textFor(m.subtitle, lang, "") }));
-  // 按公司资料和用户的故事推荐方法；弹窗里的「让 AI 推荐」和 AI 引导流程共用，结果同步显示在弹窗里
-  async function requestMethodPicks() {
+  // 按公司资料和用户的叙事推荐方法；弹窗里的「让 AI 推荐」和 AI 引导流程共用，结果同步显示在弹窗里
+  async function requestMethodPicks(scenario = null) {
+    if (loadGuideData) Object.assign(refData, await loadGuideData());
     const views = await aiViews();
     const res = await fetch("/api/my/ai/method", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), verified: aiVerified(), ...views, methods: methodChoices(), thesis: readThesis() }) });
+      body: JSON.stringify({ lang, stock: aiStock(), facts: stockFacts(), verified: aiVerified(), ...views, methods: methodChoices(), thesis: scenario ? { [scenario]: readThesis()[scenario] } : readThesis() }) });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(aiErrorText(res.status, j, lang));
     Object.assign(j, { market: views.market, lenses: views.lenses, businessFacts: views.business });
@@ -367,27 +378,38 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   methodRow.append(methodName, changeBtn);
   const methodDesc = el("div", "vc-method-desc");
   const methodLab = el("div", "vc-method-lab"); methodLab.textContent = lang === "zh" ? "估值方法" : "Method";
-  methodHead.append(methodLab, methodRow, methodDesc);
+  const methodActions = el("div", "vc-method-actions");
+  const recommendBtn = el("button", "vc-method-change", { type: "button" });
+  recommendBtn.replaceChildren(ri("sparkling-2-fill"), document.createTextNode(lang === "zh" ? "AI 推荐" : "AI recommendation"));
+  recommendBtn.addEventListener("click", () => { showPicker(true); pickAiBtn.click(); });
+  methodHead.append(methodLab, methodRow, methodDesc, methodActions);
   function updateMethodDesc() {
     const model = activeIdx >= 0 ? MODELS[activeIdx] : null;
     const meta = model ? methodMenuMeta(model) : null;
     methodName.textContent = model ? textFor(meta && meta.title, lang, modelTitle(model, lang)) : (lang === "zh" ? "选择估值方法" : "Choose a method");
     changeBtn.replaceChildren(ri("arrow-left-right-line"), document.createTextNode(model ? (lang === "zh" ? "更换" : "Change") : (lang === "zh" ? "选择方法" : "Choose method")));
     aiBtn.hidden = !model;
-    methodDesc.textContent = meta ? textFor(meta.subtitle, lang, "") : (lang === "zh" ? "故事经过检验后，选择能表达这些商业驱动力的估值方法。" : "After testing the story, choose a method that captures its business drivers.");
+    methodHead.classList.toggle("empty", !model);
+    methodLab.hidden = !model;
+    recommendBtn.hidden = !!model;
+    methodActions.hidden = !!model;
+    (model ? methodRow : methodActions).prepend(changeBtn);
+    if (model) methodRow.prepend(methodName);
+    if (!model) methodActions.append(recommendBtn);
+    methodDesc.textContent = meta ? textFor(meta.subtitle, lang, "") : (lang === "zh" ? "选择适合这家公司和你的叙事的方法，再填写对应参数。" : "Choose a method that fits the company and your narrative, then fill in its inputs.");
   }
   buildMethodMenu();
   updatePickerLabel();
   updateMethodDesc();
-  showPicker(false); // 先形成故事，用户准备量化时再选方法。
+  showPicker(false); // 先形成叙事，用户准备量化时再选方法。
 
   const formWrap = el("div", "vc-form");
 
-  // ── 场景故事：在选择模型和填写数字前形成判断 ──
+  // ── 场景叙事：在选择模型和填写数字前形成判断 ──
   const noteWrap = el("div", "vc-note");
   const noteLabel = el("div", "vc-note-label");
-  const noteLabelText = el("span"); noteLabelText.textContent = lang === "zh" ? "故事与估值" : "Story & valuation";
-  // AI 只起草选中场景；已填参数用于检验一致性，不能倒推故事。
+  const noteLabelText = el("span"); noteLabelText.textContent = lang === "zh" ? "叙事与估值" : "Story & valuation";
+  // AI 只起草选中场景；已填参数用于检验一致性，不能倒推叙事。
   const noteDraftBtn = el("button", "vc-note-ai", { type: "button" });
   const noteUndo = el("button", "vc-note-undo", { type: "button" }); noteUndo.hidden = true;
   noteUndo.textContent = lang === "zh" ? "撤销 AI 填入" : "Undo AI fill";
@@ -403,7 +425,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   noteInput.setAttribute("aria-label", lang === "zh" ? "补充备注" : "Additional notes");
   if (initialNote) noteInput.value = initialNote;
   const thesisEditors = {};
-  // 整条 AI 流程（故事 → 方法 → 参数 → 结果）：一张卡片，挂载放在表单建好之后（见文件末尾 mountFlow）
+  // 整条 AI 流程（叙事 → 方法 → 参数 → 结果）：一张卡片，挂载放在表单建好之后（见文件末尾 mountFlow）
   let flow = null, flowMode = false;
   const flowHost = el("div", "vc-flow-host");
   const modeBar = el("div", "vc-thesis-modes");
@@ -421,12 +443,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const thesisTabs = el("div", "vc-thesis-tabs");
   thesisTabs.setAttribute("role", "tablist");
   thesisTabs.setAttribute("aria-label", lang === "zh" ? "投资逻辑场景" : "Thesis scenarios");
-  let activeThesisScenario = restored?.state?.activeScenario === "o" ? "o" : "c";
+  let activeThesisScenario = valuationMode !== "single" && restored?.state?.activeScenario === "o" ? "o" : "c";
   const thesisPanels = {}, thesisTabButtons = {}, followupPanels = {};
   for (const scenario of THESIS_SCENARIOS) {
-    const scenarioTitle = lang === "zh" ? scenario.zh : scenario.en;
+    const scenarioTitle = valuationMode === "single" && scenario.key === "c" ? (lang === "zh" ? "主情景" : "Main case") : lang === "zh" ? scenario.zh : scenario.en;
     const tab = el("button", "vc-thesis-tab", { type: "button" });
-    tab.textContent = scenarioTitle; tab.setAttribute("role", "tab");
+    tab.textContent = valuationMode === "single" && scenario.key === "c" ? (lang === "zh" ? "主情景" : "Main case") : scenarioTitle; tab.hidden = valuationMode === "single" && scenario.key === "o"; tab.setAttribute("role", "tab");
     tab.id = `vc-thesis-tab-${scenario.key}`;
     const panel = el("div", "vc-thesis-panel"); panel.id = `vc-thesis-panel-${scenario.key}`;
     panel.setAttribute("role", "tabpanel"); panel.setAttribute("aria-labelledby", tab.id);
@@ -442,6 +464,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     tab.addEventListener("keydown", (e) => {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
       e.preventDefault();
+      if (valuationMode === "single") return;
       const key = e.key === "Home" ? "c" : e.key === "End" ? "o" : scenario.key === "c" ? "o" : "c";
       selectThesisScenario(key); thesisTabButtons[key].focus();
     });
@@ -454,13 +477,15 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     flowHost.hidden = !flowMode; thesisTabs.hidden = flowMode; thesisForm.hidden = flowMode;
     guideModeBtn.setAttribute("aria-pressed", String(flowMode)); manualModeBtn.setAttribute("aria-pressed", String(!flowMode));
     noteDraftBtn.hidden = true; // 整条 AI 引导已覆盖「AI 起草」，编辑页只保留一个 AI 入口（引导）+ 参数对话（AI 助手）
+    syncEditorTabs();
   }
   function hasStory(key) { return !!thesisEditors[key] && !!cleanThesis({ [key]: thesisEditors[key].read() })[key]?.story; }
-  // 场景标签上标出已有故事的场景，一眼看出还差哪个
+  // 场景标签上标出已有叙事的场景，一眼看出还差哪个
   function refreshThesisTabs() {
     for (const scenario of THESIS_SCENARIOS) thesisTabButtons[scenario.key]?.classList.toggle("done", hasStory(scenario.key));
   }
   function selectThesisScenario(key) {
+    if (valuationMode === "single") key = "c";
     activeThesisScenario = key;
     if (flow) syncGuideLayout();
     for (const scenario of THESIS_SCENARIOS) {
@@ -472,7 +497,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     }
   }
   selectThesisScenario(activeThesisScenario); refreshThesisTabs();
-  const readThesis = () => cleanThesis({ ...Object.fromEntries(THESIS_SCENARIOS.map(({ key }) => [key, thesisEditors[key].read()])), legacy: thesisSeed.legacy });
+  const readThesis = () => cleanThesis({ ...Object.fromEntries(THESIS_SCENARIOS.filter(({ key }) => valuationMode !== "single" || key === "c").map(({ key }) => [key, thesisEditors[key].read()])), legacy: thesisSeed.legacy });
   const writeScenario = (key, value) => thesisEditors[key].write(cleanThesis(value)[key]);
   const noteDetails = el("details", "vc-thesis-notes"); noteDetails.open = !!initialNote;
   const noteSummary = el("summary"); noteSummary.textContent = lang === "zh" ? "补充备注" : "Additional notes";
@@ -532,7 +557,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const bdMount = el("div", "vc-summary-metrics");
   const schedMount = el("div", "vc-sched");
   const emptyHint = el("div", "vc-summary-empty");
-  emptyHint.textContent = lang === "zh" ? "先形成并检验故事，再选择方法、量化假设。这里的估值结果用来检验故事的财务可行性。" : "Develop and test the story, then choose a method and quantify its drivers. The resulting value helps test its financial plausibility.";
+  emptyHint.textContent = lang === "zh" ? "先形成并检验叙事，再选择方法、量化假设。这里的估值结果用来检验叙事的财务可行性。" : "Develop and test the story, then choose a method and quantify its drivers. The resulting value helps test its financial plausibility.";
   const rangeViz = el("div", "vc-rangeviz");
   const nowPx = el("span", "vc-rnow");
   if (ctx && ctx.price > 0) nowPx.textContent = (lang === "zh" ? " / 现价 " : " / Price ") + fmt(ctx.price, "—");
@@ -578,7 +603,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   submitBtn.addEventListener("click", async () => {
     if (saving) return;
     if (lastLow === null || lastHigh === null || !isFinite(lastLow) || !isFinite(lastHigh)) return;
-    if (!(lastLow > 0 && lastHigh > 0) || Math.round(lastHigh * 100) === Math.round(lastLow * 100)) return;
+    if (!(lastLow > 0 && lastHigh > 0) || (valuationMode !== "single" && Math.round(lastHigh * 100) === Math.round(lastLow * 100))) return;
     const segOut = currentMode === "segment" ? { enabled: true, rows: segments.rows } : { enabled: false, rows: segments.rows || [] };
     saving = true; submitBtn.disabled = true; submitBtn.textContent = lang === "zh" ? "保存中…" : "Saving…"; saveError.hidden = true;
     flow?.setLocked(true);
@@ -587,7 +612,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     flow?.pause();
     persistDraft();
     try {
-      const result = await onDone({ method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), segments: segOut, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim(), thesis: readThesis() });
+      const result = await onDone({ scenarioMode: valuationMode, method: MODELS[activeIdx].key, inputs: lastForm, derivations: currentDerivations(), segments: segOut, low: Math.min(lastLow, lastHigh), high: Math.max(lastLow, lastHigh), note: noteInput.value.trim(), thesis: readThesis(), ...(managementData ? { managementResearch: managementData } : {}) });
       if (result === false) throw new Error(lang === "zh" ? "保存失败，请重试。" : "Save failed. Please retry.");
       didSave = true; clearTimeout(draftTimer); draftTimer = null; draftStore.clear();
     } catch { saveError.textContent = lang === "zh" ? "未能保存，输入已保留。请稍后重试。" : "Not saved; your input is kept. Please retry shortly."; saveError.hidden = false; }
@@ -604,9 +629,11 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const ppx = el("div", "vc-prof-px");
   if (ctx && ctx.price > 0) setNum(ppx, fmt(ctx.price, "—"));
   prof.append(avatar, pid, ppx);
-  const infoSec = el("div", "vc-prof-sec");
-  const infoTitle = el("div", "vc-prof-title"); infoTitle.textContent = lang === "zh" ? "估值用到的数据" : "Inputs from data";
+  const infoSec = el("details", "vc-prof-sec vc-data-details");
+  const infoTitle = el("summary", "vc-prof-title"); infoTitle.textContent = lang === "zh" ? "已有财务数据" : "Available financial data";
   infoSec.appendChild(infoTitle);
+  const dataNote = el("p", "vc-question-help"); dataNote.textContent = lang === "zh" ? "供选择方法时参考；缺少的数据可在选定方法后的参数表单中补充。" : "For reference when choosing a method. Fill in missing inputs in the form after choosing.";
+  infoSec.append(dataNote);
   ((stock && stock.rows) || []).forEach(([k, v]) => {
     const r = el("div", "vc-kv"); const kk = el("span", "vc-kv-k"); kk.textContent = k; const vv = el("span", "vc-kv-v"); vv.textContent = v;
     r.append(kk, el("span", "vc-kv-dots"), vv); infoSec.appendChild(r);
@@ -618,13 +645,52 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   saveBar.append(saveError, submitBtn);
   // 栏头一行：左「关键假设」，右「AI 助手」
   const inHead = el("div", "vc-colhead-row");
-  inHead.append(colHead("1–2. 讲故事 · 评估故事", "1–2. Story & evidence", "保守、乐观各写一个；不确定的先留待验证", "One story per case; leave uncertainties unverified"), aiBtn);
-  const translateHead = colHead("3. 把故事翻译成数字", "3. Translate to numbers", "选择方法，给故事里的驱动力赋值", "Choose a method and quantify the business drivers");
+  inHead.append(colHead("构建与检验叙事", "Narrative & evidence", "写下经营判断和依据；不确定的先留待验证", "Record business views and evidence; leave uncertainties unverified"));
+  const translateHead = colHead("方法与参数", "Method & inputs", "把叙事中的经营变化转成参数", "Translate business changes into inputs");
   // 沉浸式引导：回答问题时只留场景切换和当前这一步，方法、数据和参数等引导结束再出现
-  for (const node of [inHead, modeBar, thesisTabs, thesisForm, translateHead, methodHead, infoSec, formWrap]) node.classList.add("vc-guide-hide");
-  center.append(inHead, noteWrap, translateHead, methodHead, infoSec, formWrap);
-  sideR.append(colHead("4. 计算估值", "4. Calculate value", "检验数字是否支持故事", "Check whether the numbers support the story"),
-    prof, summaryCard, bdSec, schedMount, vizGrid, followup, noteDetails, saveBar);
+  for (const node of [inHead, modeBar, thesisTabs, thesisForm, translateHead, methodHead, infoSec, formWrap, followup, noteDetails]) node.classList.add("vc-guide-hide");
+  const editorBar = el("div", "vc-editor-bar");
+  const editorTabs = el("div", "vc-editor-tabs"); editorTabs.setAttribute("role", "tablist");
+  editorTabs.setAttribute("aria-label", lang === "zh" ? "估值编辑内容" : "Valuation editor sections");
+  const editorId = `vc-editor-${crypto.randomUUID()}`;
+  const editorPanels = { story: el("div", "vc-editor-panel vc-story-panel"), params: el("div", "vc-editor-panel vc-params-panel") };
+  const editorButtons = {}, editorScroll = { story: 0, params: 0 };
+  let activeEditorTab = ["story", "params"].includes(restored?.state?.editorTab) ? restored.state.editorTab : activeIdx >= 0 ? "params" : "story";
+  function syncEditorTabs() {
+    editorBar.hidden = flowMode;
+    for (const key of ["story", "params"]) {
+      const selected = key === activeEditorTab;
+      editorButtons[key].setAttribute("aria-selected", String(selected));
+      editorButtons[key].tabIndex = selected ? 0 : -1;
+      editorPanels[key].hidden = flowMode ? key !== "story" : !selected;
+    }
+  }
+  function selectEditorTab(key) {
+    editorScroll[activeEditorTab] = center.scrollTop;
+    activeEditorTab = key; syncEditorTabs();
+    center.scrollTop = editorScroll[key];
+  }
+  for (const [key, zh, en] of [["story", "叙事", "Story"], ["params", "参数", "Inputs"]]) {
+    const tab = el("button", "vc-editor-tab", { type: "button", textContent: lang === "zh" ? zh : en });
+    tab.id = `${editorId}-tab-${key}`; tab.setAttribute("role", "tab"); tab.setAttribute("aria-controls", `${editorId}-panel-${key}`);
+    const panel = editorPanels[key]; panel.id = `${editorId}-panel-${key}`;
+    panel.setAttribute("role", "tabpanel"); panel.setAttribute("aria-labelledby", tab.id);
+    tab.addEventListener("click", () => selectEditorTab(key));
+    tab.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === "Home" ? "story" : event.key === "End" ? "params" : key === "story" ? "params" : "story";
+      selectEditorTab(next); editorButtons[next].focus({ preventScroll: true });
+    });
+    editorButtons[key] = tab; editorTabs.append(tab);
+  }
+  editorBar.append(editorTabs, aiBtn);
+  editorPanels.story.append(inHead, noteWrap, followup, noteDetails);
+  editorPanels.params.append(translateHead, methodHead, infoSec, formWrap);
+  center.append(editorBar, flowDone, editorPanels.story, editorPanels.params);
+  syncEditorTabs();
+  sideR.append(colHead("估值结果", "Valuation result", "检验数字是否支持叙事", "Check whether the numbers support the story"),
+    prof, summaryCard, bdSec, schedMount, vizGrid, saveBar);
 
   // ── 计算 + 渲染结果 ──
   function consOpt(model, form) {
@@ -776,11 +842,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     sensitivityCard.append(title, yTitle, table);
   }
   function compute(formData) {
+    if (valuationMode === "single") for (const value of Object.values(formData)) if (value && typeof value === "object" && "c" in value) value.o = value.c;
     lastForm = formData;
     const model = MODELS[activeIdx];
     for (const editor of Object.values(thesisEditors)) editor.updateModel(modeFields(model, currentMode), model.key);
     let r = { low: null, high: null };
-    try { r = runModel(model, formData, ctx); } catch { /* 输入不完整 */ }
+    try { r = valuationMode === "single" ? { low: runScenario(model, formData, ctx, "c"), high: runScenario(model, formData, ctx, "c") } : runModel(model, formData, ctx); } catch { /* 输入不完整 */ }
     lastLow = r.low; lastHigh = r.high;
     const dash = tx("dash");
     const valid = lastLow !== null && lastHigh !== null && isFinite(lastLow) && isFinite(lastHigh);
@@ -799,20 +866,20 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const sample = valid && defaults.length > 0 && defaults.every((f) => formData[f.k] && formData[f.k].c === f.default && formData[f.k].o === f.default);
     if (sample) {
       const list = defaults.slice(0, 3).map((f) => `${textFor(f.label, lang, f.k)} ${f.default}${f.unit === "%" ? "%" : ""}`).join(lang === "zh" ? "、" : ", ");
-      sampleHint.textContent = lang === "zh" ? `这是用方法自带的示例参数（${list}）算出的数字，还不是你对这家公司的判断。在左侧按两个场景填入参数后，这里才是你的估值。`
-        : `This uses the method's sample inputs (${list}), not your view of the company. Fill in both cases on the left to get your valuation.`;
+      sampleHint.textContent = lang === "zh" ? `这是用方法自带的示例参数（${list}）算出的数字，还不是你对这家公司的判断。在左侧按${valuationMode === "single" ? "主情景" : "两个场景"}填入参数后，这里才是你的估值。`
+        : `This uses the method's sample inputs (${list}), not your view of the company. Fill in ${valuationMode === "single" ? "the main case" : "both cases"} on the left to get your valuation.`;
     }
     summaryCard.classList.toggle("vc-hero-sample", sample);
     if (sample) verdictEl.style.display = "none"; // 示例数字不给「低估 / 合理」判定
     sampleHint.style.display = sample ? "" : "none";
-    pointHint.style.display = point && !sample ? "" : "none";
+    pointHint.style.display = valuationMode !== "single" && point && !sample ? "" : "none";
     emptyHint.style.display = valid ? "none" : "";
     renderRangeViz(lastLow, lastHigh, valid);
     renderBreakdown(model, formData, valid);
     renderSchedule(model, formData, valid);
     renderChart(model, formData, valid);
     renderSensitivity(model, formData, valid);
-    submitBtn.disabled = saving || !valid || !(lastLow > 0 && lastHigh > 0) || Math.round(lastHigh * 100) === Math.round(lastLow * 100);
+    submitBtn.disabled = saving || !valid || !(lastLow > 0 && lastHigh > 0) || (valuationMode !== "single" && Math.round(lastHigh * 100) === Math.round(lastLow * 100));
   }
 
   // ── 字段构件（标签 + ⓘ、参考筹码 + ↗）──
@@ -1241,13 +1308,17 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
 
   function renderForm() {
     formWrap.innerHTML = "";
+    translateHead.hidden = activeIdx < 0;
     // 未选方法：显示提示、清空结果，不预填任何模型
     if (activeIdx < 0) {
       aiBtn.disabled = true;
       updatePickerLabel();
       updateMethodDesc();
       const hint = el("div", "vc-empty-method");
-      hint.textContent = lang === "zh" ? "先完成上面的故事与检验；准备量化时，选择估值方法。" : "Start with the story and its evidence above. Choose a method when ready to quantify it.";
+      hint.append(document.createTextNode(lang === "zh" ? "需要补充判断？" : "Need to refine your view? "));
+      const backToStory = el("button", "vc-guide-link", { type: "button", textContent: lang === "zh" ? "返回「叙事」页" : "Return to Narrative" });
+      backToStory.addEventListener("click", () => { selectEditorTab("story"); editorButtons.story.focus({ preventScroll: true }); });
+      hint.append(backToStory);
       formWrap.appendChild(hint);
       lastForm = {}; lastLow = null; lastHigh = null;
       const dash = tx("dash");
@@ -1374,7 +1445,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       const h = el("div", "vc-card-head"); h.textContent = tx("assume"); card.appendChild(h);
       const hr = el("div", "vc-arow vc-arow-head");
       const cc = el("div", "vc-chead"); cc.textContent = tx("conservative");
-      const co = el("div", "vc-chead"); co.textContent = tx("optimistic");
+      const co = el("div", "vc-chead"); co.textContent = tx("optimistic"); co.hidden = valuationMode === "single";
+      if (valuationMode === "single") { cc.textContent = lang === "zh" ? "主情景" : "Main case"; hr.style.gridTemplateColumns = "minmax(0,1fr) minmax(90px,.7fr)"; }
       hr.append(el("div"), cc, co); card.appendChild(hr);
       duals.forEach((field) => {
         const arow = el("div", "vc-arow");
@@ -1393,6 +1465,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
           recompute();
         };
         inC.addEventListener("input", onEdit); inO.addEventListener("input", onEdit);
+        if (valuationMode === "single") { inO.hidden = true; arow.style.gridTemplateColumns = "minmax(0,1fr) minmax(90px,.7fr)"; }
         arow.append(lab, inC, inO);
         if (field.meta) {
           const hint = el("p", "vc-story-hint"); hint.style.gridColumn = "1 / -1"; arow.appendChild(hint);
@@ -1472,14 +1545,15 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // 市场投研（/api/research，服务端缓存 6 小时）+ 大师方法视角；拿不到就只用基本面
   async function aiViews() {
     const sym = stock && stock.symbol;
-    const research = await researchP;
+    const [research] = await Promise.all([researchP, loadManagementResearch(), loadBusinessReports()]);
     try {
       return {
         market: marketViews({ research, financials: refData && refData.financials, price: ctx.price, market: sym ? sym.slice(0, 2) : "", lang }),
         lenses: masterLenses({ financials: refData && refData.financials, research, price: ctx.price, eps: ctx.epsTtm, bps: ctx.bps, lang }),
-        business: businessFacts({ research, lang }),
+        business: [...businessReportFacts(businessData, lang), ...businessFacts({ research, lang })].slice(0, 20),
+        managementResearch: managementData,
       };
-    } catch { return { market: [], lenses: [], business: [] }; }
+    } catch { return { market: [], lenses: [], business: [], managementResearch: managementData }; }
   }
   function aiStock() {
     return { name: (stock && stock.name) || "", code: (stock && stock.code) || "", currency: (stock && stock.currency) || "", price: finiteOr(ctx.price) };
@@ -1495,6 +1569,47 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     };
   }
   // 市场投研 + 公司简介 / 收入构成：工作台打开时取一次（服务端按标的缓存 6 小时），选方法和对话都用
+  let managementData = [restored?.state?.managementResearch, restored?.state?.flow?.managementResearch, initialManagementResearch].reduce(recoverManagementResearch, null);
+  const managementHost = el("div", "vc-management-host"); noteWrap.append(managementHost);
+  function drawManagementResearch() {
+    if (destroyed) return;
+    managementHost.hidden = flowMode;
+    managementHost.replaceChildren();
+    const box = managementResearchElement(managementData, lang, { onRetry: () => loadManagementResearch({ retry: true }) }); if (box) managementHost.append(box);
+  }
+  const loadManagementResearch = createManagementResearchLoader({ initial: managementData, symbol: stock?.symbol, name: stock?.name || "",
+    onChange(data) {
+      if (destroyed) return;
+      managementData = data; drawManagementResearch(); flow?.setManagementResearch(data); scheduleDraft();
+    } });
+  drawManagementResearch();
+  let businessData = cleanBusinessReports(restored?.state?.businessReports || restored?.state?.flow?.businessReports);
+  let businessPending = null, businessAttempted = false;
+  const businessHost = el("div", "vc-business-host"); noteWrap.append(businessHost);
+  function drawBusinessReports() {
+    if (destroyed) return;
+    businessHost.hidden = flowMode; businessHost.replaceChildren();
+    const box = businessReportElement(businessData, lang, { onRetry: () => loadBusinessReports({ retry: true }) }); if (box) businessHost.append(box);
+  }
+  async function loadBusinessReports({ retry = false } = {}) {
+    if (!/^(sh|sz|bj)\d{6}$/.test(stock?.symbol || "")) return null;
+    if (businessPending) return businessPending;
+    if (businessAttempted && !retry) return businessData;
+    businessAttempted = true;
+    businessPending = (async () => {
+      const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 40000); let next = null;
+      try {
+        const response = await fetch("/api/my/business-reports?symbol=" + encodeURIComponent(stock.symbol), { signal: controller.signal });
+        if (response.ok) next = cleanBusinessReports(await response.json());
+      } catch { /* Missing source material does not discard the valuation draft. */ }
+      finally { clearTimeout(timer); }
+      if (destroyed) return businessData;
+      if (next?.status === "ok" || businessData?.status !== "ok") businessData = next || cleanBusinessReports({ status: "unavailable", symbol: stock.symbol, reports: [] });
+      drawBusinessReports(); flow?.setBusinessReports(businessData); scheduleDraft(); return businessData;
+    })();
+    try { return await businessPending; } finally { businessPending = null; }
+  }
+  drawBusinessReports();
   let researchData = null;
   const researchP = stock && stock.symbol
     ? fetch("/api/research?symbol=" + encodeURIComponent(stock.symbol)).then((r) => r.json()).then((j) => (researchData = j.research || null)).catch(() => null)
@@ -1504,7 +1619,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     try { return verifiedFacts({ financials: refData && refData.financials, dividends: refData && refData.dividends, dps: ctx.dividendYield, price: ctx.price, eps: ctx.epsTtm, financial: isFinancialCompany(researchData), lang }); } catch { return []; }
   }
   function storyContext() {
-    return aiContext() || { stock: aiStock(), verified: aiVerified(), method: { key: "", label: lang === "zh" ? "尚未选择，先形成故事" : "Not chosen; start with the story" }, fields: [], facts: stockFacts(), thesis: readThesis() };
+    return aiContext() || { stock: aiStock(), verified: aiVerified(), method: { key: "", label: lang === "zh" ? "尚未选择，先形成叙事" : "Not chosen; start with the story" }, fields: [], facts: stockFacts(), thesis: readThesis() };
   }
   function aiContext() {
     const model = MODELS[activeIdx]; if (!model) return null;
@@ -1531,7 +1646,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       extra.lenses = masterLenses({ financials: fin, research: researchData, price: ctx.price, eps: ctx.epsTtm, bps: ctx.bps, lang });
     } catch { /* 缺数据时只用基本面 */ }
     if (model.assetModel) fields.push(...resourceAiFields(lastForm, lang));
-    return { stock: aiStock(), verified: aiVerified(), ...extra, thesis: readThesis(),
+    return { stock: aiStock(), verified: aiVerified(), ...extra, managementResearch: managementData, thesis: readThesis(),
       method: { key: model.key, label: textFor(meta && meta.title, lang, modelTitle(model, lang)) }, mode: currentMode || null, fields, facts };
   }
   // AI 建议的参数 vs 最新实际值：由代码比较（小模型常把 10% 说成「低于 8.6%」），在建议卡每行下面显示 → { 字段k: 一句话 }
@@ -1572,6 +1687,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const ai = mountAiPanel(mount, {
     lang,
     getContext: aiContext,
+    prepareContext: loadManagementResearch,
     // 对话按标的保存；记下当时用的估值方法
     chatKey: () => ({ symbol: (stock && stock.symbol) || "", method: (MODELS[activeIdx] && MODELS[activeIdx].key) || "" }),
     checkParams,
@@ -1607,6 +1723,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
 
   renderForm();
   mountFlow();
+  void loadBusinessReports();
+  // Restored questions need no new AI request, but empty evidence still needs recovery.
+  if (managementData && !managementData.sources.length) void loadManagementResearch();
 
   // ── AI 引导整条流程：表单与结果都建好后再挂载，恢复到「方法 / 参数 / 结果」步骤时才能读到它们 ──
   function mountFlow() {
@@ -1615,14 +1734,27 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       lang, company: stock?.name || stock?.code || (zh ? "这家公司" : "this company"),
       initial: restored?.state?.flow, onChange: scheduleDraft, visible: () => flowMode,
       hooks: {
-        getContext: async () => { if (loadGuideData) Object.assign(refData, await loadGuideData()); const views = await aiViews(); return { stock: aiStock(), verified: aiVerified(), business: views.business }; },
+        setScenarioMode: (mode) => {
+          if (valuationMode === mode) return;
+          valuationMode = mode;
+          selectThesisScenario("c");
+          for (const key of ["c", "o"]) { thesisTabButtons[key].hidden = mode === "single" && key === "o"; thesisTabButtons[key].textContent = key === "c" && mode === "single" ? (zh ? "主情景" : "Main case") : key === "c" ? (zh ? "保守" : "Conservative") : (zh ? "乐观" : "Optimistic"); }
+          if (activeIdx >= 0) { seedInputs = cleanForm(lastForm); renderForm(); }
+          const label = followupPanels.c.querySelector(".vc-thesis-hint"); if (label) label.textContent = mode === "single" ? (zh ? "主情景" : "Main case") : (zh ? "保守" : "Conservative");
+          scheduleDraft();
+        },
+        retryBusinessReports: () => loadBusinessReports({ retry: true }),
+        retryManagementResearch: () => loadManagementResearch({ retry: true }),
+        getContext: async () => { if (loadGuideData) Object.assign(refData, await loadGuideData()); const views = await aiViews(); return { stock: aiStock(), verified: aiVerified(), business: views.business, managementResearch: views.managementResearch }; },
+        switchModel: (anchor) => ai.openModelPicker(anchor),
         getThesis: () => readThesis(),
         applyThesis: (drafts) => {
           noteBefore = { scenario: "both", thesis: readThesis() };
-          for (const { key } of THESIS_SCENARIOS) writeScenario(key, { [key]: { ...(noteBefore.thesis[key] || {}), ...drafts[key] } });
+          for (const { key } of THESIS_SCENARIOS) if (drafts[key]) writeScenario(key, { [key]: { ...(noteBefore.thesis[key] || {}), ...drafts[key] } });
           noteUndo.hidden = false; refreshThesisTabs(); refreshStoryHints(); scheduleDraft();
         },
-        recommendMethods: () => requestMethodPicks(),
+        recommendMethods: (scenario) => requestMethodPicks(scenario),
+        sharedKey: () => currentMode || "",
         methods: methodChoices,
         currentMethod: () => MODELS[activeIdx]?.key || "",
         selectMethod: (key) => {
@@ -1644,35 +1776,48 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
             return { k: f.k, label: textFor(f.label, lang, f.k), unit: f.unit || "", col: f.col, meta: f.meta, value: lastForm[f.k], isDefault: f.default !== undefined && (f.col === "dual" ? lastForm[f.k]?.c === f.default && lastForm[f.k]?.o === f.default : lastForm[f.k] === f.default), refs };
           });
         },
-        suggestParams: async () => {
+        suggestParams: async (scenario = null, singleCase = false) => {
           if (loadGuideData) Object.assign(refData, await loadGuideData());
-          const context = aiContext(); if (!context) throw new Error(zh ? "请先选择估值方法。" : "Choose a method first.");
+          await loadManagementResearch();
+          const base = aiContext(); if (!base) throw new Error(zh ? "请先选择估值方法。" : "Choose a method first.");
+          const context = scenarioContext(base, scenario);
+          if (singleCase) context.singleCase = true;
+          context.business = [...businessReportFacts(businessData, lang), ...(base.business || [])].slice(0, 20);
           const r = await fetch("/api/my/ai/valuation", { method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ lang, context, messages: [{ role: "user", content: zh
-              ? "按我写好的保守、乐观两个场景故事，给每个两档参数一对建议值（保守 c、乐观 o）。每项一句理由，理由里写出参考的财报数据或历史区间，以及它对应故事里的哪个判断。"
+            body: JSON.stringify({ lang, context, messages: [{ role: "user", content: scenario ? (zh
+              ? `只按我确认的${singleCase ? "单一主" : scenario === "c" ? "保守" : "乐观"}情景叙事，建议当前情景 ${scenario} 的参数。两档字段只返回 {"${scenario}": 数字}。每项说明财报依据或历史区间及对应的业务判断，不生成另一情景。${scenario === "o" ? "方法与基础数据已经确认，本轮只改乐观假设。" : "缺少资料时保留待补，不填示例值。"}`
+              : `Suggest ONLY ${singleCase ? "main-case" : scenario === "c" ? "conservative" : "optimistic"} inputs using my confirmed story. Dual fields return only {"${scenario}": number}. Explain the source and business assumption for each value. Do not generate the other case.${scenario === "o" ? " Keep the confirmed method and shared base data." : " Leave missing evidence explicit."}`) : zh
+              ? "按我写好的保守、乐观两个场景叙事，给每个两档参数一对建议值（保守 c、乐观 o）。每项一句理由，理由里写出参考的财报数据或历史区间，以及它对应叙事里的哪个判断。"
               : "Using my conservative and optimistic stories, suggest a conservative (c) and optimistic (o) value for every two-case input. Give one reason per input, citing the financial data or historical range used and which part of the story it reflects." }] }) });
           const j = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(aiErrorText(r.status, j, lang));
           return { params: j.params || {}, reasons: j.reasons || {} };
         },
-        applyParams: (params) => { applyParamsToForm(params); scheduleDraft(); },
+        applyParams: (params, scenario = null) => {
+          const fields = MODELS[activeIdx] ? modeFields(MODELS[activeIdx], currentMode).map((f) => ({ ...f, value: lastForm[f.k] })) : [];
+          applyParamsToForm(scenario ? mergeScenarioParams(params, fields, scenario) : params); scheduleDraft();
+        },
         checkParams,
-        result: () => {
-          const lo = lastLow, hi = lastHigh, ok = Number.isFinite(lo) && Number.isFinite(hi);
+        result: (scenario = null) => {
+          const currentModel = MODELS[activeIdx];
+          const lo = currentModel ? runScenario(currentModel, lastForm, ctx, "c") : null;
+          const hi = currentModel ? runScenario(currentModel, lastForm, ctx, "o") : null;
+          const ok = Number.isFinite(lo) && Number.isFinite(hi);
           let v = null; if (ok && typeof verdict === "function") { try { v = verdict(Math.min(lo, hi), Math.max(lo, hi)); } catch { v = null; } }
           const model = MODELS[activeIdx];
-          const missing = model ? modeFields(model, currentMode).filter((f) => { const x = lastForm[f.k]; return f.col === "dual" ? !(x && Number.isFinite(x.c) && Number.isFinite(x.o)) : !Number.isFinite(x); }).map((f) => textFor(f.label, lang, f.k)) : [];
+          const missing = model ? modeFields(model, currentMode).filter((f) => { const x = lastForm[f.k]; return f.col === "dual" ? !(x && (scenario ? Number.isFinite(x[scenario]) : Number.isFinite(x.c) && Number.isFinite(x.o))) : !Number.isFinite(x); }).map((f) => textFor(f.label, lang, f.k)) : [];
           const sample = summaryCard.classList.contains("vc-hero-sample");
           const shown = model ? modeFields(model, currentMode).filter((f) => f.col === "dual" && lastForm[f.k] && Number.isFinite(lastForm[f.k].c)).slice(0, 3)
             .map((f) => `${textFor(f.label, lang, f.k)} ${lastForm[f.k].c}${f.unit === "%" ? "%" : ""}–${lastForm[f.k].o}${f.unit === "%" ? "%" : ""}`) : [];
-          const samples = model ? modeFields(model, currentMode).filter((f) => f.col === "dual" && f.default !== undefined && lastForm[f.k]?.c === f.default && lastForm[f.k]?.o === f.default).map((f) => `${textFor(f.label, lang, f.k)} ${f.default}${f.unit === "%" ? "%" : ""}`) : [];
+          const samples = model ? modeFields(model, currentMode).filter((f) => f.col === "dual" && f.default !== undefined && (scenario ? lastForm[f.k]?.[scenario] === f.default : lastForm[f.k]?.c === f.default && lastForm[f.k]?.o === f.default)).map((f) => `${textFor(f.label, lang, f.k)} ${f.default}${f.unit === "%" ? "%" : ""}`) : [];
           return { low: lo, high: hi, price: ctx && ctx.price, currency: (stock && stock.currency) || "", method: model ? textFor(methodMenuMeta(model)?.title, lang, modelTitle(model, lang)) : "", inputs: shown, samples,
             inverted: ok && lo > hi, // 保守场景算出的价值反而更高：多半是两组参数填反了
             verdict: !sample && v && v.text && v.text !== "—" ? v.text : "", sample, missing, canSave: !submitBtn.disabled, fmt: (x) => fmt(x, "—") }; // 示例参数不给判定
         },
         finish: () => {
           setFlowMode(false);
-          flowDone.replaceChildren(ri("checkbox-circle-fill"), el("span", "vc-next-step-text", { textContent: zh ? "AI 引导完成。故事、依据和参数都可以在下面继续修改，确认后保存估值。" : "Guide complete. Keep editing the story, evidence and inputs below, then save." }));
+          selectEditorTab(activeIdx >= 0 ? "params" : "story");
+          flowDone.replaceChildren(ri("checkbox-circle-fill"), el("span", "vc-next-step-text", { textContent: zh ? "AI 引导完成。可以在「叙事」和「参数」间切换修改，确认后保存估值。" : "Guide complete. Review the Story and Inputs tabs, then save." }));
           flowDone.hidden = false; flowDone.tabIndex = -1;
           root.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
           flowDone.focus({ preventScroll: true }); // 读屏和键盘用户从完成提示继续
@@ -1686,7 +1831,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   }
   function setFlowMode(on, save = true) {
     if (!on) flow?.pause();
-    flowMode = on; if (on) flowDone.hidden = true;
+    managementHost.hidden = on;
+    businessHost.hidden = on;
+    flowMode = on; if (on) { activeEditorTab = "story"; flowDone.hidden = true; }
     syncGuideLayout(); if (on) flow?.refresh();
     if (save) scheduleDraft();
   }
@@ -1696,8 +1843,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // ── 未保存改动：用户第一次点击 / 按键时记一份基线（页面自动预填、异步补的数据不算改动），离开时和当前状态比 ──
   let baseline; // undefined = 还没记
   function draftState() {
-    return { method: MODELS[activeIdx]?.key || null, inputs: cleanForm(lastForm), derivations: currentDerivations(), segments: { enabled: !!segments?.enabled, rows: segments?.rows || [] }, note: noteInput.value.trim(), thesis: readThesis(),
-      activeScenario: activeThesisScenario, mode: flowMode ? "guide" : "manual", flow: flow ? flow.snapshot() : null };
+    return { scenarioMode: valuationMode, method: MODELS[activeIdx]?.key || null, inputs: cleanForm(lastForm), derivations: currentDerivations(), segments: { enabled: !!segments?.enabled, rows: segments?.rows || [] }, note: noteInput.value.trim(), thesis: readThesis(),
+      ...(managementData ? { managementResearch: managementData } : {}), ...(businessData ? { businessReports: businessData } : {}), activeScenario: activeThesisScenario, editorTab: activeEditorTab, mode: flowMode ? "guide" : "manual", flow: flow ? flow.snapshot() : null };
   }
   function persistDraft() {
     if (destroyed || didSave || didDiscard || !draftKey) return false;
@@ -1706,7 +1853,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     return ok;
   }
   function snapshot() {
-    return JSON.stringify(draftState());
+    const { editorTab, ...content } = draftState();
+    return JSON.stringify(content); // 切换编辑 tab 本身不算未保存的内容改动。
   }
   const markBase = (e) => { if (e.isTrusted && baseline === undefined) baseline = snapshot(); };
   for (const t of ["pointerdown", "keydown"]) document.addEventListener(t, markBase, true); // 抽屉 / 弹窗也算在内

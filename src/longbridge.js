@@ -81,13 +81,15 @@ export function pickLatestAnnual(financials) {
 }
 
 // 签名 GET（沿用 getOtp 的 canonical 规则；query 须按 key 字母序，签名与 URL 用同一字符串）
-export async function signedGet(env, path, query) {
+export async function signedGet(env, path, query, options = {}) {
   const ts = (Date.now() / 1000).toFixed(3);
   const names = "authorization;x-api-key;x-timestamp";
   const sh = `authorization:${env.LONGBRIDGE_ACCESS_TOKEN}\nx-api-key:${env.LONGBRIDGE_APP_KEY}\nx-timestamp:${ts}\n`;
   const canonical = `GET|${path}|${query}|${sh}|${names}|`;
   const sig = await hmac256hex(env.LONGBRIDGE_APP_SECRET, "HMAC-SHA256|" + await sha1hex(canonical));
-  const res = await fetch(HTTP_HOST + path + (query ? "?" + query : ""), {
+  const res = await (options.fetchImpl || fetch)(HTTP_HOST + path + (query ? "?" + query : ""), {
+    ...(options.signal ? { signal: options.signal } : {}),
+    ...(options.maxBytes ? { redirect: "manual" } : {}),
     headers: {
       authorization: env.LONGBRIDGE_ACCESS_TOKEN,
       "x-api-key": env.LONGBRIDGE_APP_KEY,
@@ -95,6 +97,21 @@ export async function signedGet(env, path, query) {
       "x-api-signature": `HMAC-SHA256 SignedHeaders=${names}, Signature=${sig}`,
     },
   });
+  if (options.maxBytes) {
+    if (!res.ok || !res.body) { await res.body?.cancel(); throw new Error("longbridge_request_failed"); }
+    const reader = res.body.getReader(), chunks = []; let length = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read(); if (done) break;
+        length += value.byteLength;
+        if (length > options.maxBytes) throw new Error("longbridge_response_too_large");
+        chunks.push(value);
+      }
+    } finally { await reader.cancel().catch(() => {}); }
+    const bytes = new Uint8Array(length); let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }
   return res.json();
 }
 
