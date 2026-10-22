@@ -68,6 +68,8 @@ describe("buildAssistPrompt", () => {
     expect(p).toContain("估值钟摆");
     expect(p).toContain("个股详情页 (/b/demo/AAPL)");
     expect(p).toContain("苹果 AAPL");
+    expect(p).toContain("通用 SOTP 用 sotp");
+    expect(p).toContain("FCFE/DDM 用股权成本，不重复扣净负债");
     expect(p).toContain("  现价 $230.10");
     expect(p).toMatch(/不要编造/);
     expect(p).toMatch(/不是持牌投资顾问/);

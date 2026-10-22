@@ -22,6 +22,8 @@
   .article tr + tr td{border-top:1px dashed var(--border)}
   .article th{font-size:13px;color:#fff;background:var(--dark);font-weight:400}
   .article td:first-child{font-weight:500;white-space:nowrap}
+  .article .method-table td:first-child{white-space:normal;width:26%}
+  .article .method-table td:nth-child(2){width:20%}
   .back{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 16px;border-radius:var(--r-pill);
     background:rgba(255,255,255,.7);font-size:13.5px;color:var(--ink-soft);text-decoration:none}
   .back:hover{color:var(--ink);background:#fff}
@@ -31,6 +33,16 @@
   .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
   #langSlot{display:flex;align-items:center;gap:8px}
   @media (max-width:640px){ .article{padding:22px 18px 26px} .article td:first-child{white-space:normal} }
+  @media (max-width:640px){
+    .article .method-table,.article .method-table tbody,.article .method-table tr{display:block}
+    .article .method-table tr:first-child{display:none}
+    .article .method-table tr + tr{padding:14px 16px;border-top:1px dashed var(--border)}
+    .article .method-table tr:nth-child(2){border-top:0}
+    .article .method-table td,.article .method-table td:first-child,.article .method-table td:nth-child(2){display:block;width:auto;padding:0;border:0;line-height:1.7}
+    .article .method-table td:first-child{font-size:15px}
+    .article .method-table td:nth-child(2){font-size:12px;color:var(--ink-mute);margin:3px 0 8px}
+    .article .method-table td:last-child{color:var(--ink-soft)}
+  }
 </style>
 </head>
 <body>
@@ -38,81 +50,80 @@
   <div class="article">
     <div class="topbar"><a class="back" href="#" id="backLink"><i class="ri-arrow-left-line" aria-hidden="true"></i><span id="backText">返回</span></a><div id="langSlot"></div></div>
     <div id="art-zh">
-    <p class="eyebrow">Valuation · 估值方法</p>
-    <h1>什么是合理价值？</h1>
-    <p><b>合理价值（内在价值）</b>是一家公司值多少钱的估计——理论上等于它未来能产生的所有现金流，折算到今天的价值。价格每天在波动，但它围绕的中心是价值。本看板的钟摆，就是把「现价」放到「你估计的价值区间」里去看：现在是便宜、合理，还是贵。</p>
-    <p>两个要点：第一，价值是<b>区间，不是精确数字</b>——任何估值都建立在对未来的假设上，所以用「低点 ~ 高点」表达比单点更诚实；第二，<b>安全边际</b>（Margin of Safety，格雷厄姆提出）——只在价格明显低于价值低点时才算真正便宜，为估错留出缓冲。</p>
-
-    <h2>常见估值方法</h2>
-    <table>
-      <tr><th>方法</th><th>思路</th><th>适用</th></tr>
-      <tr><td>市盈率 PE</td><td>合理价 = 每股收益 EPS × 合理市盈率。参照公司历史 PE 区间、同行业水平。</td><td>盈利稳定的成熟公司</td></tr>
-      <tr><td>市净率 PB</td><td>合理价 = 每股净资产 × 合理市净率。</td><td>银行、保险、重资产行业</td></tr>
-      <tr><td>市销率 PS</td><td>用收入代替利润估值。</td><td>尚未盈利的成长公司</td></tr>
-      <tr><td>PEG</td><td>PE ÷ 盈利增速。PEG ≈ 1 视为合理，越低越便宜。</td><td>高成长公司</td></tr>
-      <tr><td>股息贴现 DDM</td><td>把未来股息折现加总。</td><td>高分红、分红稳定的公司</td></tr>
-      <tr><td>现金流折现 DCF</td><td>预测未来自由现金流并折现，理论上最严谨，但对增长率与折现率假设极其敏感。</td><td>现金流可预测的公司</td></tr>
-      <tr><td>历史分位法</td><td>看当前估值（PE/PB）处在自身历史的什么分位：低于 20% 分位偏便宜，高于 80% 偏贵。</td><td>周期相对稳定的公司/指数</td></tr>
-    </table>
-
-    <h3>一个简单的例子（PE 法）</h3>
-    <div class="formula">某公司 EPS ≈ 10 元；历史合理 PE 区间 20–26 倍<br>→ 合理价值区间 ≈ 200 ~ 260 元</div>
-    <p>悲观一点的假设给出低点，乐观一点的假设给出高点。用两种以上方法交叉验证，区间更可靠。</p>
-
-    <h2>怎么用在本看板</h2>
-    <p>在添加/编辑标的时填三样东西，钟摆的五个区间就由它们决定：</p>
-    <table>
-      <tr><th>设置</th><th>含义</th></tr>
-      <tr><td>合理 · 低点 / 高点</td><td>你估计的合理价值区间。现价落在区间内 = <b>合理（Fair value）</b>。</td></tr>
-      <tr><td>安全边际 %</td><td>低于「低点 ×（1 − 安全边际）」= <b>击球区</b>（价值投资里最值得出手的价位）；介于其间 = <b>低估</b>。例：低点 200、安全边际 50% → 100 以下才进入击球区。</td></tr>
-      <tr><td>泡沫阈值 %</td><td>高于「高点 ×（1 + 泡沫阈值）」= <b>泡沫区</b>（价格已远离价值，该警惕甚至离场）；介于其间 = <b>高估</b>。</td></tr>
-    </table>
-    <div class="tip">建议：估值是「毛估估」，把功夫花在理解生意上，而不是把数字算到小数点后两位。定期（如每季度财报后）回顾并更新区间。</div>
-
-    <p class="disclaim">本页内容仅为估值方法的一般性介绍，不构成任何投资建议。市场有风险，决策需独立判断。</p>
+      <p class="eyebrow">Valuation · 方法与口径</p>
+      <h1>先选依据，再选方法</h1>
+      <p>内在估值问的是“未来现金流值多少”，相对定价问的是“可比资产在市场上卖多少”。两者可以交叉验证，但都依赖明确的假设和一致的数据口径。你可以做单场景估值，也可以用保守、乐观情景表达不同判断。</p>
+      <p>按达摩达兰的基本框架，主要路径是现金流折现、相对定价和或有权益估值。资产基础方法从资产逐项估算；SOTP 是把多种方法组合起来的分部加总框架。下列方法均可在工作台使用，并支持单场景或保守／乐观情景。</p>
+      <div data-method-catalog="zh"></div>
+      <h2>先对齐三个口径</h2>
+      <table><tr><th>口径</th><th>核对事项</th></tr>
+      <tr><td>企业 / 股权</td><td>FCFF 对应 WACC；企业价值转股权价值时扣净负债并核对其他索偿。FCFE、DDM 对应股权成本。P/E、P/B、P/S 直接是股权口径；EV/EBITDA、EV/Sales 是企业口径，避免重复加减债务与现金。</td></tr>
+      <tr><td>期间 / 币种</td><td>TTM、年度、预测年度不能混用；金额与股数、报价币种、汇率及稀释口径要一致。当前带预测年数的倍数模型给出预测期价格，未自动折现到今天；与 DCF 现值比较前应统一日期。</td></tr>
+      <tr><td>盈利 / 现金流</td><td>经调整 P/E 属于盈利输入口径，不是独立估值流派。一次性与非现金调整需逐项核实；股权激励仍可能造成经济成本与稀释。分部毛利不能直接当净利润乘 PE，EBITDA 也不等于自由现金流。</td></tr></table>
+      <h2>PEG 的公式与限制</h2>
+      <div class="formula">PEG = P/E ÷ 预期 EPS 增速（百分数）<br>例如：P/E = 20，预期增速 = 10% → PEG = 20 ÷ 10 = 2<br>模型反推：目标 P/E = 假设 PEG × 预期增速百分数</div>
+      <p>PEG 不是 PE 乘增长率。增长期限、风险、派息和再投资回报不同，会使 PEG 不可直接比较；1 或 1–2 不是通用合理标准。亏损、低增长或强周期公司尤其不适合机械套用。</p>
+      <h2 id="frameworks">模型假设与适用边界</h2>
+      <div data-method-frameworks="zh"></div>
+      <h2>如何选择和交叉验证</h2>
+      <p>先读业务与财报，确认现金流、盈利、净资产或收入哪一个指标有经济意义；再选择对应方法。可比倍数需要解释风险、利润率、资本投入和成长差异，历史分位只是定价背景，不是内在价值或买卖信号。</p>
+      <p>小米一类多业务公司可以先拆分硬件、互联网服务和汽车等业务，再分别研究方法和假设。选择 SOTP，可将硬件用 PE、汽车用 EV/Sales 等方法分别估值，再按持股比例、汇率和集团调整汇总。原 PE“分业务”仍适用于共用一个目标 PE 的情形。</p>
+      <h2>用在估值钟摆中</h2>
+      <p>把确认后的单点或区间设为钟摆依据，另外设置安全边际与泡沫阈值。击球区 ≤ 低点 ×（1−安全边际）；泡沫区 &gt; 高点 ×（1+泡沫阈值）。这些标签反映你设定的假设，不是确定的价格底部或交易指令。</p>
+      <div class="tip">保存每项数据的报告期与来源，区分已披露事实和未来假设。交叉验证的重点是解释差异，而不是取几种模型的平均数。</div>
+      <p>参考：<a href="https://pages.stern.nyu.edu/~adamodar/pdfiles/eqnotes/approach.pdf" target="_blank" rel="noopener">Damodaran · Approaches to Valuation</a>；<a href="https://pages.stern.nyu.edu/~adamodar/pdfiles/eqnotes/pe.pdf" target="_blank" rel="noopener">PE 与 PEG 课程讲义</a>。</p>
+      <p class="disclaim">本页介绍方法与应用能力，不构成投资建议。估值结果依赖资料质量与假设。</p>
     </div>
-
     <div id="art-en" class="hidden">
-    <p class="eyebrow">Valuation · Methods</p>
-    <h1>What is fair value?</h1>
-    <p><b>Fair value (intrinsic value)</b> is an estimate of what a business is worth — in theory, all the cash it will generate in the future, discounted to today. Prices fluctuate daily, but they orbit value. The pendulum on this board simply places the <b>current price</b> inside <b>your estimated value range</b>: cheap, fair, or expensive.</p>
-    <p>Two principles. First, value is a <b>range, not a precise number</b> — every valuation rests on assumptions about the future, so a low–high range is more honest than a single point. Second, the <b>margin of safety</b> (Benjamin Graham): a stock is only truly cheap when the price sits clearly below the low end, leaving a buffer for being wrong.</p>
-
-    <h2>Common valuation methods</h2>
-    <table>
-      <tr><th>Method</th><th>Idea</th><th>Best for</th></tr>
-      <tr><td>P/E</td><td>Fair price = EPS × a reasonable P/E, anchored to the company's own history and peers.</td><td>Mature, steadily profitable companies</td></tr>
-      <tr><td>P/B</td><td>Fair price = book value per share × a reasonable P/B.</td><td>Banks, insurers, asset-heavy industries</td></tr>
-      <tr><td>P/S</td><td>Value on revenue instead of profit.</td><td>Growth companies not yet profitable</td></tr>
-      <tr><td>PEG</td><td>P/E ÷ earnings growth. ≈1 is fair; lower is cheaper.</td><td>High-growth companies</td></tr>
-      <tr><td>DDM</td><td>Discount all future dividends to today.</td><td>Stable, high-dividend payers</td></tr>
-      <tr><td>DCF</td><td>Project free cash flows and discount them — rigorous in theory, but extremely sensitive to growth/discount assumptions.</td><td>Predictable cash-flow businesses</td></tr>
-      <tr><td>Historical percentile</td><td>Where does today's P/E or P/B sit in its own history? Below the 20th percentile is cheap-ish; above the 80th, expensive.</td><td>Stable-cycle companies and indices</td></tr>
-    </table>
-
-    <h3>A quick example (P/E)</h3>
-    <div class="formula">EPS ≈ ¥10; historical fair P/E range 20–26×<br>→ fair-value range ≈ ¥200 – ¥260</div>
-    <p>Pessimistic assumptions give the low end; optimistic ones give the high end. Cross-check with more than one method for a sturdier range.</p>
-
-    <h2>Using it on this board</h2>
-    <p>You enter three things per holding; they define the pendulum's five zones:</p>
-    <table>
-      <tr><th>Input</th><th>Meaning</th></tr>
-      <tr><td>Fair · low / high</td><td>Your estimated fair-value range. Price inside it = <b>Fair value</b>.</td></tr>
-      <tr><td>Margin of safety %</td><td>Below "low × (1 − MOS)" = <b>Strike zone</b> (the price a value investor waits to swing at); in between = <b>Undervalued</b>. E.g. low 200, MOS 50% → strike zone only below 100.</td></tr>
-      <tr><td>Bubble threshold %</td><td>Above "high × (1 + threshold)" = <b>Bubble</b> (price has run far ahead of value — time to be wary or exit); in between = <b>Overvalued</b>.</td></tr>
-    </table>
-    <div class="tip">Tip: valuation is rough arithmetic. Spend your effort understanding the business, not polishing decimals. Revisit the range after each quarterly report.</div>
-
-    <p class="disclaim">This page is a general introduction to valuation methods, not investment advice. Markets are risky; judge independently.</p>
+      <p class="eyebrow">Valuation · Methods and definitions</p>
+      <h1>Choose the basis first</h1>
+      <p>Intrinsic valuation asks what future cash flows are worth; relative pricing asks what comparable assets trade for. Both depend on explicit assumptions and consistent data. Use a single case or conservative and optimistic cases to express your views.</p>
+      <p>Damodaran's main approaches are discounted cash flows, relative valuation and contingent claims. Asset-based methods assess assets individually; SOTP combines methods across businesses. The following calculators support a single case or conservative and optimistic cases.</p>
+      <div data-method-catalog="en"></div>
+      <h2>Align three definitions</h2>
+      <table><tr><th>Definition</th><th>What to check</th></tr>
+      <tr><td>Enterprise / equity</td><td>FCFF uses WACC; bridge enterprise value to equity by subtracting net debt and checking other claims. FCFE and DDM use cost of equity. P/E, P/B and P/S use equity value; EV/EBITDA and EV/Sales use enterprise value. Do not count cash or debt twice.</td></tr>
+      <tr><td>Period / currency</td><td>Align TTM, annual and forecast periods, currency, exchange rates, shares and dilution. Multiples models with a forecast horizon currently return a future price without discounting it to today. Align valuation dates before comparing with DCF present values.</td></tr>
+      <tr><td>Earnings / cash flow</td><td>Adjusted P/E is an earnings definition, not a separate valuation school. Reconcile adjustments; non-cash stock compensation may still impose economic costs and dilution. Segment gross profit is not net income for a P/E, and EBITDA is not free cash flow.</td></tr></table>
+      <h2>PEG: formula and limits</h2>
+      <div class="formula">PEG = P/E ÷ expected EPS growth in percentage points<br>P/E 20 and expected growth 10% → PEG = 20 ÷ 10 = 2<br>Implied target P/E = assumed PEG × expected growth in percentage points</div>
+      <p>PEG divides, rather than multiplies, P/E by growth. Growth horizons, risk, payouts and returns on reinvestment affect comparability. Neither 1 nor 1–2 is a universal fair range, particularly for losses, low growth or cyclical earnings.</p>
+      <h2 id="frameworks-en">Model assumptions and boundaries</h2>
+      <div data-method-frameworks="en"></div>
+      <h2>Choose and cross-check</h2>
+      <p>Read the business disclosures first, then decide whether cash flow, earnings, book equity or revenue is economically meaningful. Explain differences in risk, margins, reinvestment and growth before using peer multiples. Historical percentiles are pricing context, not intrinsic value or trading signals.</p>
+      <p>For a diversified company such as Xiaomi, assess hardware, internet services and vehicles separately. Use SOTP to combine hardware P/E with vehicle EV/Sales and reconcile ownership, FX and group adjustments. The P/E segment mode remains available for businesses sharing one target P/E.</p>
+      <h2>Use the result on the pendulum</h2>
+      <p>Choose a confirmed point or range, then set the margin of safety and bubble threshold. Strike zone ≤ low × (1−margin); bubble zone &gt; high × (1+threshold). The labels reflect your assumptions, not a guaranteed floor or a trading instruction.</p>
+      <div class="tip">Record each input's period and source, and separate reported facts from future assumptions. Cross-checks should explain differences rather than mechanically average models.</div>
+      <p>References: <a href="https://pages.stern.nyu.edu/~adamodar/pdfiles/eqnotes/approach.pdf" target="_blank" rel="noopener">Damodaran · Approaches to Valuation</a>; <a href="https://pages.stern.nyu.edu/~adamodar/pdfiles/eqnotes/pe.pdf" target="_blank" rel="noopener">PE and PEG lecture notes</a>.</p>
+      <p class="disclaim">This guide describes methods and app capabilities, not investment advice. Results depend on data quality and assumptions.</p>
     </div>
-
-    
 
     <script type="module">
+    import { METHOD_MENU_GROUPS, METHOD_FRAMEWORK_NOTES } from "/shared/valuation/index.js";
     import { LANG } from "/shared/i18n.js";
     import { mountLangMenu } from "/shared/langmenu.js";
     import { mountGlobalAi } from "/shared/global-ai.js";
+    const node = (tag, text) => { const e = document.createElement(tag); e.textContent = text; return e; };
+    for (const lang of ["zh", "en"]) {
+      const host = document.querySelector(`[data-method-catalog="${lang}"]`);
+      for (const group of METHOD_MENU_GROUPS) {
+        host.append(node("h2", group.title[lang]), node("p", group.description[lang]));
+        const table = document.createElement("table"), head = document.createElement("tr");
+        table.className = "method-table";
+        for (const title of lang === "zh" ? ["可用计算器", "价值口径", "依据与边界"] : ["Available calculator", "Value basis", "Basis and boundaries"]) head.append(node("th", title));
+        table.append(head);
+        for (const method of group.methods) {
+          const row = document.createElement("tr");
+          row.append(node("td", method.title[lang]), node("td", method.category[lang]), node("td", method.subtitle[lang]));
+          table.append(row);
+        }
+        host.append(table);
+      }
+      const notes = document.querySelector(`[data-method-frameworks="${lang}"]`);
+      for (const note of METHOD_FRAMEWORK_NOTES) notes.append(node("h3", note.title[lang]), node("p", note.description[lang]));
+    }
     document.documentElement.lang = LANG === "zh" ? "zh-CN" : "en";
     document.title = LANG === "zh" ? "什么是合理价值 · 常见估值方法" : "What is Fair Value · Valuation Methods";
     const backLink = document.getElementById("backLink");
@@ -127,6 +138,7 @@
     });
     document.getElementById(LANG === "zh" ? "art-en" : "art-zh").classList.add("hidden");
     document.getElementById(LANG === "zh" ? "art-zh" : "art-en").classList.remove("hidden");
+    if (LANG === "en" && location.hash === "#frameworks") document.getElementById("frameworks-en").scrollIntoView();
     mountLangMenu(document.getElementById("langSlot"));
     mountGlobalAi(document.getElementById("langSlot"), { getPage: () => ({ kind: "other", path: location.pathname, title: document.title, summary: LANG === "zh" ? "估值方法介绍页：合理价值、安全边际与常见估值方法" : "Guide page: fair value, margin of safety and common valuation methods" }) }); // 全站 AI 助手
     </script>

@@ -9,7 +9,9 @@ import { scenarioContext, mergeScenarioParams } from "./valuation/thesis-guide.j
  *   verdict(low, high) → { text, cls } | null     —— 由宿主提供（结果卡判定行）
  *   stock: { name, code, mountLogo(el), rows: [[标签, 值], …] } —— 右栏标的资料（可选）
  */
-import { METHOD_MENU_GROUPS, MODELS, methodMenuMeta, runModel, runScenario, modeFields } from "/shared/valuation/index.js";
+import { validValuationRange } from "/shared/valuation/save.js";
+import { PART_METHODS, defaultParts, validParts, MAX_PARTS } from "/shared/valuation/sotp.js";
+import { METHOD_MENU_GROUPS, METHOD_FRAMEWORK_NOTES, MODELS, methodMenuMeta, runModel, runScenario, modeFields } from "/shared/valuation/index.js";
 import { midpointForm, scheduleSeries, sensitivityMatrix, fieldSweep } from "/shared/valuation/workbench.js";
 import { FIELD_META, fieldReference, moneyAnnualRef, moneyQuarterRef, multipleCompare } from "/shared/field-meta.js";
 import { derivationForMeta } from "/shared/valuation/derivations.js";
@@ -142,7 +144,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // 仅保留当前模型字段的推导,存档时用
   function currentDerivations() {
     const model = MODELS[activeIdx]; if (!model) return {};
-    const keys = new Set(modeFields(model, currentMode).map((f) => f.k));
+    const keys = new Set(modeFields(model, currentMode, lastForm).map((f) => f.k));
     const out = {}; for (const k in derivations) if (keys.has(k)) out[k] = derivations[k];
     return out;
   }
@@ -301,7 +303,18 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     try { sessionStorage.setItem(aiPickKey(), JSON.stringify(j)); } catch { /* 存不下就算了 */ }
     return j;
   }
-  pickerModal.append(pickHead, methodBar);
+  const frameworks = el("details", "vc-method-frameworks");
+  const frameworkTitle = el("summary"); frameworkTitle.textContent = lang === "zh" ? "模型假设与适用边界" : "Model assumptions and boundaries";
+  frameworks.appendChild(frameworkTitle);
+  for (const note of METHOD_FRAMEWORK_NOTES) {
+    const title = el("strong"); title.textContent = textFor(note.title, lang, note.key);
+    const paragraph = el("p"); paragraph.textContent = textFor(note.description, lang, "");
+    frameworks.append(title, paragraph);
+  }
+  const guideLink = el("a", "", { href: "/valuation#frameworks", target: "_blank", rel: "noopener" });
+  guideLink.textContent = lang === "zh" ? "查看完整方法分类与公式" : "View the method guide and formulas";
+  frameworks.appendChild(guideLink);
+  pickerModal.append(pickHead, methodBar, frameworks);
   // 关闭：还没选过方法（新增）→ 退出工作台回详情；已有方法（更换）→ 保持原方法
   function closePicker() { showPicker(false); }
   pickerView.addEventListener("click", (e) => { if (e.target === pickerView) closePicker(); });
@@ -318,6 +331,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       if (!available.length) return;
       const g = el("section", "vc-pgroup");
       const lab = el("div", "vc-pgroup-lab"); lab.textContent = textFor(group.title, lang, group.key);
+      const description = el("p", "vc-pgroup-desc"); description.textContent = textFor(group.description, lang, "");
       const items = el("div", "vc-pcards");
       available.forEach(({ method, entry }) => {
         const b = el("button", "vc-pcard", { type: "button" });
@@ -326,7 +340,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         const tt = el("span", "vc-pcard-title"); tt.textContent = textFor(method.title, lang, modelTitle(entry.model, lang));
         const st = el("span", "vc-pcard-sub"); st.textContent = textFor(method.subtitle, lang, "");
         const cur = el("span", "vc-pcard-cur"); cur.textContent = lang === "zh" ? "当前方法" : "Current";
-        b.append(tt, st, cur);
+        const category = el("span", "vc-pcard-category"); category.textContent = textFor(method.category, lang, "");
+        b.append(category, tt, st, cur);
         b.addEventListener("click", () => {
           if (entry.idx === activeIdx) { showPicker(false); return; }
           // 编辑已存估值时换方法：已填假设不保留
@@ -337,7 +352,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         });
         items.appendChild(b);
       });
-      g.append(lab, items);
+      g.append(lab, description, items);
       methodBar.appendChild(g);
     });
     applyPicks();
@@ -360,8 +375,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     const changing = activeIdx >= 0;
     pickTitle.textContent = changing ? (lang === "zh" ? "更换估值方法" : "Change method") : (lang === "zh" ? "选择估值方法" : "Choose a valuation method");
     pickSub.textContent = lang === "zh"
-      ? "按公司类型选：银行保险看 P/B，稳定分红用 DDM，现金流可预测用 DCF，尚未盈利的成长股用 P/S，资源股用 NAV。想交叉验证，就再添加一张用别的方法的估值卡。"
-      : "Pick by business type: P/B for banks and insurers, DDM for steady dividend payers, DCF when cash flows are predictable, P/S for growth names not yet profitable, NAV for resource stocks. To cross-check, add another card with a different method.";
+      ? "先选估值依据：预测现金流以估计内在价值，或用可比倍数判断市场定价。再核对业务、数据与企业/股权口径。"
+      : "Start with cash-flow-based intrinsic value or comparable-based market pricing, then check business fit, data and enterprise/equity definitions.";
     pickWarn.textContent = changing ? (lang === "zh" ? "切换后，已填的假设不会保留。" : "Switching clears the assumptions you have entered.") : "";
     pickWarn.style.display = changing ? "" : "none";
     pickerView.hidden = !open;
@@ -605,7 +620,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   submitBtn.addEventListener("click", async () => {
     if (saving) return;
     if (lastLow === null || lastHigh === null || !isFinite(lastLow) || !isFinite(lastHigh)) return;
-    if (!(lastLow > 0 && lastHigh > 0) || (valuationMode !== "single" && Math.round(lastHigh * 100) === Math.round(lastLow * 100))) return;
+    if (!validValuationRange({ method: MODELS[activeIdx]?.key, scenarioMode: valuationMode, low: lastLow, high: lastHigh })) return;
     const segOut = currentMode === "segment" ? { enabled: true, rows: segments.rows } : { enabled: false, rows: segments.rows || [] };
     saving = true; submitBtn.disabled = true; submitBtn.textContent = lang === "zh" ? "保存中…" : "Saving…"; saveError.hidden = true;
     flow?.setLocked(true);
@@ -697,11 +712,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // ── 计算 + 渲染结果 ──
   function consOpt(model, form) {
     const cons = {}, opt = {};
-    for (const f of modeFields(model, currentMode)) {
+    for (const f of modeFields(model, currentMode, lastForm)) {
       const v = form[f.k];
       if (f.col === "dual") { cons[f.k] = v && typeof v === "object" ? v.c : NaN; opt[f.k] = v && typeof v === "object" ? v.o : NaN; }
       else { cons[f.k] = v; opt[f.k] = v; }
     }
+    if (form._parts) cons._parts = opt._parts = form._parts;
     if (model.modes) { cons._mode = opt._mode = currentMode; }
     if (form.assets) { cons.assets = opt.assets = form.assets; } // 资产型模型：明细/摘要需要资产数组
     if (form.prices) { cons.prices = opt.prices = form.prices; }
@@ -725,7 +741,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // 情景取中（保守/乐观取均）用于逐年现金流展示
   function midVals(model, form) {
     const v = {};
-    for (const f of modeFields(model, currentMode)) {
+    for (const f of modeFields(model, currentMode, lastForm)) {
       const x = form[f.k];
       if (f.col === "dual") {
         const c = x && typeof x === "object" ? x.c : NaN, o = x && typeof x === "object" ? x.o : NaN;
@@ -733,6 +749,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       } else v[f.k] = x;
     }
     if (model.modes) v._mode = currentMode;
+    if (form._parts) v._parts = form._parts;
     if (form.assets) v.assets = form.assets;
     if (form.prices) v.prices = form.prices;
     return v;
@@ -847,7 +864,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     if (valuationMode === "single") for (const value of Object.values(formData)) if (value && typeof value === "object" && "c" in value) value.o = value.c;
     lastForm = formData;
     const model = MODELS[activeIdx];
-    for (const editor of Object.values(thesisEditors)) editor.updateModel(modeFields(model, currentMode), model.key);
+    for (const editor of Object.values(thesisEditors)) editor.updateModel(modeFields(model, currentMode, lastForm), model.key);
     let r = { low: null, high: null };
     try { r = valuationMode === "single" ? { low: runScenario(model, formData, ctx, "c"), high: runScenario(model, formData, ctx, "c") } : runModel(model, formData, ctx); } catch { /* 输入不完整 */ }
     lastLow = r.low; lastHigh = r.high;
@@ -864,7 +881,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     heroTop.style.display = valid ? "" : "none";
     const point = valid && Math.abs(lastHigh - lastLow) < 1e-9;
     outDash.style.display = outHigh.style.display = point ? "none" : "";
-    const defaults = modeFields(model, currentMode).filter((f) => f.col === "dual" && f.default !== undefined);
+    const defaults = modeFields(model, currentMode, lastForm).filter((f) => f.col === "dual" && f.default !== undefined);
     const sample = valid && defaults.length > 0 && defaults.every((f) => formData[f.k] && formData[f.k].c === f.default && formData[f.k].o === f.default);
     if (sample) {
       const list = defaults.slice(0, 3).map((f) => `${textFor(f.label, lang, f.k)} ${f.default}${f.unit === "%" ? "%" : ""}`).join(lang === "zh" ? "、" : ", ");
@@ -881,7 +898,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     renderSchedule(model, formData, valid);
     renderChart(model, formData, valid);
     renderSensitivity(model, formData, valid);
-    submitBtn.disabled = saving || !valid || !(lastLow > 0 && lastHigh > 0) || (valuationMode !== "single" && Math.round(lastHigh * 100) === Math.round(lastLow * 100));
+    submitBtn.disabled = saving || !valid || !validValuationRange({ method: model.key, scenarioMode: valuationMode, low: lastLow, high: lastHigh });
   }
 
   // ── 字段构件（标签 + ⓘ、参考筹码 + ↗）──
@@ -891,9 +908,9 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
     if (field.unit === "%") { const u = el("span", "vc-unit"); u.textContent = "%"; lab.appendChild(u); }
     const meta = field.meta && FIELD_META[field.meta];
     let guideRow = null;
-    if (meta && meta.guide) {
+    if (meta?.guide || field.hint) {
       const info = el("button", "vc-info"); info.type = "button"; info.appendChild(ri("information-line")); info.setAttribute("aria-label", lang === "zh" ? "估值提示" : "Valuation tip");
-      guideRow = el("div", "vc-guide"); guideRow.textContent = meta.guide[lang] || meta.guide.zh; guideRow.style.display = "none";
+      guideRow = el("div", "vc-guide"); guideRow.textContent = (meta?.guide || field.hint)[lang] || (meta?.guide || field.hint).zh; guideRow.style.display = "none";
       info.addEventListener("click", () => { guideRow.style.display = guideRow.style.display === "none" ? "block" : "none"; });
       lab.appendChild(info);
     }
@@ -1197,11 +1214,11 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       rowEls.forEach((r) => {
         const a = r.collect();
         const v = assetResetValue(a, priceOf, wMid, tax);
-        r.setReset(Number.isFinite(v) ? (lang === "zh" ? `重置值≈${fmtMoney(v)}` : `≈${fmtMoney(v)}`) : "");
+        r.setReset(Number.isFinite(v) ? (lang === "zh" ? `资产现值≈${fmtMoney(v)}` : `≈${fmtMoney(v)}`) : "");
         if (Number.isFinite(v)) { sum += v; n++; }
       });
       summary.textContent = n
-        ? (lang === "zh" ? `${n} 项资产 · 重置现值合计≈${fmtMoney(sum)}（价取中 · WACC ${Number.isFinite(wMid) ? wMid.toFixed(1) : "—"}%）` : `${n} assets · Σ≈${fmtMoney(sum)} (mid price · WACC ${Number.isFinite(wMid) ? wMid.toFixed(1) : "—"}%)`)
+        ? (lang === "zh" ? `${n} 项资产 · 资产估值合计≈${fmtMoney(sum)}（价取中 · WACC ${Number.isFinite(wMid) ? wMid.toFixed(1) : "—"}%）` : `${n} assets · Σ≈${fmtMoney(sum)} (mid price · WACC ${Number.isFinite(wMid) ? wMid.toFixed(1) : "—"}%)`)
         : (lang === "zh" ? "添加资产：在产矿（产量/成本/寿命）或固定值包" : "Add a mine (output/cost/life) or a fixed pack");
       recompute();
     }
@@ -1344,11 +1361,13 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         if (!model.modes.some((m) => m.key === currentMode)) currentMode = model.modes[0].key;
       }
     } else { currentMode = null; }
-    const fields = modeFields(model, currentMode);
+    const parts = model.key === "sotp" ? (validParts(seedInputs?._parts) ? structuredClone(seedInputs._parts) : defaultParts()) : null;
+    const fields = modeFields(model, currentMode, parts ? { ...seedInputs, _parts: parts } : seedInputs || {});
     const readers = [];
     const singles = fields.filter((f) => f.col !== "dual");
     const duals = fields.filter((f) => f.col === "dual");
-    const recompute = () => compute(buildForm(readers));
+    const recompute = () => compute({ ...buildForm(readers), ...(parts ? { _parts: parts } : {}) });
+    if (model.guidance) { const hint = el("p", "vc-model-guidance"); hint.textContent = textFor(model.guidance, lang, ""); formWrap.appendChild(hint); }
     const fieldEls = {};
     let singlesCard = null, dualsCard = null;
     if (model.modes) {
@@ -1356,7 +1375,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
       model.modes.forEach((mo) => {
         const b = el("button", "vc-modetab" + (mo.key === currentMode ? " on" : ""), { type: "button" });
         b.textContent = (mo.label && mo.label[lang]) || mo.key;
-        b.addEventListener("click", () => { if (currentMode !== mo.key) { currentMode = mo.key; renderForm(); } });
+        b.addEventListener("click", () => { if (currentMode !== mo.key) { if (["apv", "options"].includes(model.key)) seedInputs = cleanForm(lastForm); else if (model.key === "sector") seedInputs = null; currentMode = mo.key; renderForm(); } });
         tabs.appendChild(b);
       });
       formWrap.appendChild(tabs);
@@ -1381,10 +1400,11 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
             : (lang === "zh" ? "默认取最新年报口径" : "Defaults to latest annual report");
           lab.insertBefore(tag, lab.firstChild ? lab.firstChild.nextSibling : null);
         }
-        const money = MONEY_METAS.has(field.meta);
+        const money = (field.money || MONEY_METAS.has(field.meta));
         const input = money ? makeMoneyInput(singleInit(field)) : makeInput(singleInit(field));
         if (!money && field.hint && field.hint[lang]) input.placeholder = field.hint[lang];
         readers.push({ field, getVal: money ? () => moneyVal(input) : () => input.value !== "" ? Number(input.value) : NaN });
+        input.setAttribute("aria-label", textFor(field.label, lang, field.k));
         input.addEventListener("input", recompute);
         fld.append(lab, input);
         fieldEls[field.k] = { input, fld };
@@ -1454,8 +1474,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         const arow = el("div", "vc-arow");
         const { lab, guideRow } = buildLabel(field);
         const init = dualInit(field);
-        const inC = makeInput(init.c), inO = makeInput(init.o);
-        readers.push({ field, getVal: () => ({ c: inC.value !== "" ? Number(inC.value) : NaN, o: inO.value !== "" ? Number(inO.value) : NaN }) });
+        const money = field.money || MONEY_METAS.has(field.meta);
+        const inC = money ? makeMoneyInput(init.c) : makeInput(init.c), inO = money ? makeMoneyInput(init.o) : makeInput(init.o);
+        const fieldLabel = textFor(field.label, lang, field.k);
+        inC.setAttribute("aria-label", fieldLabel + (valuationMode === "single" ? "" : lang === "zh" ? " · 保守" : " · Conservative"));
+        inO.setAttribute("aria-label", fieldLabel + (lang === "zh" ? " · 乐观" : " · Optimistic"));
+        readers.push({ field, getVal: () => ({ c: money ? moneyVal(inC) : inC.value !== "" ? Number(inC.value) : NaN, o: money ? moneyVal(inO) : inO.value !== "" ? Number(inO.value) : NaN }) });
         const deriv = derivationForMeta(field.meta);
         let derivEl = null;
         // 手动改字段两格 ⇒ 解除该字段推导,就地复位面板(与卡片选区间的解除一致)
@@ -1485,6 +1509,41 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         card.appendChild(arow);
       });
       formWrap.appendChild(card);
+    }
+    if (parts) {
+      const changeParts = (next, clearId) => {
+        const nextInputs = cleanForm({ ...buildForm(readers), _parts: next });
+        if (clearId) for (const key of Object.keys(nextInputs)) if (key.startsWith(clearId + "_")) delete nextInputs[key];
+        seedInputs = nextInputs; renderForm();
+      };
+      parts.forEach((part, index) => {
+        const card = el("section", "vc-card vc-sotp-part");
+        const heading = el("div", "vc-sotp-head");
+        const name = el("input", "vc-input", {type:"text", maxLength:80}); name.value = part.name;
+        name.placeholder = lang === "zh" ? `业务 ${index+1} 名称` : `Business ${index+1} name`;
+        name.setAttribute("aria-label", name.placeholder);
+        name.addEventListener("change", () => changeParts(parts.map(p => p.id === part.id ? {...p,name:name.value.trim()} : p)));
+        const method = el("select", "vc-input"); method.setAttribute("aria-label", lang === "zh" ? `业务 ${index+1} 估值方法` : `Business ${index+1} method`);
+        for (const item of PART_METHODS) { const option = el("option"); option.value=item.key; option.textContent=item[lang]||item.en; method.appendChild(option); }
+        method.value=part.method;
+        method.addEventListener("change",()=>changeParts(parts.map(p=>p.id===part.id?{...p,method:method.value}:p),part.id));
+        const remove=el("button","vc-seg-add",{type:"button"}); remove.textContent=lang==="zh"?"移除分部":"Remove business"; remove.disabled=parts.length===1;
+        remove.addEventListener("click",()=>changeParts(parts.filter(p=>p.id!==part.id),part.id));
+        heading.append(name,method,remove); card.appendChild(heading);
+        const inputs=el("div","vc-sotp-facts");
+        for(const f of fields.filter(f=>f.partId===part.id&&f.col!=="dual")) inputs.appendChild(fieldEls[f.k].fld);
+        card.appendChild(inputs);
+        const labels=el("div","vc-arow vc-arow-head");
+        labels.append(el("div"),el("div","vc-chead",{textContent:valuationMode==="single"?(lang==="zh"?"主情景":"Main case"):tx("conservative")}));
+        if(valuationMode!=="single")labels.append(el("div","vc-chead",{textContent:tx("optimistic")}));
+        else labels.style.gridTemplateColumns="minmax(0,1fr) minmax(90px,.7fr)";
+        card.appendChild(labels);
+        for(const f of fields.filter(f=>f.partId===part.id&&f.col==="dual")) card.appendChild(fieldEls[f.k].arow);
+        formWrap.appendChild(card);
+      });
+      const add=el("button","vc-seg-add",{type:"button"}); add.textContent=lang==="zh"?"＋ 添加业务分部":"＋ Add business"; add.disabled=parts.length>=MAX_PARTS;
+      add.addEventListener("click",()=>changeParts([...parts,{id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:'',method:'pe'}]));
+      formWrap.appendChild(add);
     }
     if (currentMode === "segment") {
       // 重排:整体参数(预测年数 + 目标PE)单独成卡置顶;营收/增速/净利率由分部表驱动 → 原前提/情景假设卡隐藏(仍持有隐藏输入喂模型)
@@ -1626,12 +1685,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   function aiContext() {
     const model = MODELS[activeIdx]; if (!model) return null;
     const meta = methodMenuMeta(model);
-    const fields = modeFields(model, currentMode).map((f) => {
+    const fields = modeFields(model, currentMode, lastForm).map((f) => {
       const v = lastForm[f.k];
       // isDefault：还停在方法自带的默认值（如增速 10%、利润率 15%），不是对这家公司的判断——提示词会让 AI 重新判断
       const d = f.default, isDefault = d !== undefined && (f.col === "dual" ? (v && v.c === d && v.o === d) : v === d);
-      return { k: f.k, label: textFor(f.label, lang, f.k), col: f.col, unit: f.unit || "", money: MONEY_METAS.has(f.meta),
-        value: f.col === "dual" ? { c: finiteOr(v && v.c), o: finiteOr(v && v.o) } : finiteOr(v), ...(isDefault ? { isDefault: true } : {}) };
+      return { k: f.k, label: textFor(f.label, lang, f.k), col: f.col, unit: f.unit || "", money: (f.money || MONEY_METAS.has(f.meta)),
+        value: f.col === "dual" ? { c: finiteOr(v && v.c), o: finiteOr(v && v.o) } : finiteOr(v), ...(f.hint ? {hint:textFor(f.hint,lang,"")} : {}), ...(isDefault ? { isDefault: true } : {}) };
     });
     const facts = {
       ...stockFacts(),
@@ -1654,7 +1713,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   // AI 建议的参数 vs 最新实际值：由代码比较（小模型常把 10% 说成「低于 8.6%」），在建议卡每行下面显示 → { 字段k: 一句话 }
   function checkParams(params) {
     const model = MODELS[activeIdx]; if (!model) return {};
-    const fields = modeFields(model, currentMode).filter((f) => params[f.k] !== undefined)
+    const fields = modeFields(model, currentMode, lastForm).filter((f) => params[f.k] !== undefined)
       .map((f) => ({ k: f.k, label: textFor(f.label, lang, f.k), meta: f.meta, col: f.col, unit: f.unit || "", value: params[f.k] }));
     const out = {};
     try {
@@ -1714,8 +1773,8 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
           return fieldSweep({ model, form: { ...lastForm, [k]: field.value }, ctx, field, steps, money: field.money,
             run: (m, varied, context) => runModel(m, applyResourceAiParams(lastForm, { [k]: varied[k] }, fields), context) });
         }
-        const field = modeFields(model, currentMode).find((f) => f.k === k); if (!field) return null;
-        return fieldSweep({ model, form: lastForm, ctx, run: runModel, field, steps, money: MONEY_METAS.has(field.meta) });
+        const field = modeFields(model, currentMode, lastForm).find((f) => f.k === k); if (!field) return null;
+        return fieldSweep({ model, form: lastForm, ctx, run: runModel, field, steps, money: (field.money || MONEY_METAS.has(field.meta)) });
       },
       peers: (multiple) => multipleCompare(refData, multiple, lang),
       fmtPrice: (n) => fmt(n, tx("dash")),
@@ -1765,9 +1824,15 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
           seedInputs = initialMethod && key === initialMethod ? (initialInputs || null) : null; // 换方法：上一个方法填的数不带过来
           selectMethod(idx);
         },
+        needsConfiguration: () => MODELS[activeIdx]?.key === "sotp" && (!lastForm._parts?.length || lastForm._parts.length === 1 && !lastForm._parts[0].name),
+        configureMethod: () => {
+          setFlowMode(false); selectEditorTab("params");
+          flowDone.replaceChildren(el("span", "vc-next-step-text", { textContent: zh ? "先添加业务分部、选择各自方法并核对基础数据。完成后回到「叙事 → AI 引导」，继续当前情景的参数建议。" : "Configure businesses, methods and base data first. Then return to Story → AI guide to continue this case's input suggestions." }));
+          flowDone.hidden = false;
+        },
         fields: () => {
           const model = MODELS[activeIdx]; if (!model) return [];
-          return modeFields(model, currentMode).map((f) => {
+          return modeFields(model, currentMode, lastForm).map((f) => {
             // 和编辑器里一样的历史参考（年报口径），供引导里一键填入、以及取消采用时说明会用什么数
             let refs = null;
             try {
@@ -1796,7 +1861,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
           return { params: j.params || {}, reasons: j.reasons || {} };
         },
         applyParams: (params, scenario = null) => {
-          const fields = MODELS[activeIdx] ? modeFields(MODELS[activeIdx], currentMode).map((f) => ({ ...f, value: lastForm[f.k] })) : [];
+          const fields = MODELS[activeIdx] ? modeFields(MODELS[activeIdx], currentMode, lastForm).map((f) => ({ ...f, value: lastForm[f.k] })) : [];
           applyParamsToForm(scenario ? mergeScenarioParams(params, fields, scenario) : params); scheduleDraft();
         },
         checkParams,
@@ -1807,12 +1872,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
           const ok = Number.isFinite(lo) && Number.isFinite(hi);
           let v = null; if (ok && typeof verdict === "function") { try { v = verdict(Math.min(lo, hi), Math.max(lo, hi)); } catch { v = null; } }
           const model = MODELS[activeIdx];
-          const missing = model ? modeFields(model, currentMode).filter((f) => { const x = lastForm[f.k]; return f.col === "dual" ? !(x && (scenario ? Number.isFinite(x[scenario]) : Number.isFinite(x.c) && Number.isFinite(x.o))) : !Number.isFinite(x); }).map((f) => textFor(f.label, lang, f.k)) : [];
+          const missing = model ? modeFields(model, currentMode, lastForm).filter((f) => { const x = lastForm[f.k]; return f.col === "dual" ? !(x && (scenario ? Number.isFinite(x[scenario]) : Number.isFinite(x.c) && Number.isFinite(x.o))) : !Number.isFinite(x); }).map((f) => textFor(f.label, lang, f.k)) : [];
           const sample = summaryCard.classList.contains("vc-hero-sample");
-          const shown = model ? modeFields(model, currentMode).filter((f) => f.col === "dual" && lastForm[f.k] && Number.isFinite(lastForm[f.k].c)).slice(0, 3)
+          const shown = model ? modeFields(model, currentMode, lastForm).filter((f) => f.col === "dual" && lastForm[f.k] && Number.isFinite(lastForm[f.k].c)).slice(0, 3)
             .map((f) => `${textFor(f.label, lang, f.k)} ${lastForm[f.k].c}${f.unit === "%" ? "%" : ""}–${lastForm[f.k].o}${f.unit === "%" ? "%" : ""}`) : [];
           // 对照时任一情景仍是示例值都要列出（只有一边是示例值时注明哪一边），否则示例值造成的估值差异会被藏起来
-          const samples = model ? modeFields(model, currentMode).filter((f) => f.col === "dual" && f.default !== undefined).flatMap((f) => {
+          const samples = model ? modeFields(model, currentMode, lastForm).filter((f) => f.col === "dual" && f.default !== undefined).flatMap((f) => {
             const x = lastForm[f.k], c = x?.c === f.default, o = x?.o === f.default;
             if (scenario ? x?.[scenario] !== f.default : !c && !o) return [];
             const side = scenario || (c && o) ? "" : zh ? `（${c ? "保守" : "乐观"}）` : ` (${c ? "conservative" : "optimistic"})`;

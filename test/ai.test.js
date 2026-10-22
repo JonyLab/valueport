@@ -237,6 +237,10 @@ describe("AI review", () => {
     expect(p).toContain("最新实际数据");
     expect(p).toContain("近三年复合 +6.1%");
     expect(p).toContain("不给买卖建议");
+    expect(p).toContain("SOTP 分部结构由用户在参数页添加");
+    const optionReview = buildReviewPrompt({...BODY, method: {key: 'options'}}, 'zh');
+    expect(optionReview).toContain("欧式 Black–Scholes");
+    expect(optionReview).toContain("不再扣债务");
     const p2 = buildReviewPrompt({ ...BODY, comparisons: ["targetPE（目标 PE）：当初 保守 18 / 乐观 25；当前倍数 20.0 → 落在两档之间"] }, "zh");
     expect(p2).toContain("假设对照");
     expect(p2).toContain("落在两档之间");
@@ -725,6 +729,10 @@ describe("business-first method recommendation", () => {
     expect(p).toContain("cyclical｜资源与周期");
     expect(p).toContain("利润增速高不等于高速成长");
     expect(p).toContain('"business": {"type"');
+    expect(p).toContain("不能把资源股 NAV 当作通用 SOTP");
+    expect(p).toContain("未开发储量 Black–Scholes 组件");
+    expect(p).toContain("PEG = PE ÷ 预期盈利增速百分数");
+    expect(p).toContain("P/S 与 P/GMV 直接得到股权价值");
   });
   it("drops methods that don't fit the business type and keeps the profile", async () => {
     const { parsePicks } = await import("../src/ai.js");
@@ -1042,4 +1050,21 @@ describe("sequential case API boundaries", () => {
     expect(parseSuggestion('```json\n{"params":{"growth":{"c":5},"wacc":{"o":9},"n":7}}\n```', FIELDS, "c").params).toEqual({ growth: { c: 5 }, n: 7 });
     expect(parseSuggestion('```json\n{"params":{"growth":{"c":5},"wacc":{"o":9},"n":7}}\n```', FIELDS, "o").params).toEqual({ wacc: { o: 9 } });
   });
+});
+
+describe("extended model AI context", () => {
+ it("accepts large SOTP structures and limits shared facts to each case", async () => {
+  const { MODELS, modeFields } = await import("../public/shared/valuation/index.js");
+  const parts=Array.from({length:12},(_,i)=>({id:"p"+i,name:"Business "+i,method:"apv"}));
+  const fields=modeFields(MODELS.find(m=>m.key==="sotp"),null,{_parts:parts}).map(f=>({...f,value:f.col==="dual"?{c:1,o:2}:1}));
+  const context={stock:{name:"Example diversified group"},method:{key:"sotp"},fields};
+  expect(fields.length).toBeGreaterThan(160);
+  expect(validateChat({context,messages:[{role:"user",content:"Review this model"}]})).toBeNull();
+  const prompt=buildSystemPrompt(context,"zh");
+  expect(prompt).toContain("只扣未分配的集团净负债");
+  expect(prompt).toContain("不得把集团收入或利润填到每个分部");
+  const p=model => buildSystemPrompt({...context,method:{key:model},fields:fields.slice(0,1)},"zh");
+  expect(p("options")).toContain("困境股权模式直接");
+  expect(p("apv")).toContain("偿债期结束后不再产生税盾");
+ });
 });

@@ -71,10 +71,10 @@ export function buildReviewEvidence({ fields, scenarioMode = 'range', financials
 }
 export function cleanReviewEvidence(raw, fields) {
   const known = fields ? new Set(fields.map((f) => f.k)) : null, seen = new Set();
-  return (Array.isArray(raw) ? raw : []).slice(0, 40).filter((e) => {
+  return (Array.isArray(raw) ? raw : []).slice(0, 240).filter((e) => {
     if (!e || typeof e.k !== 'string' || (known && !known.has(e.k)) || seen.has(e.k) || !['baseline', 'forecast', 'multiple', 'missing'].includes(e.kind)) return false;
     seen.add(e.k); return true;
-  }).map((e) => ({ k: text(e.k, 40), expected: text(e.expected), observed: text(e.observed), period: text(e.period, 120), source: text(e.source, 120), kind: e.kind,
+  }).map((e) => ({ k: text(e.k, 80), expected: text(e.expected), observed: text(e.observed), period: text(e.period, 120), source: text(e.source, 120), kind: e.kind,
     relation: ['below', 'above', 'equal', 'within', 'missing'].includes(e.relation) ? e.relation : 'missing', comparison: text(e.comparison), note: text(e.note, 400) }));
 }
 export function constrainReview(review, evidence, lang = 'zh') {

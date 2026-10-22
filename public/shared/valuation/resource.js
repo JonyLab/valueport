@@ -1,8 +1,8 @@
 /**
- * valuation/resource.js — 资源股 NAV / SOTP（商品价格驱动）。
- * 思路（参考紫金式重置净值法）：每个在产矿的税后年现金流由「宏观商品价」派生——
+ * valuation/resource.js — 资源股 NAV（商品价格驱动，含资源期权组件）。
+ * 思路：每个在产矿的税后年现金流由「宏观商品价」派生——
  *   税后年现金流 = 权益年产量 × 单位换算 ×(长期商品价 − 完全成本)×(1 − 税率)
- *   资产重置价值 = 税后年现金流 × 年金系数(寿命 L, WACC)   ← 平价、不增长、有限寿命、无永续
+ *   资产现金流现值 = 税后年现金流 × 年金系数(寿命 L, WACC)   ← 平价、不增长、有限寿命、无永续
  * 另支持「固定值包」(锂板块 / 已折算的未开发期权现值等)。各资产现值加总 − 净负债 = 股权 NAV ÷ 股本。
  * 保守/乐观由宏观价(低/高)与 WACC(高/低)共同决定 → NAV 区间喂钟摆。
  */
@@ -61,7 +61,7 @@ export function optionValue(asset, priceOf) {
   return blackScholesCall(S, K, T, sigma, rf, y);
 }
 
-// 单资产重置价值。priceOf(commodity)→当前情景商品价；wPct 折现率；taxPct 税率。
+// 单资产估值。priceOf(commodity)→当前情景商品价；wPct 折现率；taxPct 税率。
 // type==="fixed" → 直接用 value；type==="option" → B-S 期权现值（忽略 wPct/tax，用期权自身参数）。
 export function assetResetValue(asset, priceOf, wPct, taxPct) {
   if (!asset) return NaN;
@@ -107,7 +107,7 @@ function priceResolver(prices, side) {
 const NAVSOTP = {
   key: "navsotp",
   group: "intrinsic",
-  label: { zh: "资源股 NAV / SOTP", en: "Resource NAV / SOTP" },
+  label: { zh: "资源股 NAV", en: "Resource NAV" },
   assetModel: true, // UI 标记：渲染商品价 + 资产表
   fields: [
     { k: "wacc", label: { zh: "宏观折现率 WACC", en: "Macro WACC" }, col: "dual", unit: "%", default: 8, meta: "wacc" },
@@ -135,8 +135,8 @@ const NAVSOTP = {
     const price = ctx && ctx.price;
     const pnav = (isPos(price) && isPos(ps)) ? price / ps : null;
     return [
-      { key: "sumpv", label: { zh: "资产重置现值合计", en: "Sum of asset value" }, value: sum, kind: "money" },
-      { key: "equity", label: { zh: "股权 NAV（铁底）", en: "Equity NAV" }, value: equity, kind: "money" },
+      { key: "sumpv", label: { zh: "资产估值合计", en: "Sum of asset values" }, value: sum, kind: "money" },
+      { key: "equity", label: { zh: "股权 NAV", en: "Equity NAV" }, value: equity, kind: "money" },
       { key: "pnav", label: { zh: "P/NAV", en: "P/NAV" }, value: pnav, kind: "mult" },
     ];
   },

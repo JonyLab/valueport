@@ -29,10 +29,10 @@ export const FIELD_META = {
   wacc: { guide: { zh: "加权资本成本 = 股权成本×权重 + 税后债务成本×权重；股权成本=无风险利率+β×股权风险溢价（美股约 8–10%）。", en: "WACC = cost of equity×weight + after-tax cost of debt×weight; cost of equity = risk-free + β×ERP (~8–10% for US equities)." } },
   costOfEquity: { guide: { zh: "无风险利率(10Y 国债)+ β×股权风险溢价(~4.5–5.5%)；稳定大盘股约 8–9%。", en: "Risk-free (10Y) + β×equity risk premium (~4.5–5.5%); ~8–9% for stable large caps." } },
   termGrowth: { guide: { zh: "≤ 长期名义 GDP/无风险利率(通常 2–3%)，且必须 < 折现率；代表进入永续稳定期。", en: "≤ long-run nominal GDP/risk-free (~2–3%) and must be < discount rate; the perpetual steady state." } },
-  targetPE: { ref: "pe", guide: { zh: "反映增长与确定性；锚定自身历史中枢、行业中位、与增速匹配(PEG≈1 ⇒ PE≈增速)。", en: "Reflects growth and certainty; anchor to own history, industry median, and growth (PEG≈1 ⇒ PE≈growth)." } },
+  targetPE: { ref: "pe", guide: { zh: "参照历史与可比公司，统一盈利期间，并解释增长、风险、派息和再投资回报差异；不能直接把增速当作合理 PE。", en: "Compare history and peers on aligned earnings periods, explaining growth, risk, payout and reinvestment returns; growth alone does not determine fair P/E." } },
   targetPB: { ref: "pb", guide: { zh: "与 ROE 强相关（高 ROE 配高 PB）；周期股参考历史 PB 区间。", en: "Tightly linked to ROE (higher ROE warrants higher PB); use the historical PB band for cyclicals." } },
   targetPS: { ref: "ps", guide: { zh: "适合未盈利/低利润期；最终应能回推到合理净利率下的 PE，别脱离盈利能力。", en: "For pre-profit/low-margin firms; must still map back to a sane PE at a normal net margin." } },
-  peg: { guide: { zh: "经验上 PEG≈1 视为合理，<1 偏低估；对超高/超低增长会失真，谨慎。", en: "PEG≈1 is the rule-of-thumb fair level, <1 cheap; breaks down at very high/low growth." } },
+  peg: { guide: { zh: "PEG = PE ÷ 预期 EPS 增速百分数。目标值需参考可比公司的风险与增长质量，1 或 1–2 不是通用合理标准；亏损、低增长和强周期企业不宜机械使用。", en: "PEG = P/E divided by expected EPS growth in percentage points. Compare peer risk and growth quality; neither 1 nor 1–2 is universally fair. Avoid mechanical use for losses, low growth or cyclical earnings." } },
   targetMultiple: { guide: { zh: "参考同业与历史；资本密集/高增长行业差异大。", en: "Reference peers and history; varies widely by capital intensity and growth." } },
 };
 

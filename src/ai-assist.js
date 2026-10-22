@@ -1,3 +1,4 @@
+import { METHOD_RULES } from "../public/shared/valuation/index.js";
 import { searchPublicQuery, searchPrompt, searchMetadata } from "./web-search.js";
 
 // 全站 AI 助手（右上角入口，见 /shared/global-ai.js）：通用的投研问答，结合用户当前所在页面的简短上下文。
@@ -62,6 +63,7 @@ export function buildAssistPrompt(page, lang) {
     "",
     "用户当前所在页面：",
     pageBlock(page, lang),
+    METHOD_RULES,
     "",
     "应用的主要功能（回答「怎么用」时以此为准，不要编造不存在的按钮或功能）：",
     "- 自选看板：每只标的一只「估值钟摆」，指针位置由现价相对用户设定的合理价值区间、安全边际、泡沫阈值决定，分为击球区 / 低估 / 合理 / 高估 / 泡沫区。",
@@ -81,6 +83,7 @@ export function buildAssistPrompt(page, lang) {
     "",
     "The page the user is on:",
     pageBlock(page, lang),
+    METHOD_RULES,
     "",
     "What the app offers (use this when explaining how to do things; never invent buttons or features):",
     "- Watchlist board: each holding gets a valuation pendulum; the needle reflects price versus the user's fair-value range, margin of safety and bubble threshold — strike zone / undervalued / fair / overvalued / bubble.",

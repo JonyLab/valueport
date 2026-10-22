@@ -2,13 +2,13 @@ import { modeFields } from "./index.js";
 
 const finite = (n) => typeof n === "number" && Number.isFinite(n);
 
-export function fieldsFor(model, mode) {
-  return model ? modeFields(model, mode) : [];
+export function fieldsFor(model, mode, form) {
+  return model ? modeFields(model, mode, form) : [];
 }
 
 export function midpointForm(model, mode, form) {
   const out = {};
-  for (const field of fieldsFor(model, mode)) {
+  for (const field of fieldsFor(model, mode, form)) {
     const value = form[field.k];
     if (field.col === "dual") {
       const c = value && typeof value === "object" ? Number(value.c) : NaN;
@@ -19,6 +19,7 @@ export function midpointForm(model, mode, form) {
     }
   }
   if (model && model.modes) out._mode = mode || model.defaultMode;
+  if (form._parts) out._parts = form._parts;
   if (form.assets) out.assets = form.assets;
   if (form.prices) out.prices = form.prices;
   return out;
@@ -37,7 +38,7 @@ export function scheduleSeries(schedule) {
 
 export function sensitivityMatrix({ model, mode, form, ctx, run, lang }) {
   if (!model || typeof run !== "function") return null;
-  const fields = fieldsFor(model, mode);
+  const fields = fieldsFor(model, mode, form);
   const candidates = fields
     .filter((field) => field.col === "dual" && numericDual(form[field.k]))
     .concat(fields.filter((field) => field.col !== "dual" && finite(Number(form[field.k]))));

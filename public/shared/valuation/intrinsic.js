@@ -304,12 +304,12 @@ const DDM = {
 const FCF_DCF = {
   key: "fcf",
   group: "intrinsic",
-  label: { zh: "现金流折现", en: "DCF (FCF)" },
+  label: { zh: "简化 FCFF", en: "Simplified FCFF" },
   fields: [
-    { k: "fcf", label: { zh: "当前自由现金流", en: "Current free cash flow" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.fcf)) ? ctx.fcf : "", hint: { zh: "公司自由现金流总额（不是每股）", en: "Total free cash flow, not per share" }, meta: "fcf" },
+    { k: "fcf", label: { zh: "当前企业自由现金流", en: "Current firm free cash flow" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.fcf)) ? ctx.fcf : "", hint: { zh: "企业口径、非每股；CFO−资本开支不一定是 FCFF，需核对税后利息与再投资", en: "Firm basis, not per share; reconcile after-tax interest and reinvestment before treating CFO−capex as FCFF" }, meta: "fcf" },
     { k: "n", label: { zh: "高增长年数", en: "High-growth years" }, col: "single", unit: "", prefill: (ctx) => 10, default: 10, meta: "growthYears" },
     { k: "growth", label: { zh: "高增长期现金流增速", en: "FCF growth (high-growth yrs)" }, col: "dual", unit: "%", default: 10, meta: "fcfGrowth" },
-    { k: "discount", label: { zh: "折现率", en: "Discount rate" }, col: "dual", unit: "%", default: 9, meta: "wacc" },
+    { k: "discount", label: { zh: "WACC", en: "WACC" }, col: "dual", unit: "%", default: 9, meta: "wacc" },
     { k: "termGrowth", label: { zh: "永续增速", en: "Terminal growth" }, col: "dual", unit: "%", default: 2.5, meta: "termGrowth" },
     { k: "netDebt", label: { zh: "净负债", en: "Net debt" }, col: "single", unit: "", prefill: (ctx) => (ctx && Number.isFinite(ctx.netDebt)) ? ctx.netDebt : 0, default: 0, meta: "netDebt" },
   ],

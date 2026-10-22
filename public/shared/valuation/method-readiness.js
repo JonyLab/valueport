@@ -18,11 +18,13 @@ export function methodReadiness(key, facts = {}, lang = "zh") {
     if (factKey) {
       const actualKey = field.k === "revenue" ? Object.keys(facts).find((k) => k === factKey || k.startsWith(factKey + " (FY")) : factKey;
       if (!number(facts[actualKey])) missingInputs.push({ key: field.k, label: label(field.label) });
-    } else assumptions.push({ key: field.k, label: label(field.label) });
+    } else if (field.money && field.col === "single" && field.default === undefined) missingInputs.push({ key: field.k, label: label(field.label) });
+    else assumptions.push({ key: field.k, label: label(field.label) });
   }
   if (!["peg", "pb", "ddm"].includes(key) && !(number(facts.sharesOutstanding) && facts.sharesOutstanding > 0)) {
     missingInputs.push({ key: "shares", label: lang === "en" ? "Shares outstanding (company data)" : "总股本（公司基础资料）" });
   }
+  if (key === "sotp") missingInputs.push({ key: "_parts", label: lang === "en" ? "Configure businesses and their valuation methods in Parameters first" : "先在参数页添加业务分部并选择各自方法" });
   if (model.assetModel) missingInputs.push({ key: "assets", label: lang === "en" ? "Asset packages: output, costs, mine lives or appraised values" : "资产包：产量、成本、矿山寿命或评估价值" });
   return { status: missingInputs.length ? "needs_data" : "needs_confirmation", missingInputs, assumptions };
 }

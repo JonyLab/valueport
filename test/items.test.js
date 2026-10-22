@@ -57,6 +57,15 @@ describe("validateItem with valuations", () => {
   const base = { ticker: "AAPL", name: "苹果", symbol: "usAAPL", fairLow: 215, fairHigh: 265, mos: 20, ext: 25 };
   const card = { id: "v1", method: "pe", inputs: { revenue: 4e11, growth: { c: 8, o: 15 } }, low: 211.29, high: 460.13, updatedAt: "2026-06-16T00:00:00Z" };
 
+  it("retains SOTP review checks beyond the old 40-field limit and preserves long keys", () => {
+    const key = 'p12345678901234567890_equityDiscount';
+    const checks = Array.from({length: 70}, (_, i) => ({k: i === 69 ? key : `p${i}_growth`, status: 'watch', reason: '待验证'}));
+    const result = validateItem({...base, valuations: [{...card, method: 'sotp', inputs: {_parts: [{id: 'p1', name: '业务', method: 'pe'}]}, review: {overall: 'watch', checks}}]});
+    expect(result.ok).toBe(true);
+    expect(result.value.valuations[0].review.checks).toHaveLength(70);
+    expect(result.value.valuations[0].review.checks[69].k).toBe(key);
+  });
+
   it("keeps a sanitised AI review on a card and drops a malformed one", () => {
     const review = { overall: "watch", summary: "增速放缓", at: "2026-10-17T00:00:00Z", checks: [{ k: "growth", status: "watch", reason: "最新同比 +3%", metric: "revenue" }, { k: "targetPE", status: "ok", reason: "", metric: "toString" }, { k: "x", status: "nope" }], extra: 1 };
     const r = validateItem({ ...base, valuations: [{ ...card, review }], selectedValuationId: "v1" });
@@ -192,4 +201,30 @@ describe("explicit single-case valuations", () => {
     expect(validateItem({ ...body, valuations: [{ ...single, high: 121 }] }).ok).toBe(false);
     expect(validateItem({ ...body, valuations: [{ ...single, low: Infinity, high: Infinity }] }).ok).toBe(false);
   });
+});
+
+// New calculators use the same persistence contract as existing cards.
+describe("extended calculator persistence", () => {
+  it("accepts every registered method and preserves SOTP structure and scenarios", async () => {
+    const { MODELS } = await import("../public/shared/valuation/index.js");
+    for (const model of MODELS) {
+      const inputs = { _parts: [{ id: "p1", name: "Hardware", method: "pe" }], p1_targetPE: { c: 10, o: 20 } };
+      const result = validateItem({ ticker: "TEST", symbol: "usTEST", mos: 20, ext: 25, fairLow: 10, fairHigh: 20, valuations: [{ id: "v1", method: model.key, inputs, low: 10, high: 20 }], selectedValuationId: "v1" });
+      expect(result.ok, model.key).toBe(true);
+      expect(rowToItem({ valuations: JSON.stringify(result.value.valuations) }).valuations[0].inputs).toEqual(inputs);
+    }
+  });
+});
+
+describe("zero equity cards and SOTP validation", () => {
+ const base={ticker:"TEST",symbol:"usTEST",mos:20,ext:25,fairLow:0,fairHigh:0};
+ it("stores zero NCAV as research and rejects negative values",()=>{
+  const card={id:"zero",method:"ncav",scenarioMode:"single",inputs:{},low:0,high:0};
+  expect(validateItem({...base,valuations:[card]}).ok).toBe(true);
+  expect(validateItem({...base,valuations:[{...card,low:-1,high:-1}]}).ok).toBe(false);
+ });
+ it("rejects an invalid or unsupported SOTP structure",()=>{
+  const card={id:"s",method:"sotp",inputs:{_parts:[{id:"p1",name:"Test",method:"unknown"}]},low:10,high:20};
+  expect(validateItem({...base,valuations:[card]}).ok).toBe(false);
+ });
 });

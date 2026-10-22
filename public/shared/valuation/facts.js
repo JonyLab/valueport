@@ -311,7 +311,7 @@ export function marketViews({ research, financials, price, market, lang = "zh" }
  * masterLenses({ financials, research, price, eps, bps, lang }) → string[]
  * 按投资大师公开的方法论算一遍（不代表大师本人对这只股的看法）：
  *   格雷厄姆：PE ≤ 15、PB ≤ 1.5、PE × PB ≤ 22.5；格雷厄姆数 √(22.5 × EPS × BPS)
- *   林奇：PEG = PE / 盈利增速（优先用一致预期 EPS 增速，否则净利润三年复合），< 1 便宜、1–2 合理、> 2 偏贵
+ *   林奇：PEG = PE / 盈利增速（优先用一致预期 EPS 增速，否则净利润三年复合）；辅助比较，不据固定阈值判定贵贱
  *   巴菲特式：所有者收益率 ≈ 自由现金流 / 净利润 × 盈利收益率（EPS / 价格），近五年 ROE 是否持续 > 15%，有无净现金
  * price / eps / bps 来自行情（同一报价币种）；跨币种的量只用无单位的比值。
  */
@@ -333,8 +333,8 @@ export function masterLenses({ financials, research, price, eps, bps, lang = "zh
   if (Number.isFinite(pe) && Number.isFinite(g)) {
     if (g > 0) {
       const peg = pe / g;
-      out.push(zh ? `按林奇的方法：PEG = PE ${pe.toFixed(1)} ÷ ${gSrc} ${g.toFixed(1)}% = ${peg.toFixed(2)}（< 1 便宜、1–2 合理、> 2 偏贵 → ${peg < 1 ? "便宜" : peg <= 2 ? "合理" : "偏贵"}）`
-        : `By Lynch's method: PEG = P/E ${pe.toFixed(1)} ÷ ${gSrc} ${g.toFixed(1)}% = ${peg.toFixed(2)} (${peg < 1 ? "cheap" : peg <= 2 ? "fair" : "expensive"})`);
+      out.push(zh ? `按林奇的方法：PEG = PE ${pe.toFixed(1)} ÷ ${gSrc} ${g.toFixed(1)}% = ${peg.toFixed(2)}（仅作增长校准参考，需比较风险、再投资和增长质量；不设统一合理阈值）`
+        : `By Lynch's method: PEG = P/E ${pe.toFixed(1)} ÷ ${gSrc} ${g.toFixed(1)}% = ${peg.toFixed(2)} (growth-adjusted reference only; compare risk, reinvestment and growth quality, with no universal fair threshold)`);
     } else out.push(zh ? `按林奇的方法：${gSrc} 为 ${g.toFixed(1)}%，不增长，PEG 不适用` : `By Lynch's method: ${gSrc} is ${g.toFixed(1)}%, so PEG doesn't apply`);
   }
   // 巴菲特式：所有者收益率、ROE 持续性、净现金

@@ -4,16 +4,19 @@ import { cleanThesis } from "../public/shared/valuation/thesis.js";
 import { cleanManagementResearch } from "../public/shared/valuation/management-research.js";
 
 // 估值方法白名单（与 public/shared/valuation/* 的 model.key 一致）
-const METHODS = new Set(["fcff", "fcf", "fcfe", "ddm", "pe", "peg", "pb", "ps", "evebitda"]);
+import { validValuationRange } from "../public/shared/valuation/save.js";
+import { validParts } from "../public/shared/valuation/sotp.js";
+import { MODELS } from "../public/shared/valuation/index.js";
+const METHODS = new Set(MODELS.map(model => model.key));
 
 // 校验估值卡片数组。返回 { ok, value } 或 { ok:false }。
 // AI 复核结果（可选）：只留合法的结论与有限长度的文字，其余丢掉
 const REVIEW_OVERALL = new Set(["hold", "watch", "broken"]), REVIEW_STATUS = new Set(["ok", "watch", "broken"]);
-function cleanReview(r) {
+function cleanReview(r, method) {
   if (!r || typeof r !== "object" || !REVIEW_OVERALL.has(r.overall)) return undefined;
-  const checks = (Array.isArray(r.checks) ? r.checks : []).slice(0, 40)
+  const checks = (Array.isArray(r.checks) ? r.checks : []).slice(0, method === "sotp" ? 240 : 40)
     .filter((c) => c && typeof c.k === "string" && REVIEW_STATUS.has(c.status))
-    .map((c) => ({ k: c.k.slice(0, 40), status: c.status, reason: typeof c.reason === "string" ? c.reason.slice(0, 240) : "", ...(metricKey(c.metric) ? { metric: c.metric } : {}), ...(typeof c.condition === "string" && c.condition ? { condition: c.condition.slice(0, 240) } : {}) }));
+    .map((c) => ({ k: c.k.slice(0, 80), status: c.status, reason: typeof c.reason === "string" ? c.reason.slice(0, 240) : "", ...(metricKey(c.metric) ? { metric: c.metric } : {}), ...(typeof c.condition === "string" && c.condition ? { condition: c.condition.slice(0, 240) } : {}) }));
   return { ...(r.version === REVIEW_VERSION && ["single", "range"].includes(r.scenarioMode) ? { version: REVIEW_VERSION, scenarioMode: r.scenarioMode, valuedAt: typeof r.valuedAt === "string" ? r.valuedAt.slice(0, 40) : "", evidence: cleanReviewEvidence(r.evidence) } : {}), overall: r.overall, summary: typeof r.summary === "string" ? r.summary.slice(0, 400) : "", checks, at: typeof r.at === "string" ? r.at.slice(0, 40) : "" };
 }
 function validateValuations(raw) {
@@ -25,8 +28,9 @@ function validateValuations(raw) {
     if (typeof card.id !== "string" || !card.id) return { ok: false };
     if (!METHODS.has(card.method)) return { ok: false };
     if (!card.inputs || typeof card.inputs !== "object") return { ok: false };
+    if (card.method === "sotp" && !validParts(card.inputs._parts)) return { ok: false };
     const low = Number(card.low), high = Number(card.high);
-    if (!Number.isFinite(low) || !Number.isFinite(high) || !(low > 0) || (card.scenarioMode === "single" ? high !== low : !(high > low))) return { ok: false };
+    if (!validValuationRange({ ...card, low, high })) return { ok: false };
     if (card.scenarioMode !== undefined && !["single", "range"].includes(card.scenarioMode)) return { ok: false };
     out.push({ id: card.id, method: card.method, inputs: card.inputs, low, high,
       ...(card.scenarioMode ? { scenarioMode: card.scenarioMode } : {}),
@@ -37,7 +41,7 @@ function validateValuations(raw) {
       segments: (card.segments && typeof card.segments === "object" && !Array.isArray(card.segments)) ? card.segments : {},
       updatedAt: typeof card.updatedAt === "string" ? card.updatedAt : "",
       ...(typeof card.reviewedAt === "string" && card.reviewedAt ? { reviewedAt: card.reviewedAt.slice(0, 40) } : {}), // 手动「标记已复核」的时间
-      ...(cleanReview(card.review) ? { review: cleanReview(card.review) } : {}) });
+      ...(cleanReview(card.review, card.method) ? { review: cleanReview(card.review, card.method) } : {}) });
   }
   return { ok: true, value: out };
 }

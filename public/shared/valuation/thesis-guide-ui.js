@@ -505,6 +505,7 @@ function mountCaseFlow(host, { lang, company, initial, hooks, onChange, visible 
     content.append(fieldset, more);
     const next = button(t("下一步：填参数", "Next: enter inputs"), () => {
       hooks.selectMethod(state.method);
+      if (hooks.needsConfiguration?.()) { state.stage = "params"; state.rows = null; notify(); hooks.configureMethod(); return; }
       const missing = picked.find((p) => p.key === state.method)?.readiness?.missingInputs || [];
       if (missing.some((item) => item.key === "assets" || item.key === "shares")) { hooks.finish(); return; }
       go("params");
@@ -890,12 +891,16 @@ export function mountValuationFlow(host, options) {
     host.replaceChildren(); host.classList.add("vc-thesis-guide");
     if (state.guideMode === "choose") {
       host.append(node("h3", "vc-guide-title", t("这次想怎样估值？", "How would you like to value this company?")), node("p", "vc-guide-lead", t("先选情景数量。两种方式都会使用财报依据，由你确认业务判断和参数。", "Choose how many cases to build. Both use report evidence and your confirmed business assumptions and inputs.")));
-      const list = node("div", "vc-guide-options");
+      const list = node("div", "vc-scenario-choices");
       for (const [mode, title, description] of [["single", t("单场景估值", "Single-case valuation"), t("围绕你认为最合理的一套经营假设，得到一个每股合理价值。", "Build one plausible set of business assumptions for one fair value per share.")], ["sequential", t("保守／乐观情景估值", "Conservative / optimistic valuation"), t("先完整完成保守情景，再完整完成乐观情景，最后对照估值区间。", "Complete the conservative case, then the optimistic case, and compare the valuation range.")]]) {
-        const card = node("section", "vc-flow-case"); card.append(node("h4", "", title), node("p", "", description), button(t("选择", "Choose") + title, () => {
+        const card = node("section", "vc-scenario-choice");
+        const badge = node("span", "vc-scenario-choice-icon"); badge.append(icon(mode === "single" ? "focus-3-line" : "scales-3-line"));
+        const action = button(t("选择", "Choose ") + title, () => {
           state.guideMode = mode; state.modeChosen = true; state.activeCase = "c"; state.cases = { c: null, o: null }; state.completed = { c: false, o: false }; state.basis = { c: "", o: "" };
           hooks.setScenarioMode?.(mode === "single" ? "single" : "range"); render(); onChange?.();
-        }, true)); list.append(card);
+        }, true);
+        action.append(icon("arrow-right-line"));
+        card.append(badge, node("h4", "", title), node("p", "", description), action); list.append(card);
       }
       host.append(list); return;
     }

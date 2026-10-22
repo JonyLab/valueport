@@ -166,7 +166,9 @@ describe("marketViews / masterLenses", () => {
     const m = masterLenses({ financials: fin, research, price: 343.46, eps: 8.83, bps: 7.37, lang: "zh" }).join("\n");
     expect(m).toMatch(/按格雷厄姆的方法：PE 38\.9、PB 46\.6，PE×PB = \d+（标准 ≤ 22\.5）/);
     expect(m).toContain("不满足");
-    expect(m).toContain("按林奇的方法：PEG = PE 38.9 ÷ 一致预期 EPS 增速 23.8% = 1.63（< 1 便宜、1–2 合理、> 2 偏贵 → 合理）");
+    expect(m).toContain("按林奇的方法：PEG = PE 38.9 ÷ 一致预期 EPS 增速 23.8% = 1.63");
+    expect(m).toContain("不设统一合理阈值");
+    expect(m).not.toContain("1–2 合理");
     expect(m).toMatch(/按巴菲特看重的：所有者收益率约 2\.6%.*ROE 均值 165%、最低 150%（持续高于 15%），账上净现金/);
     expect(m).toContain("不代表他们本人对这只股票的看法");
     expect(masterLenses({})).toEqual([]);

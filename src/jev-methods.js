@@ -9,13 +9,21 @@ const FIT = ["suitable", "uncertain", "unsuitable"];
 // 首版路由阈值，尚未经过投资领域的标注集校准；只影响辅助推荐，不自动替用户确认。
 const CLASSIFICATION_PROBABILITY = 0.7, REVIEW_CONFIDENCE = 0.45;
 const RUBRICS = {
+  apv: "Value unlevered operating cash flow plus separately discounted financing effects. Requires a finite amortizing or bullet debt plan and tax-shield usability. Not financial institutions.",
+  options: "Requires an identifiable underlying asset value, exercise cost, expiry and asset volatility. European Black-Scholes approximation; uncertainty alone is insufficient. Project mode and distressed equity have different debt treatments.",
+  liquidation: "Asset realization or wind-down economics with evidence for recoveries, taxes, costs and liability settlement. Not a going-concern growth model.",
+  ncav: "Current assets and all liabilities are economically meaningful; a defensive asset cross-check. Negative NCAV is not positive equity value.",
+  sotp: "Diversified businesses with separately supportable segment economics. Methods can differ per business; reconcile present equity values, ownership, FX and unallocated group debt/costs. Do not double count assets or debt.",
+  evsales: "Enterprise sales multiple with comparable margins, growth and reinvestment; subtract net debt. Not financial institutions.",
+  tobinq: "Replacement costs can be estimated independently and compared on the same operating-asset convention. Book equity is not replacement cost.",
+  sector: "Comparable user, GMV or reserve economics with matched dates, units and enterprise/equity basis; no universal sector multiple.",
   fcff: "Operating business where revenue, margins and reinvestment can describe future enterprise cash flows. Not financial institutions.",
-  fcf: "Cash flows can be normalized and forecast directly. Volatile current cash flow alone must not be extrapolated. Not financial institutions.",
+  fcf: "Cash flows can be normalized and forecast directly. The implemented model discounts firm cash flow at WACC and subtracts net debt; reconcile reported CFO minus capex first. Volatile current cash flow alone must not be extrapolated. Not financial institutions.",
   fcfe: "Equity earnings, equity reinvestment and financing policy can be forecast. Not financial institutions.",
   ddm: "Predictable and sustainable dividends are the principal distributable return. No established dividends means unsuitable, unless a justified dividend policy is part of the story.",
   navsotp: "Resource assets with finite reserves or mine lives, where production, commodity prices and costs drive value. This implemented model is resource NAV, not generic holding-company SOTP.",
   pe: "Meaningful positive normalized earnings. For cyclical businesses use mid-cycle earnings, not peak profits. Unsuitable for persistent losses.",
-  peg: "Profitable business with reasonably predictable sustainable earnings growth. Unsuitable for commodity cycles or loss-making firms.",
+  peg: "Profitable business with reasonably predictable sustainable earnings growth. Use only as a growth-adjusted cross-check, not a universal PEG=1 fair-value rule. Unsuitable for commodity cycles or loss-making firms.",
   pb: "Book equity and sustainable ROE are economically meaningful, especially banks, insurers or asset-heavy companies. Poor fit for asset-light intangible-heavy companies.",
   ps: "Revenue is economically meaningful but profits are not yet representative. Requires credible future margins and comparable sales multiples. Not banks or commodity cycles.",
   evebitda: "Operating assets can be compared using normalized EBITDA and net debt. Reflect capital expenditure needs. Not financial institutions.",

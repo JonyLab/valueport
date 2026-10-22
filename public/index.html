@@ -366,9 +366,20 @@
   .vc-picker-title{font-size:24px;font-weight:400;letter-spacing:-.015em}
   .vc-picker-sub{max-width:760px;font-size:14px;line-height:1.7;color:var(--ink-soft)}
   .vc-picker-warn{font-size:13px;color:var(--sun-ink);background:rgba(246,207,74,.28);border-radius:var(--r-pill);padding:5px 12px}
+  .vc-model-guidance{font-size:13px;line-height:1.8;color:var(--ink-soft);padding:14px 16px;background:rgba(246,207,74,.12);border-radius:14px}
+  .vc-sotp-head{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;margin-bottom:16px}
+  .vc-sotp-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:16px}
+  @media(max-width:640px){.vc-sotp-head{grid-template-columns:1fr}.vc-sotp-facts{grid-template-columns:1fr}}
   .vc-pgroups{display:flex;flex-direction:column;gap:22px}
-  .vc-pgroup-lab{font-size:13px;color:var(--ink-mute);margin:0 4px 10px}
-  .vc-pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));gap:10px}
+  .vc-pgroup-lab{font-size:15px;font-weight:500;color:var(--ink);margin:0 4px 8px}
+  .vc-pgroup-desc{font-size:12.5px;line-height:1.6;color:var(--ink-soft);margin:0 4px 12px}
+  .vc-pcard-category{font-size:10.5px;color:var(--ink-mute);padding-right:56px}
+  .vc-method-frameworks{margin-top:22px;border-top:1px solid var(--divider);padding-top:14px;font-size:12.5px;line-height:1.65;color:var(--ink-soft)}
+  .vc-method-frameworks summary{cursor:pointer;color:var(--ink)}
+  .vc-method-frameworks strong{display:block;margin-top:14px;font-weight:500;color:var(--ink)}
+  .vc-method-frameworks p{margin:4px 0 8px}
+  .vc-method-frameworks a{color:var(--ink);text-underline-offset:3px}
+  .vc-pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr));gap:10px}
   .vc-pcard{position:relative;display:flex;flex-direction:column;gap:8px;min-height:104px;padding:16px 18px;border:1px solid var(--divider);border-radius:var(--r-lg);
     background:#fff;cursor:pointer;text-align:left;font-family:var(--font);color:var(--ink);
     transition:transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s,border-color .2s}
@@ -826,6 +837,16 @@
   .vc-flow-case{display:grid;gap:8px;align-content:start;padding:14px 16px;border-radius:var(--r-md);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);overflow-wrap:anywhere}
   .vc-flow-case h4{margin:0;font-size:12px;font-weight:500;color:var(--ink-mute)}
   .vc-flow-case.o h4{color:var(--sun-ink)}
+  .vc-scenario-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;min-width:0}
+  .vc-scenario-choice{display:flex;flex-direction:column;align-items:flex-start;gap:16px;min-width:0;padding:28px;border-radius:var(--r-lg);background:#fff;box-shadow:inset 0 0 0 1px var(--divider)}
+  .vc-scenario-choice-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--track);color:var(--ink);font-size:24px}
+  .vc-scenario-choice:nth-child(2) .vc-scenario-choice-icon{background:rgba(246,207,74,.2);color:var(--sun-ink)}
+  .vc-scenario-choice h4{margin:0;font-size:19px;line-height:1.5;font-weight:500;color:var(--ink)}
+  .vc-scenario-choice p{margin:0 0 8px;font-size:14px;line-height:1.8;color:var(--ink-soft);text-wrap:pretty}
+  .vc-scenario-choice .vc-guide-primary{display:inline-flex;align-items:center;justify-content:center;gap:10px;margin-top:auto;max-width:100%;padding:12px 18px;line-height:1.5;text-align:left}
+  .vc-scenario-choice .vc-guide-primary i{flex:none;font-size:18px}
+  .vc-scenario-choice .vc-guide-primary:focus-visible{outline:3px solid var(--sun);outline-offset:4px}
+  @media(max-width:600px){.vc-scenario-choices{grid-template-columns:minmax(0,1fr);gap:14px}.vc-scenario-choice{padding:22px;gap:12px}.vc-scenario-choice h4{font-size:18px}}
   .vc-flow-story{margin:0;font-size:14px;line-height:1.7;color:var(--ink)}
   .vc-flow-case dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:4px 0 0;font-size:12px;line-height:1.65}
   .vc-flow-case dt{color:var(--ink-mute)}
@@ -1473,6 +1494,8 @@
   <link rel="modulepreload" href="/shared/valuation/derivations.js">
   <link rel="modulepreload" href="/shared/valuation/facts.js">
   <link rel="modulepreload" href="/shared/valuation/index.js">
+<link rel="modulepreload" href="/shared/valuation/extended.js">
+<link rel="modulepreload" href="/shared/valuation/sotp.js">
   <link rel="modulepreload" href="/shared/valuation/intrinsic.js">
   <link rel="modulepreload" href="/shared/valuation/relative.js">
   <link rel="modulepreload" href="/shared/valuation/resource.js">
@@ -1662,7 +1685,7 @@ import { mountFeedback } from "/shared/feedback.js";
 import { mountGlobalAi, watchlistPage } from "/shared/global-ai.js";
 import { mountValuationCalc } from "/shared/valuation-ui.js";
 import { cleanThesis, thesisEntries, THESIS_SCENARIOS } from "/shared/valuation/thesis.js";
-import { persistValuation } from "/shared/valuation/save.js";
+import { persistValuation, usableValuationRange } from "/shared/valuation/save.js";
 import { MODELS, modeFields } from "/shared/valuation/index.js";
 import { verifiedFacts, latestMetrics, marketViews, masterLenses, businessFacts, isFinancialCompany } from "/shared/valuation/facts.js";
 import { aiErrorText } from "/shared/ai-panel.js";
@@ -2421,6 +2444,7 @@ function buildItemForm(item) {
           const nm = document.createElement("span"); nm.textContent = model ? (model.label[LANG] || model.key) : card.method;
           const rng = document.createElement("span"); rng.className = "vp-rng"; rng.textContent = `${lo} ~ ${hi}`;
           b.append(nm, rng);
+          b.disabled = !usableValuationRange(card);
           b.addEventListener("click", () => {
             fieldInputs.fairLow.value = lo; fieldInputs.fairHigh.value = hi;
             fieldInputs.fairLow.classList.remove("bad"); fieldInputs.fairHigh.classList.remove("bad");
@@ -3263,6 +3287,7 @@ function valuationCtx(item) {
 
 // 把某卡设为合理区间：写 fair 区间 + 选中 id，刷新钟摆/顶部判定/列表行，并保存。
 function selectValuation(item, card, idBlock) {
+  if (!usableValuationRange(card)) return;
   const c = item.cfg;
   c.fairLow = Math.round(Math.min(card.low, card.high) * 100) / 100;
   c.fairHigh = Math.round(Math.max(card.low, card.high) * 100) / 100;
@@ -3289,7 +3314,7 @@ function syncFairUI(item, idBlock, persist = true) {
 
 // 关键假设摘要：先列单值「(高)增长年数」(它框定后面增速的适用区间)，再列 dual 字段（保守–乐观）
 function assumeSummary(model, inputs) {
-  const fields = model.modes ? modeFields(model, (inputs && inputs._mode) || model.defaultMode) : (model.fields || []);
+  const fields = modeFields(model, inputs?._mode || model.defaultMode, inputs || {});
   const parts = [];
   // 资源股 NAV/SOTP：先报资产数（资产明细在 inputs.assets，不是 dual 字段）
   if (model.assetModel && Array.isArray(inputs.assets)) {
@@ -3554,6 +3579,8 @@ function renderValuationPanel(item, panel, idBlock) {
     const picked = c.selectedValuationId === card.id;
     const sel = document.createElement("button"); sel.type = "button"; sel.className = "vcard-sel" + (picked ? " on" : "");
     sel.textContent = picked ? (LANG === "zh" ? "取消选定" : "Unset") : card.scenarioMode === "single" ? (LANG === "zh" ? "设为合理价值" : "Set as fair value") : (LANG === "zh" ? "设为合理区间" : "Set as fair range");
+    sel.disabled = !usableValuationRange(card);
+    if (sel.disabled) sel.textContent = LANG === "zh" ? "保留研究结果（不设钟摆）" : "Research result only";
     sel.title = picked ? (LANG === "zh" ? "点击取消选定" : "Click to unset") : "";
     sel.addEventListener("click", () => { (picked ? clearValuation : (i, b) => selectValuation(i, card, b))(item, idBlock); showList(); });
     const edit = document.createElement("button"); edit.type = "button"; edit.className = "vcard-edit"; edit.textContent = LANG === "zh" ? "编辑" : "Edit";
@@ -3602,9 +3629,9 @@ function renderValuationPanel(item, panel, idBlock) {
 
   // ---- AI 复核 ----
   const REV_MONEY = new Set(["revenue", "netIncome", "netDebt", "ebitda", "fcf"]);
-  const revFields = (model, inputs) => modeFields(model, inputs && inputs._mode).map((f) => {
+  const revFields = (model, inputs) => modeFields(model, inputs && inputs._mode, inputs || {}).map((f) => {
     const v = inputs ? inputs[f.k] : undefined, n = (x) => (typeof x === "number" && Number.isFinite(x) ? x : null);
-    return { k: f.k, label: (f.label && f.label[LANG]) || f.k, col: f.col, unit: f.unit || "", meta: f.meta || "", money: REV_MONEY.has(f.meta),
+    return { k: f.k, label: (f.label && f.label[LANG]) || f.k, col: f.col, unit: f.unit || "", meta: f.meta || "", money: !!f.money || REV_MONEY.has(f.meta),
       value: f.col === "dual" ? { c: n(v && v.c), o: n(v && v.o) } : n(v) };
   });
   async function runReview(card, btn, errEl) {
