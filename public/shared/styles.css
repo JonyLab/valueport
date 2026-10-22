@@ -488,6 +488,15 @@
 .gai-mact.done{color:var(--green)}
 .gai-msg.error .gai-mact{color:var(--red)}
 .gai-foot{padding:10px 14px 12px;border-top:1px dashed var(--border)}
+.gai-search{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:var(--r-pill);background:transparent;color:var(--ink-soft);padding:5px 10px;margin-bottom:8px;font:inherit;font-size:12px;cursor:pointer}
+.gai-search[aria-pressed="true"]{background:var(--sun);border-color:var(--sun);color:var(--sun-ink)}
+.gai-search:disabled{opacity:.5;cursor:default}
+.gai-search-box{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;font-size:12px;color:var(--ink-soft)}
+.gai-search-box[hidden]{display:none}
+.gai-search-input{width:100%;box-sizing:border-box;min-width:0;padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--ink);font:inherit}
+.gai-search-box small,.gai-sources small{font-size:10.5px;color:var(--ink-mute)}
+.gai-sources{margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--ink-soft)}
+.gai-sources a{color:inherit;overflow-wrap:anywhere;text-decoration:underline;text-underline-offset:3px}
 .gai-box{display:flex;align-items:flex-end;gap:8px;background:#fff;border-radius:22px;box-shadow:inset 0 0 0 1px var(--divider);padding:6px 6px 6px 14px}
 .gai-box:focus-within{box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 4px var(--ring)}
 .gai-input{flex:1;min-width:0;border:0;outline:none;resize:none;background:none;padding:7px 0;font-family:var(--font);font-size:13.5px;line-height:1.5;color:var(--ink);max-height:140px}

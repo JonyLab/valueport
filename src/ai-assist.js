@@ -1,3 +1,5 @@
+import { searchPublicQuery, searchPrompt, searchMetadata } from "./web-search.js";
+
 // 全站 AI 助手（右上角入口，见 /shared/global-ai.js）：通用的投研问答，结合用户当前所在页面的简短上下文。
 // 和估值工作台的 /api/my/ai/valuation 不同：不产出建议参数，只回答问题。额度 / 用量 / 错误码走同一个 runChat。
 // 隐私：资产页默认只告诉模型「用户在资产页」，不带任何持仓或金额（前端决定 summary 里放什么）。
@@ -13,6 +15,9 @@ const oneLine = (v) => v === undefined || v === null || !/[\r\n`]/.test(v);
 export function validateAssist(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return "bad body";
   if (body.lang !== undefined && body.lang !== "zh" && body.lang !== "en") return "bad lang";
+  if (body.webSearch !== undefined && typeof body.webSearch !== "boolean") return "bad webSearch";
+  if (body.searchQuery !== undefined && (typeof body.searchQuery !== "string" || body.searchQuery.length > 300 || /[\x00-\x1f]/.test(body.searchQuery))) return "bad searchQuery";
+  if (body.webSearch && !body.searchQuery?.trim()) return "search_query_required";
   const { messages, page } = body;
   if (!Array.isArray(messages) || !messages.length || messages.length > L.messages) return `messages must be 1-${L.messages} items`;
   for (const m of messages) {
@@ -66,7 +71,7 @@ export function buildAssistPrompt(page, lang) {
     "- 宏观看板：利率、通胀、市场温度等宏观指标的概览。",
     "",
     "规则：",
-    "1. 只用上面提供的页面信息和公认的通用知识回答。页面信息里没有的具体数字（股价、财务数据、估值结果、持仓）不要编造；需要时直接说「当前页面没有提供这个数据」，并告诉用户在应用的哪里可以看到或自己去核实。",
+    "1. 使用上面提供的页面信息、公认的通用知识，以及本轮实际附带的联网检索资料回答。未附带检索资料时，不要声称已联网或掌握最新动态。页面信息及本轮检索资料都没有的具体数字（股价、财务数据、估值结果、持仓）不要编造；需要时直接说「当前页面没有提供这个数据」，并告诉用户在应用的哪里可以看到或自己去核实。",
     "2. 不给个性化的买卖建议、仓位或择时建议（例如「现在该买 / 该卖」「买多少」）；可以讲分析框架、需要考虑的因素、不同情形下的利弊。用户追问时，说明你不是持牌投资顾问，内容仅供参考、不构成投资建议。",
     "3. 回答简洁、具体，先给结论再展开；适当用短列表（以「- 」开头），不要用表格，不要用 # 标题。",
     "4. 用简体中文回答。",
@@ -85,7 +90,7 @@ export function buildAssistPrompt(page, lang) {
     "- Macro board: an overview of rates, inflation, market temperature and other macro indicators.",
     "",
     "Rules:",
-    "1. Answer only from the page context above and widely accepted general knowledge. Never invent specific numbers (prices, financials, valuation results, positions) that are not in the context — say the current page doesn't provide that data, and point to where in the app the user can find or verify it.",
+    "1. Answer from the page context, general knowledge and any search results actually attached to this request. Without attached search results, do not claim to have searched or verified current developments. Never invent specific numbers (prices, financials, valuation results, positions) that are not in the page context or attached search results — say the current page doesn't provide that data, and point to where in the app the user can find or verify it.",
     "2. Do not give personalized buy/sell, sizing or timing advice (e.g. \"buy now\", \"sell\", \"how much to buy\"). You may explain frameworks, factors to weigh and trade-offs. If pressed, say you are not a licensed financial adviser and this is for reference only, not investment advice.",
     "3. Be concise and concrete: lead with the answer, then explain; use short bullet lists (starting with \"- \") where helpful, no tables, no # headings.",
     "4. Reply in English.",
@@ -103,11 +108,16 @@ export function registerAssist(app, runChat) {
     const err = validateAssist(body);
     if (err) return c.json({ error: err }, 400);
     const lang = body.lang === "en" ? "en" : "zh";
-    const { text, res } = await runChat(c, buildAssistPrompt(body.page, lang), body.messages.map((m) => ({ role: m.role, content: m.content })));
+    let research;
+    const { text, res } = await runChat(c, buildAssistPrompt(body.page, lang), body.messages.map((m) => ({ role: m.role, content: m.content })),
+      body.webSearch ? async (system) => {
+        research = await searchPublicQuery(c.env, body.searchQuery);
+        return system + searchPrompt(research, { assistant: true });
+      } : null);
     if (res) return res;
     const reply = cleanAssistReply(text);
     if (!reply) return c.json({ error: "bad_ai_output" }, 502);
     c.header("Cache-Control", "no-store");
-    return c.json({ reply });
+    return c.json({ reply, ...(research ? { research: searchMetadata(research) } : {}) });
   });
 }

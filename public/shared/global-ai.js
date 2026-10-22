@@ -1,11 +1,12 @@
 // 全站 AI 助手（右上角入口）：顶栏一个圆形图标按钮，只对已登录用户显示；点开右侧抽屉，结合当前页面聊投研问题。
 // 和估值工作台里的 AI 估值助手（/shared/ai-panel.js，aside.vc-ai）互斥：打开一个就关掉另一个，两个抽屉不会叠在一起。
-// 后端：POST /api/my/ai/assist { lang, messages, page } → { reply }（额度 / 错误码同其它 AI 接口）。
+// 后端：POST /api/my/ai/assist { lang, messages, page, webSearch?, searchQuery? } → { reply, research? }（额度 / 错误码同其它 AI 接口）。
 // 用法：mountGlobalAi(容器, { getPage, extraHosts })
 //   getPage() → { kind: "watchlist"|"stock"|"portfolio"|"macro"|"other", path, title, symbol?, name?, summary? }（发送时现取；不传按路径推断）
 //   extraHosts（可选）—— CSS 选择器：页面后来才画出来的工具条（如个股详情页的 .vd-backrow-right），出现时自动也放一个按钮
 // 快捷键 ⌘K / Ctrl+K 开关；Esc 关闭。对话按页面路径存在 sessionStorage，返回这页时还在。样式在 /shared/styles.css 的 .gai-*。
 import { LANG } from "./i18n.js";
+import { normalizeResearch } from "./search-sources.js";
 
 const zh = LANG === "zh";
 const TX = zh ? {
@@ -237,7 +238,7 @@ function loadChat(path) {
     const j = JSON.parse(sessionStorage.getItem(CHAT_PREFIX + path) || "null");
     if (!j || !Array.isArray(j.msgs)) return [];
     return j.msgs.filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content)
-      .map((m) => ({ role: m.role, content: m.content.slice(0, LIM.content) })).slice(-40);
+      .map((m) => ({ role: m.role, content: m.content.slice(0, LIM.content), ...(m.role === "assistant" && normalizeResearch(m.research) ? { research: normalizeResearch(m.research) } : {}) })).slice(-40);
   } catch { return []; }
 }
 function saveChat(path, msgs) {
@@ -317,14 +318,38 @@ function build() {
   const input = el("textarea", "gai-input"); input.rows = 1; input.placeholder = TX.ph; input.maxLength = 2000; input.setAttribute("aria-label", TX.ph);
   const sendBtn = el("button", "gai-send"); sendBtn.type = "submit";
   box.append(input, sendBtn);
-  foot.append(box, el("div", "gai-disclaimer", TX.disclaimer));
+  const searchBtn = el("button", "gai-search", zh ? "联网搜索" : "Web search"); searchBtn.type = "button";
+  searchBtn.prepend(ri("global-line")); searchBtn.setAttribute("aria-pressed", "false");
+  const searchBox = el("label", "gai-search-box"); searchBox.hidden = true;
+  const searchInput = el("input", "gai-search-input"); searchInput.type = "text"; searchInput.maxLength = 300;
+  searchInput.placeholder = zh ? "例如：Sea 最新财报" : "e.g. Sea latest earnings";
+  searchInput.setAttribute("aria-label", zh ? "搜索关键词" : "Search keywords");
+  searchBox.append(el("span", "", zh ? "搜索关键词" : "Search keywords"), searchInput,
+    el("small", "", zh ? "仅将以上关键词发送给搜索服务 Tavily" : "Only these keywords are sent to Tavily search"));
+  foot.append(searchBtn, searchBox, box, el("div", "gai-disclaimer", TX.disclaimer));
   panel.append(head, ctx, log, foot);
   document.body.appendChild(panel);
 
-  let path = null, msgs = [], busy = false, request = null, page = currentPage();
+  let path = null, msgs = [], busy = false, request = null, page = currentPage(), useSearch = false;
+
+  function syncSearch() {
+    const available = !!models?.webSearchAvailable;
+    if (!available) useSearch = false;
+    searchBtn.disabled = busy || !available;
+    searchBtn.title = available ? (zh ? "搜索公开资料，并在回复中附上来源" : "Search public information with sources") : (zh ? "联网搜索暂未配置" : "Web search is not configured");
+    searchBtn.setAttribute("aria-pressed", String(useSearch));
+    searchBox.hidden = !useSearch; searchInput.disabled = busy || !useSearch;
+    if (!useSearch) searchInput.setCustomValidity("");
+  }
+  searchBtn.addEventListener("click", () => {
+    if (busy) return;
+    useSearch = !useSearch; syncSearch();
+    if (useSearch) searchInput.focus();
+  });
 
   // 模型切换：和估值 AI 抽屉同一份配置（/api/my/ai/models、PUT /api/my/ai/active）
   function drawModels() {
+    syncSearch();
     if (!models) { modelName.textContent = TX.modelLoading; return; }
     const all = [models.site, ...(models.workers || []), ...(models.siteKey || []), ...(models.custom || [])];
     const cur = all.find((m) => m.id === models.active) || models.site;
@@ -382,6 +407,7 @@ function build() {
     sendBtn.classList.toggle("stop", b);
     syncSend();
     clearBtn.disabled = b;
+    syncSearch();
   }
   function syncSend() { sendBtn.disabled = !busy && !input.value.trim(); }
   function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 140) + "px"; }
@@ -399,11 +425,22 @@ function build() {
     intro.appendChild(chips);
     log.appendChild(intro);
   }
-  function bubble(role, text, { error = false } = {}) {
+  function bubble(role, text, { error = false, research = null } = {}) {
     const intro = log.querySelector(".gai-intro"); if (intro) intro.remove();
     const m = el("div", "gai-msg " + (role === "user" ? "me" : "ai") + (error ? " error" : ""));
     const b = el("div", "gai-bubble");
     if (role === "assistant" && !error) b.appendChild(renderRich(text)); else b.textContent = text;
+    const sources = normalizeResearch(research);
+    if (role === "assistant" && sources) {
+      const refs = el("div", "gai-sources");
+      refs.appendChild(el("div", "", sources.sources.length ? (zh ? "搜索来源 · 摘要待核实" : "Search sources · verify excerpts") : (zh ? "本次搜索未找到相关资料" : "No relevant search results")));
+      if (sources.searchedAt && Number.isFinite(Date.parse(sources.searchedAt))) refs.appendChild(el("small", "", (zh ? "检索于 " : "Searched ") + new Date(sources.searchedAt).toLocaleString(zh ? "zh-CN" : "en-US")));
+      for (const source of sources.sources) {
+        const a = el("a", "", `[${source.id}] ${source.title}${source.publishedAt ? " · " + source.publishedAt : ""}`);
+        a.href = source.url; a.target = "_blank"; a.rel = "noopener noreferrer"; refs.appendChild(a);
+      }
+      b.appendChild(refs);
+    }
     m.appendChild(b); log.appendChild(m); scrollEnd();
     return m;
   }
@@ -430,7 +467,7 @@ function build() {
     log.replaceChildren();
     if (!msgs.length) { renderIntro(); return; }
     for (const m of msgs) {
-      const node = bubble(m.role, m.content);
+      const node = bubble(m.role, m.content, { research: m.research });
       if (m.role === "assistant") actions(node, { copy: m.content });
     }
   }
@@ -439,7 +476,7 @@ function build() {
     ctxText.textContent = chipText(page);
     ctx.title = page.title || "";
     const p = location.pathname;
-    if (p !== path && !busy) { path = p; msgs = loadChat(p); renderAll(); }
+    if (p !== path && !busy) { path = p; useSearch = false; searchInput.value = page.kind === "stock" ? [page.name, page.symbol, zh ? "最新财报 经营数据" : "latest earnings operating results"].filter(Boolean).join(" ").slice(0, 300) : ""; syncSearch(); msgs = loadChat(p); renderAll(); }
     else if (!msgs.length && !busy && !log.querySelector(".gai-msg")) { log.replaceChildren(); renderIntro(); } // 同一路径但页面类型变了：刷新快捷问题
   }
 
@@ -447,6 +484,9 @@ function build() {
     const text = String(raw || "").trim().slice(0, LIM.content);
     if (!text || busy) return;
     refreshPage();
+    const searchQuery = searchInput.value.trim();
+    if (useSearch && !searchQuery) { searchInput.setCustomValidity(zh ? "请输入要搜索的公开关键词" : "Enter public search keywords"); searchInput.reportValidity(); searchInput.focus(); return; }
+    const searching = useSearch;
     const sendPath = path;
     input.value = ""; autosize();
     const entry = { role: "user", content: text };
@@ -455,7 +495,7 @@ function build() {
     saveChat(sendPath, msgs);
     const pending = bubble("assistant", ""); pending.classList.add("pending");
     const pb = pending.querySelector(".gai-bubble");
-    pb.replaceChildren(el("span", "gai-dots"), el("span", "", TX.thinking));
+    pb.replaceChildren(el("span", "gai-dots"), el("span", "", searching ? (zh ? "正在搜索并整理资料…" : "Searching and reviewing sources…") : TX.thinking));
     const controller = new AbortController();
     const req = { controller };
     request = req; setBusy(true);
@@ -478,7 +518,7 @@ function build() {
     try {
       const r = await fetch("/api/my/ai/assist", {
         method: "POST", credentials: "same-origin", signal: controller.signal, headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lang: LANG, messages: forServer(msgs), page }),
+        body: JSON.stringify({ lang: LANG, messages: forServer(msgs), page, webSearch: searching, ...(searching ? { searchQuery } : {}) }),
       });
       const j = await r.json().catch(() => ({}));
       if (controller.signal.aborted) return;
@@ -492,10 +532,12 @@ function build() {
         actions(m, { retry: retry(m) });
         return;
       }
-      if (sendPath !== path) { saveChat(sendPath, [...loadChat(sendPath), { role: "assistant", content: j.reply }]); return; } // 等回复时换了页：存进原页面的对话，不画到当前页
-      msgs.push({ role: "assistant", content: j.reply });
+      const research = normalizeResearch(j.research);
+      const answer = { role: "assistant", content: j.reply, ...(research ? { research } : {}) };
+      if (sendPath !== path) { saveChat(sendPath, [...loadChat(sendPath), answer]); return; } // 等回复时换了页：存进原页面的对话，不画到当前页
+      msgs.push(answer);
       saveChat(sendPath, msgs);
-      const m = bubble("assistant", j.reply);
+      const m = bubble("assistant", j.reply, { research });
       actions(m, { copy: j.reply });
     } catch {
       if (controller.signal.aborted) return;
@@ -509,6 +551,7 @@ function build() {
   }
 
   foot.addEventListener("submit", (e) => { e.preventDefault(); if (busy) { if (request && request.stop) request.stop(); } else send(input.value); });
+  searchInput.addEventListener("input", () => searchInput.setCustomValidity(""));
   input.addEventListener("input", () => { autosize(); syncSend(); });
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!busy) send(input.value); }

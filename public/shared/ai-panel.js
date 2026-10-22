@@ -1,3 +1,5 @@
+import { normalizeResearch } from "./search-sources.js";
+export { normalizeResearch } from "./search-sources.js";
 import { cleanManagementResearch } from "./valuation/management-research.js";
 import { managementResearchElement } from "./valuation/management-research-ui.js";
 
@@ -53,6 +55,7 @@ const TX = {
 export function aiErrorText(status, j, lang) {
   const zh = lang !== "en", e = j && j.error;
   if (e === "search_not_configured") return zh ? "联网搜索暂未配置" : "Web search is not configured";
+  if (e === "search_query_required") return zh ? "请输入要搜索的公开关键词" : "Enter public search keywords";
   if (e === "search_company_required") return zh ? "缺少公司名称或代码，无法搜索" : "A company name or ticker is required for search";
   if (e === "search_timeout" || e === "search_failed") return zh ? "联网搜索失败，请重试或关闭搜索后发送" : "Search failed. Retry or turn off web search.";
   if (e === "site_quota") return zh ? "站点的免费 AI 额度今天已用完（全站共用），北京时间早上 8 点恢复；也可以在「设置 → AI 模型」里配置自己的模型，不受这个限制"
@@ -70,20 +73,6 @@ export function aiErrorText(status, j, lang) {
   return zh ? "AI 暂时没有响应，可能是服务繁忙，请稍后再试" : "The AI didn't respond. It may be busy; please try again shortly";
 }
 
-// History is user-editable data too: validate links on both new replies and restoration.
-export function normalizeResearch(value) {
-  if (!value || !["ok", "empty"].includes(value.status) || !Array.isArray(value.sources)) return null;
-  const sources = [];
-  for (const s of value.sources.slice(0, 5)) {
-    try {
-      const u = new URL(s.url);
-      if (u.protocol !== "https:" || u.username || u.password || u.href.length > 1200 || !Number.isInteger(s.id) || s.id < 1 || s.id > 5) continue;
-      sources.push({ id: s.id, url: u.href, title: typeof s.title === "string" ? s.title.slice(0, 200) : u.hostname,
-        publishedAt: typeof s.publishedAt === "string" ? s.publishedAt.slice(0, 80) : null });
-    } catch { /* Ignore unsafe links in old or edited history. */ }
-  }
-  return { status: sources.length ? "ok" : "empty", searchedAt: typeof value.searchedAt === "string" ? value.searchedAt.slice(0, 80) : "", sources };
-}
 
 export function mountAiPanel(host, { lang, getContext, prepareContext, onApply, onUndo, fmtField, widgets: wx, checkParams, chatKey }) {
   const T = TX[lang] || TX.zh;
