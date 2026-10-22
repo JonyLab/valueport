@@ -1173,13 +1173,13 @@
   .vsec-title{font-size:20px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
   .vsec-sub{font-size:13px;color:var(--ink-mute)}
   /* 估值区间对照图（football field） */
-  .vmap{padding:0}
+  .vmap{padding:0;container-type:inline-size;container-name:valuation-map}
   .vmap-grid{display:grid;grid-template-columns:minmax(110px,170px) minmax(0,1fr);column-gap:16px;row-gap:14px;align-items:center}
   .vmap-lab{font-size:13.5px;color:var(--ink-soft);min-width:0;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
   .vmap-lab.picked{color:var(--ink);font-weight:500}
   .vmap-pick{font-size:10.5px;font-weight:500;color:var(--sun-ink);background:var(--sun);border-radius:var(--r-pill);padding:2px 8px}
-  .vmap-track{position:relative;height:44px;grid-column:2}
-  .vmap-bar{position:absolute;top:15px;bottom:15px;border-radius:var(--r-pill);background:rgba(29,29,27,.22)} /* 不建层叠上下文：端点数字才能盖在现价虚线上面 */
+  .vmap-track{position:relative;height:60px;grid-column:2}
+  .vmap-bar{position:absolute;top:22px;height:10px;border-radius:var(--r-pill);background:rgba(29,29,27,.22)} /* 不建层叠上下文：端点数字才能盖在现价虚线上面 */
   .vmap-track.picked .vmap-bar{background:var(--sun)}
   .vmap-point{position:absolute;top:50%;width:0;height:0;z-index:3}
   .vmap-value{position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;padding:5px 10px;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft);font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
@@ -1188,20 +1188,27 @@
   .vmap-track.picked .vmap-point::after{background:var(--sun)}
   .vmap-point.edge-start .vmap-value{transform:translate(0,-50%)}
   .vmap-point.edge-end .vmap-value{transform:translate(-100%,-50%)}
-  .vmap-end{position:absolute;top:50%;transform:translateY(-50%);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;font-variant-numeric:tabular-nums}
-  .vmap-end.lo{right:100%;margin-right:6px}
-  .vmap-end.hi{left:100%;margin-left:6px}
-  .vmap-end.near-now{z-index:3;padding:1px 6px;border-radius:var(--r-pill);background:var(--card-solid);box-shadow:0 0 0 3px var(--card-solid)}
+  .vmap-range-caption{position:absolute;top:38px;left:clamp(0px,calc(var(--range-center) - 80px),max(0px,calc(100% - 160px)));width:160px;max-width:100%;font-size:11.5px;font-weight:500;color:var(--ink-soft);line-height:1.4;text-align:center;font-variant-numeric:tabular-nums;z-index:3}
+  .vmap-range-caption span{padding:2px 5px;border-radius:4px;background:var(--card-solid);box-decoration-break:clone;-webkit-box-decoration-break:clone}
   .vmap-now{position:absolute;top:-7px;bottom:-7px;width:0;border-left:1px dashed var(--ink-soft);pointer-events:none;z-index:2}
   .vmap-now.first{top:-4px}
-  .vmap-zone{position:absolute;top:-7px;bottom:-7px;pointer-events:none;background:linear-gradient(to right,color-mix(in srgb,var(--zone-color) 4%,transparent),color-mix(in srgb,var(--zone-color) 22%,transparent))} /* 贴着阈值虚线最深，向外渐淡 */
+  .vmap-zone{position:absolute;top:-7px;bottom:-7px;pointer-events:none;background:linear-gradient(to right,transparent,color-mix(in srgb,var(--zone-color) 12%,transparent))} /* 阈值处较深，向外缘淡回底色 */
   .vmap-zone.strike{left:0;border-right:1px dashed var(--zone-color)}
-  .vmap-zone.bubble{right:0;border-left:1px dashed var(--zone-color);background:linear-gradient(to right,color-mix(in srgb,var(--zone-color) 22%,transparent),color-mix(in srgb,var(--zone-color) 4%,transparent))}
-  .vmap-zone-labels{grid-column:2;display:flex;justify-content:space-between;gap:12px;padding-top:2px;font-size:11px;line-height:1.5;font-variant-numeric:tabular-nums}
-  .vmap-zone-label{display:flex;flex-direction:column;gap:1px;min-width:0}
-  .vmap-zone-label:last-child{text-align:right}
+  .vmap-zone.bubble{right:0;border-left:1px dashed var(--zone-color);background:linear-gradient(to right,color-mix(in srgb,var(--zone-color) 12%,transparent),transparent)}
+  .vmap-zone-labels{grid-column:2;position:relative;height:36px;font-size:11px;line-height:1.5;font-variant-numeric:tabular-nums}
+  .vmap-zone-label{position:absolute;top:0;left:clamp(0px,calc(var(--threshold) - 50px),max(0px,calc(100% - 100px)));width:100px;max-width:100%;display:flex;flex-direction:column;gap:1px;text-align:center}
   .vmap-zone-label strong{font-weight:500}
   .vmap-zone-label span{font-size:10.5px;color:var(--ink-soft)}
+  .vmap-zone-labels.tight{height:70px}
+  .vmap-zone-labels.tight .bubble{top:34px}
+  @container valuation-map (max-width:480px){
+    .vmap .vmap-grid{grid-template-columns:minmax(0,1fr);row-gap:14px}
+    .vmap .vmap-track,.vmap .vmap-zone-labels,.vmap .vmap-axis{grid-column:1}
+    .vmap-lab.axis{display:none}
+    .vmap-lab{margin-bottom:14px}
+    .vmap-zone-labels{height:70px}
+    .vmap-zone-label.bubble{top:34px}
+  }
   .vmap-now-tag{position:absolute;bottom:100%;left:0;transform:translate(-50%,-2px);white-space:nowrap;font-size:11px;font-weight:500;
     color:var(--ink-soft);background:#fff;box-shadow:inset 0 0 0 1px var(--border);border-radius:var(--r-pill);padding:3px 9px;font-variant-numeric:tabular-nums}
   .vmap-axis{grid-column:2;position:relative;height:18px;border-top:1px solid var(--divider);margin-top:4px}
@@ -3454,10 +3461,10 @@ function renderValuationPanel(item, panel, idBlock) {
         point.appendChild(value); tr.appendChild(point); return;
       }
       const bar = document.createElement("div"); bar.className = "vmap-bar"; bar.style.left = x0 + "%"; bar.style.width = Math.max(0.8, x1 - x0) + "%";
-      const near = (x) => p > 0 && Math.abs(X(p) - x) < 7 ? " near-now" : "";
-      const e0 = document.createElement("span"); e0.className = "vmap-end lo" + near(x0); e0.textContent = fmtPx(Math.min(k.low, k.high));
-      const e1 = document.createElement("span"); e1.className = "vmap-end hi" + near(x1); e1.textContent = fmtPx(Math.max(k.low, k.high));
-      bar.append(e0, e1); tr.appendChild(bar);
+      const caption = document.createElement("div"); caption.className = "vmap-range-caption";
+      caption.style.setProperty("--range-center", ((x0 + x1) / 2) + "%");
+      const text = document.createElement("span"); text.textContent = (zh ? "合理区间 " : "Fair range ") + fmtPx(Math.min(k.low, k.high)) + "–" + fmtPx(Math.max(k.low, k.high));
+      caption.appendChild(text); tr.append(bar, caption);
     });
     // 现价竖线：每条轨道各画一段，上下伸进行间距里首尾相接；第一段顶上挂现价标签
     if (p > 0) {
@@ -3467,17 +3474,17 @@ function renderValuationPanel(item, panel, idBlock) {
         tr.appendChild(seg);
       });
     }
-    // 两端区域向图外延伸；渐变贴着阈值虚线最深、向外渐淡，虚线精确标出阈值。各行首尾相接。
+    // 两端区域向图外延伸；渐变由阈值向外缘淡回底色，虚线精确标出阈值。各行首尾相接。
     if (valued) {
       const tracks = [...grid.querySelectorAll(".vmap-track")];
-      const labels = document.createElement("div"); labels.className = "vmap-zone-labels";
+      const labels = document.createElement("div"); labels.className = "vmap-zone-labels" + (X(a[4]) - X(a[1]) < 15 ? " tight" : "");
       [[a[1], ZONES[0].hex, "strike", zh ? "← 击球区" : "← Strike zone"], [a[4], ZONES[ZONES.length - 1].hex, "bubble", zh ? "泡沫区 →" : "Bubble zone →"]].forEach(([v, col, side, lab]) => {
         tracks.forEach((tr) => {
           const zone = document.createElement("div"); zone.className = "vmap-zone " + side;
           zone.style.setProperty("--zone-color", col); zone.style.width = (side === "strike" ? X(v) : 100 - X(v)) + "%";
           zone.setAttribute("aria-hidden", "true"); tr.prepend(zone);
         });
-        const label = document.createElement("div"); label.className = "vmap-zone-label"; label.style.color = col;
+        const label = document.createElement("div"); label.className = "vmap-zone-label " + side; label.style.color = col; label.style.setProperty("--threshold", X(v) + "%");
         const name = document.createElement("strong"); name.textContent = lab;
         const rule = document.createElement("span"); rule.textContent = (zh ? "价格 " : "Price ") + (side === "strike" ? "≤ " : "> ") + fmtPx(v);
         label.append(name, rule); labels.appendChild(label);
