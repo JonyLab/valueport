@@ -41,6 +41,8 @@ export function ensureAlertBannerStyles() {
 /* 走势小图 + 阈值虚线 + 分位条 */
 .pf-achart{display:flex;flex-direction:column;gap:5px;width:248px;max-width:100%;padding:8px 10px 7px;border-radius:var(--r-md);background:rgba(255,255,255,.85);box-shadow:inset 0 0 0 1px rgba(29,29,27,.08);flex:none}
 .pf-achart.wide{width:100%;margin-top:2px;background:rgba(255,255,255,.72)}
+.pf-achart.compact{gap:4px;padding:6px 9px 5px}
+.pf-achart.compact .pf-achart-box{height:38px}
 .pf-achart.tall .pf-achart-box{height:84px}
 .pf-achart-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:11px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
 .pf-achart-top b{color:var(--ink);font-weight:500}
@@ -187,25 +189,28 @@ export function renderAllocationBar(items = [], { title = "", showLegend = true,
   return wrap;
 }
 
-// 指标提醒走势小图：近 5 年月度折线 + 触发区浅黄阴影 + 阈值虚线 + 当前点（+ 历史分位条）
-export function renderAlertChart(a, macroData, { wide = false, tall = false, lang = "zh" } = {}) {
+// 指标提醒走势小图：近 10 年月度折线 + 触发区浅黄阴影 + 阈值虚线 + 当前点（+ 历史分位条）
+export function renderAlertChart(a, macroData, { wide = false, tall = false, compact = false, lang = "zh" } = {}) {
   ensureAlertBannerStyles();
   const zh = lang !== "en", T = (x, y) => (zh ? x : y);
-  const ser = extractAlertSeries(macroData, a.metric, a.mode, Number(a.threshold), 60);
+  const ser = extractAlertSeries(macroData, a.metric, a.mode, Number(a.threshold), 120);
   const showPctBar = a.mode === "pct" && Number.isFinite(a.reading?.pct);
   if (!ser && !showPctBar) return null;
 
-  const card = el("div", "pf-achart" + (wide ? " wide" : "") + (tall ? " tall" : ""));
+  const card = el("div", "pf-achart" + (wide ? " wide" : "") + (tall ? " tall" : "") + (compact ? " compact" : ""));
   const u = (ser && ser.unit) || (a.meta && a.meta.unit) || "";
   if (ser) {
     const top = el("div", "pf-achart-top");
     const thTxt = Number.isFinite(ser.thresholdVal)
       ? T(`触发线 ${a.op === "gte" ? "≥" : "≤"} ${ser.thresholdVal.toFixed(ser.unit === "x" ? 1 : 2)}${u}`, `${a.op === "gte" ? "≥" : "≤"} ${ser.thresholdVal.toFixed(ser.unit === "x" ? 1 : 2)}${u}`)
       : "";
-    top.append(el("span", "th", thTxt), el("span", "", T("当前 ", "Now ") + `${ser.current}${u}`));
+    const rightTxt = compact
+      ? `${T("区间", "Range")} ${Math.min(...ser.points.map((p) => p[1])).toFixed(1)}–${Math.max(...ser.points.map((p) => p[1])).toFixed(1)}${u}`
+      : T("当前 ", "Now ") + `${ser.current}${u}`;
+    top.append(el("span", "th", thTxt), el("span", "", rightTxt));
     card.appendChild(top);
 
-    const W = 240, H = tall ? 84 : 52, PT = 6, PB = 6;
+    const W = 240, H = tall ? 84 : compact ? 38 : 52, PT = 5, PB = 5;
     const pad = (ser.max - ser.min) * 0.14 || Math.abs(ser.max) * 0.08 || 0.5;
     const lo = ser.min - pad, hi = ser.max + pad;
     const pts = ser.points;
@@ -236,20 +241,35 @@ export function renderAlertChart(a, macroData, { wide = false, tall = false, lan
 
     const foot = el("div", "pf-achart-foot");
     const rangeLbl = ser.fromDate && ser.toDate ? `${ser.fromDate.slice(0, 7)} – ${ser.toDate.slice(0, 7)}` : T(`近 ${pts.length} 个月`, `Last ${pts.length}m`);
-    foot.append(el("span", "", rangeLbl), el("span", "", `${T("区间", "Range")} ${Math.min(...pts.map((p) => p[1])).toFixed(1)}–${Math.max(...pts.map((p) => p[1])).toFixed(1)}${u}`));
+    const sinceYear = (a.reading?.since || ser.allFromDate || "").slice(0, 4);
+    const scopeHint = a.mode === "pct" && sinceYear && ser.isTruncated
+      ? T(`分位按 ${sinceYear} 年起全历史`, `Pct since ${sinceYear}`)
+      : compact ? "" : `${T("区间", "Range")} ${Math.min(...pts.map((p) => p[1])).toFixed(1)}–${Math.max(...pts.map((p) => p[1])).toFixed(1)}${u}`;
+    foot.append(el("span", "", rangeLbl), el("span", "", scopeHint));
     card.appendChild(foot);
   }
   if (showPctBar) {
     const bar = el("div", "pf-achart-pct");
     const z = el("span", "pf-achart-pct-z");
     const th = Math.max(0, Math.min(100, Number(a.threshold) || 0));
-    if (a.op === "gte") { z.style.left = th + "%"; z.style.width = (100 - th) + "%"; }
-    else { z.style.left = "0%"; z.style.width = th + "%"; }
+    if (a.op === "gte") {
+      z.style.left = th + "%";
+      z.style.width = (100 - th) + "%";
+      if (th < 100) z.style.minWidth = "6px";
+    } else {
+      z.style.left = "0%";
+      z.style.width = th + "%";
+      if (th > 0) z.style.minWidth = "6px";
+    }
     const dot = el("span", "pf-achart-pct-d" + (a.triggered ? " hit" : ""));
     dot.style.left = Math.max(0, Math.min(100, a.reading.pct)) + "%";
     bar.append(z, dot);
     const pf = el("div", "pf-achart-foot");
-    pf.append(el("span", "", T("历史 0%", "0%")), el("span", "", T(`当前 ${a.reading.pct}% 分位`, `Now ${a.reading.pct}th pct`)), el("span", "", "100%"));
+    const sinceYear = (a.reading?.since || ser?.allFromDate || "").slice(0, 4);
+    const midTxt = compact
+      ? (sinceYear ? T(`全历史分位（${sinceYear} 起）`, `Full history since ${sinceYear}`) : T("全历史分位", "Historical pct"))
+      : T(`当前 ${a.reading.pct}% 分位`, `Now ${a.reading.pct}th pct`);
+    pf.append(el("span", "", T("历史 0%", "0%")), el("span", "", midTxt), el("span", "", "100%"));
     card.append(bar, pf);
   }
   return card;

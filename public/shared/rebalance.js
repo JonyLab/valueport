@@ -285,7 +285,7 @@ export function evaluateSignalAlerts(alerts = [], macro = null, profiles = []) {
 }
 
 // 为指标提醒提取历史月度序列与阈值线（供前端画走势小图 + 阈值虚线 + 触发阴影区）
-export function extractAlertSeries(macro, metricKey, mode, threshold, maxPoints = 60) {
+export function extractAlertSeries(macro, metricKey, mode, threshold, maxPoints = 120) {
   const meta = alertMetricMeta(metricKey);
   if (!meta || !macro) return null;
   const g = macro.gravity || {};
@@ -338,6 +338,7 @@ export function extractAlertSeries(macro, metricKey, mode, threshold, maxPoints 
   const hi = Math.max(...vals, ...(Number.isFinite(thresholdVal) ? [thresholdVal] : []));
   const firstD = /^\d{4}-\d{2}/.test(recent[0][0]) ? recent[0][0] : "";
   const lastD = /^\d{4}-\d{2}/.test(recent[recent.length - 1][0]) ? recent[recent.length - 1][0] : "";
+  const allFirstD = /^\d{4}-\d{2}/.test(all[0][0]) ? all[0][0] : "";
   return {
     points: recent,
     thresholdVal,
@@ -347,7 +348,34 @@ export function extractAlertSeries(macro, metricKey, mode, threshold, maxPoints 
     unit: meta.unit || "",
     fromDate: firstD,
     toDate: lastD,
+    allFromDate: allFirstD,
+    isTruncated: all.length > recent.length,
   };
+}
+
+// 切换提醒模式（历史分位 ↔ 当前数值）时自动换算阈值，避免残留荒谬数字（如 CAPE 35x 变成 35% 分位）
+export function convertAlertThreshold(macro, metricKey, fromMode, toMode, value, op = "gte") {
+  const meta = alertMetricMeta(metricKey);
+  if (!meta || fromMode === toMode) return Number(value);
+  const ser = extractAlertSeries(macro, metricKey, "value", Number(value), 9999);
+  if (toMode === "value") {
+    const pctSer = extractAlertSeries(macro, metricKey, "pct", Number(value), 9999);
+    if (pctSer && Number.isFinite(pctSer.thresholdVal)) {
+      const digits = meta.unit === "x" ? 1 : 2;
+      return Math.round(pctSer.thresholdVal * 10 ** digits) / 10 ** digits;
+    }
+    const r = readMacroMetric(macro, metricKey);
+    if (r.available && Number.isFinite(r.value)) return r.value;
+    const qp = metricQuickPresets(metricKey, "zh").find((x) => x.mode === "value");
+    return qp ? qp.threshold : 2.0;
+  }
+  // value -> pct
+  if (ser && ser.points.length >= 2 && Number.isFinite(Number(value))) {
+    const v = Number(value);
+    const below = ser.points.filter((p) => p[1] <= v).length;
+    return Math.max(1, Math.min(99, Math.round(below / ser.points.length * 100)));
+  }
+  return op === "gte" ? 90 : 10;
 }
 
 export function isAllocOnly(plan, symbol) {

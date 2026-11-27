@@ -5,6 +5,7 @@ import {
   ALERT_TEMPLATE_GROUPS,
   ALERT_TEMPLATES,
   createAlertFromTemplate,
+  convertAlertThreshold,
   inferAssetDefaults,
   metricQuickPresets,
   isAllocOnly,
@@ -260,6 +261,12 @@ describe("indicator threshold alerts and scenario profiles", () => {
     const erpSer = extractAlertSeries(macroWithGravity, "cn_erp", "pct", 100);
     expect(erpSer.points.map((p) => p[1])).toEqual([2.5, 3.8, 5.1, 6.4]);
     expect(erpSer.thresholdVal).toBe(6.4);
+    expect(erpSer.allFromDate).toBe("2024-01");
+    expect(erpSer.isTruncated).toBe(false);
+
+    // Converting thresholds between historical percentile and numeric value
+    expect(convertAlertThreshold(macroWithGravity, "cn_erp", "pct", "value", 100, "gte")).toBe(6.4);
+    expect(convertAlertThreshold(macroWithGravity, "cn_erp", "value", "pct", 5.1, "gte")).toBe(75);
   });
 
   it("auto-infers ETF bucket & allocOnly defaults, quick metric presets, and per-item guardrail override", () => {

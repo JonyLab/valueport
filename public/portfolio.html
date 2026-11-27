@@ -387,13 +387,17 @@
   .pf-preset-btn:hover{background:rgba(246,207,74,.38)}
   .pf-preset-btn.on{background:rgba(36,138,85,.14);color:var(--green)}
   .pf-preset-btn.on:hover{background:rgba(36,138,85,.22)}
-  .pf-preset-dot{width:6px;height:6px;border-radius:50%;background:#c26a19;flex:none}
+  .pf-preset-hit{padding:1px 6px;border-radius:var(--r-pill);background:rgba(194,106,25,.16);color:#9c5316;font-size:10.5px;font-weight:500;line-height:1.4}
   .pf-bkt-rows{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
   .pf-bkt-edit{display:grid;grid-template-columns:minmax(0,1fr) 106px auto auto;gap:8px;align-items:center;padding:7px 10px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
   .pf-plan-tabs{margin-bottom:14px;width:fit-content;max-width:100%;overflow-x:auto}
   .pf-plan-pane[hidden]{display:none}
-  .pf-rule-card,.pf-prof-card{padding:11px 13px;border-radius:var(--r-md);background:rgba(29,29,27,.035);display:flex;flex-direction:column;gap:8px}
-  .pf-rule-card.hit{background:rgba(246,207,74,.18);box-shadow:inset 0 0 0 1px rgba(246,207,74,.6)}
+  .pf-rule-card,.pf-prof-card{padding:9px 11px;border-radius:var(--r-md);background:rgba(29,29,27,.035);display:flex;flex-direction:column;gap:6px}
+  .pf-rule-card.hit{background:rgba(246,207,74,.16);box-shadow:inset 0 0 0 1px rgba(246,207,74,.65)}
+  .pf-rule-card.off{opacity:.62}
+  .pf-rule-en{display:inline-flex;align-items:center;gap:4px;height:28px;padding:0 9px;border-radius:var(--r-pill);background:rgba(255,255,255,.78);box-shadow:inset 0 0 0 1px var(--divider);font-size:12px;color:var(--ink-mute);cursor:pointer;white-space:nowrap}
+  .pf-rule-en input{margin:0;accent-color:var(--dark)}
+  .pf-rule-en.on{color:var(--ink);background:#fff}
   .pf-rule-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px;color:var(--ink-soft)}
   .pf-rule-row select,.pf-rule-row input[type="number"],.pf-rule-row input[type="text"]{height:32px;padding:0 9px;border:0;border-radius:var(--r-sm);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:12.5px;color:var(--ink)}
   .pf-rule-row input[type="number"]{width:74px;font-variant-numeric:tabular-nums}
@@ -547,7 +551,7 @@ import { mountFeedback } from "/shared/feedback.js";
 import { mountGlobalAi } from "/shared/global-ai.js";
 import { computeAnchors, priceToPhi, structValid, ZONES, marketLabel } from "/shared/core.js";
 import { driftText, driftTolerance, driftStatus, driftAction } from "/shared/holding.js";
-import { BUCKET_PRESETS, ALERT_METRICS, ALERT_TEMPLATE_GROUPS, ALERT_TEMPLATES, alertMetricMeta, presetBuckets, createAlertFromTemplate, inferAssetDefaults, evaluateSignalAlerts, isAllocOnly, effectiveCashTarget, computeBucketSummary, computeRebalancePlan, computeScheduleStatus, computeRiskMetrics } from "/shared/rebalance.js";
+import { BUCKET_PRESETS, ALERT_METRICS, ALERT_TEMPLATE_GROUPS, ALERT_TEMPLATES, alertMetricMeta, presetBuckets, createAlertFromTemplate, convertAlertThreshold, metricQuickPresets, inferAssetDefaults, evaluateSignalAlerts, isAllocOnly, effectiveCashTarget, computeBucketSummary, computeRebalancePlan, computeScheduleStatus, computeRiskMetrics } from "/shared/rebalance.js";
 import { formatAlertCond as _fmtCond, formatAlertReading as _fmtRead, renderAlertChart as _renderChart, renderActionStrip, renderAllocationBar, wireSafeDelete } from "/shared/alert-banner.js";
 import { showToast, confirmDialog } from "/shared/ui-toast.js";
 import { validatePfQuery, runPfQuery, dropFilter } from "/shared/pf-query.js";
@@ -1847,7 +1851,8 @@ function openPlan(s, initialTab) {
   const alCats = el("div", "pf-preset-cats");
   const alPresets = el("div", "pf-presets");
   let alertTplGroup = "featured";
-  const sameTpl = (a, tpl) => a.metric === tpl.metric && a.mode === tpl.mode && a.op === tpl.op && Number(a.threshold) === Number(tpl.threshold);
+  // 按「同指标 + 同模式 + 同方向」识别已添加，避免用户微调阈值后预设失联或误点重复
+  const sameTpl = (a, tpl) => a.metric === tpl.metric && a.mode === tpl.mode && a.op === tpl.op;
   const templatesInGroup = (gk) => gk === "all" ? ALERT_TEMPLATES : gk === "featured" ? ALERT_TEMPLATES.filter((t) => t.featured) : ALERT_TEMPLATES.filter((t) => t.group === gk);
   function renderAlertPresets() {
     alCats.innerHTML = "";
@@ -1860,13 +1865,18 @@ function openPlan(s, initialTab) {
     }
     alPresets.innerHTML = "";
     for (const tpl of templatesInGroup(alertTplGroup)) {
-      const existingIdx = draftAlerts.findIndex((a) => sameTpl(a, tpl));
-      const added = existingIdx >= 0;
-      const liveEval = macroData ? evaluateSignalAlerts([{ id: "tmp", enabled: true, metric: tpl.metric, mode: tpl.mode, op: tpl.op, threshold: tpl.threshold }], macroData).items[0] : null;
+      const existing = draftAlerts.find((a) => sameTpl(a, tpl));
+      const added = !!existing;
+      const liveEval = !added && macroData ? evaluateSignalAlerts([{ id: "tmp", enabled: true, metric: tpl.metric, mode: tpl.mode, op: tpl.op, threshold: tpl.threshold }], macroData).items[0] : null;
       const b = el("button", "pf-preset-btn" + (added ? " on" : "")); b.type = "button";
+      const customTh = added && Number(existing.threshold) !== Number(tpl.threshold);
+      const u = tpl.mode === "pct" ? "%" : (alertMetricMeta(tpl.metric)?.unit || "");
+      const lbl = customTh
+        ? T(`${(zh ? tpl.zh : tpl.en).split(/[≥≤]/)[0].trim()} ${tpl.op === "gte" ? "≥" : "≤"} ${tpl.mode === "pct" ? "历史 " : ""}${existing.threshold}${u}`, `${(zh ? tpl.zh : tpl.en).split(/[≥≤]/)[0].trim()} ${tpl.op === "gte" ? "≥" : "≤"} ${existing.threshold}${u}`)
+        : (zh ? tpl.zh : tpl.en);
       b.title = added ? T("已添加 · 点击可取消", "Added — click to remove") : (liveEval?.triggered ? T("该指标当前已触发 · 点击一键添加", "Currently triggered — click to add") : T("点击一键添加", "Click to add"));
-      if (liveEval?.triggered) b.appendChild(el("span", "pf-preset-dot"));
-      b.appendChild(document.createTextNode((added ? "✓ " : "+ ") + (zh ? tpl.zh : tpl.en)));
+      b.appendChild(document.createTextNode((added ? "✓ " : "+ ") + lbl));
+      if (!added && liveEval?.triggered) b.appendChild(el("span", "pf-preset-hit", T("已触发", "Triggered")));
       b.addEventListener("click", () => {
         const idx = draftAlerts.findIndex((a) => sameTpl(a, tpl));
         if (idx >= 0) {
@@ -1904,14 +1914,14 @@ function openPlan(s, initialTab) {
       const meta = alertMetricMeta(a.metric) || ALERT_METRICS[0];
       if (!meta.modes.includes(a.mode)) a.mode = meta.modes[0];
       const evaled = evaluateSignalAlerts([a], macroData, draftProfiles).items[0];
-      const card = el("div", "pf-rule-card" + (evaled.triggered ? " hit" : ""));
+      const card = el("div", "pf-rule-card" + (evaled.triggered ? " hit" : "") + (a.enabled === false ? " off" : ""));
 
       // 第一行：当 [指标] [历史分位 ≥ / 数值 ≤ ...] [阈值] [单位]
       const r1 = el("div", "pf-rule-row");
-      const enLbl = el("label", "pf-alloc-chk" + (a.enabled !== false ? " on" : ""));
+      const enLbl = el("label", "pf-rule-en" + (a.enabled !== false ? " on" : ""));
       const enChk = el("input"); enChk.type = "checkbox"; enChk.checked = a.enabled !== false;
       enChk.addEventListener("change", () => { a.enabled = enChk.checked; renderAlertsEditor(); });
-      enLbl.append(enChk, el("span", "", T("启用", "On")));
+      enLbl.append(enChk, el("span", "", a.enabled !== false ? T("启用", "On") : T("暂停", "Off")));
 
       const mSel = el("select");
       for (const m of ALERT_METRICS) {
@@ -1920,9 +1930,13 @@ function openPlan(s, initialTab) {
       mSel.addEventListener("change", () => {
         a.metric = mSel.value;
         const nm = alertMetricMeta(a.metric);
+        const qp = metricQuickPresets(a.metric, zh ? "zh" : "en")[0];
         if (nm && !nm.modes.includes(a.mode)) {
-          a.mode = nm.modes[0];
-          a.threshold = a.mode === "pct" ? 90 : 2.0;
+          a.mode = qp ? qp.mode : nm.modes[0];
+          a.op = qp ? qp.op : a.op;
+          a.threshold = qp ? qp.threshold : (a.mode === "pct" ? 90 : 2.0);
+        } else if (a.mode === "value" && qp && qp.mode === "value") {
+          a.threshold = qp.threshold;
         }
         renderAlertsEditor();
       });
@@ -1940,8 +1954,10 @@ function openPlan(s, initialTab) {
         const o = el("option", "", l); o.value = v; if (curCond === v) o.selected = true; condSel.appendChild(o);
       }
       condSel.addEventListener("change", () => {
+        const prevMode = a.mode;
         const [md, op] = condSel.value.split(":");
         a.mode = md; a.op = op;
+        if (prevMode !== md) a.threshold = convertAlertThreshold(macroData, a.metric, prevMode, md, a.threshold, op);
         renderAlertsEditor();
       });
 
@@ -1978,7 +1994,7 @@ function openPlan(s, initialTab) {
         ri(evaled.triggered ? "notification-3-fill" : "information-line"),
         document.createTextNode(T("当前：", "Now: ") + formatAlertReading(evaled) + " · " + (evaled.triggered ? T("已触发提醒！", "Triggered!") : evaled.available ? T("未触发", "Not triggered") : T("本地暂未拉到该数据源", "Source unavailable")))
       );
-      const chart = renderAlertChart(evaled, { wide: true });
+      const chart = renderAlertChart(evaled, { wide: true, compact: true });
       card.append(r1, r2, live);
       if (chart) card.appendChild(chart);
       alertsWrap.appendChild(card);
