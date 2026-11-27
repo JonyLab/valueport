@@ -231,6 +231,81 @@ describe("target allocation plan", () => {
     const sum = await (await call(a, "/api/my/portfolio?base=USD")).json();
     expect(sum.plan).toEqual({ targets: { usAAPL: 30 }, cash: 15, band: 4, rel: 20 });
   });
+  it("validates buckets, assetClass, allocOnly, schedule and rebalance mark endpoint", async () => {
+    const valid = validatePlan({
+      targets: { usVOO: 50 },
+      cash: 10,
+      buckets: [
+        { id: "equity", name: "权益", target: 50 },
+        { id: "bond", name: "债券", target: 40 },
+        { id: "cash", name: "现金", target: 10, isCash: true },
+      ],
+      assetClass: { usVOO: "equity", usTLT: "bond" },
+      allocOnly: ["usVOO", "usTLT", "usVOO"],
+      schedule: { freq: "quarterly" },
+      guardrail: false,
+    });
+    expect(valid.error).toBeUndefined();
+    expect(valid.plan.buckets).toHaveLength(3);
+    expect(valid.plan.assetClass).toEqual({ usVOO: "equity", usTLT: "bond" });
+    expect(valid.plan.allocOnly).toEqual(["usVOO", "usTLT"]);
+    expect(valid.plan.schedule).toEqual({ freq: "quarterly" });
+    expect(valid.plan.guardrail).toBe(false);
+
+    // Rejects bucket target sum > 100, duplicate cash bucket, unknown assetClass bucket
+    expect(validatePlan({ targets: {}, buckets: [{ id: "a", name: "A", target: 60 }, { id: "b", name: "B", target: 50 }] }).error).toMatch(/100/);
+    expect(validatePlan({ targets: {}, buckets: [{ id: "c1", name: "C1", isCash: true }, { id: "c2", name: "C2", isCash: true }] }).error).toMatch(/cash bucket/);
+    expect(validatePlan({ targets: {}, buckets: [{ id: "eq", name: "EQ" }], assetClass: { usVOO: "missing" } }).error).toMatch(/unknown bucket/);
+
+    const ck = await userCookie("plan_buckets");
+    const put = await call(ck, "/api/my/portfolio/plan", "PUT", {
+      targets: {},
+      buckets: [{ id: "equity", name: "权益", target: 60 }, { id: "cash", name: "现金", target: 40, isCash: true }],
+      assetClass: { usVOO: "equity" },
+      allocOnly: ["usVOO"],
+      schedule: { freq: "quarterly" },
+    });
+    expect(put.status).toBe(200);
+    const mark = await call(ck, "/api/my/portfolio/rebalance/mark", "POST", {
+      date: "2026-11-27",
+      mode: "cashflow",
+      scope: "bucket",
+      cashAdded: 5000,
+      note: "Q4 季度追加",
+    });
+    expect(mark.status).toBe(200);
+    const marked = (await mark.json()).plan;
+    expect(marked.schedule).toEqual({ freq: "quarterly", lastRebalancedAt: "2026-11-27" });
+    expect(marked.rebalanceLog).toEqual([{ date: "2026-11-27", mode: "cashflow", scope: "bucket", cashAdded: 5000, note: "Q4 季度追加" }]);
+  });
+  it("validates indicator signalAlerts and scenario profiles", () => {
+    const baseBuckets = [
+      { id: "equity", name: "权益", target: 50 },
+      { id: "bond", name: "债券", target: 35 },
+      { id: "commodity", name: "黄金", target: 10 },
+      { id: "cash", name: "现金", target: 5, isCash: true },
+    ];
+    const ok = validatePlan({
+      targets: {},
+      buckets: baseBuckets,
+      profiles: [{ id: "defensive", name: "防守过冬", targets: { equity: 30, bond: 45, commodity: 15, cash: 10 } }],
+      activeProfileId: "defensive",
+      signalAlerts: [
+        { id: "a1", metric: "cn_erp", mode: "pct", op: "gte", threshold: 99, note: "历史99%分位加权益" },
+        { id: "a2", metric: "cn10y", mode: "value", op: "lte", threshold: 1.8, note: "利率低位", suggestProfileId: "defensive" },
+      ],
+    });
+    expect(ok.error).toBeUndefined();
+    expect(ok.plan.profiles).toHaveLength(1);
+    expect(ok.plan.activeProfileId).toBe("defensive");
+    expect(ok.plan.signalAlerts).toHaveLength(2);
+    expect(ok.plan.signalAlerts[1].suggestProfileId).toBe("defensive");
+
+    expect(validatePlan({ targets: {}, buckets: baseBuckets, signalAlerts: [{ id: "a1", metric: "unknown", mode: "pct", op: "gte", threshold: 90 }] }).error).toMatch(/metric/);
+    expect(validatePlan({ targets: {}, buckets: baseBuckets, signalAlerts: [{ id: "a1", metric: "cn_erp", mode: "pct", op: "gte", threshold: 120 }] }).error).toMatch(/0-100/);
+    expect(validatePlan({ targets: {}, buckets: baseBuckets, signalAlerts: [{ id: "a1", metric: "cn_erp", mode: "pct", op: "gte", threshold: 90, suggestProfileId: "missing" }] }).error).toMatch(/suggestProfileId/);
+    expect(validatePlan({ targets: {}, buckets: baseBuckets, profiles: [{ id: "p1", name: "Over", targets: { equity: 70, bond: 40 } }] }).error).toMatch(/100%/);
+  });
 });
 
 describe("user settings", () => {

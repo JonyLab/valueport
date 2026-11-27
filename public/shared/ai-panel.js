@@ -2,6 +2,7 @@ import { normalizeResearch } from "./search-sources.js";
 export { normalizeResearch } from "./search-sources.js";
 import { cleanManagementResearch } from "./valuation/management-research.js";
 import { managementResearchElement } from "./valuation/management-research-ui.js";
+import { armSafeClick } from "./ui-toast.js";
 
 /**
  * ai-panel.js — 估值工作台的 AI 助手抽屉（右侧滑出）。
@@ -500,13 +501,11 @@ export function mountAiPanel(host, { lang, getContext, prepareContext, onApply, 
       b.append(el("span", "vc-ai-mname", c.title || T.untitled), el("span", "vc-ai-mmodel", `${whenText(c.updatedAt)} · ${Math.ceil(c.count / 2)} ${lang === "zh" ? "轮" : c.count > 2 ? "turns" : "turn"}${c.id === chatId ? " · " + T.cur : ""}`));
       b.addEventListener("click", () => { histMenu.hidden = true; if (busy || c.id === chatId) return; openChat(c.id); });
       const del = el("button", "vc-ai-hdel"); del.type = "button"; del.title = T.histDel; del.setAttribute("aria-label", T.histDel); del.appendChild(ri("delete-bin-6-line"));
-      del.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if (!confirm(T.histDelQ)) return;
+      armSafeClick(del, async () => {
         await fetch("/api/my/ai/chats/" + c.id, { method: "DELETE" }).catch(() => null);
         if (c.id === chatId && !busy) resetChat();
         drawHistory();
-      });
+      }, lang);
       row.append(b, del); histMenu.appendChild(row);
     }
   }

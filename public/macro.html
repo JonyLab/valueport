@@ -147,6 +147,12 @@
   .mc-tile-d{font-size:11px;color:var(--ink-mute);font-variant-numeric:tabular-nums}
   .mc-tile .mc-spark{width:100%;height:24px;margin-top:2px}
   .mc-tile.sk-t{min-height:96px}
+  /* 看图即设提醒：指标行与利率卡上的轻盈铃铛按钮 */
+  .mc-bell{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-left:auto;border:0;border-radius:50%;background:transparent;color:var(--ink-mute);cursor:pointer;font-size:14px;flex:none;opacity:.55;transition:opacity .15s,background .15s,color .15s}
+  .mc-ind:hover .mc-bell,.mc-tile:hover .mc-bell,.mc-bell:focus-visible,.mc-bell.set,.mc-bell.hit{opacity:1}
+  .mc-bell:hover{background:var(--track);color:var(--ink)}
+  .mc-bell.set{color:var(--ink);background:rgba(29,29,27,.06)}
+  .mc-bell.hit{background:var(--sun);color:var(--sun-ink)}
   @media (max-width:1100px){ .mc-markets,.mc-pulse{grid-template-columns:1fr} .mc-zones{grid-template-columns:repeat(3,minmax(0,1fr))} }
   @media (max-width:820px){ .mc-tiles{grid-template-columns:repeat(2,minmax(0,1fr))} }
   @media (max-width:600px){
@@ -163,6 +169,9 @@
   <link rel="modulepreload" href="/shared/core.js">
   <link rel="modulepreload" href="/shared/gauge.js">
   <link rel="modulepreload" href="/shared/macro-board.js">
+  <link rel="modulepreload" href="/shared/holding.js">
+  <link rel="modulepreload" href="/shared/rebalance.js">
+  <link rel="modulepreload" href="/shared/alert-banner.js">
   <link rel="modulepreload" href="/shared/i18n.js">
   <link rel="modulepreload" href="/shared/langmenu.js">
   <link rel="modulepreload" href="/shared/feedback.js">
@@ -201,6 +210,8 @@
       </div>
     </div>
   </div>
+
+  <div id="mcSigBanner"></div>
 
   <div class="mc-grid">
     <section class="mc-card" id="mcLevel">
@@ -242,6 +253,8 @@ import { mountGlobalAi } from "/shared/global-ai.js";
 import { Gauge } from "/shared/gauge.js";
 import { ZONES, structValid, computeAnchors, priceToPhi } from "/shared/core.js";
 import { PREFS_KEY, DEFAULT_PREFS, normalizePrefs, parsePrefs, serializePrefs, visibleMarkets, isDefaultPrefs, toggleMarket, moveMarket, setCross, pickNewer, marketSummary, sparkPath } from "/shared/macro-board.js";
+import { evaluateSignalAlerts } from "/shared/rebalance.js";
+import { renderActionStrip, openQuickAlertModal, formatAlertCond } from "/shared/alert-banner.js";
 
 applyI18n();
 mountLangMenu(document.getElementById("topActions"));
@@ -345,7 +358,7 @@ async function loadMacro(keys, withRates) {
     if (m) { MAC.markets[k] = m; if (d.gravity && d.gravity[k]) MAC.gravity[k] = d.gravity[k]; }
   }
   if (d) { MAC.rates = d.rates || []; MAC.ratesSt = "ok"; MAC.updatedAt = d.updatedAt || MAC.updatedAt; } else if (MAC.ratesSt !== "ok") MAC.ratesSt = "error";
-  renderLevel(); renderGravity(); renderPulse(); renderCross(); renderVerdict(); renderMineSay();
+  renderLevel(); renderGravity(); renderPulse(); renderCross(); renderVerdict(); renderMineSay(); renderSignalAlerts();
 }
 async function loadPulse(keys, withCross) {
   for (const k of keys) PUL.st[k] = "loading";
@@ -422,6 +435,8 @@ function renderLevel() {
       const meta = IND[x.key] || { name: x.key, tip: "" };
       const row = el("div", "mc-ind");
       const kk = el("span", "mc-ind-k", meta.name); const info = ri("information-line"); info.title = meta.tip; kk.appendChild(info);
+      const bell = alertBellButton(x.key);
+      if (bell) kk.appendChild(bell);
       row.append(kk, el("span", "mc-ind-v", `${x.value}${x.unit === "%" ? "%" : x.unit === "pp" ? " pp" : ""}`));
       // 五段条：位置 = 「贵的程度」分位（风险溢价类已反向）
       const bar = el("div", "mc-pbar");
@@ -503,6 +518,8 @@ function renderCross() {
   const rates = MAC.rates || [], R = (key) => rates.find((x) => x.key === key);
   const rateTile = (key) => {
     const meta = RATE[key], t = tile(meta.name, meta.tip);
+    const bell = alertBellButton(key);
+    if (bell) t.querySelector(".mc-tile-k").appendChild(bell);
     if (MAC.ratesSt === "loading" || !MAC.ratesSt) return skel();
     const x = R(key);
     if (!x) return miss(t, MAC.ratesSt === "error" ? () => { MAC.ratesSt = null; ensureData(); } : null);
@@ -650,7 +667,81 @@ async function renderMine() {
   renderMineSay(); renderVerdict();
   return counts;
 }
-let mine = null;
+let mine = null, userPlan = null, triggeredAlerts = [];
+function currentMacroSnapshot() {
+  return { markets: Object.values(MAC.markets), gravity: MAC.gravity, rates: MAC.rates || [] };
+}
+// 看图即设提醒：仅对已登录用户显示轻盈铃铛，点开直接拉线保存，不打断浏览
+function alertBellButton(metricKey) {
+  if (!userPlan) return null;
+  const list = Array.isArray(userPlan.signalAlerts) ? userPlan.signalAlerts : [];
+  const existing = list.find((a) => a.metric === metricKey && a.enabled !== false);
+  const hit = triggeredAlerts.some((a) => a.metric === metricKey);
+  const b = el("button", "mc-bell" + (hit ? " hit" : existing ? " set" : ""));
+  b.type = "button";
+  b.appendChild(ri(existing || hit ? "notification-3-fill" : "notification-3-line"));
+  b.title = existing
+    ? T(`已设提醒（${formatAlertCond(existing, LANG)}），点击修改或删除`, `Alert set (${formatAlertCond(existing, LANG)}) — click to edit`)
+    : T("为这项指标设置区间提醒", "Set an alert on this indicator");
+  b.setAttribute("aria-label", b.title);
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openQuickAlertModal({
+      metricKey,
+      macroData: currentMacroSnapshot(),
+      plan: userPlan,
+      lang: LANG,
+      onSaved: (nextPlan) => {
+        userPlan = nextPlan;
+        levelSig = ""; // 刷新指标行上的铃铛状态
+        renderSignalAlerts();
+        renderLevel();
+        renderCross();
+      },
+    });
+  });
+  return b;
+}
+function renderSignalAlerts() {
+  const host = $("mcSigBanner");
+  if (!host) return;
+  if (!userPlan || !Array.isArray(userPlan.signalAlerts) || !userPlan.signalAlerts.length) {
+    triggeredAlerts = [];
+    host.replaceChildren();
+    renderVerdict();
+    return;
+  }
+  const snap = currentMacroSnapshot();
+  const ev = evaluateSignalAlerts(userPlan.signalAlerts, snap, userPlan.profiles || []);
+  triggeredAlerts = ev.triggered;
+  const strip = renderActionStrip({
+    triggered: ev.triggered,
+    macroData: snap,
+    lang: LANG,
+    storageKey: "vp_mc_strip_dismiss",
+    defaultExpanded: true,
+    onAction: (a) => {
+      const q = new URLSearchParams({ rebalance: "1", ...(a.suggestProfile ? { profile: a.suggestProfile.id } : {}) });
+      location.href = "/portfolio?" + q.toString();
+    },
+    onManage: () => { location.href = "/portfolio"; },
+  });
+  host.replaceChildren(...(strip ? [strip] : []));
+  renderVerdict();
+}
+async function loadUserPlan() {
+  try {
+    const r = await fetch("/api/my/portfolio/plan", { cache: "no-store" });
+    if (!r.ok) return;
+    const j = await r.json();
+    userPlan = j && j.plan ? j.plan : null;
+    levelSig = ""; // 登录后点亮各指标卡片上的铃铛入口
+    const alerts = (userPlan && userPlan.signalAlerts) || [];
+    const needAll = alerts.length ? ["us", "hk", "cn"].filter((k) => !MAC.st[k]) : [];
+    if (needAll.length) loadMacro(needAll, !MAC.ratesSt);
+    else { renderSignalAlerts(); renderLevel(); renderCross(); }
+  } catch {}
+}
 // 和市场水位互相印证：市场便宜 → 去更新估值；市场贵 → 击球区里的名字更要复核（只看显示中的市场）
 function renderMineSay() {
   const say = $("mcMineSay");
@@ -672,11 +763,15 @@ function renderVerdict() {
   for (const m of live) chip(ZONES[m.zone].hex, MKT[m.key], ZN[m.zone], T(`${m.level} 分位`, `P${m.level}`));
   if (mine) chip("", T("自选", "Watchlist"), T(`击球区 ${mine[0]}`, `${mine[0]} strike`), T(`· 低估 ${mine[1]}`, `· ${mine[1]} undervalued`));
   const badge = $("mcBadge");
-  if (!settled || (!live.length && !mine)) badge.hidden = true;
+  if (!settled || (!live.length && !mine && !triggeredAlerts.length)) badge.hidden = true;
   else {
-    const go = live.some((m) => m.zone <= 1) || (mine && mine[0] > 0);
+    const hasAlert = triggeredAlerts.length > 0;
+    const go = hasAlert || live.some((m) => m.zone <= 1) || (mine && mine[0] > 0);
     badge.hidden = false; badge.className = "mc-badge" + (go ? " go" : "");
-    badge.replaceChildren(ri(go ? "search-eye-line" : "cup-line"), document.createTextNode(go ? T("值得翻一翻自选", "Worth a look at your watchlist") : T("本月无需行动", "Nothing to do this month")));
+    badge.replaceChildren(
+      ri(hasAlert ? "notification-3-fill" : go ? "search-eye-line" : "cup-line"),
+      document.createTextNode(hasAlert ? T(`有 ${triggeredAlerts.length} 条配置指标提醒`, `${triggeredAlerts.length} allocation alert(s)`) : go ? T("值得翻一翻自选", "Worth a look at your watchlist") : T("本月无需行动", "Nothing to do this month"))
+    );
   }
   const upd = MAC.updatedAt ? new Date(MAC.updatedAt) : null;
   const days = lastVisit ? Math.floor((Date.now() - lastVisit) / 86400000) : null;
@@ -736,6 +831,7 @@ document.addEventListener("click", (e) => { const path = e.composedPath(); if (!
 custLabel();
 ensureData(); renderAll();
 renderMine();
+loadUserPlan();
 </script>
 </body>
 </html>

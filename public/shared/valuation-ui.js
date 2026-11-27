@@ -19,6 +19,7 @@ import { aggregateSegments } from "/shared/valuation/segments.js";
 import { assetResetValue, COMMODITIES } from "/shared/valuation/resource.js";
 import { resourceAiFields, resourceAiFacts, applyResourceAiParams } from "/shared/valuation/resource-ai.js";
 import { mountAiPanel, aiErrorText } from "/shared/ai-panel.js";
+import { showToast } from "/shared/ui-toast.js";
 import { verifiedFacts, marketViews, masterLenses, businessFacts, latestMetrics, assumptionChecks, isFinancialCompany } from "/shared/valuation/facts.js";
 import { cleanThesis, THESIS_SCENARIOS, thesisLines, fieldStoryHint } from "/shared/valuation/thesis.js";
 import { mountThesisQuestions } from "/shared/valuation/thesis-questions.js";
@@ -1734,7 +1735,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
         merged = applyResourceAiParams(cleanForm(lastForm), params, fields);
       } else merged = { ...cleanForm(lastForm), ...params };
     } catch {
-      alert(lang === "zh" ? "资产明细或估值方法已变化，请重新获取 AI 建议。" : "Assets or method changed. Please request fresh AI suggestions.");
+      showToast(lang === "zh" ? "资产明细或估值方法已变化，请重新获取 AI 建议。" : "Assets or method changed. Please request fresh AI suggestions.", { tone: "warn" });
       return null;
     }
     for (const k of Object.keys(params)) delete derivations[k]; // 改了的字段解除推导

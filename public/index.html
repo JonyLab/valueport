@@ -1515,6 +1515,7 @@
 <link rel="modulepreload" href="/shared/valuation/management-research.js">
 <link rel="modulepreload" href="/shared/valuation/method-readiness.js">
 <link rel="modulepreload" href="/shared/search-sources.js">
+<link rel="modulepreload" href="/shared/ui-toast.js">
 </head>
 <body class="booting">
 <div class="page">
@@ -1691,6 +1692,7 @@ import { verifiedFacts, latestMetrics, marketViews, masterLenses, businessFacts,
 import { aiErrorText } from "/shared/ai-panel.js";
 import { METRICS, metricKey, metricSeries, sparkGeom } from "/shared/metric-spark.js";
 import { holdingFor, driftText } from "/shared/holding.js";
+import { showToast, confirmDialog, armSafeClick } from "/shared/ui-toast.js";
 
 applyI18n(); // 静态文案先按当前语言渲染
 // Remix Icon 图标（装饰性，读屏跳过）
@@ -2544,14 +2546,14 @@ document.getElementById("btnModalCancel").addEventListener("click", async () => 
   modalOverlay.classList.add("hidden");
 });
 async function requestRemoveItem(removed) {
-  if (!confirm(t("m_confirm_remove"))) return;
+  if (!(await confirmDialog({ message: t("m_confirm_remove"), confirmText: LANG === "zh" ? "确认移除" : "Remove", lang: LANG }))) return;
   try {
     if (removed.id) {
       const res = await fetch(`/api/my/items/${removed.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Remove failed");
     }
   } catch {
-    alert(LANG === "zh" ? "移除失败，请稍后重试" : "Could not remove this symbol. Please try again.");
+    showToast(LANG === "zh" ? "移除失败，请稍后重试" : "Could not remove this symbol. Please try again.", { tone: "bad" });
     return;
   }
   clearTimeout(removed._saveT);
@@ -2628,7 +2630,7 @@ async function renderHolding(item, card) {
     const p = h.plan, box = mk("div", "vd-hold-plan " + p.status);
     const line = mk("div", "vd-hold-planline");
     line.append(mk("span", "", T(`目标 ${p.tgt.toFixed(1)}%`, `Target ${p.tgt.toFixed(1)}%`)),
-      mk("span", "vd-hold-drift " + p.status, p.status === "build" ? T("未持有", "Not held") : (p.drift > 0 ? "+" : p.drift < 0 ? "−" : "") + Math.abs(p.drift).toFixed(1) + "pp"));
+      mk("span", "vd-hold-drift " + p.status, p.status === "build" ? T("未持有", "Not held") : (p.drift > 0 ? "+" : p.drift < 0 ? "−" : "") + Math.abs(p.drift).toFixed(1) + "%"));
     box.append(line, mk("div", "vd-hold-say " + p.action, TX[p.action]));
     if (p.status !== "ok" && Number.isFinite(p.trade) && p.trade) {
       const buy = p.trade > 0;
@@ -4030,10 +4032,9 @@ async function initAiSettings() {
       if (info.active === m.id) id.firstChild.appendChild(mk("span", "ai-inuse", T("默认", "Default")));
       const edit = mk("button", "btn sm", T("编辑", "Edit")); edit.type = "button"; edit.addEventListener("click", () => { editing = m.id; draw(); });
       const del = mk("button", "btn sm ghost", T("删除", "Delete")); del.type = "button";
-      del.addEventListener("click", async () => {
-        if (!confirm(T(`删除「${m.name}」？`, `Delete "${m.name}"?`))) return;
+      armSafeClick(del, async () => {
         await fetch("/api/my/ai/models/" + m.id.slice(2), { method: "DELETE" }); setState("ok", T("已删除", "Deleted")); refresh();
-      });
+      }, LANG);
       row.append(id, edit, del); list.appendChild(row);
     }
     if (editing === "new") list.appendChild(form(null));

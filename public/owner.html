@@ -82,8 +82,19 @@ async function login(){ $("gerr").textContent="";
 $("gin").addEventListener("click",login); $("pw").addEventListener("keydown",(e)=>{if(e.key==="Enter")login();});
 $("out").addEventListener("click",async()=>{await fetch("/api/owner/logout",{method:"POST"});location.reload();});
 $("gen").addEventListener("click",async()=>{ await fetch("/api/owner/codes",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({count:Number($("cnt").value)||1})}); filter="free"; refreshCodes(); usage?.load(); });
-$("users").addEventListener("click",async(e)=>{ const b=e.target.closest("button[data-id]"); if(!b) return;
-  const r=await fetch(`/api/owner/users/${b.dataset.id}/reset`,{method:"POST"}); const j=await r.json(); if(j.ok) alert(t("o_reset_ok")+"\n"+j.password); });
+$("users").addEventListener("click",async(e)=>{
+  const cp=e.target.closest("button[data-tmp]");
+  if(cp){ await navigator.clipboard.writeText(cp.dataset.tmp).catch(()=>{}); const o=cp.textContent; cp.textContent=t("o_copied"); setTimeout(()=>{ cp.textContent=o; },1500); return; }
+  const b=e.target.closest("button[data-id]"); if(!b) return;
+  b.disabled=true;
+  try{
+    const r=await fetch(`/api/owner/users/${b.dataset.id}/reset`,{method:"POST"}); const j=await r.json();
+    if(j.ok){
+      const td=b.parentElement;
+      td.innerHTML=`<span class="tag free mono" title="${esc(t("o_reset_ok"))}">${esc(j.password)}</span> <button class="btn" data-tmp="${esc(j.password)}">${esc(t("o_copy"))}</button>`;
+    }
+  }finally{ b.disabled=false; }
+});
 // 激活码：默认只看未用的，已用的切过去看谁用了、何时用的
 let codes=[], filter="free";
 $("cfilter").addEventListener("click",(e)=>{ const b=e.target.closest("button[data-f]"); if(b){ filter=b.dataset.f; renderCodes(); } });
