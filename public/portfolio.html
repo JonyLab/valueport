@@ -379,8 +379,15 @@
   .pf-plan-sec-h{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
   .pf-plan-sec-t{font-size:14px;font-weight:500;color:var(--ink)}
   .pf-presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-  .pf-preset-btn{height:28px;padding:0 11px;border:0;border-radius:var(--r-pill);background:rgba(246,207,74,.22);color:var(--sun-ink);font-family:var(--font);font-size:12px;cursor:pointer}
+  .pf-preset-cats{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+  .pf-preset-cat{height:24px;padding:0 10px;border:1px solid var(--hairline);border-radius:var(--r-pill);background:transparent;color:var(--ink-2);font-family:var(--font);font-size:11.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+  .pf-preset-cat:hover{background:rgba(29,29,27,.04);color:var(--ink)}
+  .pf-preset-cat.on{background:var(--dark);color:#f7f5ef;border-color:var(--dark)}
+  .pf-preset-btn{height:28px;padding:0 11px;border:0;border-radius:var(--r-pill);background:rgba(246,207,74,.22);color:var(--sun-ink);font-family:var(--font);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
   .pf-preset-btn:hover{background:rgba(246,207,74,.38)}
+  .pf-preset-btn.on{background:rgba(36,138,85,.14);color:var(--green)}
+  .pf-preset-btn.on:hover{background:rgba(36,138,85,.22)}
+  .pf-preset-dot{width:6px;height:6px;border-radius:50%;background:#c26a19;flex:none}
   .pf-bkt-rows{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
   .pf-bkt-edit{display:grid;grid-template-columns:minmax(0,1fr) 106px auto auto;gap:8px;align-items:center;padding:7px 10px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
   .pf-plan-tabs{margin-bottom:14px;width:fit-content;max-width:100%;overflow-x:auto}
@@ -540,7 +547,7 @@ import { mountFeedback } from "/shared/feedback.js";
 import { mountGlobalAi } from "/shared/global-ai.js";
 import { computeAnchors, priceToPhi, structValid, ZONES, marketLabel } from "/shared/core.js";
 import { driftText, driftTolerance, driftStatus, driftAction } from "/shared/holding.js";
-import { BUCKET_PRESETS, ALERT_METRICS, ALERT_TEMPLATES, alertMetricMeta, presetBuckets, createAlertFromTemplate, inferAssetDefaults, evaluateSignalAlerts, isAllocOnly, effectiveCashTarget, computeBucketSummary, computeRebalancePlan, computeScheduleStatus, computeRiskMetrics } from "/shared/rebalance.js";
+import { BUCKET_PRESETS, ALERT_METRICS, ALERT_TEMPLATE_GROUPS, ALERT_TEMPLATES, alertMetricMeta, presetBuckets, createAlertFromTemplate, inferAssetDefaults, evaluateSignalAlerts, isAllocOnly, effectiveCashTarget, computeBucketSummary, computeRebalancePlan, computeScheduleStatus, computeRiskMetrics } from "/shared/rebalance.js";
 import { formatAlertCond as _fmtCond, formatAlertReading as _fmtRead, renderAlertChart as _renderChart, renderActionStrip, renderAllocationBar, wireSafeDelete } from "/shared/alert-banner.js";
 import { showToast, confirmDialog } from "/shared/ui-toast.js";
 import { validatePfQuery, runPfQuery, dropFilter } from "/shared/pf-query.js";
@@ -1837,13 +1844,43 @@ function openPlan(s, initialTab) {
   alH.append(el("span", "pf-plan-sec-t", T("1. 指标区间提醒", "1. Indicator threshold alerts")), el("span", "pf-cardsub", T("到区间就提醒，点击模板一键添加", "Alert when an indicator hits your zone")));
   alSec.appendChild(alH);
 
+  const alCats = el("div", "pf-preset-cats");
   const alPresets = el("div", "pf-presets");
-  for (const tpl of ALERT_TEMPLATES) {
-    const b = el("button", "pf-preset-btn", "+ " + (zh ? tpl.zh : tpl.en)); b.type = "button";
-    b.addEventListener("click", () => { draftAlerts.push(createAlertFromTemplate(tpl.key, zh ? "zh" : "en")); renderAlertsEditor(); });
-    alPresets.appendChild(b);
+  let alertTplGroup = "featured";
+  const sameTpl = (a, tpl) => a.metric === tpl.metric && a.mode === tpl.mode && a.op === tpl.op && Number(a.threshold) === Number(tpl.threshold);
+  const templatesInGroup = (gk) => gk === "all" ? ALERT_TEMPLATES : gk === "featured" ? ALERT_TEMPLATES.filter((t) => t.featured) : ALERT_TEMPLATES.filter((t) => t.group === gk);
+  function renderAlertPresets() {
+    alCats.innerHTML = "";
+    for (const g of ALERT_TEMPLATE_GROUPS) {
+      const cnt = templatesInGroup(g.key).length;
+      const cb = el("button", "pf-preset-cat" + (alertTplGroup === g.key ? " on" : ""), `${zh ? g.zh : g.en} ${cnt}`);
+      cb.type = "button";
+      cb.addEventListener("click", () => { alertTplGroup = g.key; renderAlertPresets(); });
+      alCats.appendChild(cb);
+    }
+    alPresets.innerHTML = "";
+    for (const tpl of templatesInGroup(alertTplGroup)) {
+      const existingIdx = draftAlerts.findIndex((a) => sameTpl(a, tpl));
+      const added = existingIdx >= 0;
+      const liveEval = macroData ? evaluateSignalAlerts([{ id: "tmp", enabled: true, metric: tpl.metric, mode: tpl.mode, op: tpl.op, threshold: tpl.threshold }], macroData).items[0] : null;
+      const b = el("button", "pf-preset-btn" + (added ? " on" : "")); b.type = "button";
+      b.title = added ? T("已添加 · 点击可取消", "Added — click to remove") : (liveEval?.triggered ? T("该指标当前已触发 · 点击一键添加", "Currently triggered — click to add") : T("点击一键添加", "Click to add"));
+      if (liveEval?.triggered) b.appendChild(el("span", "pf-preset-dot"));
+      b.appendChild(document.createTextNode((added ? "✓ " : "+ ") + (zh ? tpl.zh : tpl.en)));
+      b.addEventListener("click", () => {
+        const idx = draftAlerts.findIndex((a) => sameTpl(a, tpl));
+        if (idx >= 0) {
+          draftAlerts.splice(idx, 1);
+        } else {
+          if (draftAlerts.length >= 20) { showToast(T("最多可添加 20 条指标提醒", "Max 20 alerts allowed"), { tone: "warn" }); return; }
+          draftAlerts.push(createAlertFromTemplate(tpl.key, zh ? "zh" : "en"));
+        }
+        renderAlertsEditor();
+      });
+      alPresets.appendChild(b);
+    }
   }
-  alSec.appendChild(alPresets);
+  alSec.append(alCats, alPresets);
 
   const alertsWrap = el("div", "pf-bkt-rows");
   alSec.appendChild(alertsWrap);
@@ -1857,6 +1894,7 @@ function openPlan(s, initialTab) {
   panes.alerts.appendChild(alSec);
 
   function renderAlertsEditor() {
+    renderAlertPresets();
     alertsWrap.innerHTML = "";
     if (!draftAlerts.length) {
       alertsWrap.appendChild(el("div", "pf-note", T("暂无指标提醒。点上方常用模板即可快速添加。", "No alerts yet. Click a template above to add one.")));

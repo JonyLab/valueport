@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   presetBuckets,
+  ALERT_METRICS,
+  ALERT_TEMPLATE_GROUPS,
+  ALERT_TEMPLATES,
   createAlertFromTemplate,
   inferAssetDefaults,
   metricQuickPresets,
@@ -209,6 +212,21 @@ describe("indicator threshold alerts and scenario profiles", () => {
 
     const tpl = createAlertFromTemplate("cn_erp_high", "zh");
     expect(tpl).toMatchObject({ metric: "cn_erp", mode: "pct", op: "gte", threshold: 90 });
+
+    // Every preset template references a valid metric, mode, op, and group
+    expect(ALERT_TEMPLATES.length).toBeGreaterThanOrEqual(16);
+    const metricMap = new Map(ALERT_METRICS.map((m) => [m.key, m]));
+    const groupKeys = new Set(ALERT_TEMPLATE_GROUPS.map((g) => g.key));
+    for (const item of ALERT_TEMPLATES) {
+      const m = metricMap.get(item.metric);
+      expect(m).toBeTruthy();
+      expect(m.modes).toContain(item.mode);
+      expect(["gte", "lte"]).toContain(item.op);
+      expect(groupKeys.has(item.group)).toBe(true);
+      const created = createAlertFromTemplate(item.key, "en");
+      expect(created.metric).toBe(item.metric);
+      expect(created.note.length).toBeGreaterThan(0);
+    }
   });
 
   it("applies selected scenario profile in computeRebalancePlan without mutating base targets", () => {

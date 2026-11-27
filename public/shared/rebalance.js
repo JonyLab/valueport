@@ -73,9 +73,19 @@ export const ALERT_METRICS = [
 export const ALERT_METRIC_KEYS = ALERT_METRICS.map((m) => m.key);
 export const alertMetricMeta = (key) => ALERT_METRICS.find((m) => m.key === key) || null;
 
+export const ALERT_TEMPLATE_GROUPS = [
+  { key: "featured", zh: "精选", en: "Popular" },
+  { key: "cn",       zh: "A 股", en: "China A" },
+  { key: "hk",       zh: "港股", en: "Hong Kong" },
+  { key: "us",       zh: "美股", en: "US" },
+  { key: "rates",    zh: "国债利率", en: "Bond yields" },
+  { key: "all",      zh: "全部", en: "All" },
+];
+
 export const ALERT_TEMPLATES = [
+  // ---- A 股 ----
   {
-    key: "cn_erp_high",
+    key: "cn_erp_high", group: "cn", featured: true,
     zh: "A 股股债性价比 ≥ 历史 90%（股票极便宜）",
     en: "China A ERP ≥ 90th pct (equities very cheap)",
     metric: "cn_erp", mode: "pct", op: "gte", threshold: 90,
@@ -83,7 +93,7 @@ export const ALERT_TEMPLATES = [
     noteEn: "China A equity-bond spread is near historical highs — consider adding equities",
   },
   {
-    key: "cn_erp_low",
+    key: "cn_erp_low", group: "cn", featured: true,
     zh: "A 股股债性价比 ≤ 历史 10%（股票偏贵）",
     en: "China A ERP ≤ 10th pct (equities expensive)",
     metric: "cn_erp", mode: "pct", op: "lte", threshold: 10,
@@ -91,7 +101,65 @@ export const ALERT_TEMPLATES = [
     noteEn: "China A equity-bond spread is historically thin — consider shifting toward bonds/cash",
   },
   {
-    key: "us_erp_low",
+    key: "cn_level_low", group: "cn",
+    zh: "A 股综合水位 ≤ 15%（低估击球区）",
+    en: "China A level ≤ 15th pct (strike zone)",
+    metric: "cn_level", mode: "pct", op: "lte", threshold: 15,
+    noteZh: "A 股综合估值水位落入历史低位，适合加大定投或向权益再平衡",
+    noteEn: "China A composite valuation is in historical low zone — good window to add equities",
+  },
+  {
+    key: "cn_pe_low", group: "cn",
+    zh: "全 A 市盈率 ≤ 历史 15%（估值便宜）",
+    en: "China A P/E ≤ 15th pct (cheap)",
+    metric: "cn_pe", mode: "pct", op: "lte", threshold: 15,
+    noteZh: "全 A 市盈率处于历史低分位，中长期赔率偏有利",
+    noteEn: "China A market P/E is near historical lows — favorable long-term odds",
+  },
+  // ---- 港股 ----
+  {
+    key: "hk_erp_high", group: "hk", featured: true,
+    zh: "港股股债性价比 ≥ 历史 90%（高赔率区）",
+    en: "HK ERP ≥ 90th pct (high reward)",
+    metric: "hk_erp", mode: "pct", op: "gte", threshold: 90,
+    noteZh: "港股相对无风险利率风险溢价极高，留意高股息与核心宽基机会",
+    noteEn: "HK equity risk premium is near historical highs — watch high-dividend & index opportunities",
+  },
+  {
+    key: "hk_erp_low", group: "hk",
+    zh: "港股股债性价比 ≤ 历史 10%（性价比偏薄）",
+    en: "HK ERP ≤ 10th pct (thin spread)",
+    metric: "hk_erp", mode: "pct", op: "lte", threshold: 10,
+    noteZh: "港股相对美债性价比收窄，注意控制仓位上限、逢高再平衡",
+    noteEn: "HK equity-bond spread has narrowed — review equity cap and rebalance",
+  },
+  {
+    key: "hk_pe_low", group: "hk",
+    zh: "恒指市盈率 ≤ 9x（历史深谷）",
+    en: "Hang Seng P/E ≤ 9x (deep value)",
+    metric: "hk_pe", mode: "value", op: "lte", threshold: 9,
+    noteZh: "恒生指数市盈率跌破 9 倍，处于长期深度价值区间",
+    noteEn: "Hang Seng P/E is below 9x — deep historical value territory",
+  },
+  {
+    key: "hk_level_low", group: "hk",
+    zh: "港股综合水位 ≤ 15%（低估区）",
+    en: "HK level ≤ 15th pct (undervalued)",
+    metric: "hk_level", mode: "pct", op: "lte", threshold: 15,
+    noteZh: "港股综合估值处于历史低位，适合分批补齐港股配置权重",
+    noteEn: "Hong Kong composite valuation is historically low — consider topping up HK allocation",
+  },
+  // ---- 美股 ----
+  {
+    key: "us_erp_high", group: "us",
+    zh: "美股股债性价比 ≥ 历史 85%（难得便宜）",
+    en: "US ERP ≥ 85th pct (rarely cheap)",
+    metric: "us_erp", mode: "pct", op: "gte", threshold: 85,
+    noteZh: "美股相对实际利率性价比罕见走高，可逐步增加美股宽基权重",
+    noteEn: "US equity risk premium is unusually attractive — consider adding US equities",
+  },
+  {
+    key: "us_erp_low", group: "us", featured: true,
     zh: "美股股债性价比 ≤ 历史 5%（美股偏贵）",
     en: "US ERP ≤ 5th pct (US equities expensive)",
     metric: "us_erp", mode: "pct", op: "lte", threshold: 5,
@@ -99,12 +167,53 @@ export const ALERT_TEMPLATES = [
     noteEn: "US equity risk premium is historically thin — consider tilting to bonds/cash",
   },
   {
-    key: "cn10y_low",
-    zh: "中国 10 年国债 ≤ 1.8%（利率低位）",
+    key: "us_cape_high", group: "us",
+    zh: "美股席勒 PE ≥ 35x（长期估值偏高）",
+    en: "US Shiller CAPE ≥ 35x (richly valued)",
+    metric: "cape", mode: "value", op: "gte", threshold: 35,
+    noteZh: "美股席勒周期调整市盈率突破 35 倍，未来十年预期回报收窄，宜控回撤",
+    noteEn: "US Shiller CAPE topped 35x — long-term forward returns tighten, stay disciplined",
+  },
+  {
+    key: "us_buffett_high", group: "us",
+    zh: "美股总市值 / GDP ≥ 历史 95%（巴菲特指标极高）",
+    en: "US Mkt Cap / GDP ≥ 95th pct (Buffett extreme)",
+    metric: "buffett", mode: "pct", op: "gte", threshold: 95,
+    noteZh: "美股总市值相对 GDP 处于历史极端高位，注意严守股债再平衡纪律",
+    noteEn: "US Market Cap / GDP is at historical extremes — stick strictly to rebalancing bands",
+  },
+  // ---- 国债利率 ----
+  {
+    key: "cn10y_low", group: "rates", featured: true,
+    zh: "中国 10 年国债 ≤ 1.8%（长债利率低位）",
     en: "China 10Y yield ≤ 1.8% (low rates)",
     metric: "cn10y", mode: "value", op: "lte", threshold: 1.8,
     noteZh: "国债利率处于低位，留意长债久期风险与高股息资产性价比",
     noteEn: "China 10Y yield is low — watch long-duration bond risk and income equity value",
+  },
+  {
+    key: "cn10y_high", group: "rates",
+    zh: "中国 10 年国债 ≥ 3.0%（中债配置窗口）",
+    en: "China 10Y yield ≥ 3.0% (attractive yield)",
+    metric: "cn10y", mode: "value", op: "gte", threshold: 3.0,
+    noteZh: "中债无风险票息回到较厚区间，可适度拉长久期锁定收益",
+    noteEn: "China 10Y yield is attractive again — consider locking in duration",
+  },
+  {
+    key: "us10y_high", group: "rates", featured: true,
+    zh: "美国 10 年国债 ≥ 4.5%（美债高息锁利）",
+    en: "US 10Y yield ≥ 4.5% (high Treasury yield)",
+    metric: "us10y", mode: "value", op: "gte", threshold: 4.5,
+    noteZh: "美债票息处于近十余年高位，可作为稳健仓位的优质压舱石",
+    noteEn: "US 10Y Treasury yield is near multi-year highs — strong defensive ballast",
+  },
+  {
+    key: "us_real10y_high", group: "rates",
+    zh: "美国 10 年实际利率 ≥ 2.0%（TIPS / 长债吸引）",
+    en: "US 10Y real yield ≥ 2.0% (TIPS attractive)",
+    metric: "us_real10y", mode: "value", op: "gte", threshold: 2.0,
+    noteZh: "扣除通胀后的美债实际回报 ≥ 2%，对保守型配置非常有吸引力",
+    noteEn: "Inflation-adjusted US 10Y real yield ≥ 2% — compelling for conservative portfolios",
   },
 ];
 
