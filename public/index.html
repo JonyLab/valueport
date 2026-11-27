@@ -74,7 +74,7 @@
   .chart-item.is-link:hover,.chart-item[style*="cursor"]:hover{transform:translateY(-2px);background:rgba(255,255,255,.88);
     box-shadow:0 1px 2px rgba(60,50,20,.05),0 18px 40px -18px rgba(60,50,20,.26)}
   .chart-item.is-link:active,.chart-item[style*="cursor"]:active{transform:translateY(0)}
-  .chart-item.is-link:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring),var(--shadow)}
+  .chart-item.is-link:has(.card-detail-btn:focus-visible){box-shadow:0 0 0 3px var(--ring),var(--shadow)}
   .chart-item.is-link:hover .card-detail-btn i{transform:translate(1.5px,-1.5px)}
   .card-detail-btn i{transition:transform .16s cubic-bezier(.22,1,.36,1)}
   .chart-item.is-strike{--strike-color:#2ea35d;--strike-ink:color-mix(in srgb,var(--strike-color) 65%,#14251b);
@@ -363,8 +363,8 @@
   .vc-picker-modal{margin:auto;width:min(980px,100%);max-height:min(860px,calc(100vh - 48px));overflow:auto;overscroll-behavior:contain;
     background:#fbfaf6;border-radius:var(--r-xl);box-shadow:0 40px 100px -30px rgba(40,35,20,.5);padding:0 28px 28px}
   .vc-picker-head{margin:0 0 22px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
-  .vc-picker-top{position:sticky;top:0;z-index:4;align-self:stretch;display:flex;align-items:center;justify-content:space-between;gap:12px;
-    margin:0 -28px 4px;padding:22px 28px 14px;background:rgba(251,250,246,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--divider)}
+  .vc-picker-top{position:sticky;top:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:12px;
+    margin:0 -28px 14px;padding:22px 28px 14px;background:rgba(251,250,246,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--divider)}
   .vc-picker-close{background:var(--track) !important;border-color:transparent !important;box-shadow:none !important}
   .vc-picker-close:hover{background:var(--track-edge) !important}
   .vc-picker-title{font-size:22px;font-weight:500;letter-spacing:-.015em}
@@ -1186,7 +1186,7 @@
     .vc-pcard{min-height:0;padding:14px 16px}
     .vc-picker{padding:10px}
     .vc-picker-modal{padding:0 18px 22px;max-height:calc(100vh - 20px)}
-    .vc-picker-top{margin:0 -18px 4px;padding:18px 18px 12px}
+    .vc-picker-top{margin:0 -18px 12px;padding:18px 18px 12px}
     .vc-singles-grid{grid-template-columns:1fr}
     .vc-arow{grid-template-columns:1fr 1fr;gap:7px}
     .vc-arow .vc-label{grid-column:1 / -1}
@@ -1874,13 +1874,7 @@ function addChart(cfg) {
   if (owner) {
     wrap.classList.add("is-link");
     wrap.style.cursor = "pointer";
-    wrap.tabIndex = 0;
-    wrap.setAttribute("role", "link");
     wrap.addEventListener("click", (e) => { if (e.target.closest(".card-actions")) return; openDetail(); });
-    wrap.addEventListener("keydown", (e) => {
-      if (e.target !== wrap) return;
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(); }
-    });
     const actions = document.createElement("div");
     actions.className = "card-actions";
     const more = document.createElement("details"); more.className = "card-more";
@@ -3811,7 +3805,9 @@ function askSaveValEdit() {
   const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); close(); } };
   document.addEventListener("keydown", onKey, true);
   keep.addEventListener("click", close);
-  ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+  let veDownOnOv = false;
+  ov.addEventListener("mousedown", (e) => { veDownOnOv = e.target === ov; });
+  ov.addEventListener("click", (e) => { if (veDownOnOv && e.target === ov) close(); veDownOnOv = false; });
   discard.addEventListener("click", () => { valEditApi?.discardDraft(); close(); finishValEdit(); });
   draft.addEventListener("click", () => {
     if (valEditApi.keepDraft()) { close(); finishValEdit(); }

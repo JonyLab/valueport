@@ -324,7 +324,7 @@
   /* 语言下拉：外层留 8px 透明桥，鼠标从图标移到菜单不会断开 hover */
   .lang-menu{position:relative}
   .lang-pop{position:absolute;right:0;top:100%;padding-top:8px;min-width:140px;z-index:40;display:none}
-  .lang-menu:hover .lang-pop,.lang-menu:focus-within .lang-pop,.lang-menu.open .lang-pop{display:block;animation:vpPopIn .14s cubic-bezier(.22,1,.36,1) both}
+  .lang-menu:hover .lang-pop,.lang-menu.open .lang-pop{display:block;animation:vpPopIn .14s cubic-bezier(.22,1,.36,1) both}
   .lang-pop::before{content:"";position:absolute;inset:8px 0 0;border-radius:var(--r-md);background:#fbfaf6;border:1px solid var(--divider);box-shadow:0 18px 50px -12px rgba(40,35,20,.28);z-index:-1}
   .lang-opt{display:flex;align-items:center;justify-content:space-between;width:calc(100% - 12px);margin:6px;height:38px;padding:0 12px;border:0;border-radius:var(--r-sm);
     background:none;cursor:pointer;font-family:var(--font);font-size:14px;color:var(--ink);text-align:left;transition:background .12s ease}
@@ -376,6 +376,16 @@
     .topnav-actions{grid-column:2;grid-row:1}
     .nav-tab{height:38px;padding:0 14px;font-size:13.5px}
   }
+  /* 中等视口下全局 AI 抽屉展开时，剩余内容区宽度不足 760px：顶栏回退到两行流式布局避免挤压溢出 */
+  @media (max-width:1160px){
+    html.gai-open .topnav{position:static;grid-template-columns:auto 1fr;margin-bottom:20px;padding:0;border-radius:0;
+      background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+    html.gai-open .topnav .brand{height:44px;padding:0 2px;font-size:22px}
+    html.gai-open .topnav-tabs{grid-column:1 / -1;grid-row:2;justify-self:stretch;justify-content:center;
+      background:rgba(255,255,255,.68);border:1px solid var(--card-edge);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+    html.gai-open .topnav-actions{grid-column:2;grid-row:1}
+    html.gai-open .nav-tab{height:38px;padding:0 14px;font-size:13.5px}
+  }
 
   /* ===== 跨页面过渡（资产 ⇄ 自选等同源跳转）：新旧页面短暂淡入淡出、顶部导航不动，避免整页闪白
      浏览器不支持 View Transitions 时自动忽略；用户要求减少动效时不启用 ===== */
@@ -408,7 +418,8 @@
 .combo-list,.gai-mmenu:not([hidden]),.vc-ai-mmenu:not([hidden]){border:1px solid var(--divider);animation:vpPopIn .14s cubic-bezier(.22,1,.36,1) both}
 @media (prefers-reduced-motion:reduce){
   .sk,.sk-fade,.overlay,.overlay > .modal,.fb-overlay,.fb-overlay > .fb-modal,.vc-picker,.vc-picker > .vc-picker-modal,
-  .vp-qov,.vp-qov > .vp-qmod,.vp-cf-ov,.vp-cf-ov > .vp-cf-box,.lang-pop,.combo-list,.gai-mmenu,.vc-ai-mmenu{animation:none !important}
+  .vp-qov,.vp-qov > .vp-qmod,.vp-cf-ov,.vp-cf-ov > .vp-cf-box,.lang-pop,.combo-list,.gai-mmenu,.vc-ai-mmenu,
+  .mc-pop,.pf-acc-menu,.pf-cur-menu{animation:none !important}
 }
 
 /* ===== 反馈（全站共用，见 /shared/feedback.js）：顶栏语言按钮左边的圆形图标 + 弹窗（与各页 .overlay / .modal 同一套样子） ===== */

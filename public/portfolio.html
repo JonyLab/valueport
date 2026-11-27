@@ -846,7 +846,7 @@ function totalCard(s) {
   const curMenu = el("div", "pf-cur-menu"); curMenu.setAttribute("role", "menu"); curMenu.hidden = true;
   for (const b of BASES) {
     const o = el("button", b === base ? "on" : "", b); o.type = "button"; o.setAttribute("role", "menuitemradio"); o.setAttribute("aria-checked", b === base ? "true" : "false");
-    o.addEventListener("click", () => { curMenu.hidden = true; if (b === base) return; base = b; localStorage.setItem("pf_base", b); load(); });
+    o.addEventListener("click", (e) => { e.stopPropagation(); setOpen(false); if (b === base) return; base = b; localStorage.setItem("pf_base", b); load(); });
     curMenu.appendChild(o);
   }
   const setOpen = (open) => { curMenu.hidden = !open; curBtn.setAttribute("aria-expanded", open ? "true" : "false"); };
@@ -1069,8 +1069,8 @@ function healthCard(s) {
     tip.append(th, el("span", "pf-rtip-text", x.text));
     tag.appendChild(tip);
     tag.setAttribute("aria-label", `${x.title} ${x.value}：${x.text}`);
-    // 触屏没有 hover：点按开合
-    tag.addEventListener("click", (e) => { e.stopPropagation(); const open = !tag.classList.contains("open"); closeTips(); tag.classList.toggle("open", open); });
+    // 触屏没有 hover：点按开合（同时收起已打开的币种 / 账户菜单）
+    tag.addEventListener("click", (e) => { e.stopPropagation(); const open = !tag.classList.contains("open"); closePfPopovers(tag); tag.classList.toggle("open", open); });
     wrap.appendChild(tag);
   });
   c.appendChild(wrap);
