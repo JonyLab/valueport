@@ -18,13 +18,13 @@ export async function readBoundedBytes(response, maxBytes, {
   attachStatus = false,
 } = {}) {
   if (!response.ok || !response.body) {
-    await response.body?.cancel();
+    await response.body?.cancel().catch(() => {});
     const err = new Error(failedError);
     if (attachStatus) err.status = response.status;
     throw err;
   }
   if (Number(response.headers?.get("content-length")) > maxBytes) {
-    await response.body.cancel();
+    await response.body.cancel().catch(() => {});
     throw new Error(tooLargeError);
   }
   const reader = response.body.getReader();
@@ -79,7 +79,12 @@ export async function edgeCachePut(key, response) {
 export function scheduleEdgeCachePut(c, key, response) {
   const cache = edgeCache();
   if (!cache) return;
-  const task = cache.put(key, response);
+  let task;
+  try {
+    task = Promise.resolve(cache.put(key, response)).catch(() => {});
+  } catch {
+    return;
+  }
   try {
     c.executionCtx.waitUntil(task);
   } catch {

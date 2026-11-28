@@ -1,4 +1,5 @@
-// Single Source of Truth for browser localStorage and sessionStorage keys.
+// Single Source of Truth for cross-page / shared browser localStorage and sessionStorage keys.
+// Page-private preference/cache keys (e.g. board per-symbol fingerprint or chart toggles) remain owned by their page module.
 // Note: public/shared/navboot.js runs synchronously before ES modules load;
 // test-core/architecture.test.js verifies navboot.js stays in sync with these exact keys.
 

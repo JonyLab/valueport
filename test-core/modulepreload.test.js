@@ -25,6 +25,7 @@ function graph(page) {
 }
 
 describe("modulepreload", () => {
+  // owner.html is an internal admin page and intentionally skips modulepreload optimization.
   for (const page of ["index.html", "portfolio.html", "macro.html", "login.html", "register.html"]) {
     it(`${page} preloads exactly its module graph`, () => {
       const { needed, preloaded } = graph(page);

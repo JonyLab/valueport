@@ -58,8 +58,8 @@ src/lib/*                     Canonical server utilities (edge cache, UTC date, 
 | D1 `ai_models`, `ai_chats`, `usage_daily` | `src/ai/*`, `src/ai-chats.js`, `src/usage.js` | Server persistent | Custom AI keys AES-256-GCM encrypted |
 | D1 `macro_series`, `macro_meta`, `management_research_*`, `business_report_snapshots` | `src/macro.js`, `src/management-research-store.js`, `src/business-report.js` | Server public cache | Shared across users, no user PII |
 | Cookies `pendulum_user`, `pendulum_owner` | `src/auth.js` | Stateless HMAC-SHA256 | `HttpOnly; Secure; SameSite=Strict` |
-| `localStorage` (`pendulum_lang`, `pf_base`, `pf_hide`, `macro_last_visit`, macro prefs, per-symbol FP) | `public/shared/storage-keys.js` + `navboot.js` | Client preferences | Synced across tabs |
-| `sessionStorage` (`owner_slug`, `pf_user`, `board_cache_*`, `pf_cache_*`, `fb_cap`, `gai_cap`, `gai_open`, `gai_chat_*`, `ai_pick_*`) | `public/shared/storage-keys.js` + `navboot.js` | Tab session cache | Cleared on logout |
+| `localStorage` (shared: `pendulum_lang`, `pf_base`, `pf_hide`, `macro_last_visit`; page-private: board FP/panel toggles, macro prefs) | `public/shared/storage-keys.js` + `navboot.js` (shared); owning page module (page-private) | Client preferences | Synced across tabs |
+| `sessionStorage` (shared: `owner_slug`, `pf_user`, `board_cache_*`, `pf_cache_*`, `fb_cap`, `gai_cap`, `gai_open`, `gai_chat:*`; page-private: `fd_brief_*`, `ai_pick_*`) | `public/shared/storage-keys.js` + `navboot.js` (shared); owning page module (page-private) | Tab session cache | Cleared on logout |
 
 ## 4. Environment Variable Ownership Map
 
@@ -94,7 +94,7 @@ src/lib/*                     Canonical server utilities (edge cache, UTC date, 
 
 ## 6. Post-Governance Metrics Snapshot (2026-11-28)
 
-- **Test suite**: 66 test files, 658 tests passing (`npm test`, including automated architecture fitness & `modulepreload` checks) + 8 Python tests passing (`memory_monitor`).
+- **Test suite**: 66 test files, 660 tests passing (`npm test`, including AST-backed automated architecture fitness & `modulepreload` checks) + 8 Python tests passing (`memory_monitor`).
 - **Circular dependencies**: 0 (enforced in CI).
 - **Unused named ES imports**: 0 across `src/` and `public/` (enforced in CI).
 - **Monolithic HTML files eliminated**:

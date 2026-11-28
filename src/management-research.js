@@ -60,7 +60,7 @@ export function relatedNews(markdown) {
   return items;
 }
 
-const boundedText = (res, maxBytes) => readBoundedText(res, maxBytes, { failedError: "news_unavailable", tooLargeError: "news_too_large" });
+const boundedText = (res, maxBytes, signal) => readBoundedText(res, maxBytes, { signal, failedError: "news_unavailable", tooLargeError: "news_too_large" });
 
 async function fetchNewsManagementResearch(env, symbol, name = "", options = {}) {
   const lp = tencentToLongport(symbol), now = options.now || Date.now();
@@ -90,7 +90,7 @@ async function fetchNewsManagementResearch(env, symbol, name = "", options = {})
     // Public related links are discovery only. Statements always come from signed article detail.
     try {
       const res = await fetcher(`https://longbridge.com/zh-CN/news/${candidates[0].id}.md`, { signal: controller.signal, redirect: "manual" });
-      const related = relatedNews(await boundedText(res, 256000));
+      const related = relatedNews(await boundedText(res, 256000, controller.signal));
       candidates.push(...related.filter((item) => earningsNewsScore(item) >= 2));
     } catch { partialFailure = true; }
     candidates = [...new Map(candidates.map((item) => [String(item.id), item])).values()]
