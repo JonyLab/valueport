@@ -3,6 +3,7 @@
 // 没配时 POST 返回 501，前端退回到 GitHub「新建 issue」预填页（见 public/shared/feedback.js）。
 // token 只放在请求头里，不写日志、不进任何响应。
 import { validateFeedback, buildBody, defang, repoOf, TYPE_LABEL } from "../public/shared/feedback-core.js";
+import { utcToday } from "./lib/runtime.js";
 
 export const FEEDBACK_DAILY_LIMIT = 10;
 const USAGE_KEY = "_feedback_usage"; // settings 表里的计数，值为 "YYYY-MM-DD:n"（同 src/ai.js 的 _ai_usage）
@@ -40,7 +41,7 @@ export function registerFeedback(app) {
     const repo = repoOf(c.env.FEEDBACK_REPO), token = c.env.GITHUB_TOKEN;
     if (!token) return c.json({ ok: false, error: "not_configured", repo }, 501);
 
-    const uid = c.get("uid"), day = new Date().toISOString().slice(0, 10);
+    const uid = c.get("uid"), day = utcToday();
     const used = await usedToday(c.env, uid, day);
     if (used >= FEEDBACK_DAILY_LIMIT) return c.json({ ok: false, error: "daily_limit", limit: FEEDBACK_DAILY_LIMIT }, 429);
     const user = await c.env.DB.prepare("SELECT username FROM users WHERE id=?").bind(uid).first();

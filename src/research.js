@@ -2,6 +2,7 @@
 // 给「AI 推荐方法」和「AI 复核」当「市场怎么看」的依据。A 股长桥暂无数据：两地上市的借 H 股的公司资料，其余返回 null。
 // 长桥对连续请求有限流（短时间重复请求会返回空），所以结果按标的在 Cache API 里存 6 小时。
 import { hasLongbridgeCreds, signedGet, tencentToLongport } from "./longbridge.js";
+import { edgeCacheMatch, scheduleEdgeCachePut } from "./lib/runtime.js";
 
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
@@ -86,14 +87,14 @@ export function registerResearch(app, { fetchImpl = fetchResearch } = {}) {
   app.get("/api/research", async (c) => {
     const symbol = (c.req.query("symbol") || "").trim();
     if (!SYM_RE.test(symbol)) return c.json({ error: "bad symbol" }, 400);
-    const cache = typeof caches !== "undefined" ? caches.default : null;
     const key = new Request("https://cache.local/research/v3/" + symbol); // v3：A 股借用 H 股的公司资料
-    if (cache) { const hit = await cache.match(key); if (hit) return hit; }
+    const hit = await edgeCacheMatch(key);
+    if (hit) return hit;
     const research = await fetchImpl(c.env, symbol);
     const res = new Response(JSON.stringify({ symbol, research }), {
       headers: { "content-type": "application/json", "cache-control": `public, max-age=${research ? TTL : 600}` },
     });
-    if (cache && research) { try { c.executionCtx.waitUntil(cache.put(key, res.clone())); } catch { await cache.put(key, res.clone()); } }
+    if (research) await scheduleEdgeCachePut(c, key, res.clone());
     return res;
   });
 }

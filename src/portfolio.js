@@ -2,6 +2,7 @@
 // 路由都挂在 /api/my/portfolio 下，复用 /api/my/* 的登录中间件（c.get("uid")），数据严格按 user_id 隔离。
 // 凭证只写不读：加密存库（src/crypto.js），接口永远不返回明文，只返回是否已配置 + 末四位提示。
 import { encryptJson, decryptJson } from "./crypto.js";
+import { utcToday, utcDaysAgo } from "./lib/runtime.js";
 import { readHoldings, readCash, replaceSnapshot, readHistory, historyStatement, readStoredPlan, writePlan } from "./portfolio-storage.js";
 
 export const BROKERS = ["longbridge", "ibkr", "tiger", "schwab", "etrade", "webull", "manual"];
@@ -577,7 +578,7 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     const uid = c.get("uid");
     const body = await c.req.json().catch(() => ({}));
     const cur = await readPlan(c.env, uid);
-    const today = typeof body.date === "string" && ISO_DAY_RE.test(body.date.trim()) ? body.date.trim() : new Date().toISOString().slice(0, 10);
+    const today = typeof body.date === "string" && ISO_DAY_RE.test(body.date.trim()) ? body.date.trim() : utcToday();
     const mode = body.mode === "cashflow" ? "cashflow" : "standard";
     const scope = body.scope === "bucket" || body.scope === "symbol" ? body.scope : undefined;
     const cashAdded = Number.isFinite(Number(body.cashAdded)) && Number(body.cashAdded) > 0 ? Math.round(Number(body.cashAdded) * 100) / 100 : undefined;
@@ -609,7 +610,7 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
     const per = new Map((accs || []).map((a) => [a.id, 0]));
     for (const h of hs || []) { const p = q.quotes[h.symbol], r = fx[h.currency]; if (p > 0 && r > 0) per.set(h.account_id, per.get(h.account_id) + h.quantity * p * r); }
     for (const c of cs || []) { const r = fx[c.currency]; if (r > 0) per.set(c.account_id, per.get(c.account_id) + c.amount * r); }
-    const day = new Date().toISOString().slice(0, 10);
+    const day = utcToday();
     const rows = [...per.entries(), [0, [...per.values()].reduce((a, v) => a + v, 0)]];
     await db.batch(await Promise.all(rows.map(([aid, usd]) => historyStatement(env, uid, day, aid,
       { USD: usd, HKD: usd / fx.HKD, CNY: usd / fx.CNY }))));
@@ -621,7 +622,7 @@ export function registerPortfolio(app, { adapters, getQuotes }) {
   // 资产曲线数据：合计与各账户，按日期升序；cur 选 USD / HKD / CNY
   app.get("/api/my/portfolio/history", async (c) => {
     const days = Math.max(7, Math.min(3660, parseInt(c.req.query("days"), 10) || 365));
-    const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+    const since = utcDaysAgo(days);
     const points = await readHistory(c.env, c.get("uid"), since);
     c.header("Cache-Control", "no-store");
     return c.json({ points });

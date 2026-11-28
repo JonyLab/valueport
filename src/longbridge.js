@@ -1,6 +1,7 @@
 // LongPort/Longbridge 实时行情（长连接：HTTP 取 OTP → WebSocket → protobuf 命令 11）。
 // 协议见 github.com/longportapp/openapi-protocol（v1 帧）与 openapi-protobufs（control/quote）。
 // 已对线上网关验证。Worker 运行时：Web Crypto 签名 + fetch-upgrade 出站 WebSocket。
+import { readBoundedText } from "./lib/runtime.js";
 
 const HTTP_HOST = "https://openapi.longportapp.com";
 // Workers fetch-upgrade 出站 WS 用 https:// scheme（Upgrade 头触发 WebSocket 握手）
@@ -102,19 +103,12 @@ export async function signedGet(env, path, query, options = {}) {
     },
   });
   if (options.maxBytes) {
-    if (!res.ok || !res.body) { await res.body?.cancel(); throw new Error("longbridge_request_failed"); }
-    const reader = res.body.getReader(), chunks = []; let length = 0;
-    try {
-      for (;;) {
-        const { done, value } = await reader.read(); if (done) break;
-        length += value.byteLength;
-        if (length > options.maxBytes) throw new Error("longbridge_response_too_large");
-        chunks.push(value);
-      }
-    } finally { await reader.cancel().catch(() => {}); }
-    const bytes = new Uint8Array(length); let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-    return JSON.parse(new TextDecoder().decode(bytes));
+    const raw = await readBoundedText(res, options.maxBytes, {
+      signal: options.signal,
+      failedError: "longbridge_request_failed",
+      tooLargeError: "longbridge_response_too_large",
+    });
+    return JSON.parse(raw);
   }
   return res.json();
 }

@@ -3,6 +3,7 @@ import { METHOD_RULES, MODELS } from "../public/shared/valuation/index.js";
 // 不依赖各家的原生 tool calling（Workers AI 开源模型支持参差），统一用「约定格式的 JSON 代码块」，三种协议通用。
 //
 import { encryptJson, decryptJson } from "./crypto.js";
+import { utcToday } from "./lib/runtime.js";
 import { REVIEW_VERSION, scopeReviewFields, reviewMode, cleanReviewEvidence, constrainReview } from "../public/shared/valuation/review.js";
 import { recommendWithJev } from "./jev-methods.js";
 import { auditGuideWithJev } from "./jev-guide.js";
@@ -959,7 +960,7 @@ export async function userAi(env, uid) {
 // 每人每天的对话次数上限（防刷；计数存在 settings 表的内部键，不在 SETTING_KEYS 白名单里，不会返回给前端）
 export const DAILY_LIMIT = 100;
 async function takeQuota(env, uid) {
-  const day = new Date().toISOString().slice(0, 10);
+  const day = utcToday();
   const row = await env.DB.prepare("SELECT value FROM settings WHERE user_id=? AND key='_ai_usage'").bind(uid).first();
   const [d, n] = row && typeof row.value === "string" ? row.value.split(":") : [];
   const used = d === day ? Number(n) || 0 : 0;
