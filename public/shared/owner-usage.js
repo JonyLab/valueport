@@ -1,6 +1,7 @@
 // 站长后台 · 使用统计：顶部统计格 + 每日新用户 / AI 请求柱状图 + 热门标的 + 可排序的用户表。
 // 数据来自 GET /api/owner/stats（src/usage.js）。自成一块：owner.html 只放一个 #usage 容器并调用 mountUsage()。
 import { LANG } from "/shared/i18n.js";
+import { esc } from "/shared/dom.js";
 
 const TXT = {
   zh: { title: "使用统计", refresh: "刷新", users: "用户", today: "今天", week: "本周", active: "近 7 天活跃", codes: "激活码已用",
@@ -17,7 +18,6 @@ const TXT = {
     now: "just now", min: "m ago", hr: "h ago", day: "d ago", note: "Daily active and AI history start from when this panel shipped" },
 };
 const T = TXT[LANG] || TXT.zh;
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmt = (n) => Number(n || 0).toLocaleString();
 
 const CSS = `

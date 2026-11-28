@@ -1,6 +1,8 @@
 // 轻量多语言：localStorage 持久化（pendulum_lang），未设置时跟随浏览器语言。
 // 切换后整页刷新，由各页在启动时 applyI18n() + 动态串用 t()。
-const STORE_KEY = "pendulum_lang";
+import { LOCAL_KEYS } from "./storage-keys.js";
+
+const STORE_KEY = LOCAL_KEYS.lang;
 
 function detect() {
   try {

@@ -2,8 +2,7 @@
 // 样式在 /shared/styles.css 的「登录 / 注册」一节。
 import { t } from "./i18n.js";
 import { Gauge } from "./gauge.js";
-
-const ri = (name) => `<i class="ri-${name}" aria-hidden="true"></i>`;
+import { riHtml as ri } from "./dom.js";
 
 // 示例标的：合理区间 100–130、安全边际 20%（击球线 80）、泡沫阈值 30%；现价 71.6 落在击球区
 const DEMO = { fairLow: 100, fairHigh: 130, mos: 20, ext: 30, price: 71.6, ticker: "DEMO" };

@@ -1,25 +1,14 @@
 // Webull OpenAPI（v1）：App Key / App Secret 做 HMAC-SHA1 签名（与官方 webull-python-sdk 一致），无需令牌。
 // 账户 /app/subscriptions/list → 持仓 /account/positions（holdings，翻页）+ 余额 /account/balance。
 
-import { toNum, sumCash, mergePositions } from "./common.js";
+import { toNum, normCur, MARKET_CURRENCY, rfc3986Encode, hmacSha1B64, sumCash, mergePositions } from "./common.js";
 
 export const WEBULL_HOSTS = { us: "api.webull.com", hk: "api.webull.hk" };
-
-// Python quote(s, safe='')：只保留 A-Za-z0-9-._~
-const quote = (s) => encodeURIComponent(String(s)).replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
-
-async function hmacSha1B64(key, text) {
-  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
-  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(text)));
-  let bin = "";
-  for (const b of sig) bin += String.fromCharCode(b);
-  return btoa(bin);
-}
 
 // 签名串：path & 排序后的 k=v（签名头 + host + 查询参数，原值不编码）[& 大写 md5(body)]，整体 quote 一次
 export function webullSignString(path, signParams) {
   const parts = Object.keys(signParams).sort().map((k) => `${k}=${signParams[k]}`);
-  return quote(`${path}&${parts.join("&")}`);
+  return rfc3986Encode(`${path}&${parts.join("&")}`);
 }
 
 // 生成请求头（GET，无 body）
@@ -80,8 +69,6 @@ export function webullToTencent(sym, type, currency) {
   return { reason: `unsupported instrument type ${t || "?"}` };
 }
 
-const normCur = (c) => { const u = String(c || "").toUpperCase(); return u === "CNH" ? "CNY" : u; };
-
 // /account/positions → { rows, unsupported, holdings }
 export function parseWebullPositions(json) {
   const holdings = (json && (json.holdings || json.positions)) || (Array.isArray(json) ? json : []);
@@ -94,7 +81,7 @@ export function parseWebullPositions(json) {
     const qty = toNum(h.qty ?? h.quantity);
     if (!Number.isFinite(qty) || qty === 0) { unsupported.push({ raw, reason: "invalid quantity" }); continue; }
     rows.push({ symbol: mapped.symbol, name: String(h.short_name || h.name || "").slice(0, 80), quantity: qty, costPrice: toNum(h.unit_cost ?? h.cost_price),
-      currency: normCur(h.currency) || { US: "USD", HK: "HKD", CN: "CNY" }[mapped.market], market: mapped.market });
+      currency: normCur(h.currency) || MARKET_CURRENCY[mapped.market], market: mapped.market });
   }
   return { rows, unsupported, holdings };
 }

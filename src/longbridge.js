@@ -1,10 +1,15 @@
 // LongPort/Longbridge 实时行情（长连接：HTTP 取 OTP → WebSocket → protobuf 命令 11）。
 // 协议见 github.com/longportapp/openapi-protocol（v1 帧）与 openapi-protobufs（control/quote）。
 // 已对线上网关验证。Worker 运行时：Web Crypto 签名 + fetch-upgrade 出站 WebSocket。
+import { readBoundedText } from "./lib/runtime.js";
 
 const HTTP_HOST = "https://openapi.longportapp.com";
 // Workers fetch-upgrade 出站 WS 用 https:// scheme（Upgrade 头触发 WebSocket 握手）
 const WS_URL = "https://openapi-quote.longportapp.com/v2?version=1&codec=1&platform=9";
+
+export function hasLongbridgeCreds(env) {
+  return !!(env && env.LONGBRIDGE_APP_KEY && env.LONGBRIDGE_APP_SECRET && env.LONGBRIDGE_ACCESS_TOKEN);
+}
 
 /* ---------- 符号映射：腾讯格式 ↔ LongPort 格式 ---------- */
 // usAAPL→AAPL.US, hk00700→700.HK, sh600519→600519.SH, sz000001→000001.SZ, bj→.BJ
@@ -98,19 +103,12 @@ export async function signedGet(env, path, query, options = {}) {
     },
   });
   if (options.maxBytes) {
-    if (!res.ok || !res.body) { await res.body?.cancel(); throw new Error("longbridge_request_failed"); }
-    const reader = res.body.getReader(), chunks = []; let length = 0;
-    try {
-      for (;;) {
-        const { done, value } = await reader.read(); if (done) break;
-        length += value.byteLength;
-        if (length > options.maxBytes) throw new Error("longbridge_response_too_large");
-        chunks.push(value);
-      }
-    } finally { await reader.cancel().catch(() => {}); }
-    const bytes = new Uint8Array(length); let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-    return JSON.parse(new TextDecoder().decode(bytes));
+    const raw = await readBoundedText(res, options.maxBytes, {
+      signal: options.signal,
+      failedError: "longbridge_request_failed",
+      tooLargeError: "longbridge_response_too_large",
+    });
+    return JSON.parse(raw);
   }
   return res.json();
 }
@@ -299,21 +297,7 @@ async function parseFrame(data) {
 
 /* ---------- OTP ---------- */
 async function getOtp(env) {
-  const path = "/v1/socket/token";
-  const ts = (Date.now() / 1000).toFixed(3);
-  const names = "authorization;x-api-key;x-timestamp";
-  const sh = `authorization:${env.LONGBRIDGE_ACCESS_TOKEN}\nx-api-key:${env.LONGBRIDGE_APP_KEY}\nx-timestamp:${ts}\n`;
-  const canonical = `GET|${path}||${sh}|${names}|`;
-  const sig = await hmac256hex(env.LONGBRIDGE_APP_SECRET, "HMAC-SHA256|" + await sha1hex(canonical));
-  const res = await fetch(HTTP_HOST + path, {
-    headers: {
-      authorization: env.LONGBRIDGE_ACCESS_TOKEN,
-      "x-api-key": env.LONGBRIDGE_APP_KEY,
-      "x-timestamp": ts,
-      "x-api-signature": `HMAC-SHA256 SignedHeaders=${names}, Signature=${sig}`,
-    },
-  });
-  const j = await res.json();
+  const j = await signedGet(env, "/v1/socket/token", "");
   if (j.code !== 0 || !j.data || !j.data.otp) throw new Error("otp failed: " + JSON.stringify(j));
   return j.data.otp;
 }

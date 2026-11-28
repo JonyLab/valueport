@@ -1,10 +1,7 @@
+import { el } from "./dom.js";
+
 export function mountJevSettings(host, lang) {
   const t = (zh, en) => lang === "en" ? en : zh;
-  const el = (tag, cls, text) => {
-    const node = document.createElement(tag); node.className = cls;
-    if (text) node.textContent = text;
-    return node;
-  };
   const form = el("form", "ai-form jev-settings"), heading = el("h3", "", t("增强判断（可选）· Typesafe Jev", "Enhanced checks (optional) · Typesafe Jev"));
   const note = el("p", "quote-note", t("可选。填入 Typesafe 的 API Key 后，系统会用其 Jev 模型辅助判断估值方法是否适配、核对引用是否支持陈述、判断问题是否已被回答。不填也能正常使用，只是少了这些核对。密钥加密保存，仅用于你的账户；最终选择仍由你确认。", "Optional. With a Typesafe API key, Typesafe's Jev model helps check valuation-method fit, whether citations support each passage, and whether a question has already been answered. Everything works without it, just without these checks. The key is stored encrypted for your account only; you still make the final choices."));
   const label = el("label", "field"), input = el("input", "input");

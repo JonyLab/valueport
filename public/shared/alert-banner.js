@@ -3,9 +3,10 @@
 // 2. renderActionStrip      — 克制、可展开/收回的首屏待办行动条（不抢首屏重心，按下去有回应，再按能收回）
 // 3. renderAllocationBar    — 100% 彩色堆叠分布条（用于配置弹窗实时反馈 & 再平衡 Before→After 对比）
 // 4. openQuickAlertModal    — Chart-First 就地设提醒浮层（在 /macro 点铃铛当场拉滑块保存，不打断浏览）
-// 5. wireSafeDelete         — 二次点击确认防误碰按钮（第一次点变「再点确认」，3 秒自动复位，零原生 confirm）
 
 import { alertMetricMeta, extractAlertSeries, evaluateSignalAlerts, metricQuickPresets } from "./rebalance.js";
+import { el, ri } from "./dom.js";
+import { armSafeClick } from "./ui-toast.js";
 
 const BAR_COLORS = ["#2a2a29", "#f6cf4a", "#3a73ee", "#2ea35d", "#f08c2e", "#8f8c84", "#7a5c3a"];
 
@@ -102,35 +103,6 @@ export function ensureAlertBannerStyles() {
 @media (max-width:600px){ .pf-achart{width:100%} .vp-strip-bar{flex-wrap:wrap} }
 `;
   document.head.appendChild(st);
-}
-
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const ri = (name) => { const i = document.createElement("i"); i.className = "ri-" + name; i.setAttribute("aria-hidden", "true"); return i; };
-
-// 防误碰的二次点击删除（按一次变「再点确认」，3 秒自动复位，不弹原生 confirm）
-export function wireSafeDelete(btn, onConfirm, lang = "zh") {
-  ensureAlertBannerStyles();
-  const zh = lang !== "en";
-  let timer = 0, armed = false;
-  const orig = [...btn.childNodes].map((n) => n.cloneNode(true));
-  const reset = () => {
-    armed = false;
-    clearTimeout(timer);
-    btn.classList.remove("armed");
-    btn.replaceChildren(...orig.map((n) => n.cloneNode(true)));
-  };
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (!armed) {
-      armed = true;
-      btn.classList.add("armed");
-      btn.textContent = zh ? "再点确认" : "Confirm";
-      timer = setTimeout(reset, 3000);
-      return;
-    }
-    reset();
-    onConfirm();
-  });
 }
 
 export function formatAlertCond(a, lang = "zh") {
@@ -523,7 +495,7 @@ export function openQuickAlertModal({ metricKey, macroData, plan, lang = "zh", o
 
   if (existing) {
     const delBtn = el("button", "btn ghost sm vp-safe-del", T("删除提醒", "Delete")); delBtn.type = "button";
-    wireSafeDelete(delBtn, () => persist(existingList.filter((a) => a.id !== existing.id)), lang);
+    armSafeClick(delBtn, () => persist(existingList.filter((a) => a.id !== existing.id)), lang);
     foot.appendChild(delBtn);
   }
   saveBtn.addEventListener("click", () => {

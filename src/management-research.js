@@ -1,4 +1,5 @@
-import { signedGet, tencentToLongport } from "./longbridge.js";
+import { hasLongbridgeCreds, signedGet, tencentToLongport } from "./longbridge.js";
+import { readBoundedText, edgeCacheMatch, edgeCachePut, edgeCacheJsonResponse, scheduleEdgeCachePut } from "./lib/runtime.js";
 import { cleanManagementResearch, managementText } from "../public/shared/valuation/management-research.js";
 import { fetchOfficialManagementResearch } from "./official-management-research.js";
 import { createResearchStore, mergeResearchRefresh, RESEARCH_TTL } from "./management-research-store.js";
@@ -59,26 +60,12 @@ export function relatedNews(markdown) {
   return items;
 }
 
-async function boundedText(res, maxBytes) {
-  if (!res.ok || !res.body) { await res.body?.cancel(); throw new Error("news_unavailable"); }
-  const reader = res.body.getReader(), chunks = []; let size = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read(); if (done) break;
-      size += value.byteLength;
-      if (size > maxBytes) throw new Error("news_too_large");
-      chunks.push(value);
-    }
-  } finally { await reader.cancel().catch(() => {}); }
-  const bytes = new Uint8Array(size); let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-  return new TextDecoder().decode(bytes);
-}
+const boundedText = (res, maxBytes, signal) => readBoundedText(res, maxBytes, { signal, failedError: "news_unavailable", tooLargeError: "news_too_large" });
 
 async function fetchNewsManagementResearch(env, symbol, name = "", options = {}) {
   const lp = tencentToLongport(symbol), now = options.now || Date.now();
   const empty = (status) => ({ status, symbol, fetchedAt: new Date(now).toISOString(), coverage: "recent_news_and_related", sources: [] });
-  if (!lp || !env.LONGBRIDGE_APP_KEY || !env.LONGBRIDGE_APP_SECRET || !env.LONGBRIDGE_ACCESS_TOKEN) return empty("not_configured");
+  if (!lp || !hasLongbridgeCreds(env)) return empty("not_configured");
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 12000);
   const get = options.get || ((path, query = "") => signedGet(env, path, query, { signal: controller.signal, maxBytes: 256000, fetchImpl: options.fetchImpl }));
   const fetcher = options.fetchImpl || fetch;
@@ -103,7 +90,7 @@ async function fetchNewsManagementResearch(env, symbol, name = "", options = {})
     // Public related links are discovery only. Statements always come from signed article detail.
     try {
       const res = await fetcher(`https://longbridge.com/zh-CN/news/${candidates[0].id}.md`, { signal: controller.signal, redirect: "manual" });
-      const related = relatedNews(await boundedText(res, 256000));
+      const related = relatedNews(await boundedText(res, 256000, controller.signal));
       candidates.push(...related.filter((item) => earningsNewsScore(item) >= 2));
     } catch { partialFailure = true; }
     candidates = [...new Map(candidates.map((item) => [String(item.id), item])).values()]
@@ -144,11 +131,11 @@ export function registerManagementResearch(app, { fetchResearch = fetchManagemen
     const symbol = c.req.query("symbol") || "", name = c.req.query("name") || "";
     if (!/^(?:us[A-Za-z0-9.-]{1,16}|(?:hk|sh|sz|bj)\d{1,8})$/.test(symbol) || name.length > 100) return c.json({ error: "bad company" }, 400);
     const key = new Request(`https://management-research.internal/v3?symbol=${encodeURIComponent(symbol)}`);
-    const cached = await caches.default.match(key);
+    const cached = await edgeCacheMatch(key);
     if (cached) return c.json(await cached.json());
     const at = now(), store = createResearchStore(c.env.DB), stored = await store?.load(symbol, at);
     const withStorage = (research, status, savedAt, checkedAt) => cleanManagementResearch({ ...research, storage: { status, savedAt, checkedAt } });
-    const putCache = (research, seconds = RESEARCH_TTL / 1000) => caches.default.put(key, Response.json(research, { headers: { "Cache-Control": `public, max-age=${Math.max(1, Math.floor(seconds))}` } }));
+    const putCache = (research, seconds = RESEARCH_TTL / 1000) => edgeCachePut(key, edgeCacheJsonResponse(research, seconds));
     if (stored) {
       const expired = at >= stored.refreshAfter;
       const research = withStorage(stored.research, expired ? "refreshing" : stored.failed ? "refresh_failed" : "saved", stored.savedAt, stored.checkedAt);
@@ -164,7 +151,7 @@ export function registerManagementResearch(app, { fetchResearch = fetchManagemen
             }
           } catch { await store.failRefresh(symbol, now()); }
         })());
-      } else c.executionCtx.waitUntil(putCache(research, Math.min(RESEARCH_TTL, stored.refreshAfter - at) / 1000));
+      } else await scheduleEdgeCachePut(c, key, edgeCacheJsonResponse(research, Math.min(RESEARCH_TTL, stored.refreshAfter - at) / 1000));
       return c.json(research);
     }
     const research = await fetchResearch(c.env, symbol, name, { documentStore: store });
@@ -172,7 +159,7 @@ export function registerManagementResearch(app, { fetchResearch = fetchManagemen
     if (research.status === "ok") {
       const saved = now();
       if (await store?.save(symbol, research, saved)) result = withStorage(research, "saved", new Date(saved).toISOString(), new Date(saved).toISOString());
-      c.executionCtx.waitUntil(putCache(result));
+      await scheduleEdgeCachePut(c, key, edgeCacheJsonResponse(result, RESEARCH_TTL / 1000));
     }
     return c.json(result);
   });

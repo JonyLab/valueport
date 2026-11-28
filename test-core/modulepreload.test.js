@@ -16,6 +16,8 @@ function walk(path, seen) {
 }
 function graph(page) {
   const html = readFileSync(`${ROOT}/${page}`, "utf8"), seen = new Set();
+  for (const [, src] of html.matchAll(/<script type="module" src="([^"]+)">/g))
+    if (src.startsWith("/")) walk(src, seen);
   for (const [, code] of html.matchAll(/<script type="module">([\s\S]*?)<\/script>/g))
     for (const m of code.matchAll(RX)) { const d = m[1] || m[2]; if (d.startsWith("/")) walk(d, seen); }
   const preloaded = new Set([...html.matchAll(/<link rel="modulepreload" href="([^"]+)">/g)].map((m) => m[1]));
@@ -23,6 +25,7 @@ function graph(page) {
 }
 
 describe("modulepreload", () => {
+  // owner.html is an internal admin page and intentionally skips modulepreload optimization.
   for (const page of ["index.html", "portfolio.html", "macro.html", "login.html", "register.html"]) {
     it(`${page} preloads exactly its module graph`, () => {
       const { needed, preloaded } = graph(page);

@@ -1,6 +1,7 @@
 import { publicManagementUrl, cleanOfficialSite, sameCompanySite, officialSourceUrl, regulatorFilingUrl, managementText } from "../public/shared/valuation/management-research.js";
 
-import { signedGet, tencentToLongport } from "./longbridge.js";
+import { hasLongbridgeCreds, signedGet, tencentToLongport } from "./longbridge.js";
+import { readBoundedBytes } from "./lib/runtime.js";
 
 const MAX_PDF_BYTES = 4 * 1024 * 1024;
 // HKEX results announcements are often larger and longer; only their opening pages are read.
@@ -14,23 +15,8 @@ const BROWSER_HEADERS = { "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 
 const OUTLOOK = /\b(?:expect|guidance|outlook|forecast|optimistic|will|plans?|potential|ahead|future)\b|预计|預計|展望|指引|预期|預期|未来|未來/i;
 const OPERATING = /\b(?:revenue|margin|GMV|EBITDA|monetization|take rate|cost|loan|credit|NPL|bookings|profit|cash|investment|capital|logistics|fulfillment|risk|growth)\b|收入|营收|營收|利润|利潤|成本|资本|資本|现金|現金|增长|增長|毛利|信贷|信貸/i;
 
-async function readBounded(response, limit, signal) {
-  if (!response.ok || !response.body) { await response.body?.cancel(); throw Object.assign(new Error("official_unavailable"), { status: response.status }); }
-  if (Number(response.headers.get("content-length")) > limit) { await response.body.cancel(); throw new Error("official_too_large"); }
-  const reader = response.body.getReader(), chunks = []; let size = 0;
-  try {
-    for (;;) {
-      signal?.throwIfAborted();
-      const { done, value } = await reader.read(); if (done) break;
-      size += value.byteLength;
-      if (size > limit) throw new Error("official_too_large");
-      chunks.push(value);
-    }
-  } finally { await reader.cancel().catch(() => {}); }
-  const bytes = new Uint8Array(size); let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return bytes;
-}
+const readBounded = (response, limit, signal) =>
+  readBoundedBytes(response, limit, { signal, failedError: "official_unavailable", tooLargeError: "official_too_large", attachStatus: true });
 
 export async function extractOfficialPdf(bytes, { signal, maxBytes = MAX_PDF_BYTES, firstPages = 0 } = {}) {
   if (bytes.byteLength > maxBytes) throw new Error("official_pdf_too_large");
@@ -429,7 +415,7 @@ async function hkexFilingSources(site, ctx) {
 }
 
 export async function fetchOfficialManagementResearch(symbol, options = {}, env = {}) {
-  if (!env.LONGBRIDGE_APP_KEY || !env.LONGBRIDGE_APP_SECRET || !env.LONGBRIDGE_ACCESS_TOKEN) return { status: "not_configured", sources: [] };
+  if (!hasLongbridgeCreds(env)) return { status: "not_configured", sources: [] };
   // The company IR phase gets its own shorter budget so regulator fallbacks still have time.
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), options.timeoutMs ?? TOTAL_BUDGET_MS);
   const irController = new AbortController(), irTimer = setTimeout(() => irController.abort(), options.irTimeoutMs ?? IR_BUDGET_MS);

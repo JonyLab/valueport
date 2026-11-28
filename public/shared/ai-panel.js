@@ -1,8 +1,9 @@
 import { normalizeResearch } from "./search-sources.js";
-export { normalizeResearch } from "./search-sources.js";
 import { cleanManagementResearch } from "./valuation/management-research.js";
 import { managementResearchElement } from "./valuation/management-research-ui.js";
 import { armSafeClick } from "./ui-toast.js";
+import { el, ri } from "./dom.js";
+import { aiErrorText, activeAiModel, renderAiModelMenu } from "./ai-common.js";
 
 /**
  * ai-panel.js — 估值工作台的 AI 助手抽屉（右侧滑出）。
@@ -20,9 +21,6 @@ import { armSafeClick } from "./ui-toast.js";
  *   「一键改值」组件走 onApply / onUndo，和建议参数卡一样可撤销。未知组件直接忽略。
  * 返回 { open(), close(), toggle(), openModelPicker() }
  */
-
-function ri(name) { const i = document.createElement("i"); i.className = "ri-" + name; i.setAttribute("aria-hidden", "true"); return i; }
-function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
 
 const TX = {
   zh: {
@@ -51,30 +49,6 @@ const TX = {
   },
 };
 
-// AI 接口失败时给用户看的一句话：区分「全站免费额度用完」（Workers AI 每天 10,000 Neurons，UTC 0 点 = 北京时间 8 点重置）
-// 和「个人每天次数用完」，两种都提示可以配置自己的模型（不受限制）
-export function aiErrorText(status, j, lang) {
-  const zh = lang !== "en", e = j && j.error;
-  if (e === "search_not_configured") return zh ? "联网搜索暂未配置" : "Web search is not configured";
-  if (e === "search_query_required") return zh ? "请输入要搜索的公开关键词" : "Enter public search keywords";
-  if (e === "search_company_required") return zh ? "缺少公司名称或代码，无法搜索" : "A company name or ticker is required for search";
-  if (e === "search_timeout" || e === "search_failed") return zh ? "联网搜索失败，请重试或关闭搜索后发送" : "Search failed. Retry or turn off web search.";
-  if (e === "site_quota") return zh ? "站点的免费 AI 额度今天已用完（全站共用），北京时间早上 8 点恢复；也可以在「设置 → AI 模型」里配置自己的模型，不受这个限制"
-    : "The site's free AI allowance is used up for today (shared by everyone); it resets at 00:00 UTC. Add your own model under Settings → AI models to skip this limit";
-  if (e === "daily_limit" || status === 429) return zh ? "你今天的 AI 次数已用完，明天再来；在「设置 → AI 模型」里配置自己的模型可不受限制"
-    : "You've used today's AI requests; try again tomorrow, or add your own model under Settings → AI models";
-  if (e === "bad_ai_output") return zh ? "AI 返回的格式不对，请重试" : "Unexpected AI output, try again";
-  if (/访问量过大|稍后再试/.test((j && j.detail) || "")) return zh ? "智谱免费模型现在太忙（并发有限制），稍等一会儿再试，或切换模型" : "The free Zhipu model is busy right now (concurrency is limited); try again shortly or switch models";
-  // 用户不该看到 503、upstream_error 这类代号或英文报错：一律换成人话，原始信息只记到控制台便于排查
-  const raw = String((j && j.detail) || e || "");
-  if (raw || status) console.warn("[ai]", status, raw);
-  if (status === 401 || status === 403) return zh ? "登录已过期，请刷新页面后重新登录" : "Your session has expired. Refresh the page and sign in again";
-  if (status === 400 || status === 413) return zh ? "这次提交的内容太多或格式不对，可以精简一下回答后再试" : "This request was too long or malformed. Shorten your answers and try again";
-  if (/[\u4e00-\u9fff]/.test(raw) && raw.length < 200 && !/\d{3}/.test(raw)) return raw; // 已经是给人看的中文说明
-  return zh ? "AI 暂时没有响应，可能是服务繁忙，请稍后再试" : "The AI didn't respond. It may be busy; please try again shortly";
-}
-
-
 export function mountAiPanel(host, { lang, getContext, prepareContext, onApply, onUndo, fmtField, widgets: wx, checkParams, chatKey }) {
   const T = TX[lang] || TX.zh;
   const history = []; // { role, content } —— 发给后端的对话（不含建议卡）
@@ -98,40 +72,18 @@ export function mountAiPanel(host, { lang, getContext, prepareContext, onApply, 
   let models = null, inlineModelMenu = null;
   const slug = (location.pathname.match(/^\/b\/([^/]+)/) || [])[1];
   function drawModels(menu = modelMenu) {
-    const all = [models.site, ...models.workers, ...(models.siteKey || []), ...models.custom];
-    const cur = all.find((m) => m.id === models.active) || models.site;
+    const cur = activeAiModel(models);
+    if (!cur) return;
     modelName.textContent = (lang === "zh" ? "模型：" : "Model: ") + cur.name;
-    menu.innerHTML = "";
-    const group = (label, items) => {
-      if (!items.length) return;
-      menu.appendChild(el("div", "vc-ai-mgroup", label));
-      for (const m of items) {
-        const b = el("button", m.id === models.active ? "on" : ""); b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(m.id === models.active));
-        b.append(el("span", "vc-ai-mname", m.name), el("span", "vc-ai-mmodel", m.kind === "site" ? (lang === "zh" ? "站点默认" : "Site default") : m.model));
-        b.addEventListener("click", async () => {
-          const dismiss = () => { if (menu.matches(":popover-open")) menu.hidePopover(); else menu.hidden = true; };
-          if (m.id === models.active) { dismiss(); return; }
-          for (const option of menu.querySelectorAll("button")) option.disabled = true;
-          const r = await fetch("/api/my/ai/active", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: m.id }) }).catch(() => null);
-          if (r && r.ok) { models.active = m.id; dismiss(); drawModels(); }
-          else {
-            for (const option of menu.querySelectorAll("button")) option.disabled = false;
-            let error = menu.querySelector('[role="alert"]');
-            if (!error) { error = el("p", "vc-ai-mgroup"); error.setAttribute("role", "alert"); menu.append(error); }
-            error.textContent = lang === "zh" ? "切换失败，请重试。" : "Could not switch models. Try again.";
-          }
-        });
-        menu.appendChild(b);
-      }
-    };
-    group(lang === "zh" ? "站点默认" : "Site default", [models.site]);
-    group("Workers AI", models.workers.filter((w) => w.model !== (models.site.provider === "workers-ai" ? models.site.model : "")));
-    group(lang === "zh" ? "免费模型" : "Free models", models.siteKey || []); // 站点配了 Key 的免费模型（如智谱 GLM-4.7-Flash）
-    group(lang === "zh" ? "我的模型" : "My models", models.custom);
-    const manage = document.createElement("a"); manage.className = "vc-ai-manage";
-    manage.textContent = models.custom.length ? (lang === "zh" ? "管理模型…" : "Manage models…") : (lang === "zh" ? "添加自己的模型（OpenAI 兼容 / Anthropic）…" : "Add your own model…");
-    manage.href = slug ? `/b/${slug}#ai` : "#"; manage.target = "_blank"; manage.rel = "noopener"; // 新标签打开设置，不打断正在编辑的估值
-    menu.appendChild(manage);
+    const dismiss = () => { if (menu.matches(":popover-open")) menu.hidePopover(); else menu.hidden = true; };
+    renderAiModelMenu(menu, models, {
+      lang,
+      prefix: "vc-ai",
+      manageHref: slug ? `/b/${slug}#ai` : "#",
+      manageAddText: lang === "zh" ? "添加自己的模型（OpenAI 兼容 / Anthropic）…" : "Add your own model…",
+      onDismiss: dismiss,
+      onSelected: () => { dismiss(); drawModels(); },
+    });
   }
   const loadModels = () => fetch("/api/my/ai/models").then((r) => (r.ok ? r.json() : null)).then((j) => {
     if (j) {

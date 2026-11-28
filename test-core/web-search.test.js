@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { companySearchQuery, publicSourceUrl, searchCompany, searchPrompt, searchMetadata } from "../src/web-search.js";
-import { normalizeResearch, aiErrorText } from "../public/shared/ai-panel.js";
+import { normalizeResearch } from "../public/shared/search-sources.js";
+import { aiErrorText } from "../public/shared/ai-common.js";
 
 const context = { stock: { name: "Example Mining", code: "MINER" }, method: { key: "navsotp" },
   facts: { privateHolding: "SECRET_POSITION" }, fields: [{ value: "PRIVATE_VALUE" }] };

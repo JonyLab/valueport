@@ -1,11 +1,12 @@
 // 站长后台的使用统计：每日计数（usage_daily 表）+ 最近活跃（settings 内部键 _last_seen）+ 汇总接口用的聚合查询。
 // 记录都是尽力而为：表还没建（迁移没跑）时静默跳过，不影响正常请求。
+import { utcToday, utcDaysAgo } from "./lib/runtime.js";
 const SEEN_KEY = "_last_seen";           // settings 表里的 ISO 时间，/api/me 时更新
 const SEEN_EVERY_MS = 10 * 60 * 1000;    // 10 分钟内重复打开页面不重复写
 export const STATS_DAYS = 30;            // 曲线覆盖的天数
 
-const today = () => new Date().toISOString().slice(0, 10);
-const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+const today = utcToday;
+const daysAgo = utcDaysAgo;
 
 // 打开页面（/api/me）时记一次活跃：更新 _last_seen，并在 usage_daily 里占当天一行（日活）
 export async function touchSeen(env, uid) {

@@ -1,18 +1,10 @@
+// Cloudflare Worker composition root: mounts route registrars, static SPA assets, and scheduled daily jobs.
 import { Hono } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
-import { signToken, verifyToken } from "./auth.js";
-import { validateItem, rowToItem } from "./items.js";
-import { parseTencentQuotes, parseTencentHints, parseTencentStatics, parseTencentPrevClose, logoTicker, lbLogoPath } from "./quotes.js";
-import { fetchLongbridgeQuotes, fetchLongbridgeNames, fetchLongbridgeFinancials, pickLatestAnnual, fetchValuationRefs } from "./longbridge.js";
-import { fetchDeductedNetIncome } from "./eastmoney.js";
-import { fetchAdjustedEps } from "./finnhub.js";
-import { fetchDividendHistory } from "./dividends.js";
-import { fetchEastmoneyFinancials } from "./financials-em.js";
-import { hashPassword, verifyPassword } from "./password.js";
-import { generateCode } from "./codes.js";
-import { validateUsername, validateSlug, rowToUser } from "./users.js";
+import { registerMarketRoutes, getQuotes } from "./routes/market.js";
+import { registerAuthRoutes, registerBoardRoutes, currentUserId } from "./routes/account.js";
+import { registerOwnerRoutes } from "./routes/owner.js";
 import { registerPortfolio } from "./portfolio.js";
-import { PortfolioStorageError, migratePortfolioBatch } from "./portfolio-storage.js";
+import { PortfolioStorageError } from "./portfolio-storage.js";
 import { registerAi } from "./ai.js";
 import { registerJev } from "./jev.js";
 import { registerAiChats } from "./ai-chats.js";
@@ -28,7 +20,6 @@ import { fetchSchwabAssets, schwabAuthorizeUrl, schwabExchangeCode } from "./bro
 import { fetchEtradeAssets, etradeStart, etradeFinish } from "./brokers/etrade.js";
 import { fetchWebullAssets } from "./brokers/webull.js";
 import { parseHoldingsCsv } from "./brokers/csv.js";
-import { touchSeen, ownerStats } from "./usage.js";
 
 const app = new Hono();
 app.onError((error, c) => {
@@ -39,378 +30,52 @@ app.onError((error, c) => {
   console.error(error);
   return c.text("Internal Server Error", 500);
 });
-const USER_COOKIE = "pendulum_user", OWNER_COOKIE = "pendulum_owner";
-const TTL = 7 * 24 * 3600;
-// 用户设置：只剩「新标的的默认安全边际 / 泡沫阈值」（页面文案与区间配色已取消，库里旧值不再返回、不再生效）
-const NUM_SETTINGS = { default_mos: [5, 95], default_ext: [5, 300] }; // 键 → 允许范围（%）
-const SETTING_KEYS = Object.keys(NUM_SETTINGS);
-const COOKIE_OPTS = { httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: TTL };
 
-async function readSettings(db, userId) {
-  const out = {};
-  try {
-    const { results } = await db.prepare("SELECT key, value FROM settings WHERE user_id=?").bind(userId).all();
-    for (const r of results || []) if (SETTING_KEYS.includes(r.key)) out[r.key] = r.value;
-  } catch {}
-  return out;
-}
-async function fetchGbk(url) {
-  const res = await fetch(url, { cf: { cacheTtl: 30, cacheEverything: true } });
-  if (!res.ok) throw new Error(`upstream ${res.status}`);
-  return new TextDecoder("gbk").decode(await res.arrayBuffer());
-}
+/* ---------- Public market & user auth/session ---------- */
+registerMarketRoutes(app);
+registerAuthRoutes(app); // mounts /api/config, /api/register, /api/login, /api/logout, /api/me, and /api/my/* guard
 
-/* ---------- 公开接口 ---------- */
-app.get("/api/config", async (c) => {
-  const slug = c.req.query("slug") || "";
-  const user = await c.env.DB.prepare("SELECT * FROM users WHERE board_slug=?").bind(slug).first();
-  if (!user) return c.json({ error: "board not found" }, 404);
-  const { results } = await c.env.DB.prepare("SELECT * FROM items WHERE user_id=? ORDER BY sort_order ASC, id ASC").bind(user.id).all();
-  return c.json({ board: { slug: user.board_slug, name: user.board_name }, items: (results || []).map(rowToItem), settings: await readSettings(c.env.DB, user.id) });
-});
-// 一次请求同时取现价与昨收（昨收用于前端算当日涨跌）
-async function tencentQuotes(symbols) {
-  if (!symbols.length) return { quotes: {}, prevClose: {} };
-  try {
-    const text = await fetchGbk("https://qt.gtimg.cn/q=" + symbols.join(","));
-    return { quotes: parseTencentQuotes(text, symbols), prevClose: parseTencentPrevClose(text, symbols) };
-  } catch { return { quotes: {}, prevClose: {} }; }
-}
-// 现价：有长桥凭据则优先用其实时行情，失败或缺漏的退回腾讯延时；腾讯总要请求一次，补缺漏并提供昨收（长桥行情接口不返回昨收）
-async function getQuotes(env, symbols) {
-  let quotes = {}, source = "tencent";
-  if (env.LONGBRIDGE_APP_KEY && env.LONGBRIDGE_APP_SECRET && env.LONGBRIDGE_ACCESS_TOKEN) {
-    try { quotes = await fetchLongbridgeQuotes(env, symbols); source = "longbridge"; }
-    catch (e) { console.error("longbridge failed, fall back to tencent:", e && e.message); quotes = {}; source = "tencent"; }
-  }
-  const tc = await tencentQuotes(symbols);
-  for (const s of symbols) if (!(s in quotes) && s in tc.quotes) quotes[s] = tc.quotes[s];
-  return { quotes, prevClose: tc.prevClose, source };
-}
-app.get("/api/quotes", async (c) => {
-  const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim()).filter((s) => s && s.length <= 16).slice(0, 50);
-  if (!symbols.length) return c.json({ quotes: {}, ts: new Date().toISOString() });
-  const { quotes, prevClose, source } = await getQuotes(c.env, symbols);
-  c.header("Cache-Control", "no-store"); // 实时行情不缓存
-  if (!Object.keys(quotes).length) return c.json({ quotes: {}, error: "upstream unreachable", ts: new Date().toISOString() }, 502);
-  return c.json({ quotes, prevClose, source, ts: new Date().toISOString() });
-});
-// 标的中英文名 + 静态信息（总股本、TTM EPS 等，估值计算器要用）。优先长桥；长桥未配置或缺项的，用腾讯行情串补
-// （英文名美股/港股有、A 股没有；总股本/币种/TTM EPS 三市场都有）。只补缺项，不覆盖长桥已给的值。
-app.get("/api/names", async (c) => {
-  const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim()).filter((s) => s && s.length <= 16).slice(0, 50);
-  if (!symbols.length) return c.json({ names: {} });
-  let names = {};
-  if (c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN) {
-    try { names = await fetchLongbridgeNames(c.env, symbols); }
-    catch (e) { console.error("longbridge names failed:", e && e.message); names = {}; }
-  }
-  const missing = symbols.filter((s) => !(names[s] && names[s].en && Number(names[s].totalShares) > 0 && Number(names[s].high52) > 0));
-  if (missing.length) {
-    let tc = {};
-    try { tc = parseTencentStatics(await fetchGbk("https://qt.gtimg.cn/q=" + missing.join(",")), missing); } catch { tc = {}; }
-    for (const s of missing) {
-      if (!tc[s]) continue;
-      const cur = names[s] || {};
-      const pick = (k) => (cur[k] !== undefined && cur[k] !== null && cur[k] !== "" && !(typeof cur[k] === "number" && !Number.isFinite(cur[k])) ? cur[k] : tc[s][k]);
-      names[s] = { ...cur, cn: pick("cn"), en: pick("en"), currency: pick("currency"),
-        totalShares: Number(cur.totalShares) > 0 ? cur.totalShares : tc[s].totalShares, epsTtm: pick("epsTtm"),
-        peTtm: pick("peTtm"), high52: pick("high52"), low52: pick("low52") };
-    }
-  }
-  c.header("Cache-Control", "public, max-age=86400"); // 名称基本不变，可缓存一天
-  return c.json({ names });
-});
-// 标的 logo：代理 FinancialModelingPrep 的公开图片（免 key，美/港/A 股都有），浏览器只请求本站，
-// 避免把用户看了哪些股票直接暴露给第三方；成功缓存 7 天，找不到返回 404（前端退回首字母头像）。
-// 标的 logo：先长桥的图标库（美股 / 港股 / 沪深 / 北交所；对没有图标的代码会返回首字符占位图，小于 LB_MIN_BYTES 的当作占位丢掉），再退到 FinancialModelingPrep（没有就 404）
-const LB_MIN_BYTES = 5000;
-async function fetchLogo(url, minBytes = 0) {
-  const res = await fetch(url, { cf: { cacheTtl: 604800, cacheEverything: true } });
-  const type = res.headers.get("content-type") || "";
-  if (!res.ok || !type.startsWith("image/")) return null;
-  const buf = await res.arrayBuffer();
-  return buf.byteLength >= minBytes ? { buf, type } : null;
-}
-app.get("/api/logo", async (c) => {
-  const sym = (c.req.query("symbol") || "").trim();
-  const t = logoTicker(sym), lb = lbLogoPath(sym);
-  if (!t && !lb) return c.body(null, 404);
-  try {
-    const img = (lb && await fetchLogo(`https://assets.lbkrs.com/ticker/ST/${lb}.png`, LB_MIN_BYTES).catch(() => null))
-      || (t && await fetchLogo(`https://financialmodelingprep.com/image-stock/${encodeURIComponent(t)}.png`).catch(() => null));
-    if (!img) return c.body(null, 404, { "Cache-Control": "public, max-age=86400" });
-    return new Response(img.buf, { headers: { "Content-Type": img.type, "Cache-Control": "public, max-age=604800" } });
-  } catch {
-    return c.body(null, 404);
-  }
-});
-// 券商 logo：只认白名单里的券商，取其官网图标（Google favicon 服务，128px），同样经本站代理；拿不到 404，前端退回线条图标。
-const BROKER_LOGO_DOMAINS = {
-  longbridge: "longbridge.com", ibkr: "interactivebrokers.com", tiger: "itiger.com",
-  schwab: "schwab.com", etrade: "etrade.com", webull: "webull.com",
-};
-app.get("/api/broker-logo/:broker", async (c) => {
-  const domain = BROKER_LOGO_DOMAINS[c.req.param("broker")];
-  if (!domain) return c.body(null, 404);
-  try {
-    const res = await fetch(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`, { cf: { cacheTtl: 2592000, cacheEverything: true } });
-    const type = res.headers.get("content-type") || "";
-    if (!res.ok || !type.startsWith("image/")) return c.body(null, 404, { "Cache-Control": "public, max-age=86400" });
-    return new Response(res.body, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=2592000" } });
-  } catch {
-    return c.body(null, 404);
-  }
-});
-// 财报（Fundamental）：按需取 + 缓存一天。长桥（需凭据）优先；长桥无凭据/失败/空 → 东财 F10 免费兜底（A/港/美）。
-// 两者都取不到 → financials:null（前端优雅降级）。financialsSource 标明来源，便于排查。
-app.get("/api/financials", async (c) => {
-  const symbol = (c.req.query("symbol") || "").trim();
-  const isAnnual = c.req.query("period") !== "quarter";
-  const report = isAnnual ? "af" : "qf";
-  const haveCreds = c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN;
-  const hasData = (f) => !!(f && (f.IS || f.BS || f.CF));
-  let financials = null, valuationRefs = null, deducted = null, adjEps = null, dividends = null, financialsSource = null;
-  if (symbol) {
-    try {
-      if (isAnnual) {
-        // 扣非(东财·A股)、调整后EPS(Finnhub·美股)、逐年派息(东财·全市场)均与长桥并行拉取;免费、各自失败不影响其余
-        const [f, vr, dni, aeps, div] = await Promise.all([
-          haveCreds ? fetchLongbridgeFinancials(c.env, symbol, report) : null,
-          haveCreds ? fetchValuationRefs(c.env, symbol) : null,
-          fetchDeductedNetIncome(symbol),
-          fetchAdjustedEps(c.env, symbol),
-          fetchDividendHistory(symbol),
-        ]);
-        financials = f; valuationRefs = vr; deducted = dni; adjEps = aeps; dividends = div;
-      } else if (haveCreds) {
-        financials = await fetchLongbridgeFinancials(c.env, symbol, report);
-      }
-    } catch (e) { console.error("financials failed:", e && e.message); financials = null; }
-    if (hasData(financials)) financialsSource = "longbridge";
-    else {
-      financials = await fetchEastmoneyFinancials(symbol, report);
-      if (hasData(financials)) financialsSource = "eastmoney";
-    }
-  }
-  const latest = pickLatestAnnual(financials);
-  if (Number.isFinite(deducted)) latest.deductedNetIncome = deducted;
-  if (Number.isFinite(adjEps)) latest.adjustedEps = adjEps;
-  // 仅缓存成功结果;失败/空响应不长期缓存,避免一次瞬时失败把基本面钉死 24 小时
-  const ok = hasData(financials);
-  // 派息支持的市场但本次没取到(东财瞬时失败)→ 缩短缓存,避免把派息钉死 24h,约 1h 后自愈
-  const divMissing = isAnnual && /^(sh|sz|bj|hk|us)/i.test(symbol) && !dividends;
-  // 兜底数据源也缩短缓存:长桥恢复后约 1h 内切回
-  const maxAge = !ok ? 0 : (divMissing || financialsSource !== "longbridge" ? 3600 : 86400);
-  c.header("Cache-Control", maxAge ? `public, max-age=${maxAge}` : "no-store");
-  return c.json({ financials, latest, valuationRefs, dividends, financialsSource });
-});
-app.get("/api/hints", async (c) => {
-  const q = c.req.query("q") || "";
-  if (!q) return c.json({ hints: [] });
-  try { const text = await fetchGbk("https://smartbox.gtimg.cn/s3/?v=2&t=all&q=" + encodeURIComponent(q)); return c.json({ hints: parseTencentHints(text) }); }
-  catch { return c.json({ hints: [] }); }
-});
-
-/* ---------- 注册 / 登录 ---------- */
-app.post("/api/register", async (c) => {
-  const { username, password, code } = await c.req.json().catch(() => ({}));
-  if (!validateUsername(username)) return c.json({ ok: false, error: "用户名需 3-20 位字母/数字/_/-" }, 400);
-  if (typeof password !== "string" || password.length < 6 || password.length > 1024) return c.json({ ok: false, error: "密码需 6-1024 位" }, 400);
-  if (await c.env.DB.prepare("SELECT id FROM users WHERE username=?").bind(username).first()) return c.json({ ok: false, error: "用户名已被占用" }, 409);
-  // 原子领取激活码：仅未使用的码能被领取，防并发重复使用（TOCTOU）
-  const claim = await c.env.DB.prepare("UPDATE activation_codes SET used_by=-1, used_at=? WHERE code=? AND used_by IS NULL").bind(new Date().toISOString(), code || "").run();
-  if (!claim.meta.changes) return c.json({ ok: false, error: "激活码无效或已被使用" }, 400);
-  let slug = username.toLowerCase().replace(/[^a-z0-9-]/g, "-");
-  if (!validateSlug(slug)) slug = "b-" + slug;
-  if (await c.env.DB.prepare("SELECT id FROM users WHERE board_slug=?").bind(slug).first()) slug = slug + "-" + (Date.now() % 10000);
-  const { hash, salt } = await hashPassword(password);
-  const now = new Date().toISOString();
-  let uid;
-  try {
-    const { meta } = await c.env.DB.prepare(
-      "INSERT INTO users (username,pass_hash,pass_salt,board_slug,board_name,created_at) VALUES (?,?,?,?,?,?)"
-    ).bind(username, hash, salt, slug, username, now).run();
-    uid = meta.last_row_id;
-  } catch {
-    await c.env.DB.prepare("UPDATE activation_codes SET used_by=NULL, used_at=NULL WHERE code=?").bind(code).run(); // 注册失败，归还激活码
-    return c.json({ ok: false, error: "用户名或网址已被占用，请重试" }, 409);
-  }
-  await c.env.DB.prepare("UPDATE activation_codes SET used_by=? WHERE code=?").bind(uid, code).run();
-  const token = await signToken(c.env.SESSION_SECRET, { role: "user", uid }, TTL);
-  setCookie(c, USER_COOKIE, token, COOKIE_OPTS);
-  return c.json({ ok: true, board: { slug, name: username } });
-});
-app.post("/api/login", async (c) => {
-  const { username, password } = await c.req.json().catch(() => ({}));
-  const user = await c.env.DB.prepare("SELECT * FROM users WHERE username=?").bind(username || "").first();
-  if (!user || !(await verifyPassword(password || "", user.pass_salt, user.pass_hash))) return c.json({ ok: false, error: "用户名或密码错误" }, 401);
-  const token = await signToken(c.env.SESSION_SECRET, { role: "user", uid: user.id }, TTL);
-  setCookie(c, USER_COOKIE, token, COOKIE_OPTS);
-  return c.json({ ok: true });
-});
-app.post("/api/logout", (c) => { setCookie(c, USER_COOKIE, "", { ...COOKIE_OPTS, maxAge: 0 }); return c.json({ ok: true }); });
-
-/* ---------- 用户会话中间件 ---------- */
-async function currentUserId(c) {
-  const token = getCookie(c, USER_COOKIE);
-  if (!token) return null;
-  const claims = await verifyToken(c.env.SESSION_SECRET, token);
-  return claims && claims.role === "user" ? claims.uid : null;
-}
-app.get("/api/me", async (c) => {
-  const uid = await currentUserId(c);
-  if (!uid) return c.json({ ok: false, error: "unauthorized" }, 401);
-  const user = await c.env.DB.prepare("SELECT * FROM users WHERE id=?").bind(uid).first();
-  if (!user) return c.json({ ok: false }, 401);
-  await touchSeen(c.env, uid); // 站长统计里的「最近活跃」
-  return c.json({ username: user.username, board: { slug: user.board_slug, name: user.board_name } });
-});
-app.use("/api/my/*", async (c, next) => {
-  const uid = await currentUserId(c);
-  if (!uid) return c.json({ ok: false, error: "unauthorized" }, 401);
-  c.set("uid", uid);
-  await next();
-});
-
-/* ---------- Portfolio（券商账户 / 持仓汇总，按 uid 隔离，见 src/portfolio.js） ---------- */
+/* ---------- Feature modules (/api/my/* & public research/macro) ---------- */
 registerAi(app);
 registerJev(app);
 registerAiChats(app);
-registerResearch(app); // 分析师评级 / 目标价 / 一致预期（公开，按标的缓存 6 小时）
+registerResearch(app);
 registerManagementResearch(app);
 registerBusinessReports(app);
 registerMacro(app);
 registerFeedback(app);
 const portfolio = registerPortfolio(app, {
-  adapters: { longbridge: (cr) => fetchLongbridgeAssets(cr), ibkr: (cr) => fetchIbkrFlex(cr), tiger: (cr) => fetchTigerAssets(cr),
-    schwab: (cr) => fetchSchwabAssets(cr), etrade: (cr) => fetchEtradeAssets(cr), webull: (cr) => fetchWebullAssets(cr),
+  adapters: {
+    longbridge: (cr) => fetchLongbridgeAssets(cr),
+    ibkr: (cr) => fetchIbkrFlex(cr),
+    tiger: (cr) => fetchTigerAssets(cr),
+    schwab: (cr) => fetchSchwabAssets(cr),
+    etrade: (cr) => fetchEtradeAssets(cr),
+    webull: (cr) => fetchWebullAssets(cr),
     oauth: {
-      schwab: { start: (cr, { redirectUri, state }) => ({ url: schwabAuthorizeUrl(cr.appKey, redirectUri, state) }), finish: (cr, { code }, { redirectUri }) => schwabExchangeCode(cr, code, redirectUri) },
+      schwab: {
+        start: (cr, { redirectUri, state }) => ({ url: schwabAuthorizeUrl(cr.appKey, redirectUri, state) }),
+        finish: (cr, { code }, { redirectUri }) => schwabExchangeCode(cr, code, redirectUri),
+      },
       etrade: {
         start: async (cr) => { const r = await etradeStart(cr); return { url: r.url, verifier: true, pending: { requestToken: r.requestToken, requestSecret: r.requestSecret } }; },
         finish: (cr, { verifier }) => etradeFinish(cr, verifier),
       },
     },
-    csv: (text) => parseHoldingsCsv(text) },
+    csv: (text) => parseHoldingsCsv(text),
+  },
   getQuotes,
 });
+registerBoardRoutes(app);
+registerOwnerRoutes(app);
 
-/* ---------- 用户数据 CRUD（按 uid 隔离） ---------- */
-app.get("/api/my/items", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT * FROM items WHERE user_id=? ORDER BY sort_order ASC, id ASC").bind(c.get("uid")).all();
-  return c.json({ items: (results || []).map(rowToItem) });
-});
-app.post("/api/my/items", async (c) => {
-  const v = validateItem(await c.req.json().catch(() => ({})));
-  if (!v.ok) return c.json({ ok: false, errors: v.errors }, 400);
-  const it = v.value;
-  const { meta } = await c.env.DB.prepare(
-    "INSERT INTO items (user_id,ticker,name,symbol,fair_low,fair_high,mos,ext,sort_order,valuations,selected_valuation_id,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
-  ).bind(c.get("uid"), it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder,
-    JSON.stringify(it.valuations), it.selectedValuationId, new Date().toISOString()).run();
-  return c.json({ ok: true, id: meta.last_row_id }, 201);
-});
-app.put("/api/my/items/:id", async (c) => {
-  const v = validateItem(await c.req.json().catch(() => ({})));
-  if (!v.ok) return c.json({ ok: false, errors: v.errors }, 400);
-  const it = v.value;
-  const { meta } = await c.env.DB.prepare(
-    "UPDATE items SET ticker=?,name=?,symbol=?,fair_low=?,fair_high=?,mos=?,ext=?,sort_order=?,valuations=?,selected_valuation_id=?,updated_at=? WHERE id=? AND user_id=?"
-  ).bind(it.ticker, it.name, it.symbol, it.fairLow, it.fairHigh, it.mos, it.ext, it.sortOrder,
-    JSON.stringify(it.valuations), it.selectedValuationId, new Date().toISOString(),
-    Number(c.req.param("id")), c.get("uid")).run();
-  if (!meta.changes) return c.json({ ok: false, error: "not found" }, 404);
-  return c.json({ ok: true });
-});
-app.delete("/api/my/items/:id", async (c) => {
-  const { meta } = await c.env.DB.prepare("DELETE FROM items WHERE id=? AND user_id=?").bind(Number(c.req.param("id")), c.get("uid")).run();
-  if (!meta.changes) return c.json({ ok: false, error: "not found" }, 404);
-  return c.json({ ok: true });
-});
-app.get("/api/my/settings", async (c) => c.json({ settings: await readSettings(c.env.DB, c.get("uid")) }));
-app.put("/api/my/settings", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  const uid = c.get("uid"), stmts = [];
-  for (const k of SETTING_KEYS) {
-    if (!(k in body)) continue;
-    const raw = body[k] === null || body[k] === undefined ? "" : String(body[k]).trim();
-    const n = Number(raw), [lo, hi] = NUM_SETTINGS[k];
-    if (raw && !(Number.isFinite(n) && n >= lo && n <= hi)) return c.json({ error: `${k} must be ${lo}-${hi}` }, 400);
-    const val = raw ? String(Math.round(n * 10) / 10) : "";
-    stmts.push(val
-      ? c.env.DB.prepare("INSERT INTO settings (user_id,key,value) VALUES (?,?,?) ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value").bind(uid, k, val)
-      : c.env.DB.prepare("DELETE FROM settings WHERE user_id=? AND key=?").bind(uid, k));
-  }
-  if (stmts.length) await c.env.DB.batch(stmts);
-  return c.json({ ok: true, settings: await readSettings(c.env.DB, uid) });
-});
-app.put("/api/my/board", async (c) => {
-  const { slug, name } = await c.req.json().catch(() => ({}));
-  if (!validateSlug(slug)) return c.json({ ok: false, error: "网址 slug 需 3-32 位小写字母/数字/-" }, 400);
-  const clash = await c.env.DB.prepare("SELECT id FROM users WHERE board_slug=? AND id<>?").bind(slug, c.get("uid")).first();
-  if (clash) return c.json({ ok: false, error: "该网址已被占用" }, 409);
-  try {
-    await c.env.DB.prepare("UPDATE users SET board_slug=?, board_name=? WHERE id=?").bind(slug, typeof name === "string" ? name : "", c.get("uid")).run();
-  } catch (e) {
-    if (String(e).includes("UNIQUE")) return c.json({ ok: false, error: "该网址已被占用" }, 409); // 并发抢占
-    throw e;
-  }
-  return c.json({ ok: true, board: { slug, name: name || "" } });
-});
+/* ---------- Static HTML & SPA entry routes ---------- */
+const serveAsset = (pathname) => (c) => {
+  const url = new URL(c.req.url);
+  url.pathname = pathname;
+  return c.env.ASSETS.fetch(new Request(url, { method: "GET" }));
+};
 
-/* ---------- 站长 ---------- */
-app.post("/api/owner/login", async (c) => {
-  const { password } = await c.req.json().catch(() => ({}));
-  if (!password || password !== c.env.ADMIN_PASSWORD) return c.json({ ok: false, error: "密码错误" }, 401);
-  const token = await signToken(c.env.SESSION_SECRET, { role: "owner" }, TTL);
-  setCookie(c, OWNER_COOKIE, token, COOKIE_OPTS);
-  return c.json({ ok: true });
-});
-app.post("/api/owner/logout", (c) => { setCookie(c, OWNER_COOKIE, "", { ...COOKIE_OPTS, maxAge: 0 }); return c.json({ ok: true }); });
-// /api/owner/login 与 /logout 故意注册在本中间件之前 → 天然公开（Hono 中间件只作用于其后注册的路由）。
-// 其余 /api/owner/* 路由都在下方注册，受本中间件保护。下面这行对 login 是冗余兜底（实际到不了）。
-app.use("/api/owner/*", async (c, next) => {
-  if (c.req.path === "/api/owner/login") return next();
-  const token = getCookie(c, OWNER_COOKIE);
-  const claims = token ? await verifyToken(c.env.SESSION_SECRET, token) : null;
-  if (!claims || claims.role !== "owner") return c.json({ ok: false, error: "unauthorized" }, 401);
-  await next();
-});
-app.get("/api/owner/codes", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT a.code, a.used_by, a.used_at, a.created_at, u.username FROM activation_codes a LEFT JOIN users u ON u.id=a.used_by ORDER BY a.created_at DESC").all();
-  return c.json({ codes: (results || []).map((r) => ({ code: r.code, used: r.used_by != null, usedBy: r.used_by, usedByName: r.username || null, usedAt: r.used_at, createdAt: r.created_at })) });
-});
-app.post("/api/owner/codes", async (c) => {
-  const { count } = await c.req.json().catch(() => ({}));
-  const n = Math.max(1, Math.min(50, Number(count) || 1));
-  const now = new Date().toISOString(), created = [], stmts = [];
-  for (let i = 0; i < n; i++) { const code = generateCode(); created.push(code); stmts.push(c.env.DB.prepare("INSERT INTO activation_codes (code,used_by,created_at,used_at) VALUES (?,?,?,?)").bind(code, null, now, null)); }
-  await c.env.DB.batch(stmts);
-  return c.json({ ok: true, created });
-});
-app.get("/api/owner/users", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT * FROM users ORDER BY created_at DESC").all();
-  return c.json({ users: (results || []).map(rowToUser) });
-});
-// 使用统计（站长后台顶部的仪表盘）：只读聚合，见 src/usage.js
-app.get("/api/owner/stats", async (c) => { c.header("Cache-Control", "no-store"); return c.json(await ownerStats(c.env)); });
-// Restartable backfill; only counts are returned, never financial values or ciphertext.
-app.post("/api/owner/portfolio/encrypt", async (c) => {
-  c.header("Cache-Control", "no-store");
-  const body = await c.req.json().catch(() => ({}));
-  return c.json(await migratePortfolioBatch(c.env, body.limit));
-});
-app.post("/api/owner/users/:id/reset", async (c) => {
-  const tmp = generateCode();
-  const { hash, salt } = await hashPassword(tmp);
-  const { meta } = await c.env.DB.prepare("UPDATE users SET pass_hash=?, pass_salt=? WHERE id=?").bind(hash, salt, Number(c.req.param("id"))).run();
-  if (!meta.changes) return c.json({ ok: false, error: "not found" }, 404);
-  return c.json({ ok: true, password: tmp });
-});
-
-/* ---------- 公开页路由 + 静态 ---------- */
-// 旧入口 /app：看板页已查看/编辑合一，重定向到自己的 /b/<slug>（无会话则去登录）。
 app.get("/app", async (c) => {
   const uid = await currentUserId(c);
   if (uid) {
@@ -419,22 +84,21 @@ app.get("/app", async (c) => {
   }
   return c.redirect("/login", 302);
 });
-// 取根路径的 index.html（canonical，200，不会触发 .html→去扩展名的 307 跳转），
-// 浏览器地址保持 /b/<slug>，页面 JS 再从 location.pathname 解析 slug。
-app.get("/b/:slug", (c) => { const url = new URL(c.req.url); url.pathname = "/"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
-// 标的详情页：同一个 SPA，前端按 /b/<slug>/<code> 解析后渲染详情
-app.get("/b/:slug/:code", (c) => { const url = new URL(c.req.url); url.pathname = "/"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
-// 估值方法介绍页（干净 URL，公开）
-app.get("/portfolio", (c) => { const url = new URL(c.req.url); url.pathname = "/portfolio.html"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
-app.get("/macro", (c) => { const url = new URL(c.req.url); url.pathname = "/macro.html"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
-app.get("/valuation", (c) => { const url = new URL(c.req.url); url.pathname = "/valuation.html"; return c.env.ASSETS.fetch(new Request(url, { method: "GET" })); });
+app.get("/b/:slug", serveAsset("/"));
+app.get("/b/:slug/:code", serveAsset("/"));
+app.get("/portfolio", serveAsset("/portfolio.html"));
+app.get("/macro", serveAsset("/macro.html"));
+app.get("/valuation", serveAsset("/valuation.html"));
 app.all("*", (c) => {
   if (c.req.path.startsWith("/api/")) return c.json({ ok: false, error: "not found" }, 404);
   return c.env.ASSETS.fetch(c.req.raw);
 });
-// fetch = Hono 路由；scheduled = 每日定时任务（wrangler.toml [triggers]）：同步券商账户 + 记录资产快照
+
 export default {
   fetch: (req, env, ctx) => app.fetch(req, env, ctx),
   // 每日：同步券商账户 + 记资产快照；宏观序列超过 7 天没刷新就顺带刷新一次
-  scheduled: (event, env, ctx) => ctx.waitUntil(Promise.all([portfolio.runDaily(env), refreshIfStale(env).catch((e) => console.error("macro refresh failed:", e && e.message))])),
+  scheduled: (event, env, ctx) => ctx.waitUntil(Promise.all([
+    portfolio.runDaily(env),
+    refreshIfStale(env).catch((e) => console.error("macro refresh failed:", e && e.message)),
+  ])),
 };

@@ -2,22 +2,13 @@
 // 访问令牌在美东午夜失效、闲置 2 小时需续期——所以每天要重新授权一次；
 // 账户列表 /v1/accounts/list.json → 每个经纪账户的 portfolio.json + balance.json。
 
-import { toNum, sumCash, mergePositions } from "./common.js";
+import { toNum, authError, rfc3986Encode as pct, hmacSha1B64 as hmacSha1, sumCash, mergePositions } from "./common.js";
 
 export const ETRADE_API = "https://api.etrade.com";
 export const ETRADE_AUTHORIZE = "https://us.etrade.com/e/t/etws/authorize";
 
 /* ---------- OAuth 1.0a ---------- */
-// RFC 3986 百分号编码
-export const pct = (s) => encodeURIComponent(String(s)).replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
-
-async function hmacSha1(key, text) {
-  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
-  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(text)));
-  let bin = "";
-  for (const b of sig) bin += String.fromCharCode(b);
-  return btoa(bin);
-}
+export { pct };
 
 // 签名基串：METHOD&url&排序后的参数（查询参数 + oauth_*）
 export function oauthBaseString(method, url, params) {
@@ -41,8 +32,6 @@ export async function oauthHeader(method, url, query, o, { nonce, timestamp } = 
   oauth.oauth_signature = await hmacSha1(`${pct(o.consumerSecret)}&${pct(o.tokenSecret || "")}`, base);
   return "OAuth " + Object.keys(oauth).sort().map((k) => `${pct(k)}="${pct(oauth[k])}"`).join(",");
 }
-
-function authError(msg) { const e = new Error(msg); e.needsAuth = true; return e; }
 
 async function oauthGet(path, query, o, { fetchImpl = fetch, nonce, timestamp } = {}) {
   const url = ETRADE_API + path;

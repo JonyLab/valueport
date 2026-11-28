@@ -7,6 +7,9 @@
 // 快捷键 ⌘K / Ctrl+K 开关；Esc 关闭。对话按页面路径存在 sessionStorage，返回这页时还在。样式在 /shared/styles.css 的 .gai-*。
 import { LANG } from "./i18n.js";
 import { normalizeResearch } from "./search-sources.js";
+import { el, ri } from "./dom.js";
+import { SESSION_KEYS, gaiChatKey } from "./storage-keys.js";
+import { aiErrorText, activeAiModel, renderAiModelMenu, renderSearchSources, copyToClipboard } from "./ai-common.js";
 
 const zh = LANG === "zh";
 const TX = zh ? {
@@ -48,16 +51,13 @@ const SHORTCUT = IS_MAC ? "⌘K" : "Ctrl+K";
 // 和后端 src/ai-assist.js 的 ASSIST_LIMITS 保持一致：发送前先裁好，避免被 400
 const LIM = { messages: 20, content: 4000, path: 200, title: 120, symbol: 24, name: 80, summary: 2000 };
 const KINDS = ["watchlist", "stock", "portfolio", "macro", "other"];
-const CAP_KEY = "gai_cap";       // sessionStorage：本次会话确认已登录（navboot 据此首帧放占位按钮；退出登录会清空会话存储）
-const CHAT_PREFIX = "gai_chat:"; // sessionStorage：按页面路径存对话
-const OPEN_KEY = "gai_open";     // sessionStorage：抽屉开着就记下，切页后保持打开（navboot.js 首帧前先加 html.gai-open，布局不跳）
+const CAP_KEY = SESSION_KEYS.gaiCap;       // sessionStorage：本次会话确认已登录（navboot 据此首帧放占位按钮；退出登录会清空会话存储）
+const OPEN_KEY = SESSION_KEYS.gaiOpen;     // sessionStorage：抽屉开着就记下，切页后保持打开（navboot.js 首帧前先加 html.gai-open，布局不跳）
 const root = typeof document !== "undefined" ? document.documentElement : null; // 单测（node）里只用纯函数
 const remember = (on) => { try { on ? sessionStorage.setItem(OPEN_KEY, "1") : sessionStorage.removeItem(OPEN_KEY); } catch { /* ignore */ } };
 const wasOpen = () => { try { return sessionStorage.getItem(OPEN_KEY) === "1"; } catch { return false; } };
 const CHAT_MAX_CHARS = 24000;    // 每页对话最多存这么多字（超了丢最早的一问一答）
 
-function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-function ri(name) { const i = el("i", "ri-" + name); i.setAttribute("aria-hidden", "true"); return i; }
 const line = (v, max) => (typeof v === "string" ? v.replace(/[\r\n`]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max) : "");
 
 /* ---------- 页面上下文 ---------- */
@@ -118,7 +118,7 @@ function chipText(page) {
 /* ---------- 登录探测（兼取模型列表） ---------- */
 const buttons = new Set();
 let cap = false, capP = null, models = null;
-try { cap = sessionStorage.getItem(CAP_KEY) === "1" || !!sessionStorage.getItem("fb_cap"); } catch { cap = false; } // 反馈的 fb_cap 也说明已登录
+try { cap = sessionStorage.getItem(CAP_KEY) === "1" || !!sessionStorage.getItem(SESSION_KEYS.fbCap); } catch { cap = false; } // 反馈的 fb_cap 也说明已登录
 function syncButtons() {
   for (const b of buttons) { if (!b.isConnected) buttons.delete(b); else b.classList.toggle("hidden", !cap); }
 }
@@ -235,7 +235,7 @@ function close(returnFocus) {
 /* ---------- 对话存储（sessionStorage，按路径） ---------- */
 function loadChat(path) {
   try {
-    const j = JSON.parse(sessionStorage.getItem(CHAT_PREFIX + path) || "null");
+    const j = JSON.parse(sessionStorage.getItem(gaiChatKey(path)) || "null");
     if (!j || !Array.isArray(j.msgs)) return [];
     return j.msgs.filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content)
       .map((m) => ({ role: m.role, content: m.content.slice(0, LIM.content), ...(m.role === "assistant" && normalizeResearch(m.research) ? { research: normalizeResearch(m.research) } : {}) })).slice(-40);
@@ -246,8 +246,8 @@ function saveChat(path, msgs) {
   const size = (l) => l.reduce((n, m) => n + m.content.length, 0);
   while (list.length > 2 && size(list) > CHAT_MAX_CHARS) list = list.slice(2);
   try {
-    if (!list.length) sessionStorage.removeItem(CHAT_PREFIX + path);
-    else sessionStorage.setItem(CHAT_PREFIX + path, JSON.stringify({ v: 1, msgs: list }));
+    if (!list.length) sessionStorage.removeItem(gaiChatKey(path));
+    else sessionStorage.setItem(gaiChatKey(path), JSON.stringify({ v: 1, msgs: list }));
   } catch { /* 存储满了 / 不可用：只是不保留 */ }
 }
 // 发给后端的历史：最近 20 条，并且以用户消息开头
@@ -350,44 +350,20 @@ function build() {
   // 模型切换：和估值 AI 抽屉同一份配置（/api/my/ai/models、PUT /api/my/ai/active）
   function drawModels() {
     syncSearch();
-    if (!models) { modelName.textContent = TX.modelLoading; return; }
-    const all = [models.site, ...(models.workers || []), ...(models.siteKey || []), ...(models.custom || [])];
-    const cur = all.find((m) => m.id === models.active) || models.site;
+    const cur = activeAiModel(models);
+    if (!cur) { modelName.textContent = TX.modelLoading; return; }
     modelName.textContent = TX.model + cur.name;
-    modelMenu.replaceChildren();
-    const group = (label, items) => {
-      if (!items.length) return;
-      modelMenu.appendChild(el("div", "gai-mgroup", label));
-      for (const m of items) {
-        const on = m.id === models.active;
-        const b = el("button", on ? "on" : ""); b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(on));
-        b.append(el("span", "gai-mname", m.name), el("span", "gai-mmodel", m.kind === "site" ? TX.site : m.model));
-        b.addEventListener("click", async () => {
-          if (m.id === models.active) { closeMenu(); return; }
-          modelMenu.querySelectorAll("button").forEach((x) => { x.disabled = true; });
-          const r = await fetch("/api/my/ai/active", { method: "PUT", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: m.id }) }).catch(() => null);
-          if (r && r.ok) { models.active = m.id; drawModels(); closeMenu(); modelBtn.focus(); }
-          else {
-            modelMenu.querySelectorAll("button").forEach((x) => { x.disabled = false; });
-            let er = modelMenu.querySelector('[role="alert"]');
-            if (!er) { er = el("p", "gai-mgroup gai-merr"); er.setAttribute("role", "alert"); modelMenu.appendChild(er); }
-            er.textContent = TX.switchFail;
-          }
-        });
-        modelMenu.appendChild(b);
-      }
-    };
-    group(TX.site, [models.site]);
-    group("Workers AI", (models.workers || []).filter((w) => w.model !== (models.site.provider === "workers-ai" ? models.site.model : "")));
-    group(TX.free, models.siteKey || []);
-    group(TX.mine, models.custom || []);
     let slug = (location.pathname.match(/^\/b\/([^/]+)/) || [])[1];
-    if (!slug) { try { slug = sessionStorage.getItem("owner_slug") || ""; } catch { slug = ""; } }
-    if (slug) {
-      const a = el("a", "gai-manage", (models.custom || []).length ? TX.manage : TX.manageAdd);
-      a.href = "/b/" + encodeURIComponent(decodeURIComponent(slug)) + "#ai"; a.target = "_blank"; a.rel = "noopener";
-      modelMenu.appendChild(a);
-    }
+    if (!slug) { try { slug = sessionStorage.getItem(SESSION_KEYS.ownerSlug) || ""; } catch { slug = ""; } }
+    renderAiModelMenu(modelMenu, models, {
+      lang: LANG,
+      prefix: "gai",
+      manageHref: slug ? "/b/" + encodeURIComponent(decodeURIComponent(slug)) + "#ai" : "",
+      manageText: TX.manage,
+      manageAddText: TX.manageAdd,
+      onDismiss: closeMenu,
+      onSelected: () => { drawModels(); closeMenu(); modelBtn.focus(); },
+    });
   }
   function closeMenu() { if (modelMenu.hidden) return false; modelMenu.hidden = true; modelBtn.setAttribute("aria-expanded", "false"); return true; }
   modelBtn.addEventListener("click", (e) => {
@@ -430,22 +406,10 @@ function build() {
     const m = el("div", "gai-msg " + (role === "user" ? "me" : "ai") + (error ? " error" : ""));
     const b = el("div", "gai-bubble");
     if (role === "assistant" && !error) b.appendChild(renderRich(text)); else b.textContent = text;
-    const sources = normalizeResearch(research);
-    if (role === "assistant" && sources) {
-      const refs = el("div", "gai-sources");
-      refs.appendChild(el("div", "", sources.sources.length ? (zh ? "搜索来源 · 摘要待核实" : "Search sources · verify excerpts") : (zh ? "本次搜索未找到相关资料" : "No relevant search results")));
-      if (sources.searchedAt && Number.isFinite(Date.parse(sources.searchedAt))) refs.appendChild(el("small", "", (zh ? "检索于 " : "Searched ") + new Date(sources.searchedAt).toLocaleString(zh ? "zh-CN" : "en-US")));
-      for (const source of sources.sources) {
-        const a = el("a", "", `[${source.id}] ${source.title}${source.publishedAt ? " · " + source.publishedAt : ""}`);
-        a.href = source.url; a.target = "_blank"; a.rel = "noopener noreferrer"; refs.appendChild(a);
-      }
-      b.appendChild(refs);
-    }
+    const refs = role === "assistant" ? renderSearchSources(research, { lang: LANG, cls: "gai-sources" }) : null;
+    if (refs) b.appendChild(refs);
     m.appendChild(b); log.appendChild(m); scrollEnd();
     return m;
-  }
-  async function copyText(t) {
-    try { await navigator.clipboard.writeText(t); return true; } catch { return false; }
   }
   function actions(m, { copy, retry }) {
     const row = el("div", "gai-macts");
@@ -453,7 +417,7 @@ function build() {
     if (copy) {
       const b = mk("file-copy-line", TX.copy);
       b.addEventListener("click", async () => {
-        const ok = await copyText(copy + "\n\n—— " + TX.disclaimer);
+        const ok = await copyToClipboard(copy + "\n\n—— " + TX.disclaimer);
         if (!ok) return;
         b.replaceChildren(ri("check-line")); b.title = TX.copied; b.classList.add("done");
         setTimeout(() => { b.replaceChildren(ri("file-copy-line")); b.title = TX.copy; b.classList.remove("done"); }, 1500);
@@ -526,8 +490,7 @@ function build() {
       if (!r.ok || typeof j.reply !== "string" || !j.reply) {
         drop();
         if (r.status === 401) { cap = false; try { sessionStorage.removeItem(CAP_KEY); } catch { /* ignore */ } }
-        let msg = TX.err;
-        try { const { aiErrorText } = await import("./ai-panel.js"); msg = aiErrorText(r.status, j, LANG); } catch { /* 用默认文案 */ }
+        const msg = aiErrorText(r.status, j, LANG);
         const m = bubble("assistant", msg, { error: true });
         actions(m, { retry: retry(m) });
         return;

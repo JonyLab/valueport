@@ -1,4 +1,5 @@
 // Original A-share periodic reports, discovered by security code rather than issuer adapters.
+import { readBoundedBytes, edgeCacheMatch, edgeCacheJsonResponse, scheduleEdgeCachePut } from "./lib/runtime.js";
 const CATALOG = "https://www.cninfo.com.cn";
 const CDN = "https://static.cninfo.com.cn";
 const MAX_PDF_BYTES = 16 * 1024 * 1024;
@@ -14,20 +15,8 @@ export function reportFailure(error) {
     report_identity_mismatch: "identity_mismatch", report_page_limit: "page_limit", report_text_limit: "page_limit" }[message] || "parse_failed";
 }
 
-async function bounded(response, limit) {
-  if (!response.ok || !response.body) { await response.body?.cancel(); throw new Error("report_request_failed"); }
-  if (Number(response.headers.get("content-length")) > limit) { await response.body.cancel(); throw new Error("report_too_large"); }
-  const reader = response.body.getReader(), chunks = []; let size = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read(); if (done) break;
-      size += value.length; if (size > limit) throw new Error("report_too_large"); chunks.push(value);
-    }
-  } finally { await reader.cancel().catch(() => {}); }
-  const result = new Uint8Array(size); let offset = 0;
-  for (const value of chunks) { result.set(value, offset); offset += value.length; }
-  return result;
-}
+const bounded = (response, limit) =>
+  readBoundedBytes(response, limit, { failedError: "report_request_failed", tooLargeError: "report_too_large" });
 
 export function selectPeriodicReports(items, code, now = Date.now()) {
   const candidates = (Array.isArray(items) ? items : []).flatMap((item) => {
@@ -353,21 +342,21 @@ export function registerBusinessReports(app, { fetchReports = fetchBusinessRepor
     c.header("Cache-Control", "no-store");
     const symbol = c.req.query("symbol") || "";
     if (!/^(?:us[A-Za-z0-9.-]{1,16}|(?:sh|sz|bj)\d{6}|hk\d{1,8})$/.test(symbol)) return c.json({ error: "bad symbol" }, 400);
-    const at = now(), key = new Request("https://business-reports.internal/v1/" + symbol), hit = await caches.default.match(key);
+    const at = now(), key = new Request("https://business-reports.internal/v1/" + symbol), hit = await edgeCacheMatch(key);
     if (hit) return c.json(await hit.json());
     let saved = null;
     try { await c.env.DB.prepare(TABLE).run(); saved = await c.env.DB.prepare("SELECT * FROM business_report_snapshots WHERE symbol=?").bind(symbol).first(); } catch { /* Storage failure does not block retrieval. */ }
-    const cache = (value, ttl) => caches.default.put(key, Response.json(value, { headers: { "Cache-Control": `public, max-age=${ttl}` } }));
+    const cache = (value, ttl) => scheduleEdgeCachePut(c, key, edgeCacheJsonResponse(value, ttl));
     let previous = null;
     try { previous = saved && JSON.parse(saved.snapshot_json); } catch { saved = null; }
     if (previous?.symbol !== symbol || !Array.isArray(previous?.reports)) { previous = null; saved = null; }
     if (saved && saved.refresh_after > at) {
-      c.executionCtx.waitUntil(cache(previous, Math.max(1, Math.floor((saved.refresh_after - at) / 1000)))); return c.json(previous);
+      await cache(previous, Math.max(1, Math.floor((saved.refresh_after - at) / 1000))); return c.json(previous);
     }
     const fresh = await fetchReports(symbol), success = fresh.status === "ok";
     if (!success && saved) {
       const value = { ...previous, storage: { status: "refresh_failed", savedAt: saved.saved_at } };
-      c.executionCtx.waitUntil(cache(value, 600)); return c.json(value);
+      await cache(value, 600); return c.json(value);
     }
     if (success) {
       const ttl = fresh.reports.length === 2 && fresh.reports.every((r) => r.status === "ok") ? 21600 : 600;
@@ -382,7 +371,7 @@ export function registerBusinessReports(app, { fetchReports = fetchBusinessRepor
       const cacheTtl = retained ? 600 : ttl;
       try { await c.env.DB.prepare("INSERT INTO business_report_snapshots(symbol,snapshot_json,saved_at,refresh_after) VALUES(?,?,?,?) ON CONFLICT(symbol) DO UPDATE SET snapshot_json=excluded.snapshot_json,saved_at=excluded.saved_at,refresh_after=excluded.refresh_after")
         .bind(symbol, JSON.stringify(value), value.storage.savedAt, at + cacheTtl * 1000).run(); } catch { /* Edge cache remains usable. */ }
-      c.executionCtx.waitUntil(cache(value, cacheTtl)); return c.json(value);
+      await cache(value, cacheTtl); return c.json(value);
     }
     return c.json(fresh);
   });
