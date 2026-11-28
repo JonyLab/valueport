@@ -89,7 +89,7 @@ src/lib/*                     Canonical server utilities (edge cache, UTC date, 
 - [x] **Batch 9**: Extract `public/macro.html` inline CSS/JS into `public/shared/macro-page.css` and `public/shared/macro-page.js`
 - [x] **Batch 10**: Extract & modularize `public/portfolio.html` inline CSS/JS into `public/shared/portfolio-page.css` and `public/shared/portfolio/*`
 - [x] **Batch 11**: Extract & modularize `public/index.html` inline CSS/JS into `public/shared/board-page.css` and `public/shared/board/*`
-- [ ] **Batch 12**: Decompose `public/shared/valuation-ui.js` (1,948 lines) into cohesive submodules
+- [x] **Batch 12**: Decompose `public/shared/valuation-ui.js` (1,948 lines) — extracted pure formatting/parsing/chart helpers into `public/shared/valuation/ui-format.js` with unit tests; kept deeply stateful editor closures cohesive per Deletion Test
 - [ ] **Batch 13**: Add automated architecture fitness test suite (`test-core/architecture.test.js`) + verify CI coverage
 
 ## 6. Deferred / Needs Product Confirmation
