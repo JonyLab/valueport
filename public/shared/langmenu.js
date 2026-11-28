@@ -17,15 +17,29 @@ export function mountLangMenu(host) {
     const o = document.createElement("button");
     o.type = "button"; o.className = "lang-opt" + (code === LANG ? " on" : ""); o.textContent = label;
     o.setAttribute("role", "menuitemradio"); o.setAttribute("aria-checked", code === LANG ? "true" : "false");
-    o.addEventListener("click", () => { if (code !== LANG) setLang(code); else setOpen(false); });
+    o.addEventListener("click", () => { if (code !== LANG) setLang(code); else { setOpen(false); btn.focus(); } });
     pop.appendChild(o);
   }
   wrap.append(btn, pop);
-  // 触屏没有 hover：点按图标开合，点菜单外收起
+  // 触屏 / 键盘显式维护 .open，不依赖 :focus-within，确保 Esc 与点选当前语言后能真正收起
+  const opts = [...pop.querySelectorAll(".lang-opt")];
   function setOpen(open) { wrap.classList.toggle("open", open); btn.setAttribute("aria-expanded", open ? "true" : "false"); }
   btn.addEventListener("click", () => setOpen(!wrap.classList.contains("open")));
   wrap.addEventListener("mouseenter", () => btn.setAttribute("aria-expanded", "true"));
   wrap.addEventListener("mouseleave", () => { if (!wrap.classList.contains("open")) btn.setAttribute("aria-expanded", "false"); });
+  wrap.addEventListener("focusout", (e) => { if (!wrap.contains(e.relatedTarget)) setOpen(false); });
+  wrap.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (!wrap.classList.contains("open")) return;
+      e.stopPropagation(); e.preventDefault(); setOpen(false); btn.focus();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!wrap.classList.contains("open")) setOpen(true);
+      const cur = opts.indexOf(document.activeElement);
+      const next = e.key === "ArrowDown" ? (cur + 1) % opts.length : (cur <= 0 ? opts.length - 1 : cur - 1);
+      opts[next].focus();
+    }
+  });
   document.addEventListener("click", (e) => { if (!wrap.contains(e.target)) setOpen(false); });
   // navboot.js 首帧放过一个静态占位：原地替换，位置不变、不闪
   const stub = host.querySelector(".lang-menu[data-static]");

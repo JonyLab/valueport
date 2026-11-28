@@ -19,15 +19,15 @@ export function ensureAlertBannerStyles() {
 /* 统一待办行动条（单行紧凑，点开看详情和图，再点收回） */
 .vp-strip{margin:0 0 16px;border-radius:var(--r-xl);background:rgba(255,255,255,.72);border:1px solid rgba(246,207,74,.65);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);overflow:hidden}
 .vp-strip.alert{background:linear-gradient(90deg,rgba(246,207,74,.24),rgba(255,255,255,.76) 45%)}
-.vp-strip-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;cursor:pointer;user-select:none}
-.vp-strip-bar:hover{background:rgba(246,207,74,.08)}
+.vp-strip-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;cursor:pointer;user-select:none;transition:background .15s ease}
+.vp-strip-bar:hover{background:rgba(246,207,74,.10)}
 .vp-strip-main{display:flex;align-items:center;gap:10px;min-width:0;flex:1;flex-wrap:wrap}
 .vp-strip-dot{width:28px;height:28px;border-radius:50%;background:var(--sun);color:var(--sun-ink);display:inline-flex;align-items:center;justify-content:center;font-size:15px;flex:none}
 .vp-strip-text{font-size:13.5px;color:var(--ink);line-height:1.45;min-width:0}
 .vp-strip-text b{font-weight:500}
 .vp-strip-meta{font-size:12.5px;color:var(--ink-soft)}
 .vp-strip-acts{display:flex;align-items:center;gap:6px;flex:none}
-.vp-strip-tog{display:inline-flex;align-items:center;gap:3px;height:30px;padding:0 10px;border:0;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft);cursor:pointer;font-family:var(--font);font-size:12.5px}
+.vp-strip-tog{display:inline-flex;align-items:center;gap:3px;height:30px;padding:0 10px;border:0;border-radius:var(--r-pill);background:var(--track);color:var(--ink-soft);cursor:pointer;font-family:var(--font);font-size:12.5px;transition:background .14s ease,color .14s ease}
 .vp-strip-tog:hover{background:var(--track-edge);color:var(--ink)}
 .vp-strip-body{padding:0 16px 14px;display:flex;flex-direction:column;gap:10px;border-top:1px dashed rgba(59,48,0,.15)}
 .vp-strip-body[hidden]{display:none}
@@ -36,7 +36,7 @@ export function ensureAlertBannerStyles() {
 .vp-abanner-left{flex:1;min-width:220px;display:flex;flex-direction:column;gap:7px;font-size:13.5px;line-height:1.55;color:var(--ink-soft)}
 .vp-abanner-left b{color:var(--ink);font-weight:500}
 .vp-abanner-btnrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.vp-abanner-close{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:var(--ink-mute);cursor:pointer;font-size:15px}
+.vp-abanner-close{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:var(--ink-mute);cursor:pointer;font-size:15px;transition:background .14s ease,color .14s ease}
 .vp-abanner-close:hover{background:var(--track);color:var(--ink)}
 
 /* 走势小图 + 阈值虚线 + 分位条 */
@@ -78,22 +78,27 @@ export function ensureAlertBannerStyles() {
 /* 就地设提醒浮层（Chart-First Quick Alert Modal） */
 .vp-qov{position:fixed;inset:0;z-index:95;background:rgba(40,36,25,.32);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;padding:18px}
 .vp-qov[hidden]{display:none}
-.vp-qmod{margin:auto;width:min(520px,100%);max-height:calc(100vh - 36px);overflow:auto;background:#fbfaf6;border-radius:var(--r-xl);box-shadow:0 40px 100px -30px rgba(40,35,20,.5);padding:22px 22px 20px;display:flex;flex-direction:column;gap:12px}
-.vp-qtop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.vp-qmod{margin:auto;width:min(520px,100%);max-height:calc(100vh - 36px);overflow:auto;overscroll-behavior:contain;background:#fbfaf6;border-radius:var(--r-xl);box-shadow:0 40px 100px -30px rgba(40,35,20,.5);padding:0 22px;display:flex;flex-direction:column;gap:12px}
+.vp-qtop{position:sticky;top:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 -22px 2px;padding:18px 22px 12px;background:rgba(251,250,246,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--divider)}
 .vp-qtitle{font-size:19px;font-weight:500}
 .vp-qchips{display:flex;flex-wrap:wrap;gap:6px}
-.vp-qchip{height:29px;padding:0 12px;border:0;border-radius:var(--r-pill);background:rgba(246,207,74,.22);color:var(--sun-ink);font-family:var(--font);font-size:12.5px;cursor:pointer}
+.vp-qchip{height:29px;padding:0 12px;border:0;border-radius:var(--r-pill);background:rgba(246,207,74,.22);color:var(--sun-ink);font-family:var(--font);font-size:12.5px;cursor:pointer;transition:background .14s ease,color .14s ease}
 .vp-qchip:hover{background:rgba(246,207,74,.38)}
 .vp-qchip.on{background:var(--dark);color:#fff}
 .vp-qslider{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);background:rgba(29,29,27,.035)}
-.vp-qslider input[type="range"]{flex:1;accent-color:var(--dark);cursor:pointer}
-.vp-qslider input[type="number"]{width:76px;height:34px;padding:0 9px;border:0;border-radius:var(--r-sm);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:13.5px;font-variant-numeric:tabular-nums}
-.vp-qslider select{height:34px;padding:0 8px;border:0;border-radius:var(--r-sm);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:12.5px}
-.vp-qinput{width:100%;height:38px;padding:0 12px;border:0;border-radius:var(--r-sm);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:13.5px;color:var(--ink)}
+.vp-qslider input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:var(--r-pill);background:var(--track-edge);cursor:pointer}
+.vp-qslider input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--dark);border:2.5px solid #fff;box-shadow:0 2px 6px rgba(30,25,10,.28);transition:transform .12s ease}
+.vp-qslider input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.1)}
+.vp-qslider input[type="range"]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--dark);border:2.5px solid #fff;box-shadow:0 2px 6px rgba(30,25,10,.28)}
+.vp-qslider input[type="number"]{width:76px;height:34px;padding:0 9px;border:0;border-radius:var(--r-sm);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:13.5px;font-variant-numeric:tabular-nums;transition:box-shadow .15s ease}
+.vp-qslider select{height:34px;padding:0 8px;border:0;border-radius:var(--r-sm);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:12.5px;transition:box-shadow .15s ease}
+.vp-qslider input[type="number"]:focus,.vp-qslider select:focus{outline:none;box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 3px var(--ring)}
+.vp-qinput{width:100%;height:38px;padding:0 12px;border:0;border-radius:var(--r-sm);background:#fff;box-shadow:inset 0 0 0 1px var(--divider);font-family:var(--font);font-size:13.5px;color:var(--ink);transition:box-shadow .15s ease}
 .vp-qinput:focus{outline:none;box-shadow:inset 0 0 0 1px var(--ring-border),0 0 0 3px var(--ring)}
-.vp-qfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;padding-top:12px;border-top:1px dashed var(--border)}
+.vp-qfoot{position:sticky;bottom:0;z-index:4;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px -22px 0;padding:12px 22px 16px;background:rgba(251,250,246,.94);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px dashed var(--border)}
 .vp-qfoot-r{display:flex;gap:8px;margin-left:auto}
 .vp-qerr{font-size:12.5px;color:var(--red);min-height:16px}
+.vp-safe-del{transition:background .15s ease,color .15s ease,padding .15s ease}
 .vp-safe-del.armed{background:rgba(198,65,65,.14) !important;color:var(--red) !important;border-radius:var(--r-pill) !important;padding:0 10px !important;font-size:12px !important;width:auto !important}
 @media (max-width:600px){ .pf-achart{width:100%} .vp-strip-bar{flex-wrap:wrap} }
 `;
@@ -298,6 +303,7 @@ export function renderActionStrip({
   if (triggered.length) {
     tog = el("button", "vp-strip-tog"); tog.type = "button";
     const syncTog = () => {
+      tog.setAttribute("aria-expanded", String(expanded));
       tog.replaceChildren(document.createTextNode(expanded ? T("收起", "Hide") : T("看图与详情", "Details")), ri(expanded ? "arrow-up-s-line" : "arrow-down-s-line"));
       if (body) body.hidden = !expanded;
     };
@@ -357,7 +363,10 @@ export function renderActionStrip({
       body.appendChild(row);
     }
     strip.appendChild(body);
-    if (tog) tog.replaceChildren(document.createTextNode(expanded ? T("收起", "Hide") : T("看图与详情", "Details")), ri(expanded ? "arrow-up-s-line" : "arrow-down-s-line"));
+    if (tog) {
+      tog.setAttribute("aria-expanded", String(expanded));
+      tog.replaceChildren(document.createTextNode(expanded ? T("收起", "Hide") : T("看图与详情", "Details")), ri(expanded ? "arrow-up-s-line" : "arrow-down-s-line"));
+    }
   }
   return strip;
 }
@@ -393,12 +402,20 @@ export function openQuickAlertModal({ metricKey, macroData, plan, lang = "zh", o
       suggestProfileId: "",
     };
 
+  const prevFocus = document.activeElement;
   const ov = el("div", "vp-qov");
   const mod = el("div", "vp-qmod"); mod.setAttribute("role", "dialog"); mod.setAttribute("aria-modal", "true");
-  const close = () => { document.removeEventListener("keydown", onEsc); ov.remove(); };
-  const onEsc = (e) => { if (e.key === "Escape") close(); };
-  document.addEventListener("keydown", onEsc);
-  ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+  const close = () => {
+    document.removeEventListener("keydown", onEsc, true);
+    ov.remove();
+    if (prevFocus && prevFocus.isConnected && typeof prevFocus.focus === "function") prevFocus.focus();
+  };
+  const onEsc = (e) => { if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); close(); } };
+  document.addEventListener("keydown", onEsc, true);
+  // 只有 mousedown 起点在遮罩上才关闭，避免拖动滑块或拖选文字松手到遮罩上误关弹窗
+  let downOnOv = false;
+  ov.addEventListener("mousedown", (e) => { downOnOv = e.target === ov; });
+  ov.addEventListener("click", (e) => { if (downOnOv && e.target === ov) close(); downOnOv = false; });
 
   const top = el("div", "vp-qtop");
   const title = el("span", "vp-qtitle", (zh ? meta.zh : meta.en) + T(" · 提醒", " · Alert"));

@@ -147,7 +147,7 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const pickAiOut = el("div", "vc-picker-aiout");
   pickAi.append(pickAiBtn, pickAiOut);
   if (!stock || !stock.name) pickAi.hidden = true;
-  pickHead.append(pickTop, pickSub, pickWarn, pickAi);
+  pickHead.append(pickSub, pickWarn, pickAi);
   let aiPicks = [];
   // 生意类型标签（与 src/ai.js 的 BUSINESS_TYPES 对应）
   const BIZ_LABEL = { cyclical: ["资源与周期", "Cyclical / commodity"], financial: ["金融", "Financial"], utility: ["公用事业 / 类债券", "Utility / bond-like"], stalwart: ["成熟稳健", "Stalwart"],
@@ -260,10 +260,12 @@ export function mountValuationCalc(mount, ctx, { lang, initialMethod, initialInp
   const guideLink = el("a", "", { href: "/valuation#frameworks", target: "_blank", rel: "noopener" });
   guideLink.textContent = lang === "zh" ? "查看完整方法分类与公式" : "View the method guide and formulas";
   frameworks.appendChild(guideLink);
-  pickerModal.append(pickHead, methodBar, frameworks);
+  pickerModal.append(pickTop, pickHead, methodBar, frameworks);
   // 关闭：还没选过方法（新增）→ 退出工作台回详情；已有方法（更换）→ 保持原方法
   function closePicker() { showPicker(false); }
-  pickerView.addEventListener("click", (e) => { if (e.target === pickerView) closePicker(); });
+  let pickerDownOnOv = false;
+  pickerView.addEventListener("mousedown", (e) => { pickerDownOnOv = e.target === pickerView; });
+  pickerView.addEventListener("click", (e) => { if (pickerDownOnOv && e.target === pickerView) closePicker(); pickerDownOnOv = false; });
   // Esc 只关弹窗：捕获阶段先接住，避免宿主页的全局 Esc 顺带退出整个编辑器
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || pickerView.hidden || !pickerView.isConnected) return;

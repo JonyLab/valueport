@@ -38,8 +38,9 @@
   /* 引力 */
   .mc-ctl{display:flex;gap:8px;flex-wrap:wrap}
   .mc-seg{display:flex;gap:2px;padding:3px;background:var(--track);border-radius:var(--r-pill)}
-  .mc-seg button{height:28px;padding:0 12px;border:0;border-radius:var(--r-pill);background:none;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);white-space:nowrap}
-  .mc-seg button.on{background:#fff;color:var(--ink)}
+  .mc-seg button{height:28px;padding:0 12px;border:0;border-radius:var(--r-pill);background:none;cursor:pointer;font-family:var(--font);font-size:12.5px;color:var(--ink-soft);white-space:nowrap;transition:background .15s ease,color .15s ease,box-shadow .15s ease}
+  .mc-seg button:hover:not(.on){color:var(--ink)}
+  .mc-seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(60,50,20,.1)}
   .mc-gsay{font-size:14px;line-height:1.7;color:var(--ink-soft);margin:-4px 0 12px}
   .mc-gsay b{color:var(--ink);font-weight:500}
   .mc-chart{position:relative;height:240px;padding-left:44px}
@@ -69,8 +70,8 @@
   .mc-zone-k i{width:8px;height:8px;border-radius:50%}
   .mc-zone-v{font-size:26px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
   .mc-names{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-  .mc-name{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 13px 0 6px;border-radius:var(--r-pill);background:rgba(29,29,27,.045);color:var(--ink);text-decoration:none;font-size:13px}
-  .mc-name:hover{background:rgba(29,29,27,.08)}
+  .mc-name{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 13px 0 6px;border-radius:var(--r-pill);background:rgba(29,29,27,.045);color:var(--ink);text-decoration:none;font-size:13px;transition:background .15s ease,transform .14s ease,box-shadow .15s ease}
+  .mc-name:hover{background:#fff;transform:translateY(-1px);box-shadow:0 4px 12px -6px rgba(60,50,20,.22)}
   .mc-name .dot{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px}
   .mc-name small{color:var(--ink-mute);font-size:11.5px}
   .mc-callout{margin-top:14px;font-size:13.5px;line-height:1.7;color:var(--ink-soft);background:rgba(246,207,74,.16);border-radius:var(--r-md);padding:11px 15px}
@@ -82,7 +83,7 @@
   .mc-hero-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .mc-cust{position:relative}
   .mc-cust-btn i{font-size:15px}
-  .mc-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:320px;padding:14px;border-radius:var(--r-lg);background:var(--card-solid);box-shadow:0 18px 50px -12px rgba(40,35,20,.28),0 0 0 1px var(--divider)}
+  .mc-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:30;width:320px;padding:14px;border-radius:var(--r-lg);background:var(--card-solid);box-shadow:0 18px 50px -12px rgba(40,35,20,.28),0 0 0 1px var(--divider);animation:vpPopIn .14s cubic-bezier(.22,1,.36,1) both}
   .mc-pop[hidden],.mc-scrim[hidden]{display:none}
   .mc-pop-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 4px 10px}
   .mc-pop-h b{font-size:15px;font-weight:500}

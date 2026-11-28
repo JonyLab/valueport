@@ -196,12 +196,11 @@ function totalCard(s) {
   const curMenu = el("div", "pf-cur-menu"); curMenu.setAttribute("role", "menu"); curMenu.hidden = true;
   for (const b of BASES) {
     const o = el("button", b === base ? "on" : "", b); o.type = "button"; o.setAttribute("role", "menuitemradio"); o.setAttribute("aria-checked", b === base ? "true" : "false");
-    o.addEventListener("click", () => { curMenu.hidden = true; if (b === base) return; base = b; localStorage.setItem(LOCAL_KEYS.pfBase, b); load(); });
+    o.addEventListener("click", (e) => { e.stopPropagation(); setOpen(false); if (b === base) return; base = b; localStorage.setItem(LOCAL_KEYS.pfBase, b); load(); });
     curMenu.appendChild(o);
   }
   const setOpen = (open) => { curMenu.hidden = !open; curBtn.setAttribute("aria-expanded", open ? "true" : "false"); };
-  curBtn.addEventListener("click", (e) => { e.stopPropagation(); setOpen(curMenu.hidden); });
-  document.addEventListener("click", (e) => { if (!cur.contains(e.target)) setOpen(false); });
+  curBtn.addEventListener("click", (e) => { e.stopPropagation(); const open = curMenu.hidden; closePfPopovers(); setOpen(open); });
   cur.append(curBtn, curMenu);
   const day = el("span", "pf-day " + (s.day > 0 ? "up" : s.day < 0 ? "down" : ""), `${T("今日", "Today")} ${hideAmt ? "" : signed(s.day) + " "}(${pct(s.dayPct, 2)})`);
   row.append(num, cur, day);
@@ -407,7 +406,6 @@ function healthCard(s) {
   checks.forEach((x, i) => { const [px, py] = P(i, R * LEVEL_SCORE[x.level] / 100); svg.appendChild(mk("circle", { class: "pf-radar-dot " + x.level, cx: px, cy: py, r: 4 })); });
   svg.appendChild(mk("text", { class: "pf-radar-score", x: cx, y: cy + 10, "text-anchor": "middle" }, String(score)));
   wrap.appendChild(svg);
-  const closeTips = () => wrap.querySelectorAll(".pf-rtag.open").forEach((t) => t.classList.remove("open"));
   checks.forEach((x, i) => {
     const [lx, ly] = P(i, R + 26), a = Math.cos(ang(i));
     const side = Math.abs(a) < 0.2 ? "mid" : a > 0 ? "right" : "left";
@@ -420,11 +418,10 @@ function healthCard(s) {
     tip.append(th, el("span", "pf-rtip-text", x.text));
     tag.appendChild(tip);
     tag.setAttribute("aria-label", `${x.title} ${x.value}：${x.text}`);
-    // 触屏没有 hover：点按开合
-    tag.addEventListener("click", (e) => { e.stopPropagation(); const open = !tag.classList.contains("open"); closeTips(); tag.classList.toggle("open", open); });
+    // 触屏没有 hover：点按开合（同时收起已打开的币种 / 账户菜单）
+    tag.addEventListener("click", (e) => { e.stopPropagation(); const open = !tag.classList.contains("open"); closePfPopovers(tag); tag.classList.toggle("open", open); });
     wrap.appendChild(tag);
   });
-  document.addEventListener("click", closeTips);
   c.appendChild(wrap);
   const counts = { ok: 0, warn: 0, bad: 0 }; checks.forEach((x) => counts[x.level]++);
   const sumTxt = el("div", "pf-health-sum " + level);
@@ -1883,11 +1880,14 @@ function distCard(s) {
 function accountsStrip(s) {
   const wrap = el("div", "pf-accs");
   const row = el("div", "pf-accs-row");
-  const closeAll = () => row.querySelectorAll(".pf-acc-menu").forEach((m) => { m.hidden = true; });
+  const closeAll = () => {
+    row.querySelectorAll(".pf-acc-menu").forEach((m) => { m.hidden = true; });
+    row.querySelectorAll(".pf-acc-chip").forEach((b) => b.setAttribute("aria-expanded", "false"));
+  };
   for (const a of data.accounts) {
     const m = BROKER_META[a.broker] || BROKER_META.manual, A = s.perAcc.get(a.id);
     const box = el("div", "pf-acc-chipwrap");
-    const chip = el("button", "pf-acc-chip" + (a.lastError ? " err" : "")); chip.type = "button"; chip.setAttribute("aria-haspopup", "menu");
+    const chip = el("button", "pf-acc-chip" + (a.lastError ? " err" : "")); chip.type = "button"; chip.setAttribute("aria-haspopup", "menu"); chip.setAttribute("aria-expanded", "false");
     const ico = el("span", "pf-acc-ico"); ico.appendChild(ri("wallet-3-line")); mountBrokerLogo(ico, a.broker); // 券商账户用券商 logo，手动账户用钱包图标
     const txt = el("span", "pf-acc-txt");
     txt.append(el("span", "pf-acc-name", a.name), el("span", "pf-acc-v", A && A.value ? `${amt(A.value, 0)} · ${(A.value / s.total * 100).toFixed(1)}%` : "—"));
@@ -1903,24 +1903,47 @@ function accountsStrip(s) {
     if (OAUTH_BROKERS.has(a.broker)) item(T("重新授权", "Reconnect"), "link", () => startAuth(a.id, a.broker));
     else { item(T("编辑持仓", "Edit holdings"), "edit-line", () => openHoldings(a)); item(T("导入 CSV", "Import CSV"), "upload-2-line", () => openImport(a)); }
     item(T("设置", "Settings"), "settings-3-line", () => openAccount(a));
-    chip.addEventListener("click", (e) => { e.stopPropagation(); const open = menu.hidden; closeAll(); menu.hidden = !open; });
+    chip.addEventListener("click", (e) => { e.stopPropagation(); const open = menu.hidden; closePfPopovers(); menu.hidden = !open; chip.setAttribute("aria-expanded", open ? "true" : "false"); });
     box.append(chip, menu);
     row.appendChild(box);
   }
   const add = el("button", "pf-acc-add"); add.type = "button"; add.append(ri("add-line"), document.createTextNode(T("添加账户", "Add account")));
   add.addEventListener("click", () => openAccount());
   row.appendChild(add);
-  document.addEventListener("click", closeAll);
   wrap.appendChild(row);
   return wrap;
 }
 
+// 统一关闭页面内的弹出菜单 / 雷达提示（避免每次重绘重复挂 document 监听）
+function closePfPopovers(except) {
+  document.querySelectorAll(".pf-cur-menu, .pf-acc-menu").forEach((m) => {
+    if (except && m.contains(except)) return;
+    m.hidden = true;
+    const btn = m.previousElementSibling;
+    if (btn && btn.hasAttribute("aria-expanded")) btn.setAttribute("aria-expanded", "false");
+  });
+  document.querySelectorAll(".pf-rtag.open").forEach((t) => {
+    if (!except || !t.contains(except)) t.classList.remove("open");
+  });
+}
+document.addEventListener("click", (e) => closePfPopovers(e.target));
+
 // ---------- 弹窗：添加 / 设置账户 ----------
 function closeOverlays() { document.querySelectorAll(".overlay").forEach((o) => o.classList.add("hidden")); }
 document.querySelectorAll(".overlay").forEach((o) => {
-  o.addEventListener("click", (e) => { if (e.target === o || e.target.closest("[data-close]")) closeOverlays(); });
+  let downOnOv = false;
+  o.addEventListener("mousedown", (e) => { downOnOv = e.target === o; });
+  o.addEventListener("click", (e) => {
+    if ((downOnOv && e.target === o) || e.target.closest("[data-close]")) closeOverlays();
+    downOnOv = false;
+  });
 });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeOverlays(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  const openOv = [...document.querySelectorAll(".overlay")].some((o) => !o.classList.contains("hidden"));
+  if (openOv) { closeOverlays(); return; }
+  closePfPopovers();
+});
 
 const CRED_UI = {
   longbridge: {

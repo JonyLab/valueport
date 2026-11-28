@@ -179,6 +179,7 @@ function addChart(cfg) {
     showDetail(item);
   };
   if (owner) {
+    wrap.classList.add("is-link");
     wrap.style.cursor = "pointer";
     wrap.addEventListener("click", (e) => { if (e.target.closest(".card-actions")) return; openDetail(); });
     const actions = document.createElement("div");
@@ -211,7 +212,7 @@ function addChart(cfg) {
       if (e.key === "Escape" && more.open) { e.stopPropagation(); more.open = false; moreButton.focus(); }
     });
     const detail = document.createElement("button");
-    detail.className = "btn icon sm";
+    detail.className = "btn icon sm card-detail-btn";
     detail.title = t("b_detail"); detail.setAttribute("aria-label", t("b_detail"));
     detail.innerHTML = '<i class="ri-arrow-right-up-line" aria-hidden="true"></i>';
     detail.addEventListener("click", openDetail);
@@ -840,7 +841,9 @@ function trySubmitModal() {
   }
 }
 document.getElementById("btnModalDone").addEventListener("click", trySubmitModal);
-modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) closeItemModal(); });
+let modalDownOnOv = false;
+modalOverlay.addEventListener("mousedown", (e) => { modalDownOnOv = e.target === modalOverlay; });
+modalOverlay.addEventListener("click", (e) => { if (modalDownOnOv && e.target === modalOverlay) closeItemModal(); modalDownOnOv = false; });
 document.getElementById("btnModalCancel").addEventListener("click", async () => {
   if (!modalItem) return;
   const item = modalItem;
@@ -1942,7 +1945,9 @@ function askSaveValEdit() {
   const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); e.preventDefault(); close(); } };
   document.addEventListener("keydown", onKey, true);
   keep.addEventListener("click", close);
-  ov.addEventListener("click", (e) => { if (e.target === ov) close(); });
+  let veDownOnOv = false;
+  ov.addEventListener("mousedown", (e) => { veDownOnOv = e.target === ov; });
+  ov.addEventListener("click", (e) => { if (veDownOnOv && e.target === ov) close(); veDownOnOv = false; });
   discard.addEventListener("click", () => { valEditApi?.discardDraft(); close(); finishValEdit(); });
   draft.addEventListener("click", () => {
     if (valEditApi.keepDraft()) { close(); finishValEdit(); }
