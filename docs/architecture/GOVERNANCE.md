@@ -86,7 +86,7 @@ src/lib/*                     Canonical server utilities (edge cache, UTC date, 
 - [x] **Batch 6**: Decompose `src/portfolio.js` (642 lines) into cohesive submodules
 - [x] **Batch 7**: Create canonical `public/shared/dom.js` and `public/shared/storage-keys.js`; migrate all frontend callers
 - [x] **Batch 8**: Extract shared AI drawer utilities between `public/shared/ai-panel.js` and `public/shared/global-ai.js`
-- [ ] **Batch 9**: Extract `public/macro.html` inline CSS/JS into `public/shared/macro-page.css` and `public/shared/macro-page.js`
+- [x] **Batch 9**: Extract `public/macro.html` inline CSS/JS into `public/shared/macro-page.css` and `public/shared/macro-page.js`
 - [ ] **Batch 10**: Extract & modularize `public/portfolio.html` inline CSS/JS into `public/shared/portfolio-page.css` and `public/shared/portfolio/*`
 - [ ] **Batch 11**: Extract & modularize `public/index.html` inline CSS/JS into `public/shared/board-page.css` and `public/shared/board/*`
 - [ ] **Batch 12**: Decompose `public/shared/valuation-ui.js` (1,948 lines) into cohesive submodules
