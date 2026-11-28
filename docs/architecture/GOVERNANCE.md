@@ -83,7 +83,7 @@ src/lib/*                     Canonical server utilities (edge cache, UTC date, 
 - [x] **Batch 3**: Unify backend edge-cache & UTC-date utilities (`src/lib/runtime.js`) across research, business-report, usage, feedback, ai, portfolio
 - [x] **Batch 4**: Decompose `src/ai.js` (1,184 lines) into cohesive `src/ai/*` modules
 - [x] **Batch 5**: Decompose `src/index.js` (440 lines) into focused route registrars (`src/routes/*`)
-- [ ] **Batch 6**: Decompose `src/portfolio.js` (642 lines) into cohesive submodules
+- [x] **Batch 6**: Decompose `src/portfolio.js` (642 lines) into cohesive submodules
 - [ ] **Batch 7**: Create canonical `public/shared/dom.js` and `public/shared/storage-keys.js`; migrate all frontend callers
 - [ ] **Batch 8**: Extract shared AI drawer utilities between `public/shared/ai-panel.js` and `public/shared/global-ai.js`
 - [ ] **Batch 9**: Extract `public/macro.html` inline CSS/JS into `public/shared/macro-page.css` and `public/shared/macro-page.js`
