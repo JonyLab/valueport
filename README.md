@@ -173,30 +173,10 @@ After deploying:
 
 `wrangler.toml` currently points to the project's existing D1 database. For a separate deployment, replace the database IDs (including `[env.test]`) with your own. For an existing deployment, preserve the original `CREDENTIALS_KEY` and follow the migration instructions instead of generating a replacement.
 
-## Continuous deployment (GitHub Actions)
+## Continuous integration & deployment
 
-`.github/workflows/ci.yml` runs on every push and pull request to `main`:
-
-1. **test** — `npm ci`, then `vitest run` (core + worker projects; the worker project uses wrangler's `[env.test]`, which has no AI binding).
-2. **deploy** — only on push to `main`, and only after `test` passes: `wrangler deploy --env=""` (the top-level production config). Deploys run one at a time in push order.
-
-The normal release path is a tested push to `main`. An explicit manual release can deploy a reviewed local checkout with `npx wrangler deploy --env="" --keep-vars`; it may temporarily differ from `main`, and the next CI release will replace it. Commit and merge the corresponding code before the next CI deployment. Runtime secrets are preserved; `--keep-vars` also preserves dashboard variables for a manual deployment, while CI currently takes variables from the repository configuration.
-
-### Repository secrets (Settings → Secrets and variables → Actions → New repository secret)
-
-| Secret | Value |
-|---|---|
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID (right sidebar) |
-| `CLOUDFLARE_API_TOKEN` | API token created at My Profile → API Tokens → Create Token |
-
-Token permissions (start from the **Edit Cloudflare Workers** template, then check the list), scoped to this account only:
-
-- Account · **Workers Scripts · Edit** — upload the worker, its static assets and cron trigger
-- Account · **D1 · Edit** — bind `pendulum-db` (also lets you run migrations with the same token if you ever want to)
-- Account · **Workers AI · Read** — only if the deploy complains about the `[ai]` binding; not needed otherwise
-- Account · **Account Settings · Read** — harmless, lets wrangler resolve the account
-
-The workflow passes the token only as an environment variable to the `wrangler deploy` step; it is never echoed. Worker runtime secrets (`ADMIN_PASSWORD`, `SESSION_SECRET`, …) stay in Cloudflare (`wrangler secret put`) and are not needed in GitHub — `wrangler deploy` keeps existing secrets.
+- **CI (`test`)**: `.github/workflows/ci.yml` runs `npm ci` and `vitest run` (core + worker projects, using wrangler's `[env.test]`) on every push and pull request to `main`.
+- **Production deployment**: handled automatically by **Cloudflare Workers Builds** on pushes to `main`. Worker runtime secrets (`ADMIN_PASSWORD`, `SESSION_SECRET`, …) stay in Cloudflare (`wrangler secret put`). An explicit manual release can deploy a reviewed local checkout with `npx wrangler deploy --env="" --keep-vars`.
 
 ### D1 migrations stay manual
 
