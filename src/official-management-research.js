@@ -1,6 +1,6 @@
 import { publicManagementUrl, cleanOfficialSite, sameCompanySite, officialSourceUrl, regulatorFilingUrl, managementText } from "../public/shared/valuation/management-research.js";
 
-import { signedGet, tencentToLongport } from "./longbridge.js";
+import { hasLongbridgeCreds, signedGet, tencentToLongport } from "./longbridge.js";
 
 const MAX_PDF_BYTES = 4 * 1024 * 1024;
 // HKEX results announcements are often larger and longer; only their opening pages are read.
@@ -429,7 +429,7 @@ async function hkexFilingSources(site, ctx) {
 }
 
 export async function fetchOfficialManagementResearch(symbol, options = {}, env = {}) {
-  if (!env.LONGBRIDGE_APP_KEY || !env.LONGBRIDGE_APP_SECRET || !env.LONGBRIDGE_ACCESS_TOKEN) return { status: "not_configured", sources: [] };
+  if (!hasLongbridgeCreds(env)) return { status: "not_configured", sources: [] };
   // The company IR phase gets its own shorter budget so regulator fallbacks still have time.
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), options.timeoutMs ?? TOTAL_BUDGET_MS);
   const irController = new AbortController(), irTimer = setTimeout(() => irController.abort(), options.irTimeoutMs ?? IR_BUDGET_MS);

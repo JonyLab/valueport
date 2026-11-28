@@ -1,7 +1,7 @@
 // 市场投研数据（长桥 OpenAPI）：分析师评级分布 + 目标价区间 + 一致预期 EPS，以及公司简介与收入构成（先看懂生意再谈估值）。
 // 给「AI 推荐方法」和「AI 复核」当「市场怎么看」的依据。A 股长桥暂无数据：两地上市的借 H 股的公司资料，其余返回 null。
 // 长桥对连续请求有限流（短时间重复请求会返回空），所以结果按标的在 Cache API 里存 6 小时。
-import { signedGet, tencentToLongport } from "./longbridge.js";
+import { hasLongbridgeCreds, signedGet, tencentToLongport } from "./longbridge.js";
 
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
@@ -61,7 +61,7 @@ export const A_TO_H = {
 
 export async function fetchResearch(env, tencentSymbol, get = signedGet) {
   const lp = tencentToLongport(tencentSymbol);
-  if (!lp || !env.LONGBRIDGE_APP_KEY || !env.LONGBRIDGE_APP_SECRET || !env.LONGBRIDGE_ACCESS_TOKEN) return null;
+  if (!lp || !hasLongbridgeCreds(env)) return null;
   // 串行请求，避免触发限流
   const one = async (path, parse, symbol = lp) => { try { return parse(await get(env, path, `symbol=${encodeURIComponent(symbol)}`)); } catch { return null; } };
   const rating = await one("/v1/quote/institution-rating-latest", parseRating);

@@ -79,7 +79,7 @@ src/lib/*                     Canonical server utilities (edge cache, UTC date, 
 ## 5. Governance Task Pool & Progress Log
 
 - [x] **Batch 1**: Delete dead `public/admin.html` and obsolete admin-only CSS rules
-- [ ] **Batch 2**: Unify backend crypto (`b64ToBytes`), broker (`normCur`, `authError`), and Longbridge (`hasLongbridgeCreds`, `signedGet` reuse in `getOtp`) primitives
+- [x] **Batch 2**: Unify backend crypto (`b64ToBytes`), broker (`normCur`, `authError`), and Longbridge (`hasLongbridgeCreds`, `signedGet` reuse in `getOtp`) primitives
 - [ ] **Batch 3**: Unify backend edge-cache & UTC-date utilities (`src/lib/runtime.js`) across research, business-report, usage, feedback, ai, portfolio
 - [ ] **Batch 4**: Decompose `src/ai.js` (1,184 lines) into cohesive `src/ai/*` modules
 - [ ] **Batch 5**: Decompose `src/index.js` (440 lines) into focused route registrars (`src/routes/*`)

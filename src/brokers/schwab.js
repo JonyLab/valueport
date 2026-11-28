@@ -1,7 +1,7 @@
 // 嘉信 Schwab Trader API：OAuth2（用户自己的 App Key / Secret，回调到本站），
 // 访问令牌约 30 分钟、刷新令牌 7 天（过期只能重新授权）；持仓 GET /trader/v1/accounts?fields=positions。
 
-import { toNum, sumCash, mergePositions } from "./common.js";
+import { toNum, authError, sumCash, mergePositions } from "./common.js";
 
 export const SCHWAB_AUTHORIZE = "https://api.schwabapi.com/v1/oauth/authorize";
 export const SCHWAB_TOKEN = "https://api.schwabapi.com/v1/oauth/token";
@@ -12,8 +12,6 @@ export function schwabAuthorizeUrl(appKey, redirectUri, state) {
   const q = new URLSearchParams({ response_type: "code", client_id: appKey, redirect_uri: redirectUri, state });
   return `${SCHWAB_AUTHORIZE}?${q}`;
 }
-
-function authError(msg) { const e = new Error(msg); e.needsAuth = true; return e; }
 
 async function tokenRequest(creds, form, fetchImpl) {
   let res;

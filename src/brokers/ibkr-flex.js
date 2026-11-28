@@ -1,7 +1,7 @@
 // IBKR Flex Web Service：SendRequest 取 ReferenceCode → GetStatement 取报表 XML。
 // Worker 无 DOMParser：用正则解析自闭合元素属性（OpenPosition / CashReportCurrency）。
 
-import { toNum, sumCash, mergePositions } from "./common.js";
+import { toNum, normCur, sumCash, mergePositions } from "./common.js";
 
 const SEND_URL = "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/SendRequest";
 const RETRY_CODES = new Set(["1019", "1018"]); // 1019 生成中；1018 请求过于频繁
@@ -61,8 +61,6 @@ export function ibkrToTencent(sym, exchange, currency) {
   }
   return { reason: `unsupported exchange ${ex || "?"}/${cur || "?"}` };
 }
-
-const normCur = (c) => { const u = String(c || "").toUpperCase(); return u === "CNH" ? "CNY" : u; };
 
 /* ---------- 报表解析（多个 FlexStatement 自动合并：同符号累加、加权成本） ---------- */
 export function parseIbkrFlexStatement(xml) {

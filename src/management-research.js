@@ -1,4 +1,4 @@
-import { signedGet, tencentToLongport } from "./longbridge.js";
+import { hasLongbridgeCreds, signedGet, tencentToLongport } from "./longbridge.js";
 import { cleanManagementResearch, managementText } from "../public/shared/valuation/management-research.js";
 import { fetchOfficialManagementResearch } from "./official-management-research.js";
 import { createResearchStore, mergeResearchRefresh, RESEARCH_TTL } from "./management-research-store.js";
@@ -78,7 +78,7 @@ async function boundedText(res, maxBytes) {
 async function fetchNewsManagementResearch(env, symbol, name = "", options = {}) {
   const lp = tencentToLongport(symbol), now = options.now || Date.now();
   const empty = (status) => ({ status, symbol, fetchedAt: new Date(now).toISOString(), coverage: "recent_news_and_related", sources: [] });
-  if (!lp || !env.LONGBRIDGE_APP_KEY || !env.LONGBRIDGE_APP_SECRET || !env.LONGBRIDGE_ACCESS_TOKEN) return empty("not_configured");
+  if (!lp || !hasLongbridgeCreds(env)) return empty("not_configured");
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 12000);
   const get = options.get || ((path, query = "") => signedGet(env, path, query, { signal: controller.signal, maxBytes: 256000, fetchImpl: options.fetchImpl }));
   const fetcher = options.fetchImpl || fetch;

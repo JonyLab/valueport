@@ -2,17 +2,12 @@
 // 用开发者 RSA 私钥做 SHA1withRSA（RSASSA-PKCS1-v1_5 + SHA-1）签名，与官方 SDK（tigeropen）一致。
 // 持仓用 positions（sec_type=STK），现金用 prime_assets（综合账户）；环球账户不支持时退回 assets。
 
-import { toNum, MARKET_CURRENCY, sumCash, mergePositions } from "./common.js";
+import { b64ToBytes, bytesToB64 } from "../crypto.js";
+import { toNum, normCur, MARKET_CURRENCY, sumCash, mergePositions } from "./common.js";
 
 export const TIGER_GATEWAY = "https://openapi.tigerfintech.com/gateway";
 
 /* ---------- 私钥：PEM / 裸 base64，PKCS#1 自动包成 PKCS#8 ---------- */
-function b64ToBytes(b64) {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
 function derLen(n) {
   if (n < 0x80) return [n];
   const bytes = [];
@@ -74,9 +69,7 @@ export function tigerTimestamp(now = Date.now()) {
 export async function signParams(params, privateKey) {
   const key = await importTigerKey(privateKey);
   const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(signContent(params)));
-  let bin = "";
-  for (const b of new Uint8Array(sig)) bin += String.fromCharCode(b);
-  return btoa(bin);
+  return bytesToB64(new Uint8Array(sig));
 }
 
 // biz_content 与 SDK 一样：key 排序、紧凑 JSON
@@ -118,8 +111,6 @@ export async function tigerCall(creds, method, biz, { fetchImpl = fetch, now = D
 }
 
 /* ---------- 代码映射 ---------- */
-const normCur = (c) => { const u = String(c || "").toUpperCase(); return u === "CNH" ? "CNY" : u; };
-
 // Tiger 的 symbol + market → 腾讯格式；返回 { symbol, market } 或 { reason }
 export function tigerToTencent(sym, market) {
   const s = String(sym || "").trim().toUpperCase();

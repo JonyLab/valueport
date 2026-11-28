@@ -3,7 +3,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { signToken, verifyToken } from "./auth.js";
 import { validateItem, rowToItem } from "./items.js";
 import { parseTencentQuotes, parseTencentHints, parseTencentStatics, parseTencentPrevClose, logoTicker, lbLogoPath } from "./quotes.js";
-import { fetchLongbridgeQuotes, fetchLongbridgeNames, fetchLongbridgeFinancials, pickLatestAnnual, fetchValuationRefs } from "./longbridge.js";
+import { hasLongbridgeCreds, fetchLongbridgeQuotes, fetchLongbridgeNames, fetchLongbridgeFinancials, pickLatestAnnual, fetchValuationRefs } from "./longbridge.js";
 import { fetchDeductedNetIncome } from "./eastmoney.js";
 import { fetchAdjustedEps } from "./finnhub.js";
 import { fetchDividendHistory } from "./dividends.js";
@@ -79,7 +79,7 @@ async function tencentQuotes(symbols) {
 // 现价：有长桥凭据则优先用其实时行情，失败或缺漏的退回腾讯延时；腾讯总要请求一次，补缺漏并提供昨收（长桥行情接口不返回昨收）
 async function getQuotes(env, symbols) {
   let quotes = {}, source = "tencent";
-  if (env.LONGBRIDGE_APP_KEY && env.LONGBRIDGE_APP_SECRET && env.LONGBRIDGE_ACCESS_TOKEN) {
+  if (hasLongbridgeCreds(env)) {
     try { quotes = await fetchLongbridgeQuotes(env, symbols); source = "longbridge"; }
     catch (e) { console.error("longbridge failed, fall back to tencent:", e && e.message); quotes = {}; source = "tencent"; }
   }
@@ -101,7 +101,7 @@ app.get("/api/names", async (c) => {
   const symbols = (c.req.query("symbols") || "").split(",").map((s) => s.trim()).filter((s) => s && s.length <= 16).slice(0, 50);
   if (!symbols.length) return c.json({ names: {} });
   let names = {};
-  if (c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN) {
+  if (hasLongbridgeCreds(c.env)) {
     try { names = await fetchLongbridgeNames(c.env, symbols); }
     catch (e) { console.error("longbridge names failed:", e && e.message); names = {}; }
   }
@@ -168,7 +168,7 @@ app.get("/api/financials", async (c) => {
   const symbol = (c.req.query("symbol") || "").trim();
   const isAnnual = c.req.query("period") !== "quarter";
   const report = isAnnual ? "af" : "qf";
-  const haveCreds = c.env.LONGBRIDGE_APP_KEY && c.env.LONGBRIDGE_APP_SECRET && c.env.LONGBRIDGE_ACCESS_TOKEN;
+  const haveCreds = hasLongbridgeCreds(c.env);
   const hasData = (f) => !!(f && (f.IS || f.BS || f.CF));
   let financials = null, valuationRefs = null, deducted = null, adjEps = null, dividends = null, financialsSource = null;
   if (symbol) {

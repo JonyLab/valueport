@@ -6,6 +6,10 @@ const HTTP_HOST = "https://openapi.longportapp.com";
 // Workers fetch-upgrade 出站 WS 用 https:// scheme（Upgrade 头触发 WebSocket 握手）
 const WS_URL = "https://openapi-quote.longportapp.com/v2?version=1&codec=1&platform=9";
 
+export function hasLongbridgeCreds(env) {
+  return !!(env && env.LONGBRIDGE_APP_KEY && env.LONGBRIDGE_APP_SECRET && env.LONGBRIDGE_ACCESS_TOKEN);
+}
+
 /* ---------- 符号映射：腾讯格式 ↔ LongPort 格式 ---------- */
 // usAAPL→AAPL.US, hk00700→700.HK, sh600519→600519.SH, sz000001→000001.SZ, bj→.BJ
 export function tencentToLongport(sym) {
@@ -299,21 +303,7 @@ async function parseFrame(data) {
 
 /* ---------- OTP ---------- */
 async function getOtp(env) {
-  const path = "/v1/socket/token";
-  const ts = (Date.now() / 1000).toFixed(3);
-  const names = "authorization;x-api-key;x-timestamp";
-  const sh = `authorization:${env.LONGBRIDGE_ACCESS_TOKEN}\nx-api-key:${env.LONGBRIDGE_APP_KEY}\nx-timestamp:${ts}\n`;
-  const canonical = `GET|${path}||${sh}|${names}|`;
-  const sig = await hmac256hex(env.LONGBRIDGE_APP_SECRET, "HMAC-SHA256|" + await sha1hex(canonical));
-  const res = await fetch(HTTP_HOST + path, {
-    headers: {
-      authorization: env.LONGBRIDGE_ACCESS_TOKEN,
-      "x-api-key": env.LONGBRIDGE_APP_KEY,
-      "x-timestamp": ts,
-      "x-api-signature": `HMAC-SHA256 SignedHeaders=${names}, Signature=${sig}`,
-    },
-  });
-  const j = await res.json();
+  const j = await signedGet(env, "/v1/socket/token", "");
   if (j.code !== 0 || !j.data || !j.data.otp) throw new Error("otp failed: " + JSON.stringify(j));
   return j.data.otp;
 }
