@@ -33,12 +33,12 @@ public/shared/storage-keys.js Canonical localStorage/sessionStorage key registry
 public/shared/valuation/*     Pure domain logic (shared with Worker) + focused UI modules
 public/shared/board/*         Watchlist & stock detail page modules
 public/shared/portfolio/*     Portfolio page modules
-public/shared/ai-drawer.js    Shared AI drawer primitives (model picker, error text, copy, markdown-lite)
+public/shared/ai-common.js    Shared AI drawer primitives (model picker, error text, copy, search sources)
 ---------------------------------------------------------------------------------
 src/index.js                  Thin Worker composition root + error handler + cron
 src/routes/*                  HTTP route registrars (market, account/board, owner)
 src/ai/*                      Cohesive AI subsystem (provider, shared, valuation, method, thesis, review-brief, portfolio-query)
-src/portfolio/*               Cohesive portfolio subsystem (storage, fx, accounts, routes)
+src/portfolio*.js             Cohesive portfolio subsystem (routes, validation, storage, fx, accounts)
 src/brokers/*                 Broker adapters + shared broker primitives (common.js)
 src/lib/*                     Canonical server utilities (edge cache, UTC date, etc.)
 ```
@@ -90,8 +90,28 @@ src/lib/*                     Canonical server utilities (edge cache, UTC date, 
 - [x] **Batch 10**: Extract & modularize `public/portfolio.html` inline CSS/JS into `public/shared/portfolio-page.css` and `public/shared/portfolio/*`
 - [x] **Batch 11**: Extract & modularize `public/index.html` inline CSS/JS into `public/shared/board-page.css` and `public/shared/board/*`
 - [x] **Batch 12**: Decompose `public/shared/valuation-ui.js` (1,948 lines) — extracted pure formatting/parsing/chart helpers into `public/shared/valuation/ui-format.js` with unit tests; kept deeply stateful editor closures cohesive per Deletion Test
-- [ ] **Batch 13**: Add automated architecture fitness test suite (`test-core/architecture.test.js`) + verify CI coverage
+- [x] **Batch 13**: Add automated architecture fitness test suite (`test-core/architecture.test.js`) + verify CI coverage
 
-## 6. Deferred / Needs Product Confirmation
+## 6. Post-Governance Metrics Snapshot (2026-11-28)
 
-*(None yet — items requiring breaking API/data changes or product decisions will be recorded here.)*
+- **Test suite**: 66 test files, 658 tests passing (`npm test`, including automated architecture fitness & `modulepreload` checks) + 8 Python tests passing (`memory_monitor`).
+- **Circular dependencies**: 0 (enforced in CI).
+- **Unused named ES imports**: 0 across `src/` and `public/` (enforced in CI).
+- **Monolithic HTML files eliminated**:
+  - `public/index.html`: 4,147 → 224 lines (0 inline CSS; CSS → `board-page.css`, JS → `public/shared/board/*`)
+  - `public/portfolio.html`: 2,938 → 93 lines (0 inline CSS; CSS → `portfolio-page.css`, JS → `public/shared/portfolio/*`)
+  - `public/macro.html`: 838 → 98 lines (0 inline CSS; CSS → `macro-page.css`, JS → `macro-page.js`)
+  - `public/admin.html`: 535 lines → deleted (dead legacy page calling non-existent `/api/admin/*` endpoints)
+- **God modules decomposed**:
+  - `src/ai.js`: 1,185 → 35-line facade + 7 cohesive domain modules under `src/ai/`
+  - `src/index.js`: 440 → 86-line composition root + 3 route registrars under `src/routes/`
+  - `src/portfolio.js`: 643 → 355 lines + pure `src/portfolio-validation.js`
+  - `public/shared/valuation-ui.js`: extracted pure `public/shared/valuation/ui-format.js` with unit tests
+- **Canonical Single-Source-of-Truth primitives enforced by CI**:
+  - Backend: `src/crypto.js` (`b64ToBytes`/`bytesToB64`), `src/brokers/common.js` (`normCur`, `authError`, `hmacSha1B64`, `rfc3986Encode`), `src/longbridge.js` (`hasLongbridgeCreds`, `signedGet`), `src/lib/runtime.js` (`utcToday`, `utcDaysAgo`, `readBoundedBytes`, `readBoundedText`, `edgeCache*`)
+  - Frontend: `public/shared/dom.js` (`el`, `ri`, `riHtml`, `esc`, `setNum`, `mountStockLogo`), `public/shared/storage-keys.js` (synced with `navboot.js`), `public/shared/ai-common.js` (`aiErrorText`, `activeAiModel`, `renderAiModelMenu`, `renderSearchSources`, `copyToClipboard`), `public/shared/ui-toast.js` (`armSafeClick`)
+
+## 7. Deferred / Needs Product Confirmation
+
+1. **`memory_monitor/` Python subsystem**: Currently co-located in this repo with its own `pyproject.toml`, Playwright scraper, and PostgreSQL schema, completely decoupled from the Cloudflare Worker. Whether to keep it co-located or split into a separate repo is a product/repo-organization decision.
+2. **Further decomposition of `public/shared/board/page.js` (2,133 lines), `public/shared/portfolio/page.js` (2,208 lines), and `public/shared/valuation-ui.js` (1,870 lines)**: Now that CSS, pure domain models (`portfolio/model.js`, `valuation/ui-format.js`), charts (`board/charts.js`), and settings (`board/ai-settings.js`) are cleanly separated, further splitting of their remaining stateful DOM closures should happen organically when adding new features or introducing an explicit state store — avoiding premature parameter-drilling (ADR-003).
