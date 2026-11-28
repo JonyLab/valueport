@@ -1518,6 +1518,7 @@
 <link rel="modulepreload" href="/shared/ui-toast.js">
   <link rel="modulepreload" href="/shared/dom.js">
   <link rel="modulepreload" href="/shared/storage-keys.js">
+  <link rel="modulepreload" href="/shared/ai-common.js">
 </head>
 <body class="booting">
 <div class="page">
@@ -1691,7 +1692,7 @@ import { cleanThesis, thesisEntries, THESIS_SCENARIOS } from "/shared/valuation/
 import { persistValuation, usableValuationRange } from "/shared/valuation/save.js";
 import { MODELS, modeFields } from "/shared/valuation/index.js";
 import { verifiedFacts, latestMetrics, marketViews, masterLenses, businessFacts, isFinancialCompany } from "/shared/valuation/facts.js";
-import { aiErrorText } from "/shared/ai-panel.js";
+import { aiErrorText } from "/shared/ai-common.js";
 import { METRICS, metricKey, metricSeries, sparkGeom } from "/shared/metric-spark.js";
 import { holdingFor, driftText } from "/shared/holding.js";
 import { showToast, confirmDialog, armSafeClick } from "/shared/ui-toast.js";

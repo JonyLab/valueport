@@ -1,7 +1,7 @@
 import { FLOW_STEPS, guideQuestion, guideDraft, guideDrafts, guideAnswer, validGuideTurns, citedGuideReferences } from "./thesis-guide.js";
 import { impactDirection, THESIS_IMPACTS, fieldStoryHint } from "./thesis.js";
 import { cleanReadiness, readinessText, cleanMethodDecision, methodDecisionText } from "./method-readiness.js";
-import { aiErrorText } from "../ai-panel.js";
+import { aiErrorText } from "../ai-common.js";
 import { cleanGuideAudit, guideAuditLabels } from "./guide-audit.js";
 import { cleanDriverPlan, GUIDE_DRIVERS } from "./guide-drivers.js";
 import { guideRoutingNote } from "./guide-routing.js";

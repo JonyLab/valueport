@@ -9,6 +9,7 @@ import { LANG } from "./i18n.js";
 import { normalizeResearch } from "./search-sources.js";
 import { el, ri } from "./dom.js";
 import { SESSION_KEYS, gaiChatKey } from "./storage-keys.js";
+import { aiErrorText, activeAiModel, renderAiModelMenu, renderSearchSources, copyToClipboard } from "./ai-common.js";
 
 const zh = LANG === "zh";
 const TX = zh ? {
@@ -349,44 +350,20 @@ function build() {
   // 模型切换：和估值 AI 抽屉同一份配置（/api/my/ai/models、PUT /api/my/ai/active）
   function drawModels() {
     syncSearch();
-    if (!models) { modelName.textContent = TX.modelLoading; return; }
-    const all = [models.site, ...(models.workers || []), ...(models.siteKey || []), ...(models.custom || [])];
-    const cur = all.find((m) => m.id === models.active) || models.site;
+    const cur = activeAiModel(models);
+    if (!cur) { modelName.textContent = TX.modelLoading; return; }
     modelName.textContent = TX.model + cur.name;
-    modelMenu.replaceChildren();
-    const group = (label, items) => {
-      if (!items.length) return;
-      modelMenu.appendChild(el("div", "gai-mgroup", label));
-      for (const m of items) {
-        const on = m.id === models.active;
-        const b = el("button", on ? "on" : ""); b.type = "button"; b.setAttribute("role", "menuitemradio"); b.setAttribute("aria-checked", String(on));
-        b.append(el("span", "gai-mname", m.name), el("span", "gai-mmodel", m.kind === "site" ? TX.site : m.model));
-        b.addEventListener("click", async () => {
-          if (m.id === models.active) { closeMenu(); return; }
-          modelMenu.querySelectorAll("button").forEach((x) => { x.disabled = true; });
-          const r = await fetch("/api/my/ai/active", { method: "PUT", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: m.id }) }).catch(() => null);
-          if (r && r.ok) { models.active = m.id; drawModels(); closeMenu(); modelBtn.focus(); }
-          else {
-            modelMenu.querySelectorAll("button").forEach((x) => { x.disabled = false; });
-            let er = modelMenu.querySelector('[role="alert"]');
-            if (!er) { er = el("p", "gai-mgroup gai-merr"); er.setAttribute("role", "alert"); modelMenu.appendChild(er); }
-            er.textContent = TX.switchFail;
-          }
-        });
-        modelMenu.appendChild(b);
-      }
-    };
-    group(TX.site, [models.site]);
-    group("Workers AI", (models.workers || []).filter((w) => w.model !== (models.site.provider === "workers-ai" ? models.site.model : "")));
-    group(TX.free, models.siteKey || []);
-    group(TX.mine, models.custom || []);
     let slug = (location.pathname.match(/^\/b\/([^/]+)/) || [])[1];
     if (!slug) { try { slug = sessionStorage.getItem(SESSION_KEYS.ownerSlug) || ""; } catch { slug = ""; } }
-    if (slug) {
-      const a = el("a", "gai-manage", (models.custom || []).length ? TX.manage : TX.manageAdd);
-      a.href = "/b/" + encodeURIComponent(decodeURIComponent(slug)) + "#ai"; a.target = "_blank"; a.rel = "noopener";
-      modelMenu.appendChild(a);
-    }
+    renderAiModelMenu(modelMenu, models, {
+      lang: LANG,
+      prefix: "gai",
+      manageHref: slug ? "/b/" + encodeURIComponent(decodeURIComponent(slug)) + "#ai" : "",
+      manageText: TX.manage,
+      manageAddText: TX.manageAdd,
+      onDismiss: closeMenu,
+      onSelected: () => { drawModels(); closeMenu(); modelBtn.focus(); },
+    });
   }
   function closeMenu() { if (modelMenu.hidden) return false; modelMenu.hidden = true; modelBtn.setAttribute("aria-expanded", "false"); return true; }
   modelBtn.addEventListener("click", (e) => {
@@ -429,22 +406,10 @@ function build() {
     const m = el("div", "gai-msg " + (role === "user" ? "me" : "ai") + (error ? " error" : ""));
     const b = el("div", "gai-bubble");
     if (role === "assistant" && !error) b.appendChild(renderRich(text)); else b.textContent = text;
-    const sources = normalizeResearch(research);
-    if (role === "assistant" && sources) {
-      const refs = el("div", "gai-sources");
-      refs.appendChild(el("div", "", sources.sources.length ? (zh ? "搜索来源 · 摘要待核实" : "Search sources · verify excerpts") : (zh ? "本次搜索未找到相关资料" : "No relevant search results")));
-      if (sources.searchedAt && Number.isFinite(Date.parse(sources.searchedAt))) refs.appendChild(el("small", "", (zh ? "检索于 " : "Searched ") + new Date(sources.searchedAt).toLocaleString(zh ? "zh-CN" : "en-US")));
-      for (const source of sources.sources) {
-        const a = el("a", "", `[${source.id}] ${source.title}${source.publishedAt ? " · " + source.publishedAt : ""}`);
-        a.href = source.url; a.target = "_blank"; a.rel = "noopener noreferrer"; refs.appendChild(a);
-      }
-      b.appendChild(refs);
-    }
+    const refs = role === "assistant" ? renderSearchSources(research, { lang: LANG, cls: "gai-sources" }) : null;
+    if (refs) b.appendChild(refs);
     m.appendChild(b); log.appendChild(m); scrollEnd();
     return m;
-  }
-  async function copyText(t) {
-    try { await navigator.clipboard.writeText(t); return true; } catch { return false; }
   }
   function actions(m, { copy, retry }) {
     const row = el("div", "gai-macts");
@@ -452,7 +417,7 @@ function build() {
     if (copy) {
       const b = mk("file-copy-line", TX.copy);
       b.addEventListener("click", async () => {
-        const ok = await copyText(copy + "\n\n—— " + TX.disclaimer);
+        const ok = await copyToClipboard(copy + "\n\n—— " + TX.disclaimer);
         if (!ok) return;
         b.replaceChildren(ri("check-line")); b.title = TX.copied; b.classList.add("done");
         setTimeout(() => { b.replaceChildren(ri("file-copy-line")); b.title = TX.copy; b.classList.remove("done"); }, 1500);
@@ -525,8 +490,7 @@ function build() {
       if (!r.ok || typeof j.reply !== "string" || !j.reply) {
         drop();
         if (r.status === 401) { cap = false; try { sessionStorage.removeItem(CAP_KEY); } catch { /* ignore */ } }
-        let msg = TX.err;
-        try { const { aiErrorText } = await import("./ai-panel.js"); msg = aiErrorText(r.status, j, LANG); } catch { /* 用默认文案 */ }
+        const msg = aiErrorText(r.status, j, LANG);
         const m = bubble("assistant", msg, { error: true });
         actions(m, { retry: retry(m) });
         return;
