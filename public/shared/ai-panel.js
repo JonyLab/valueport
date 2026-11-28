@@ -3,6 +3,7 @@ export { normalizeResearch } from "./search-sources.js";
 import { cleanManagementResearch } from "./valuation/management-research.js";
 import { managementResearchElement } from "./valuation/management-research-ui.js";
 import { armSafeClick } from "./ui-toast.js";
+import { el, ri } from "./dom.js";
 
 /**
  * ai-panel.js — 估值工作台的 AI 助手抽屉（右侧滑出）。
@@ -20,9 +21,6 @@ import { armSafeClick } from "./ui-toast.js";
  *   「一键改值」组件走 onApply / onUndo，和建议参数卡一样可撤销。未知组件直接忽略。
  * 返回 { open(), close(), toggle(), openModelPicker() }
  */
-
-function ri(name) { const i = document.createElement("i"); i.className = "ri-" + name; i.setAttribute("aria-hidden", "true"); return i; }
-function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
 
 const TX = {
   zh: {

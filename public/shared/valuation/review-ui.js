@@ -1,5 +1,5 @@
 import { reviewNeedsUpdate, reviewMode, scopeReviewFields, reviewValue } from './review.js';
-const el = (tag, cls, value) => { const n = document.createElement(tag); if (cls) n.className = cls; if (value !== undefined) n.textContent = value; return n; };
+import { el } from '../dom.js';
 export function reviewElement(card, { fields = [], lang = 'zh', onEdit, onFinancials, loadTrend } = {}) {
   const r = card.review, zh = lang !== 'en', t = (a, b) => zh ? a : b, stale = reviewNeedsUpdate(card);
   const overall = stale ? 'stale' : r.overall;

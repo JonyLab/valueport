@@ -1516,6 +1516,8 @@
 <link rel="modulepreload" href="/shared/valuation/method-readiness.js">
 <link rel="modulepreload" href="/shared/search-sources.js">
 <link rel="modulepreload" href="/shared/ui-toast.js">
+  <link rel="modulepreload" href="/shared/dom.js">
+  <link rel="modulepreload" href="/shared/storage-keys.js">
 </head>
 <body class="booting">
 <div class="page">
@@ -1693,26 +1695,13 @@ import { aiErrorText } from "/shared/ai-panel.js";
 import { METRICS, metricKey, metricSeries, sparkGeom } from "/shared/metric-spark.js";
 import { holdingFor, driftText } from "/shared/holding.js";
 import { showToast, confirmDialog, armSafeClick } from "/shared/ui-toast.js";
+import { ri, setNum, mountStockLogo } from "/shared/dom.js";
+import { LOCAL_KEYS, SESSION_KEYS, boardCacheKey, pfCacheKey } from "/shared/storage-keys.js";
 
 applyI18n(); // 静态文案先按当前语言渲染
-// Remix Icon 图标（装饰性，读屏跳过）
-function ri(name) { const i = document.createElement("i"); i.className = "ri-" + name; i.setAttribute("aria-hidden", "true"); return i; }
-// 大号数字：小数点及之后（含 % 等后缀）缩小显示，"343.46" → 343<span class="num-dec">.46</span>
-function setNum(el, text) {
-  const s = String(text ?? ""), i = s.search(/\.\d/);
-  el.textContent = i < 0 ? s : s.slice(0, i);
-  if (i >= 0) { const d = document.createElement("span"); d.className = "num-dec"; d.textContent = s.slice(i); el.appendChild(d); }
-}
 // 标的 logo：先放首字母占位，/api/logo 图片加载成功再替换；失败（404 / 网络）保留首字母
 function mountLogo(el, item) {
-  el.textContent = (displayName(item) || item.cfg.ticker || "?").trim().slice(0, 1).toUpperCase();
-  el.classList.remove("has-img");
-  const sym = item.cfg.symbol;
-  if (!sym) return;
-  const img = new Image();
-  img.alt = ""; img.decoding = "async";
-  img.onload = () => { el.replaceChildren(img); el.classList.add("has-img"); };
-  img.src = "/api/logo?symbol=" + encodeURIComponent(sym);
+  mountStockLogo(el, item.cfg.symbol, displayName(item) || item.cfg.ticker);
 }
 const VMSGS = {
   px: (p) => t("v_px", typeof p === "number" ? p.toFixed(2) : p), pxNone: t("v_px_none"), noSymbol: t("v_no_symbol"),
@@ -2096,13 +2085,13 @@ async function fetchQuotes() {
 
 /* ---------- 启动 ---------- */
 // 看板缓存（本次会话）：有缓存就直接画缓存，不出骨架；新数据到了只在有变化时重画，否则只更新报价
-const BOARD_CACHE = () => "board_cache_" + boardSlug;
+const BOARD_CACHE = () => boardCacheKey(boardSlug);
 let ownerInited = false;
 function applyBoard(me, data, prices) {
   owner = !!(me && me.board && me.board.slug === boardSlug);
-  if (owner) sessionStorage.setItem("owner_slug", boardSlug);
+  if (owner) sessionStorage.setItem(SESSION_KEYS.ownerSlug, boardSlug);
   else {
-    if (sessionStorage.getItem("owner_slug") === boardSlug) sessionStorage.removeItem("owner_slug");
+    if (sessionStorage.getItem(SESSION_KEYS.ownerSlug) === boardSlug) sessionStorage.removeItem(SESSION_KEYS.ownerSlug);
     for (const id of ["appNav", "btnSettings"]) document.getElementById(id).classList.add("hidden"); // 身份已变（退出 / 换号）：收回
   }
   greetName = owner ? me.username : "";
@@ -2579,8 +2568,8 @@ let detailGoFund = null; // 切到基本面 tab 并滚到某一分节（AI 结�
 // ---------- 详情页「我的持仓」：资产页持仓表里这只股票的信息（数量、成本、盈亏、占比、目标偏离与建议、各账户） ----------
 // 数据优先用资产页的会话缓存（同一份 /api/my/portfolio 返回），没有才请求一次；没持有也没设目标就不显示
 async function portfolioData() {
-  const user = sessionStorage.getItem("pf_user"), base = localStorage.getItem("pf_base") || (LANG === "zh" ? "CNY" : "USD");
-  try { const c = JSON.parse(sessionStorage.getItem(`pf_cache_${user}_${base}`) || "null"); if (c && c.data && Array.isArray(c.data.holdings)) return c.data; } catch { /* 没有缓存 */ }
+  const user = sessionStorage.getItem(SESSION_KEYS.pfUser), base = localStorage.getItem(LOCAL_KEYS.pfBase) || (LANG === "zh" ? "CNY" : "USD");
+  try { const c = JSON.parse(sessionStorage.getItem(pfCacheKey(user, base)) || "null"); if (c && c.data && Array.isArray(c.data.holdings)) return c.data; } catch { /* 没有缓存 */ }
   try { const r = await fetch("/api/my/portfolio?base=" + encodeURIComponent(base)); return r.ok ? await r.json() : null; } catch { return null; }
 }
 function zoneOfPrice(cfg, price) {
@@ -2592,7 +2581,7 @@ async function renderHolding(item, card) {
   const c = item.cfg, zh = LANG === "zh", T = (a, b) => (zh ? a : b);
   const h = holdingFor(d, c.symbol, zoneOfPrice(c, c.price));
   if (!h || !card.isConnected) return;
-  const hide = localStorage.getItem("pf_hide") === "1", MASK = "••••";
+  const hide = localStorage.getItem(LOCAL_KEYS.pfHide) === "1", MASK = "••••";
   const nf = (n, dg = 2) => new Intl.NumberFormat(zh ? "zh-CN" : "en-US", { minimumFractionDigits: dg, maximumFractionDigits: dg }).format(n);
   const money = (n, cur, dg = 0) => (hide ? MASK : Number.isFinite(n) ? (n < 0 ? "−" : "") + nf(Math.abs(n), dg) + (cur ? " " + cur : "") : "—");
   const signed = (n, cur) => (hide ? MASK : Number.isFinite(n) ? (n > 0 ? "+" : n < 0 ? "−" : "") + nf(Math.abs(n), 0) + (cur ? " " + cur : "") : "—");

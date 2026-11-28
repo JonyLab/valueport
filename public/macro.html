@@ -180,6 +180,9 @@
   <!-- 悬停 / 按下顶部导航链接时在后台预渲染目标页 -->
   <script type="speculationrules">{"prerender":[{"where":{"or":[{"href_matches":"/portfolio"},{"href_matches":"/b/*"},{"href_matches":"/macro"}]},"eagerness":"moderate"}]}</script>
 <link rel="modulepreload" href="/shared/search-sources.js">
+  <link rel="modulepreload" href="/shared/dom.js">
+  <link rel="modulepreload" href="/shared/storage-keys.js">
+  <link rel="modulepreload" href="/shared/ui-toast.js">
 </head>
 <body>
 <div class="page">
@@ -255,6 +258,8 @@ import { ZONES, structValid, computeAnchors, priceToPhi } from "/shared/core.js"
 import { PREFS_KEY, DEFAULT_PREFS, normalizePrefs, parsePrefs, serializePrefs, visibleMarkets, isDefaultPrefs, toggleMarket, moveMarket, setCross, pickNewer, marketSummary, sparkPath } from "/shared/macro-board.js";
 import { evaluateSignalAlerts } from "/shared/rebalance.js";
 import { renderActionStrip, openQuickAlertModal, formatAlertCond } from "/shared/alert-banner.js";
+import { el, ri } from "/shared/dom.js";
+import { LOCAL_KEYS, boardCacheKey } from "/shared/storage-keys.js";
 
 applyI18n();
 mountLangMenu(document.getElementById("topActions"));
@@ -262,8 +267,6 @@ mountFeedback(document.getElementById("topActions")); // 反馈入口（只对�
 mountGlobalAi(document.getElementById("topActions"), { getPage: () => ({ kind: "macro", path: location.pathname, title: document.title }) }); // 全站 AI 助手（只对已登录用户显示）
 const zh = LANG === "zh", T = (a, b) => (zh ? a : b);
 const $ = (id) => document.getElementById(id);
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const ri = (name) => { const i = document.createElement("i"); i.className = "ri-" + name; i.setAttribute("aria-hidden", "true"); return i; };
 document.title = T("宏观看板", "Macro") + " · ValuePort";
 const ZN = zh ? ["击球区", "低估", "合理", "高估", "泡沫区"] : ["Strike zone", "Undervalued", "Fair", "Overvalued", "Bubble"];
 const MKT = { us: T("美股", "US"), hk: T("港股", "Hong Kong"), cn: T("A 股", "A-shares") };
@@ -302,8 +305,8 @@ const QUOTES = [
 ];
 
 // ---------- 页头：上次来看是几天前 ----------
-const lastVisit = Number(localStorage.getItem("macro_last_visit")) || 0;
-localStorage.setItem("macro_last_visit", String(Date.now()));
+const lastVisit = Number(localStorage.getItem(LOCAL_KEYS.macroLastVisit)) || 0;
+localStorage.setItem(LOCAL_KEYS.macroLastVisit, String(Date.now()));
 $("mcEyebrow").textContent = T("宏观看板 · 每月看一次就够了", "Macro · once a month is enough");
 const q = QUOTES[Math.floor(Date.now() / 86400000) % QUOTES.length];
 $("mcQuote").textContent = q[0]; $("mcFootNote").textContent = `—— ${q[1]}　·　${T("数据按月更新。这一页每月看一次就够了。", "Data updates monthly. Looking once a month is plenty.")}`;
@@ -637,7 +640,7 @@ async function renderMine() {
   if (window.__mountSettingsBtn) window.__mountSettingsBtn(slug);
   $("tabBoard").href = "/b/" + encodeURIComponent(slug);
   let data = null, prices = {};
-  try { const c = JSON.parse(sessionStorage.getItem("board_cache_" + slug) || "null"); if (c && c.data) { data = c.data; prices = c.prices || {}; } } catch { /* 没缓存 */ }
+  try { const c = JSON.parse(sessionStorage.getItem(boardCacheKey(slug)) || "null"); if (c && c.data) { data = c.data; prices = c.prices || {}; } } catch { /* 没缓存 */ }
   if (!data) data = await fetch("/api/config?slug=" + encodeURIComponent(slug)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const items = (data && data.items) || [];
   const need = items.map((i) => i.symbol).filter((s) => s && !(prices[s] > 0));

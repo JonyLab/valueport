@@ -4,6 +4,8 @@
 // 用法：mountFeedback(容器) → 按钮插在容器里的 .lang-menu 之前。样式在 /shared/styles.css 的 .fb-*。
 import { LANG } from "./i18n.js";
 import { TYPES, LIMITS, issueUrl, cleanMeta } from "./feedback-core.js";
+import { el, ri } from "./dom.js";
+import { SESSION_KEYS } from "./storage-keys.js";
 
 const zh = LANG === "zh";
 const TX = zh ? {
@@ -28,13 +30,11 @@ const TX = zh ? {
   e_fail: "Couldn't file it on GitHub — you can submit on GitHub's page instead.", e_net: "Network error — please try again.", e_login: "Your session expired — please sign in again.",
 };
 
-const CAP_KEY = "fb_cap"; // sessionStorage：{ server, repo }，有就首帧显示按钮（退出登录会清空会话存储）
+const CAP_KEY = SESSION_KEYS.fbCap; // sessionStorage：{ server, repo }，有就首帧显示按钮（退出登录会清空会话存储）
 const buttons = new Set();
 let cap = null, capP = null;
 try { cap = JSON.parse(sessionStorage.getItem(CAP_KEY) || "null"); } catch { cap = null; }
 
-function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-function ri(name) { const i = el("i", "ri-" + name); i.setAttribute("aria-hidden", "true"); return i; }
 function syncButtons() { for (const b of buttons) { if (!b.isConnected) buttons.delete(b); else b.classList.toggle("hidden", !cap); } }
 
 // 能力探测兼登录检查：401 = 没登录 → 不显示入口

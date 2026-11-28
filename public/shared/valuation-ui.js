@@ -1,4 +1,5 @@
 import { scenarioContext, mergeScenarioParams } from "./valuation/thesis-guide.js";
+import { ri, setNum } from "./dom.js";
 /**
  * valuation-ui.js — 估值编辑器（Figma「Add Valuation」结构）。
  * 左栏：分场景叙事、检验与驱动力，再选择方法并量化假设。
@@ -39,8 +40,6 @@ const TX = {
         submit: "Save valuation", dash: "—", note: "Note", notePh: "Why this valuation? Key logic, assumptions, risks…", useRange: "Use range" },
 };
 
-// Remix Icon 图标（装饰性，读屏跳过）：ri("close-line") → <i class="ri-close-line">
-function ri(name) { const i = document.createElement("i"); i.className = "ri-" + name; i.setAttribute("aria-hidden", "true"); return i; }
 function el(tag, cls, attrs) {
   const node = document.createElement(tag);
   if (cls) node.className = cls;
@@ -48,12 +47,6 @@ function el(tag, cls, attrs) {
   return node;
 }
 function fmt(v, dash) { return (v !== null && isFinite(v)) ? Number(v).toFixed(2) : dash; }
-// 大号数字：小数点及之后缩小显示（同 index.html 的 setNum）
-function setNum(node, text) {
-  const s = String(text ?? ""), i = s.search(/\.\d/);
-  node.textContent = i < 0 ? s : s.slice(0, i);
-  if (i >= 0) node.appendChild(el("span", "num-dec", { textContent: s.slice(i) }));
-}
 function fmtMoney(n) {
   const s = n < 0 ? "-" : "", a = Math.abs(n);
   if (a >= 1e12) return s + (a / 1e12).toFixed(2) + "T";

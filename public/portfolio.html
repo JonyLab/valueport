@@ -484,6 +484,8 @@
 <link rel="modulepreload" href="/shared/valuation/management-research-ui.js">
 <link rel="modulepreload" href="/shared/valuation/management-research.js">
 <link rel="modulepreload" href="/shared/search-sources.js">
+  <link rel="modulepreload" href="/shared/dom.js">
+  <link rel="modulepreload" href="/shared/storage-keys.js">
 </head>
 <body>
 <div class="page">
@@ -552,8 +554,10 @@ import { mountGlobalAi } from "/shared/global-ai.js";
 import { computeAnchors, priceToPhi, structValid, ZONES, marketLabel } from "/shared/core.js";
 import { driftText, driftTolerance, driftStatus, driftAction } from "/shared/holding.js";
 import { BUCKET_PRESETS, ALERT_METRICS, ALERT_TEMPLATE_GROUPS, ALERT_TEMPLATES, alertMetricMeta, presetBuckets, createAlertFromTemplate, convertAlertThreshold, metricQuickPresets, inferAssetDefaults, evaluateSignalAlerts, isAllocOnly, effectiveCashTarget, computeBucketSummary, computeRebalancePlan, computeScheduleStatus, computeRiskMetrics } from "/shared/rebalance.js";
-import { formatAlertCond as _fmtCond, formatAlertReading as _fmtRead, renderAlertChart as _renderChart, renderActionStrip, renderAllocationBar, wireSafeDelete } from "/shared/alert-banner.js";
-import { showToast, confirmDialog } from "/shared/ui-toast.js";
+import { formatAlertCond as _fmtCond, formatAlertReading as _fmtRead, renderAlertChart as _renderChart, renderActionStrip, renderAllocationBar } from "/shared/alert-banner.js";
+import { showToast, confirmDialog, armSafeClick as wireSafeDelete } from "/shared/ui-toast.js";
+import { el, ri, setNum, mountStockLogo as mountLogo } from "/shared/dom.js";
+import { LOCAL_KEYS, SESSION_KEYS } from "/shared/storage-keys.js";
 import { validatePfQuery, runPfQuery, dropFilter } from "/shared/pf-query.js";
 import { aiErrorText } from "/shared/ai-panel.js";
 
@@ -567,36 +571,22 @@ mountGlobalAi(document.getElementById("topActions"), { getPage: () => ({ kind: "
 
 // ---------- 小工具 ----------
 const $ = (id) => document.getElementById(id);
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const ri = (name) => { const i = document.createElement("i"); i.className = "ri-" + name; i.setAttribute("aria-hidden", "true"); return i; };
 const nf = (d) => new Intl.NumberFormat(zh ? "zh-CN" : "en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const money = (v, d = 2) => (Number.isFinite(v) ? (v < 0 ? "−" : "") + nf(d).format(Math.abs(v)) : "—");
 const pct = (v, d = 1) => (Number.isFinite(v) ? (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d) + "%" : "—");
 const signed = (v) => (Number.isFinite(v) ? (v > 0 ? "+" : v < 0 ? "−" : "") + nf(2).format(Math.abs(v)) : "—");
 // 小眼睛：隐藏金额与数量（百分比、每股价格照常显示），记在 localStorage
-let hideAmt = localStorage.getItem("pf_hide") === "1";
+let hideAmt = localStorage.getItem(LOCAL_KEYS.pfHide) === "1";
 const MASK = "••••";
 const amt = (v, d = 2) => (hideAmt ? MASK : money(v, d));
 const amtSigned = (v) => (hideAmt ? MASK : signed(v));
 const qtyText = (v) => (hideAmt ? MASK : nf(0).format(v));
-// 大号数字的小数部分缩小（与看板一致）
-function setNum(node, text) {
-  const s = String(text ?? ""), i = s.search(/\.\d/);
-  node.textContent = i < 0 ? s : s.slice(0, i);
-  if (i >= 0) node.appendChild(el("span", "num-dec", s.slice(i)));
-}
 // 券商真实 logo（/api/broker-logo 代理官网图标）；加载失败就保留原来的线条图标
 function mountBrokerLogo(node, broker) {
   if (!BROKER_LOGO.has(broker)) return;
   const img = new Image(); img.alt = "";
   img.onload = () => { node.replaceChildren(img); node.classList.add("has-img"); };
   img.src = "/api/broker-logo/" + broker;
-}
-function mountLogo(node, symbol, label) {
-  node.textContent = (label || symbol || "?").trim().slice(0, 1).toUpperCase();
-  const img = new Image(); img.alt = "";
-  img.onload = () => { node.replaceChildren(img); node.classList.add("has-img"); };
-  img.src = "/api/logo?symbol=" + encodeURIComponent(symbol);
 }
 async function api(path, opts = {}) {
   const r = await fetch(path, { ...opts, headers: { "content-type": "application/json", ...(opts.headers || {}) } });
@@ -620,18 +610,18 @@ const BROKER_META = {
 const OAUTH_BROKERS = new Set(["schwab", "etrade"]);
 const BROKER_LOGO = new Set(["longbridge", "ibkr", "tiger", "schwab", "etrade", "webull"]);
 const BASES = ["USD", "HKD", "CNY"];
-let base = localStorage.getItem("pf_base") || (zh ? "CNY" : "USD");
+let base = localStorage.getItem(LOCAL_KEYS.pfBase) || (zh ? "CNY" : "USD");
 if (!BASES.includes(base)) base = "USD";
 
 // ---------- 身份 / 配色 ----------
 // 身份信息不含持仓；等待 /api/me 确认身份后再加载资产。
 const meP = api("/api/me");
-let me = { ok: true, data: { username: sessionStorage.getItem("pf_user") || "", board: { slug: sessionStorage.getItem("owner_slug") || "" } } };
+let me = { ok: true, data: { username: sessionStorage.getItem(SESSION_KEYS.pfUser) || "", board: { slug: sessionStorage.getItem(SESSION_KEYS.ownerSlug) || "" } } };
 let slug = "";
 function applyIdentity() {
   slug = (me.data.board && me.data.board.slug) || "";
-  if (slug) { sessionStorage.setItem("owner_slug", slug); if (window.__mountSettingsBtn) window.__mountSettingsBtn(slug); } // 切到「自选」时导航可以立即显示；顺手补上设置按钮
-  if (me.data.username) sessionStorage.setItem("pf_user", me.data.username);
+  if (slug) { sessionStorage.setItem(SESSION_KEYS.ownerSlug, slug); if (window.__mountSettingsBtn) window.__mountSettingsBtn(slug); } // 切到「自选」时导航可以立即显示；顺手补上设置按钮
+  if (me.data.username) sessionStorage.setItem(SESSION_KEYS.pfUser, me.data.username);
   $("tabBoard").href = "/b/" + encodeURIComponent(slug);
   $("greet").textContent = me.data.username ? T(`${me.data.username} 的全部账户`, `All accounts of ${me.data.username}`) : "";
 }
@@ -734,7 +724,7 @@ function summarize(d) {
 let data = null, history = [], macroData = null, macroTried = false;
 // Remove legacy plaintext financial caches. Portfolio data now lives only in page memory.
 try {
-  for (const key of Object.keys(sessionStorage)) if (key.startsWith("pf_cache_")) sessionStorage.removeItem(key);
+  for (const key of Object.keys(sessionStorage)) if (key.startsWith(SESSION_KEYS.pfCachePrefix)) sessionStorage.removeItem(key);
 } catch {}
 async function loadMacroOnce() {
   if (macroTried) return;
@@ -825,7 +815,7 @@ function totalCard(s) {
   eye.setAttribute("aria-label", hideAmt ? T("显示金额", "Show amounts") : T("隐藏金额", "Hide amounts"));
   eye.title = eye.getAttribute("aria-label");
   eye.appendChild(ri(hideAmt ? "eye-off-line" : "eye-line"));
-  eye.addEventListener("click", () => { hideAmt = !hideAmt; localStorage.setItem("pf_hide", hideAmt ? "1" : "0"); render(); });
+  eye.addEventListener("click", () => { hideAmt = !hideAmt; localStorage.setItem(LOCAL_KEYS.pfHide, hideAmt ? "1" : "0"); render(); });
   lab.appendChild(eye);
   // 行情 / 汇率来源：低频信息，收进一个小图标（悬停看）
   const info = el("span", "pf-info"); info.appendChild(ri("information-line"));
@@ -843,7 +833,7 @@ function totalCard(s) {
   const curMenu = el("div", "pf-cur-menu"); curMenu.setAttribute("role", "menu"); curMenu.hidden = true;
   for (const b of BASES) {
     const o = el("button", b === base ? "on" : "", b); o.type = "button"; o.setAttribute("role", "menuitemradio"); o.setAttribute("aria-checked", b === base ? "true" : "false");
-    o.addEventListener("click", () => { curMenu.hidden = true; if (b === base) return; base = b; localStorage.setItem("pf_base", b); load(); });
+    o.addEventListener("click", () => { curMenu.hidden = true; if (b === base) return; base = b; localStorage.setItem(LOCAL_KEYS.pfBase, b); load(); });
     curMenu.appendChild(o);
   }
   const setOpen = (open) => { curMenu.hidden = !open; curBtn.setAttribute("aria-expanded", open ? "true" : "false"); };
