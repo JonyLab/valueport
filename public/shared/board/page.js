@@ -15,12 +15,12 @@ import { persistValuation, usableValuationRange } from "/shared/valuation/save.j
 import { MODELS, modeFields } from "/shared/valuation/index.js";
 import { verifiedFacts, latestMetrics, marketViews, masterLenses, businessFacts, isFinancialCompany } from "/shared/valuation/facts.js";
 import { aiErrorText } from "/shared/ai-common.js";
-import { METRICS, metricKey, metricSeries, sparkGeom } from "/shared/metric-spark.js";
+import { METRICS, metricSeries } from "/shared/metric-spark.js";
 import { holdingFor, driftText } from "/shared/holding.js";
-import { showToast, confirmDialog, armSafeClick } from "/shared/ui-toast.js";
+import { showToast, confirmDialog } from "/shared/ui-toast.js";
 import { ri, setNum, mountStockLogo } from "/shared/dom.js";
 import { LOCAL_KEYS, SESSION_KEYS, boardCacheKey, pfCacheKey } from "/shared/storage-keys.js";
-import { fmtBig, fmtPx, niceStep, fdEl, fdSeries, fdMoney, fdLast, fdDerive, fdBarLine, fdBars, fdLineChart, fdSpark, fdRange, fdChartWrap, aiSparkEl as _aiSparkEl, finFmt, financialsTable } from "/shared/board/charts.js";
+import { fmtBig, fmtPx, niceStep, fdSeries, fdMoney, fdLast, fdDerive, fdBarLine, fdBars, fdLineChart, fdSpark, fdRange, fdChartWrap, aiSparkEl as _aiSparkEl, financialsTable } from "/shared/board/charts.js";
 import { mountAiSettings } from "/shared/board/ai-settings.js";
 
 applyI18n(); // 静态文案先按当前语言渲染

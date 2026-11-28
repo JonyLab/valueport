@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { aiErrorText } from "../public/shared/ai-panel.js";
+import { aiErrorText } from "../public/shared/ai-common.js";
 
 describe("aiErrorText", () => {
   it("never shows bare status codes or internal error tokens to users", () => {

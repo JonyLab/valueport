@@ -1,4 +1,4 @@
-import { ZONES, N, SEG, PHI_MAX, computeAnchors, priceToPhi } from "./core.js";
+import { ZONES, N, SEG, computeAnchors, priceToPhi } from "./core.js";
 import { LANG } from "./i18n.js";
 
 // 区间名（随界面语言；与卡片五段条、详情文案一致）

@@ -1,11 +1,9 @@
 import { normalizeResearch } from "./search-sources.js";
-export { normalizeResearch } from "./search-sources.js";
 import { cleanManagementResearch } from "./valuation/management-research.js";
 import { managementResearchElement } from "./valuation/management-research-ui.js";
 import { armSafeClick } from "./ui-toast.js";
 import { el, ri } from "./dom.js";
 import { aiErrorText, activeAiModel, renderAiModelMenu } from "./ai-common.js";
-export { aiErrorText };
 
 /**
  * ai-panel.js — 估值工作台的 AI 助手抽屉（右侧滑出）。

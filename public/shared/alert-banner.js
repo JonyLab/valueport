@@ -3,7 +3,6 @@
 // 2. renderActionStrip      — 克制、可展开/收回的首屏待办行动条（不抢首屏重心，按下去有回应，再按能收回）
 // 3. renderAllocationBar    — 100% 彩色堆叠分布条（用于配置弹窗实时反馈 & 再平衡 Before→After 对比）
 // 4. openQuickAlertModal    — Chart-First 就地设提醒浮层（在 /macro 点铃铛当场拉滑块保存，不打断浏览）
-// 5. wireSafeDelete         — 二次点击确认防误碰按钮（第一次点变「再点确认」，3 秒自动复位，零原生 confirm）
 
 import { alertMetricMeta, extractAlertSeries, evaluateSignalAlerts, metricQuickPresets } from "./rebalance.js";
 import { el, ri } from "./dom.js";
@@ -100,9 +99,6 @@ export function ensureAlertBannerStyles() {
 `;
   document.head.appendChild(st);
 }
-
-// 二次点击防误碰删除统一复用 ui-toast.js 的 armSafeClick
-export { armSafeClick as wireSafeDelete };
 
 export function formatAlertCond(a, lang = "zh") {
   const zh = lang !== "en", T = (x, y) => (zh ? x : y);
